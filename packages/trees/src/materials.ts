@@ -112,6 +112,15 @@ function weathered(albedo: any, roughness: number, w: Weather) {
   }
 }
 
+/**
+ * TSL: `color` times the scatter's per-instance brightness tint (`colorVariation`; 1 on a lone mesh). Applied to the
+ * base colour, before burn and weather, so char and snow stay untinted (three.js would multiply `instanceColor` in
+ * after `colorNode`).
+ */
+function tinted(color: any): any {
+  return color.mul(scatterParamsNode().y)
+}
+
 /** TSL: three independent per-instance randoms (stable per scattered instance; constant on a lone mesh). */
 function instanceRandoms() {
   const r = scatterParamsNode().z
@@ -196,7 +205,7 @@ export function createBarkMaterial(params: Partial<TreeParams> = {}, options: Ma
     detail = detail.mul(float(1).sub(marks.mul(p.barkMarks * 0.75)))
   }
   // Green plants vary like foliage; wood only a little.
-  let color: any = varied(vertexColor().rgb.mul(detail), p, GREEN.includes(p.kind) ? 1 : 0.3)
+  let color: any = tinted(varied(vertexColor().rgb.mul(detail), p, GREEN.includes(p.kind) ? 1 : 0.3))
   color = mix(color, vec3(0.025, 0.022, 0.02), smoothstep(furrows.sub(0.3), furrows.add(0.1), w.burn.mul(1.4)))
   const look = weathered(color, 0.92, w)
   m.colorNode = look.color
@@ -250,10 +259,10 @@ export function createLeafMaterial(params: Partial<TreeParams> = {}, options: Le
   m.name = 'leaves'
   m.alphaTest = 0.5
   const sample = texture(getLeafTexture(p.leafShape === 'none' ? 'broad' : p.leafShape), uv())
-  let albedo: any = varied(vertexColor().rgb.mul(sample.rgb), p)
-  albedo = mix(albedo, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn))
-  albedo = mix(albedo, vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
-  const look = weathered(albedo, 0.7, w)
+  const scorched = (c: any) => mix(mix(c, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn)), vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
+  const base = varied(vertexColor().rgb.mul(sample.rgb), p)
+  const albedo = scorched(base) // untinted: the back-lit glow below never had the instance tint
+  const look = weathered(scorched(tinted(base)), 0.7, w)
   m.colorNode = vec4(look.color, sample.a)
   m.roughnessNode = look.roughness
   m.normalNode = normalViewGeometry
@@ -274,7 +283,7 @@ export function createFruitMaterial(params: Partial<TreeParams> = {}, options: M
   const w = weatherOf(options)
   const m = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.45, metalness: 0 })
   m.name = 'fruit'
-  const look = weathered(mix(varied(vertexColor().rgb, p), vec3(0.03, 0.025, 0.02), w.burn), 0.45, w)
+  const look = weathered(mix(tinted(varied(vertexColor().rgb, p)), vec3(0.03, 0.025, 0.02), w.burn), 0.45, w)
   m.colorNode = look.color
   m.roughnessNode = look.roughness
   m.positionNode = dropped(positionLocal.add(windOffset(p.height, 0.01)), w.damage.add(w.burn.mul(0.5)))
@@ -290,7 +299,7 @@ export function createRockMaterial(options: MaterialOptions = {}): MeshStandardN
   const m = new MeshStandardNodeMaterial({ roughness: 0.95, metalness: 0 })
   m.name = 'rock'
   const grain = mx_fractal_noise_float(positionGeometry.mul(3.5), 4, 2, 0.5).mul(0.5).add(0.5)
-  const color = vertexColor().rgb.mul(mix(float(0.8), float(1.12), grain)).mul(float(1).sub(w.burn.mul(0.75)))
+  const color = tinted(vertexColor().rgb.mul(mix(float(0.8), float(1.12), grain))).mul(float(1).sub(w.burn.mul(0.75)))
   const look = weathered(color, 0.95, w)
   m.colorNode = look.color
   m.roughnessNode = look.roughness

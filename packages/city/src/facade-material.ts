@@ -264,10 +264,11 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
  * Roof and detail material: tiles, slates, shingles, standing-seam metal, thatch and concrete
  * patterns for roof surfaces (by `facade.w`), fixed colours for rooftop plant, glazing, chimneys,
  * metal, wood and railings (by `facade.x`, see `ROOF_PARTS`), with weather (snow settles here).
- * Pass `weather: null` for instanced details (global roof weather only; per-instance colour via the
- * BatchedMesh instance colour).
+ * Pass `weather: null` for instanced details (global roof weather only). `shade` (float node) scales
+ * the colour before weather, e.g. a per-instance shade: unlike a BatchedMesh instance colour, which
+ * three.js multiplies in after `colorNode`, it leaves snow and ash untinted.
  */
-export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | null): MeshStandardNodeMaterial {
+export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | null, shade: N = float(1)): MeshStandardNodeMaterial {
   const f = attribute('facade', 'vec4') as N
   const tint = attribute('tint', 'vec3') as N
   const ruv = uv() as N
@@ -304,7 +305,7 @@ export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | n
   const metalness = isRoof.mul(roofMetal).add(eq(part, 2).mul(0.6)).add(eq(part, 4).mul(0.6)).add(eq(part, 6).mul(0.5))
   const glow = u.windowLight.mul(u.lightIntensity).mul(u.night).mul(eq(part, 2)).mul(0.5)
   const w = weather ? buildingWeather(u.roofWeather, weather) : u.roofWeather
-  const ws = weatherSurface({ color, roughness, metalness, emissive: glow }, w, p, (normalLocal as N).y)
+  const ws = weatherSurface({ color: color.mul(shade), roughness, metalness, emissive: glow }, w, p, (normalLocal as N).y)
 
   const m = new MeshStandardNodeMaterial()
   m.colorNode = vec4(ws.color, 1)

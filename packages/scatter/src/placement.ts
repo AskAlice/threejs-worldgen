@@ -53,7 +53,11 @@ export interface PlacementRules {
   tilt: number
   /** How far each instance is pushed into the ground, in metres (hides the base on slopes). */
   sink: number
-  /** Per-instance brightness variation, 0..1 (sent as instance colour). */
+  /**
+   * Per-instance brightness variation, 0..1, sent as `scatterParams.y`: multiply it into your material's `colorNode`
+   * (`scatterParamsNode().y`) before any weather, so snow and ash stay untinted. Not sent as `instanceColor`, which
+   * three.js multiplies in after `colorNode`.
+   */
   colorVariation: number
 }
 

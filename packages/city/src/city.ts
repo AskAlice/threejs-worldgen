@@ -2,6 +2,7 @@ import {
   BatchedMesh, BufferGeometry, Color, Float32BufferAttribute, Group, Matrix4, Mesh, Quaternion, Uint16BufferAttribute, Uint32BufferAttribute, Vector3,
   type Camera, type Material, type Object3D,
 } from 'three/webgpu'
+import { batchIndirectIndex, hash } from 'three/tsl'
 import { hash01, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
 import type { Climate } from './architecture.ts'
 import { buildingGeometry, detailGeometry, detailInstances, DETAIL_SHAPES } from './building-mesh.ts'
@@ -65,7 +66,6 @@ const _p = new Vector3()
 const _q = new Quaternion()
 const _s = new Vector3()
 const _y = new Vector3(0, 1, 0)
-const _c = new Color()
 
 interface Batch { mesh: BatchedMesh; full: number[]; simple: number[]; instance: number[] }
 
@@ -370,7 +370,9 @@ export class City {
     const facade = createFacadeMaterial(this.uniforms, this.weather)
     const roof = createRoofMaterial(this.uniforms, this.weather)
     const road = createRoadMaterial(this.uniforms)
-    const detail = createRoofMaterial(this.uniforms, null)
+    // Per-detail shade (0.85…1.1) from the batch instance id, folded in before weather: a BatchedMesh
+    // instance colour (setColorAt) would be multiplied in after colorNode and tint the snow.
+    const detail = createRoofMaterial(this.uniforms, null, hash(batchIndirectIndex).mul(0.25).add(0.85))
     this.materials = [facade, roof, road, detail]
     this.walls = batch(meshes.map((m) => [m.walls, m.simpleWalls]), facade)
     this.roofs = batch(meshes.map((m) => [m.roofs, m.simpleRoofs]), roof)
@@ -386,12 +388,10 @@ export class City {
       const mesh = new BatchedMesh(total, verts, idx, detail)
       const ids = units.map((g) => mesh.addGeometry(g))
       units.forEach((g) => g.dispose())
-      this.detailIds = perBuilding.map((list, bi) => list.map((d, k) => {
+      this.detailIds = perBuilding.map((list) => list.map((d) => {
         const inst = mesh.addInstance(ids[d.shape])
         _q.setFromAxisAngle(_y, -d.angle)
         mesh.setMatrixAt(inst, _m.compose(_p.set(d.x, d.y, d.z), _q, _s.set(d.width, d.height, d.depth)))
-        const g = 0.85 + hash01(bi, k, 5, 9) * 0.25
-        mesh.setColorAt(inst, _c.setRGB(g, g, g))
         return inst
       }))
       mesh.computeBoundingSphere()

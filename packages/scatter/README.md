@@ -19,12 +19,15 @@ npm i @react-three/fiber react
 
 ```ts
 import * as THREE from 'three/webgpu'
-import { Scatter, bakeImpostor } from 'threejs-scatter'
+import { materialColor } from 'three/tsl'
+import { Scatter, bakeImpostor, scatterParamsNode } from 'threejs-scatter'
 
 const renderer = new THREE.WebGPURenderer({ antialias: true })
 await renderer.init()
 
-const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshStandardNodeMaterial({ color: '#777' }))
+const rockMaterial = new THREE.MeshStandardNodeMaterial({ color: '#777' })
+rockMaterial.colorNode = materialColor.mul(scatterParamsNode().y) // colorVariation tint (1 off-scatter)
+const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), rockMaterial)
 const impostor = await bakeImpostor(renderer, rock, { frames: 8, size: 512 })
 
 const scatter = Scatter.create({
@@ -91,7 +94,7 @@ Layer fields (all but `name` have defaults):
 | `randomYaw` | `true` | Random turn about the up axis. |
 | `tilt` | `0` | Max random lean, radians. |
 | `sink` | `0` | Metres pushed into the ground. |
-| `colorVariation` | `0` | Per-instance brightness (instance colour). |
+| `colorVariation` | `0` | Per-instance brightness in `scatterParams.y`; multiply `scatterParamsNode().y` into your `colorNode` (before any weather, so snow stays white). |
 | `lods` | `[]` | `{ distance, geometry, material, castShadow? }[]`, nearest first; `material` may be an array for geometry groups. |
 | `impostor` | `null` | Far level drawn after the meshes (from `bakeImpostor`). |
 | `castShadow` / `receiveShadow` | `true` | |

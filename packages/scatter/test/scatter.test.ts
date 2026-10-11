@@ -162,6 +162,11 @@ test('Scatter streams tiles around the camera, pools by LOD and answers queries'
   assert.equal(meshes.length, 2, 'one pooled mesh per LOD')
   const params = meshes[0].geometry.getAttribute('scatterParams').array
   assert.ok(params[2] > 0 && params[2] < 1, 'per-instance random reaches the GPU')
+  // The colorVariation tint rides in scatterParams.y for materials to fold in before weather, never as instanceColor:
+  // three.js multiplies instanceColor in after colorNode, which would tint snow and ash (ASK-248).
+  const tints = Array.from({ length: meshes[0].count }, (_, n) => params[n * 4 + 1])
+  assert.ok(tints.every((t) => t >= 0.8 && t <= 1.2) && new Set(tints).size > 1, 'per-instance tint reaches the GPU')
+  for (const mesh of meshes) assert.equal(mesh.instanceColor, null, 'no instanceColor')
   assert.equal(meshes[0].geometry.getAttribute('position'), geometry.getAttribute('position'), 'pools share the level geometry buffers')
   assert.ok(meshes[0].count > 0 && meshes[1].count > meshes[0].count)
 
@@ -200,7 +205,7 @@ test('multi-material levels pool as single-material meshes sharing instance buff
     assert.equal(mesh.geometry.groups.length, 0)
     assert.deepEqual([mesh.geometry.drawRange.start, mesh.geometry.drawRange.count], [geometry.groups[k].start, geometry.groups[k].count])
     assert.equal(mesh.instanceMatrix, meshes[0].instanceMatrix, 'matrices shared')
-    assert.equal(mesh.instanceColor, meshes[0].instanceColor, 'colours shared')
+    assert.equal(mesh.instanceColor, null, 'tint in the shared scatterParams, not instanceColor')
     assert.equal(mesh.geometry.getAttribute('scatterParams'), meshes[0].geometry.getAttribute('scatterParams'), 'params shared')
     assert.ok(mesh.count > 0 && mesh.count === meshes[0].count)
   }

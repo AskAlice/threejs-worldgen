@@ -437,7 +437,7 @@ export class Scatter {
         if (!pool) return null
         visible += n
         if (n) meshes += pool.meshes.length
-        return writer(pool, layer.colorVariation > 0)
+        return writer(pool)
       }),
     )
     for (const tile of this.tiles.values()) {
@@ -492,7 +492,6 @@ export class Scatter {
         ? lod.geometry.groups.map((g) => ({ material: (lod.material as Material[])[g.materialIndex ?? 0], start: g.start, count: g.count }))
         : [{ material: lod.material, start: 0, count: Infinity }]
       const matrices = new InstancedBufferAttribute(new Float32Array(capacity * 16), 16)
-      const colors = layer.colorVariation > 0 ? new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3) : null
       for (const part of parts) {
         if (!part.material) continue
         // A per-part wrapper sharing the level's buffers, plus the pool's shared per-instance attributes.
@@ -501,7 +500,6 @@ export class Scatter {
         geometry.setAttribute('scatterParams', params)
         const mesh = new InstancedMesh(geometry, part.material, 0)
         mesh.instanceMatrix = matrices
-        mesh.instanceColor = colors
         meshes.push(mesh)
       }
     }
@@ -542,7 +540,7 @@ function shareGeometry<T extends BufferGeometry>(source: BufferGeometry, target:
 type PoolWriter = (data: Float32Array, offset: number) => void
 
 /** Appends instances to a pool from the start; {@link finishPool} then uploads them. */
-function writer(pool: Pool, tinted: boolean): PoolWriter {
+function writer(pool: Pool): PoolWriter {
   let n = 0
   if (pool.impostor) {
     const g = pool.meshes[0].geometry as InstancedBufferGeometry
@@ -563,14 +561,12 @@ function writer(pool: Pool, tinted: boolean): PoolWriter {
   if (!mesh) return () => {}
   const m = mesh.instanceMatrix.array as Float32Array
   const par = mesh.geometry.getAttribute('scatterParams').array as Float32Array
-  const c = tinted ? (mesh.instanceColor?.array as Float32Array | undefined) : undefined
   return (data, o) => {
     const w = n * 16
     for (let k = 0; k < 16; k++) m[w + k] = data[o + k]
     par[n * 4] = data[o + 16]
     par[n * 4 + 1] = data[o + 18]
     par[n * 4 + 2] = data[o + 19]
-    if (c) c[n * 3] = c[n * 3 + 1] = c[n * 3 + 2] = data[o + 18]
     n++
   }
 }
@@ -590,7 +586,6 @@ function finishPool(pool: Pool, count: number) {
     upload(first.geometry.getAttribute('scatterPosition') as InstancedBufferAttribute)
   } else {
     upload((first as InstancedMesh).instanceMatrix)
-    upload((first as InstancedMesh).instanceColor)
   }
   for (const mesh of pool.meshes) {
     if (pool.impostor) (mesh.geometry as InstancedBufferGeometry).instanceCount = count
@@ -626,7 +621,7 @@ function idOf(o: object): number {
 
 function renderKey(l: ScatterLayer): string {
   const lod = (d: ScatterLOD) => [d.distance, idOf(d.geometry), (Array.isArray(d.material) ? d.material : [d.material]).map(idOf), d.castShadow]
-  return JSON.stringify([l.lods.map(lod), l.impostor && lod(l.impostor), l.castShadow, l.receiveShadow, l.colorVariation > 0])
+  return JSON.stringify([l.lods.map(lod), l.impostor && lod(l.impostor), l.castShadow, l.receiveShadow])
 }
 
 /**
