@@ -1,6 +1,17 @@
 /**
- * threejs-vehicles (work in progress).
+ * Procedural, animated vehicles for three.js (WebGPU, TSL): cars (sedan, hatchback, SUV, pickup, van,
+ * bus), bicycles, trains, fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers,
+ * airliners and light aircraft, fighter jets and multi-stage rockets. Seeded low-poly generators,
+ * instanced fleets that follow road networks, rails, shipping lanes and flight paths, wheels, fans and
+ * propellers that turn, boats that bob and leave wakes, planes that bank, rockets that drop stages, and
+ * wet, snowy, burning and damaged states through threejs-weathering.
  *
  * @module threejs-vehicles
  */
-export {}
+export * from './mesh.ts'
+export * from './models.ts'
+export * from './paths.ts'
+export * from './sim.ts'
+export * from './material.ts'
+export * from './fleet.ts'
+export * from './placement.ts'
