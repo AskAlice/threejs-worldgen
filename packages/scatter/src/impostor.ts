@@ -1,6 +1,6 @@
 import {
   Box3, Color, LinearFilter, Mesh, MeshStandardNodeMaterial, NodeMaterial, OrthographicCamera, PlaneGeometry, RenderTarget, Scene, Sphere,
-  SRGBColorSpace, Vector3, type BufferGeometry, type Material, type Object3D, type Renderer, type Texture,
+  SRGBColorSpace, Vector3, type BufferGeometry, type Material, type Node, type Object3D, type Renderer, type Texture,
 } from 'three/webgpu'
 import {
   abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, diffuseColor, dot, float, max, normalize, normalWorld, positionGeometry,
@@ -31,8 +31,13 @@ export interface ImpostorOptions {
 export interface Impostor {
   /** Colour atlas (alpha = coverage). */
   texture: Texture
-  /** Normal atlas (object-space normals packed to 0..1), used to light the impostor like the mesh. */
+  /** Normal atlas (object-space normals packed to 0..1, alpha = the bake's `mask`), used to light the impostor like the mesh. */
   normalTexture: Texture
+  /**
+   * TSL nodes of the impostor's surface, for re-shading `material` (e.g. weather, the way the mesh materials apply
+   * it): set `material.colorNode` / `roughnessNode` from them. The default is `colorNode = vec4(color, alpha)`.
+   */
+  surface: ImpostorSurface
   /** Camera-facing, lit, alpha-tested material. Reads the `scatterPosition` / `scatterParams` instance attributes. Disposing it also frees both atlases. */
   material: MeshStandardNodeMaterial
   /** A unit quad (x, y in -1..1); the material places and turns it. */
@@ -43,6 +48,18 @@ export interface Impostor {
   options: ImpostorOptions
   /** Frees the atlases, material and quad. */
   dispose(): void
+}
+
+/** See {@link Impostor.surface}. */
+export interface ImpostorSurface {
+  /** Baked base colour × the instance's brightness tint (`scatterParams.y`). */
+  color: Node<'vec3'>
+  /** Baked coverage (alpha-tested against `options.alphaTest`). */
+  alpha: Node<'float'>
+  /** World-space normal of the view shown (what the mesh's `normalWorld` was at that pixel). */
+  normal: Node<'vec3'>
+  /** The bake's `mask` value at this pixel (0..1, 8 bits; 1 where no mask was given). */
+  mask: Node<'float'>
 }
 
 /** Defaults of {@link ImpostorOptions}. */
@@ -59,8 +76,12 @@ export const DEFAULT_IMPOSTOR: ImpostorOptions = { mode: 'octahedral', frames: 8
  * The object is baked in its own local space (its position, rotation and scale are ignored).
  *
  * @param renderer An initialised `WebGPURenderer` (`three/webgpu`).
+ * @param mask Optional 0..1 float (node) per source material, baked with the normals and read back as
+ *   `surface.mask`, e.g. which pixels are foliage, so a re-shaded impostor can treat them differently.
  */
-export async function bakeImpostor(renderer: Renderer, object: Object3D, options: Partial<ImpostorOptions> = {}): Promise<Impostor> {
+export async function bakeImpostor(
+  renderer: Renderer, object: Object3D, options: Partial<ImpostorOptions> = {}, mask?: (source: Material) => Node<'float'> | number,
+): Promise<Impostor> {
   const o: ImpostorOptions = { ...DEFAULT_IMPOSTOR, ...options }
   const billboard = o.mode === 'billboard'
   const frames = billboard ? 1 : Math.max(2, Math.round(o.frames))
@@ -101,7 +122,7 @@ export async function bakeImpostor(renderer: Renderer, object: Object3D, options
   const convertFor = (pass: 'albedo' | 'normal') => (m: Material) => {
     const key = `${pass}:${m.uuid}`
     let b = baked.get(key)
-    if (!b) baked.set(key, (b = bakeMaterial(m, pass)))
+    if (!b) baked.set(key, (b = bakeMaterial(m, pass, mask?.(m) ?? 1)))
     return b
   }
   const passes: [RenderTarget, (m: Material) => Material][] = [
@@ -151,7 +172,7 @@ export async function bakeImpostor(renderer: Renderer, object: Object3D, options
   const geometry = new PlaneGeometry(2, 2)
   // Explicit bounds: the material moves and scales the quad per instance.
   geometry.boundingSphere = new Sphere(new Vector3(), Math.SQRT2)
-  const material = createImpostorMaterial(albedoTarget.texture, normalTarget.texture, { ...o, frames }, bounds)
+  const { material, surface } = createImpostorMaterial(albedoTarget.texture, normalTarget.texture, { ...o, frames }, bounds)
   // The atlases are only reachable through shader nodes, so the material owns them: disposing it frees them too
   // (this is what `disposeLayers` relies on).
   const disposeMaterial = material.dispose.bind(material)
@@ -163,6 +184,7 @@ export async function bakeImpostor(renderer: Renderer, object: Object3D, options
   return {
     texture: albedoTarget.texture,
     normalTexture: normalTarget.texture,
+    surface,
     material,
     geometry,
     bounds,
@@ -174,20 +196,23 @@ export async function bakeImpostor(renderer: Renderer, object: Object3D, options
   }
 }
 
-/** A copy of `source` that outputs its base colour (or its world normal) unlit, keeping its alpha test and displacement. */
-function bakeMaterial(source: Material, pass: 'albedo' | 'normal'): Material {
+/**
+ * A copy of `source` that outputs its base colour (or its world normal, with `mask` in alpha) unlit, keeping its alpha
+ * test and displacement.
+ */
+function bakeMaterial(source: Material, pass: 'albedo' | 'normal', mask: Node<'float'> | number): Material {
   if (!(source as NodeMaterial).isNodeMaterial) {
     // Classic materials: approximate with a node material carrying the common colour/alpha properties.
     const s = source as any
     const m = new MeshStandardNodeMaterial()
     for (const k of ['color', 'map', 'alphaMap', 'alphaTest', 'vertexColors', 'side', 'opacity']) if (s[k] !== undefined) (m as any)[k] = s[k]
-    return bakeMaterial(m, pass)
+    return bakeMaterial(m, pass, mask)
   }
   const m = (source as NodeMaterial).clone()
   m.transparent = false
   m.depthWrite = true
   if (m.alphaTest <= 0 && (source as NodeMaterial).transparent) m.alphaTest = 0.5
-  m.outputNode = pass === 'albedo' ? vec4(diffuseColor.rgb, 1) : vec4(normalize(normalWorld).mul(0.5).add(0.5), 1)
+  m.outputNode = pass === 'albedo' ? vec4(diffuseColor.rgb, 1) : vec4(normalize(normalWorld).mul(0.5).add(0.5), mask)
   return m
 }
 
@@ -231,7 +256,7 @@ function basisNode(d: any) {
  * The impostor material. Per instance it reads `scatterPosition` (xyz = world base position, w = uniform scale) and
  * `scatterParams` (x = yaw in radians, y = brightness tint), which `Scatter` fills for impostor LODs.
  */
-function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOptions, bounds: Sphere): MeshStandardNodeMaterial {
+function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOptions, bounds: Sphere) {
   const billboard = o.mode === 'billboard'
   const N = o.frames
   const aPos = attribute('scatterPosition', 'vec4')
@@ -274,9 +299,11 @@ function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOp
   const inset = 0.5 / Math.max(1, o.size / N)
   const atlasUv = vCell.add(clamp(uv() as any, inset, 1 - inset)).div(N)
   const sample = texture(albedo, atlasUv)
-  material.colorNode = vec4(sample.rgb.mul(vTint), sample.a)
-  const n: any = texture(normals, atlasUv).xyz.mul(2).sub(1)
-  const shown: any = vRight.mul(dot(n, vFrameRight)).add(vUp.mul(dot(n, vFrameUp))).add(vDir.mul(dot(n, vFrameDir)))
-  material.normalNode = cameraViewMatrix.mul(vec4(shown.normalize(), 0)).xyz.normalize()
-  return material
+  const normalSample = texture(normals, atlasUv)
+  const n: any = normalSample.xyz.mul(2).sub(1)
+  const shown: any = vRight.mul(dot(n, vFrameRight)).add(vUp.mul(dot(n, vFrameUp))).add(vDir.mul(dot(n, vFrameDir))).normalize()
+  const surface: ImpostorSurface = { color: sample.rgb.mul(vTint), alpha: sample.a, normal: shown, mask: normalSample.a }
+  material.colorNode = vec4(surface.color, surface.alpha)
+  material.normalNode = cameraViewMatrix.mul(vec4(shown, 0)).xyz.normalize()
+  return { material, surface }
 }

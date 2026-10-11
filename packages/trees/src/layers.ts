@@ -1,6 +1,9 @@
 import { BufferAttribute, BufferGeometry, Float32BufferAttribute, Group, Mesh, type Material, type Renderer } from 'three/webgpu'
 import { bakeImpostor, hash, hashString, type ImpostorOptions, type PlacementRules, type ScatterLayer, type ScatterLOD } from 'threejs-scatter'
-import { createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, treeUniforms, type WeatherInputs } from './materials.ts'
+import { float } from 'three/tsl'
+import {
+  applyImpostorWeather, createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, impostorFoliageMask, treeUniforms, type WeatherInputs,
+} from './materials.ts'
 import { generateRock, rocks, type RockParams } from './rock.ts'
 import { DEFAULT_TREE_PARAMS, species as speciesPresets, type TreeParams } from './species.ts'
 import { generateTreeLevels, type TreeGeometry } from './tree.ts'
@@ -82,7 +85,14 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
     const size = isRock ? rock.size : tree.height
     const k = Math.min(3, Math.max(0.12, size / 15))
     const mo = { weather: options.weather }
-    const material: Material | Material[] = isRock ? createRockMaterial(mo) : [createBarkMaterial(tree, mo), createLeafMaterial(tree, mo), createFruitMaterial(tree, mo)]
+    const materialsFor = (o: typeof mo): Material | Material[] =>
+      isRock ? createRockMaterial(o) : [createBarkMaterial(tree, o), createLeafMaterial(tree, o), createFruitMaterial(tree, o)]
+    const material = materialsFor(mo)
+    // Impostors are baked from clear-weather copies; the live weather is applied on top (applyImpostorWeather), as on
+    // the meshes, so it is not baked in twice or frozen at bake time.
+    const clear = { weather: { wetness: float(0), snow: float(0), burn: float(0), damage: float(0) } }
+    const bakeMaterials = options.renderer ? materialsFor(clear) : null
+    const foliage = new Set(Array.isArray(bakeMaterials) ? bakeMaterials.slice(1) : [])
     const share = sp.density / variants
     const userDensity = options.density
     const density = userDensity ? (x: number, z: number) => share * userDensity(sp.name, x, z) : share
@@ -100,15 +110,16 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
         simple = mergeTreeGeometry(b)
       }
       let impostor: ScatterLOD | null = null
-      if (options.renderer) {
+      if (options.renderer && bakeMaterials) {
         const group = new Group()
-        const mats = Array.isArray(material) ? material : [material]
+        const mats = Array.isArray(bakeMaterials) ? bakeMaterials : [bakeMaterials]
         const mesh = new Mesh(full, mats.length > 1 ? mats : mats[0])
         group.add(mesh)
         const wind = treeUniforms.windStrength.value
         treeUniforms.windStrength.value = 0
         try {
-          const baked = await bakeImpostor(options.renderer, group, { size: 512, ...options.impostor })
+          const baked = await bakeImpostor(options.renderer, group, { size: 512, ...options.impostor }, (m) => impostorFoliageMask(foliage.has(m)))
+          applyImpostorWeather(baked.material, baked.surface, { ...mo, rock: isRock })
           impostor = { distance: farD * k, geometry: baked.geometry, material: baked.material, castShadow: false }
         } finally {
           treeUniforms.windStrength.value = wind
@@ -139,6 +150,8 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
         receiveShadow: true,
       })
     }
+    // Only ever cloned by the bake (never rendered themselves).
+    for (const m of [bakeMaterials ?? []].flat()) m.dispose()
   }
   return layers
 }

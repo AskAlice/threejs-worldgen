@@ -13,7 +13,9 @@ export { crownExtent, crownProfile, growSkeleton, sampleCrown } from './space-co
 export type { TreeSkeleton } from './space-colonization.ts'
 export { DEFAULT_ROCK_PARAMS, generateRock, icosphere, rocks } from './rock.ts'
 export type { RockName, RockParams } from './rock.ts'
-export { createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, getLeafTexture, setTreeEnvironment, treeUniforms } from './materials.ts'
+export {
+  applyImpostorWeather, createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, getLeafTexture, impostorFoliageMask, setTreeEnvironment, treeUniforms,
+} from './materials.ts'
 export type { LeafMaterialOptions, MaterialOptions, TreeEnvironment, WeatherInputs } from './materials.ts'
 export { drawLeafImage } from './leaf-texture.ts'
 export type { LeafImage } from './leaf-texture.ts'

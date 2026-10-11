@@ -7,7 +7,7 @@ import {
   normalViewGeometry, normalWorld, positionGeometry, positionLocal, positionView, positionWorld, pow, saturation, select, sign, sin, smoothstep, step,
   texture, time, uniform, uv, vec2, vec3, vec4, vertexColor,
 } from 'three/tsl'
-import { scatterParamsNode } from 'threejs-scatter'
+import { scatterParamsNode, type ImpostorSurface } from 'threejs-scatter'
 import { drawLeafImage } from './leaf-texture.ts'
 import { DEFAULT_TREE_PARAMS, type LeafShape, type TreeParams } from './species.ts'
 
@@ -101,10 +101,10 @@ function weatherOf(o: MaterialOptions): Weather {
   return { wetness: w.wetness ?? u.wetness, snow: w.snow ?? u.snow, burn: w.burn ?? u.burn, damage: w.damage ?? u.damage }
 }
 
-/** TSL: albedo and roughness after wetness and snow. */
-function weathered(albedo: any, roughness: number, w: Weather) {
+/** TSL: albedo and roughness after wetness and snow (snow settles where `normal`, world space, faces up). */
+function weathered(albedo: any, roughness: number, w: Weather, normal: any = normalWorld) {
   const wet = albedo.mul(mix(float(1), float(0.55), w.wetness))
-  const up = normalWorld.y.add(mx_noise_float(positionWorld.mul(1.7)).mul(0.25))
+  const up = normal.y.add(mx_noise_float(positionWorld.mul(1.7)).mul(0.25))
   const cover = smoothstep(0.15, 0.7, up).mul(w.snow).add(w.snow.mul(w.snow).mul(0.3)).clamp(0, 1)
   return {
     color: mix(wet, vec3(0.9, 0.93, 0.97), cover),
@@ -182,6 +182,12 @@ function bumpedNormal(height: any, strength: number): any {
 const STILL: TreeParams['kind'][] = ['cactus', 'succulent', 'lilyPad']
 const GREEN: TreeParams['kind'][] = ['cactus', 'succulent', 'bamboo', 'lilyPad']
 
+/** TSL: leaves scorch brown, then black, as `burn` rises. */
+const scorched = (c: any, w: Weather) => mix(mix(c, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn)), vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
+/** TSL: share of leaf cards the weather removes (on top of the per-instance `densityVariation`). */
+const leafLoss = (w: Weather) => w.damage.add(w.burn.mul(0.8))
+const CHAR = vec3(0.025, 0.022, 0.02)
+
 /**
  * Bark (and the solid parts of cacti, succulents, bamboo and lily pads): vertex colours from the generator, furrows
  * from seamless cylindrical noise with bump, optional dark birch marks, per-instance colour variation and wind sway.
@@ -206,7 +212,7 @@ export function createBarkMaterial(params: Partial<TreeParams> = {}, options: Ma
   }
   // Green plants vary like foliage; wood only a little.
   let color: any = tinted(varied(vertexColor().rgb.mul(detail), p, GREEN.includes(p.kind) ? 1 : 0.3))
-  color = mix(color, vec3(0.025, 0.022, 0.02), smoothstep(furrows.sub(0.3), furrows.add(0.1), w.burn.mul(1.4)))
+  color = mix(color, CHAR, smoothstep(furrows.sub(0.3), furrows.add(0.1), w.burn.mul(1.4)))
   const look = weathered(color, 0.92, w)
   m.colorNode = look.color
   m.roughnessNode = look.roughness
@@ -259,17 +265,16 @@ export function createLeafMaterial(params: Partial<TreeParams> = {}, options: Le
   m.name = 'leaves'
   m.alphaTest = 0.5
   const sample = texture(getLeafTexture(p.leafShape === 'none' ? 'broad' : p.leafShape), uv())
-  const scorched = (c: any) => mix(mix(c, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn)), vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
   const base = varied(vertexColor().rgb.mul(sample.rgb), p)
-  const albedo = scorched(base) // untinted: the back-lit glow below never had the instance tint
-  const look = weathered(scorched(tinted(base)), 0.7, w)
+  const albedo = scorched(base, w) // untinted: the back-lit glow below never had the instance tint
+  const look = weathered(scorched(tinted(base), w), 0.7, w)
   m.colorNode = vec4(look.color, sample.a)
   m.roughnessNode = look.roughness
   m.normalNode = normalViewGeometry
   const viewDir = normalize(cameraPosition.sub(positionWorld))
   const back = pow(max(dot(viewDir, u.sunDirection.negate()), 0), 3)
   m.emissiveNode = albedo.mul(u.sunColor).mul(back.mul(options.translucency ?? 0.5).mul(0.5)).mul(float(1).sub(w.burn))
-  const thin = min(instanceRandoms().b.mul(p.densityVariation).add(w.damage).add(w.burn.mul(0.8)), 1.01)
+  const thin = min(instanceRandoms().b.mul(p.densityVariation).add(leafLoss(w)), 1.01)
   m.positionNode = dropped(positionLocal.add(windOffset(p.height, options.flutter ?? Math.min(0.05, p.leafSize * 0.06))), thin)
   return m
 }
@@ -305,4 +310,34 @@ export function createRockMaterial(options: MaterialOptions = {}): MeshStandardN
   m.roughnessNode = look.roughness
   m.normalNode = bumpedNormal(grain, 0.25)
   return m
+}
+
+/** `bakeImpostor` mask for {@link applyImpostorWeather}: a leaf card's `cardRandom` (≥ 0.01) on foliage, 0 elsewhere. */
+export function impostorFoliageMask(foliage: boolean): Node<'float'> | number {
+  return foliage ? (attribute('cardRandom', 'float').clamp(0, 1).mul(0.99).add(0.01) as any) : 0
+}
+
+/**
+ * Applies the same weather as the mesh materials to a baked impostor's material (threejs-scatter `bakeImpostor`),
+ * in the same order: instance tint, then burn, then wetness and snow, from the same `treeUniforms` (or `weather`
+ * inputs), so nothing pops at the mesh-to-impostor switch. Snow settles by the baked normal; with a foliage mask
+ * ({@link impostorFoliageMask}) burn scorches leaves and chars bark separately, and burn and damage drop leaf cards.
+ * Bake with clear weather. Bark branches broken by `damage` stay on the impostor.
+ */
+export function applyImpostorWeather(material: MeshStandardNodeMaterial, surface: ImpostorSurface, options: MaterialOptions & { rock?: boolean } = {}): void {
+  const w = weatherOf(options)
+  const s = surface as Record<keyof ImpostorSurface, any>
+  let color: any
+  let alpha: any = s.alpha
+  if (options.rock) color = s.color.mul(float(1).sub(w.burn.mul(0.75)))
+  else {
+    const foliage = step(0.005, s.mask)
+    // Bark chars along its furrows (~0.5 on average, see the bark material).
+    color = mix(mix(s.color, CHAR, smoothstep(0.2, 0.6, w.burn.mul(1.4))), scorched(s.color, w), foliage)
+    const gone = foliage.mul(step(fract(s.mask.add(instanceRandoms().c.mul(7.13))), leafLoss(w)))
+    alpha = select(gone.greaterThan(0.5), float(0), alpha)
+  }
+  const look = weathered(color, 0.85, w, s.normal)
+  material.colorNode = vec4(look.color, alpha)
+  material.roughnessNode = look.roughness
 }

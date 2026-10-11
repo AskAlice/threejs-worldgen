@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { BufferGeometry } from 'three/webgpu'
+import { MeshStandardNodeMaterial, type BufferGeometry, type Node } from 'three/webgpu'
+import { float, vec3 } from 'three/tsl'
 import { mulberry32 } from 'threejs-scatter'
 import { BIOMES } from 'threejs-biomes'
 import {
-  createVegetationLayers, drawLeafImage, generateRock, generateTree, generateTreeLevels, growSkeleton, rocks, species, type SpeciesName,
+  applyImpostorWeather, createVegetationLayers, drawLeafImage, generateRock, generateTree, generateTreeLevels, growSkeleton, rocks, species, treeUniforms, type SpeciesName,
 } from '../src/index.ts'
 
 const NAMES: SpeciesName[] = [
@@ -153,4 +154,36 @@ test('every biome scatter table entry (threejs-biomes BIOMES) is a species or ro
   const names = BIOMES.flatMap((b) => b.scatter.map((e) => e.species))
   assert.ok(names.length > 20)
   for (const name of names) assert.ok(name in species || name in rocks, `${name} has a preset`)
+})
+
+/** Whether `target` is anywhere in the TSL graph under `node`. */
+function dependsOn(node: unknown, target: unknown): boolean {
+  const seen = new Set<unknown>()
+  const stack = [node as Node]
+  while (stack.length) {
+    const n = stack.pop()!
+    if (n === target) return true
+    if (!n || seen.has(n)) continue
+    seen.add(n)
+    for (const c of n.getChildren()) stack.push(c as Node)
+  }
+  return false
+}
+
+test('impostors get the same weather as the mesh LODs: snow by the baked normal, wet, burn, damage leaf loss', () => {
+  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5) }
+  const m = new MeshStandardNodeMaterial()
+  applyImpostorWeather(m, surface)
+  const u = treeUniforms
+  for (const k of ['snow', 'wetness', 'burn', 'damage'] as const) assert.ok(dependsOn(m.colorNode, u[k]), `colour reacts to ${k}`)
+  assert.ok(dependsOn(m.colorNode, surface.normal), 'snow settles by the baked normal')
+  assert.ok(dependsOn(m.colorNode, surface.color), 'keeps the tinted baked colour')
+  assert.ok(dependsOn(m.colorNode, surface.mask), 'foliage mask splits leaves from bark')
+  assert.ok(dependsOn(m.roughnessNode, u.wetness) && dependsOn(m.roughnessNode, u.snow), 'wet gloss, snow roughness')
+
+  const snow = float(0.7)
+  const own = new MeshStandardNodeMaterial()
+  applyImpostorWeather(own, surface, { weather: { snow }, rock: true })
+  assert.ok(dependsOn(own.colorNode, snow) && !dependsOn(own.colorNode, u.snow), 'per-material weather inputs win, like on the meshes')
+  assert.ok(!dependsOn(own.colorNode, surface.mask), 'rocks have no foliage')
 })
