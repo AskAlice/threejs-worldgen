@@ -1,0 +1,156 @@
+# threejs-trees
+
+Procedural trees, bushes, plants and rocks for **three.js** and **react-three-fiber**: 29 species presets from spruce
+to oak to apple to palm to redwood, plus shrubs, flowers, grass tufts, succulents, bamboo, reeds and lily pads, and five
+rock presets. Trees grow by space colonisation (Runions et al. 2007) with pipe-model radii; leaves are alpha-tested cards
+drawn procedurally (no image files); materials are TSL with wind, leaf back-lighting, per-instance variation and weather
+hooks. `createVegetationLayers` turns a species list into LOD'd, impostored layers for
+[`threejs-scatter`](https://www.npmjs.com/package/threejs-scatter): that is how a biome table drives forests.
+
+Part of [threejs-worldgen](https://github.com/AskAlice/threejs-worldgen).
+
+```bash
+npm i threejs-trees threejs-scatter three
+# for React:
+npm i @react-three/fiber react
+```
+
+## three.js
+
+```ts
+import * as THREE from 'three/webgpu'
+import { Scatter } from 'threejs-scatter'
+import {
+  createBarkMaterial, createFruitMaterial, createLeafMaterial, createVegetationLayers, generateTree,
+  setTreeEnvironment, species,
+} from 'threejs-trees'
+
+// One hero tree: one single-material mesh per part. (Avoid one mesh with a material array when it casts shadows:
+// three.js shadow passes would rebuild its GPU bindings for every part, every frame.)
+const params = { ...species.apple, fruit: 0.4 }
+const { trunk, leaves, fruit } = generateTree(params, 7)
+const materials = [createBarkMaterial(params), createLeafMaterial(params), createFruitMaterial(params)]
+const tree = new THREE.Group()
+;[trunk, leaves, fruit].forEach((g, i) => g && tree.add(new THREE.Mesh(g, materials[i])))
+scene.add(tree)
+
+// A forest: variants per species, full / simplified / impostor levels, scattered over the terrain.
+const layers = await createVegetationLayers({
+  species: [
+    { name: 'oak', density: 0.4, group: 'canopy', cluster: { scale: 120, threshold: 0.45, strength: 0.9 } },
+    { name: 'beech', density: 0.3, group: 'canopy' },   // same group: shares the oaks' points, never overlaps them
+    { name: 'fern', density: 0.6 },
+    { name: 'boulder', density: 0.1 },                  // rock presets work too
+  ],
+  variants: 3,
+  density: (name, x, z) => biomes.weight('temperateForest', x, z), // optional per-species density field
+  renderer,                                                         // optional: bakes octahedral impostors
+})
+Scatter.create({ camera, scene, terrain, layers })
+
+setTreeEnvironment({ windStrength: 0.5, sun: sunLight })  // shared by all vegetation materials
+setTreeEnvironment({ snow: 0.6, wetness: 0.3 })           // global weather
+```
+
+## React Three Fiber
+
+```tsx
+import { Forest, Tree } from 'threejs-trees/react'
+
+<Tree species="oak" seed={7} position={[0, 0, -10]} />
+<Forest terrain={ground} seed={3} species={[{ name: 'spruce', density: 0.7 }, { name: 'birch', density: 0.2 }]}
+        environment={{ windStrength: 0.4 }} maxDistance={800} />
+```
+
+`<Forest>` takes every `<Scatter>` prop plus the vegetation options; it bakes impostors with the R3F renderer
+(`impostors={false}` to skip) and picks up the first DirectionalLight as the sun.
+
+## Generators
+
+| Export | |
+|---|---|
+| `generateTree(params, seed, { detail })` | `{ trunk, leaves, fruit, bounds }`. `detail` < 1 gives a lighter mesh with the same silhouette. Missing params come from the defaults. |
+| `generateTreeLevels(params, seed, details)` | Several detail levels sharing one grown skeleton. |
+| `growSkeleton(params, rand)` | The space-colonisation skeleton (nodes, parents, pipe-model radii). |
+| `generateRock(params, seed)` | Displaced icosphere (fBm lumps, Worley facets and cracks), flattened base, moss on top. |
+| `mergeTreeGeometry(tree)` | One geometry with groups 0 = bark, 1 = leaves, 2 = fruit. |
+| `createVegetationLayers(options)` | `ScatterLayer[]` for `threejs-scatter`. |
+| `species`, `rocks` | Presets. `SpeciesName` keys: `oak beech maple birch spruce pine fir redwood acacia baobab palm jungleEmergent olive cypress mangrove deadSnag cactus shrub dwarfShrub thornShrub fern reed apple berryBush flowers tallGrassTuft succulent bamboo lilyPad`; rocks: `boulder rock pebble scree cliffChunk`. |
+| `createBarkMaterial`, `createLeafMaterial`, `createFruitMaterial`, `createRockMaterial` | TSL node materials. |
+| `treeUniforms`, `setTreeEnvironment` | Shared wind, sun and global weather uniforms. |
+
+Every geometry has `position`, `normal`, `uv`, `color` (linear) and `cardRandom` (one random per leaf card, frond or
+branch; -1 on the trunk), built straight into typed arrays with 16-bit indices where they fit.
+
+## `TreeParams`
+
+All lengths in metres; plain JSON. Spread a preset and override: `{ ...species.oak, height: 20 }`.
+
+| Field | Oak | |
+|---|---|---|
+| `kind` | `'colonization'` | Generator: `colonization`, `palm`, `cactus`, `fern`, `reed`, `flowers`, `tuft`, `succulent`, `bamboo`, `lilyPad`. |
+| `height`, `trunkHeight` | 14, 3.2 | Total height; clear trunk below the crown. |
+| `crownShape` | `'ellipsoid'` | `sphere`, `ellipsoid`, `hemisphere`, `cone`, `column`, `umbrella`, `vase`. |
+| `crownRadius`, `crownHeight` | 7, 11 | Crown envelope. |
+| `attractionPoints` | 2200 | Points in the crown; more = finer branching. |
+| `segmentLength`, `killDistance`, `influenceDistance` | 0.35, 0.7, 2.8 | Space-colonisation step and radii. |
+| `iterations` | 140 | Maximum growth steps. |
+| `tropism` | `[0, 0.04, 0]` | Added to every growth direction (negative y droops). |
+| `jitter` | 0.35 | Random wobble (gnarliness). |
+| `leader` | `false` | Straight central leader (conifers). |
+| `stems` | 1 | Basal stems (shrubs), cactus arms, reed / flower / bamboo stalks. |
+| `trunkLean` | 0.06 | Max trunk lean, radians. |
+| `radiusExponent` | 2.3 | Pipe model: parent^e = Σ children^e (2 = da Vinci). |
+| `baseRadius`, `tipRadius` | 0.45, 0.012 | Trunk and twig radius. |
+| `rootFlare`, `buttress` | 0.35, 0 | Wider base; lobed buttress roots (cypress, jungle). |
+| `propRoots` | 0 | Arching prop roots (mangrove). |
+| `radialSegments` | 9 | Trunk sides; branches use fewer. |
+| `leafShape` | `'broad'` | `broad`, `needle`, `palm`, `fern`, `blade`, `none`. |
+| `leafSize`, `leafDensity`, `leafDepth` | 0.75, 2, 3 | Card size, cards per twig node, nodes from the tips that carry leaves. |
+| `barkColor`, `barkContrast`, `barkMarks` | `#54463a`, 0.75, 0 | Bark colour, furrow depth, birch marks. |
+| `leafColor`, `leafColorVariation` | `#4a6b2a`, 0.15 | |
+| `fruit`, `fruitSize`, `fruitColors` | 0, 0.08, `['#b3261e']` | Fruit per twig node (apples, berries) or flower heads per stalk; seeded palette. |
+| `spacing` | 9 | Suggested scatter spacing. |
+| `scaleRange`, `leanVariation` | `[0.8, 1.2]`, 0.03 | Per-instance scale and lean when scattered. |
+| `hueVariation`, `saturationVariation` | 0.08, 0.12 | Per-instance foliage hue (± rad) and saturation (± fraction), in the shader. |
+| `densityVariation` | 0.25 | Per-instance crown thinning: each instance drops up to this share of its leaf cards. |
+
+`RockParams`: `size`, `elongation`, `flatness`, `roughness`, `facets`, `noiseScale`, `detail`, `baseCut`, `color`,
+`colorVariation`, `moss`, `mossColor`, `spacing`.
+
+## Vegetation options
+
+| Option | Default | |
+|---|---|---|
+| `species` | — | `{ name, density, params?, variants?, group?, spacing?, cluster?, scale?, tilt?, min/maxSlope?, min/maxHeight?, align?, sink?, … }[]`. |
+| `variants` | 3 | Generated variants per species. |
+| `seed` | 1 | Variant shapes. |
+| `density` | — | `(species, x, z) => number` multiplier, e.g. biome weights. |
+| `renderer` | — | Initialised WebGPURenderer: bakes impostors. Without it the simplified mesh is the last level. |
+| `lodDistances` | `[35, 110, 600]` | Full / simplified / impostor end distances for a 15 m tree, scaled by each species' size. |
+| `simplifiedDetail` | 0.35 | Detail of the simplified level. |
+| `impostor` | `{ size: 512 }` | `bakeImpostor` options. |
+| `castShadow` | `true` | Mesh levels (impostors never cast). |
+| `weather` | global | Per-material weather nodes, below. |
+
+## Weather hooks
+
+Bark, leaf, fruit and rock materials read four 0..1 inputs. By default they follow the global uniforms in
+`treeUniforms` (`wetness`, `snow`, `burn`, `damage`, set with `setTreeEnvironment`); pass `weather: { burn: node, … }`
+to any material factory, `createVegetationLayers` or `<Forest>` / `<Tree>` to drive one from your own TSL node: a
+`uniform()`, a world-space mask sampled at `positionWorld`, or something derived from `scatterParamsNode()` per
+instance.
+
+| Input | Effect |
+|---|---|
+| `wetness` | Darker albedo, lower roughness. |
+| `snow` | White cover on upward faces (noisy edge), all over near 1. |
+| `burn` | Bark chars along the furrows first; leaves scorch brown then black and drop out; fruit darkens; rock gets soot. |
+| `damage` | Side branches break off and leaf mass and fruit thin out (whole cards / branches collapse in the vertex shader, no alpha cost). No effect on rock. |
+
+Imports from `three/webgpu` (WebGPURenderer; falls back to WebGL2 by itself). Full API docs:
+<https://askalice.github.io/threejs-worldgen/docs/>.
+
+## License
+
+Apache-2.0
