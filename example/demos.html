@@ -10,13 +10,16 @@
       h1 { margin: 0 0 4px; font-size: 28px }
       p.lead { margin: 0 0 28px; color: #9da7b3 }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px }
-      a.card { display: block; padding: 16px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; color: inherit; text-decoration: none }
+      a.card { display: block; padding: 0 0 16px; overflow: hidden; border: 1px solid #30363d; border-radius: 10px; background: #161b22; color: inherit; text-decoration: none }
+      a.card > :not(.thumb) { margin-left: 16px; margin-right: 16px }
+      .thumb { display: block; aspect-ratio: 16 / 9; margin-bottom: 12px; background: linear-gradient(135deg, #1f2a36, #0d1117); border-bottom: 1px solid #30363d }
+      .thumb img { display: block; width: 100%; height: 100%; object-fit: cover }
       a.card:hover { border-color: #58a6ff }
       .card b { display: block; font-size: 16px }
-      .card code { color: #7ee787; font-size: 12px }
+      .card code { display: block; color: #7ee787; font-size: 12px }
       .card span { display: block; margin-top: 6px; color: #9da7b3; font-size: 13px }
       .missing { opacity: 0.45; pointer-events: none }
-      .tag { float: right; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: #30363d }
+      .tag { float: right; font-style: normal; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: #30363d }
     </style>
   </head>
   <body>
@@ -26,25 +29,29 @@
       <div class="grid" id="grid"></div>
     </main>
     <script type="module">
+      // [package, page, description, thumbnail]. Thumbnails come from the site build (site/media/), so they show on the
+      // published site and fall back to a plain tile under the dev server.
       const demos = [
-        ['threejs-grass', 'index.html', 'Infinite WebGPU grass: presets, LODs, wind, painter (three.js + lil-gui)'],
-        ['threejs-grass/react', 'r3f.html', 'The same grass as a React Three Fiber component with leva'],
-        ['threejs-biomes', 'terrain.html', '20 biomes, planet or flat world, streaming LOD terrain from orbit to 1 cm, live maps'],
-        ['threejs-water', 'water.html', 'Oceans, noise rivers and bounded hydrology'],
-        ['threejs-scatter + trees', 'scatter.html', 'Blue-noise instancing, impostors, procedural trees and rocks'],
-        ['threejs-sky', 'sky.html', 'Day/night, moon phases, Milky Way, shooting stars, solar system'],
-        ['threejs-city', 'city.html', 'Settlements, roads, blocks, lots, buildings'],
-        ['threejs-weathering', 'weathering.html', 'Rain, snow, lightning, wildfires, wet/snowy/burnt/damaged materials'],
-        ['threejs-population', 'population.html', 'Population density on an H3 hexagonal grid'],
-        ['threejs-fauna', 'fauna.html', 'Procedural fish schools'],
-        ['threejs-worldgen', 'world.html', 'Everything together: the combined world'],
+        ['threejs-grass', 'index.html', 'Infinite WebGPU grass: presets, LODs, wind, painter (three.js + lil-gui)', 'hero.jpg'],
+        ['threejs-grass/react', 'r3f.html', 'The same grass as a React Three Fiber component with leva', 'r3f-demo.jpg'],
+        ['threejs-biomes', 'terrain.html', '20 biomes, planet or flat world, streaming LOD terrain from orbit to 1 cm, live maps', 'biomes/thumb.jpg'],
+        ['threejs-water', 'water.html', 'Oceans, noise rivers and bounded hydrology', 'water/thumb.jpg'],
+        ['threejs-scatter + trees', 'scatter.html', 'Blue-noise instancing, impostors, procedural trees and rocks', 'scatter/thumb.jpg'],
+        ['threejs-sky', 'sky.html', 'Day/night, moon phases, Milky Way, shooting stars, solar system', 'sky/thumb.jpg'],
+        ['threejs-city', 'city.html', 'Settlements, roads, blocks, lots, buildings', 'city/thumb.jpg'],
+        ['threejs-props', 'props.html', 'Street and countryside props: mailboxes, power lines, street lights, signs, fences', 'props/thumb.jpg'],
+        ['threejs-vehicles', 'vehicles.html', 'Animated cars, trains, boats and aircraft on generated networks', 'vehicles/thumb.jpg'],
+        ['threejs-weathering', 'weathering.html', 'Rain, snow, lightning, wildfires, wet/snowy/burnt/damaged materials', 'weathering/thumb.jpg'],
+        ['threejs-population', 'population.html', 'Population density on an H3 hexagonal grid', 'population/thumb.jpg'],
+        ['threejs-fauna', 'fauna.html', 'Procedural fish schools', 'fauna/thumb.jpg'],
+        ['threejs-worldgen', 'world.html', 'Everything together: the combined world', null],
       ]
       const grid = document.getElementById('grid')
-      for (const [name, page, text] of demos) {
+      for (const [name, page, text, thumb] of demos) {
         const a = document.createElement('a')
         a.className = 'card'
         a.href = page
-        a.innerHTML = `<b>${name}</b><code>${page}</code><span>${text}</span>`
+        a.innerHTML = `<span class="thumb">${thumb ? `<img loading="lazy" alt="" src="../media/${thumb}" onerror="this.remove()">` : ''}</span><b>${name}</b><code>${page}</code><span>${text}</span>`
         grid.append(a)
         // Dim demos whose page doesn't exist yet.
         fetch(page, { method: 'HEAD' }).then((r) => {

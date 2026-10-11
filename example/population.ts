@@ -17,7 +17,9 @@ const scene = new THREE.Scene()
 scene.background = new THREE.Color('#0d1424')
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 1, 400_000)
 camera.position.set(0, 26_000, 30_000)
-scene.add(new THREE.HemisphereLight('#cfe3ff', '#4a4030', 1.2), Object.assign(new THREE.DirectionalLight('#fff1dc', 2.5), { position: new THREE.Vector3(1, 2, 1) }))
+const sun = new THREE.DirectionalLight('#fff1dc', 2.5) // Object3D.position is read-only, so set it rather than assign it
+sun.position.set(1, 2, 1)
+scene.add(new THREE.HemisphereLight('#cfe3ff', '#4a4030', 1.2), sun)
 
 const world = new World({ seed: 1 })
 const terrain = await WorldTerrain.create({ world, camera, scene, createWorker: () => new TerrainWorker() })
