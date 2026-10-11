@@ -69,6 +69,12 @@ The tag starts `.github/workflows/release.yml`, which checks the tag against the
 and the tests, publishes that one package to npm (using the `NPM_TOKEN` repo secret) and creates a GitHub release.
 Release a package's dependencies first. For example, `threejs-grass` needs its `threejs-heightfield` range on npm.
 
+To publish every package from your machine instead, run `npm run publish:all` (`scripts/publish-all.sh`;
+add `--dry-run` to preview). It builds once, then publishes each package whose version isn't on npm yet, dependencies
+first. Packages marked `"private": true` and versions already on npm are skipped, so it's safe to re-run. It
+authenticates with `NPM_TOKEN` if that's set, otherwise your `npm login`, otherwise it asks. Set `NPM_OTP` if your
+account requires a 2FA code to publish. It doesn't create tags or GitHub releases.
+
 ## License
 
 Apache-2.0

@@ -26,7 +26,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --conditions=worldgen-source --test packages/*/test/*.test.ts",
     "docs": "typedoc",
-    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && cp landing/index.html site/ && mkdir -p site/media && cp media/* landing/media/* site/media/"
+    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && cp landing/index.html site/ && mkdir -p site/media && cp media/* landing/media/* site/media/",
+    "publish:all": "scripts/publish-all.sh"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.9",
