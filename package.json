@@ -26,7 +26,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --conditions=worldgen-source --test packages/*/test/*.test.ts",
     "docs": "typedoc",
-    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && node landing/build.mjs",
+    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && node landing/build.mjs && node landing/check.mjs",
     "publish:all": "scripts/publish-all.sh"
   },
   "devDependencies": {

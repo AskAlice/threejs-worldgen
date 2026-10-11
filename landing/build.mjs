@@ -8,14 +8,55 @@
 //
 // Packages that are still being built ("status: 'dev'") refresh themselves: once example/<demo>.html exists their demo
 // links appear, and once landing/media/<short>/hero.jpg exists it replaces the illustration. Re-run this script.
+//
+// SEO: every page gets a search title and description, canonical, Open Graph/Twitter card (landing/media/og/, rendered
+// by landing/og.mjs) and JSON-LD. The built demo pages (<out>/demo/*.html) get the same tags injected, and the script
+// writes sitemap.xml, robots.txt, site.webmanifest and the icons. Check the result with `node landing/check.mjs`.
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { join, resolve } from 'node:path'
+import { SITE, GITHUB, esc, plain, seoTags, jsonLd } from './seo.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const out = resolve(root, process.argv[2] ?? 'site')
-const GITHUB = 'https://github.com/AskAlice/threejs-worldgen'
-const SITE = 'https://askalice.github.io/threejs-worldgen/'
+const AUTHOR = { '@type': 'Person', '@id': `${SITE}#author`, name: 'AskAlice', url: 'https://github.com/AskAlice' }
+const HOME = { name: 'threejs-worldgen', short: 'worldgen', accent: '#1f5a35', icon: '<circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6 19c4-3 7 1 10-2s6-6 10-3M9 9c3 2 6 1 8-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="27" cy="6" r="2.2" fill="currentColor"/>' }
+
+// Related packages for the "Works with" row on each lander.
+const RELATED = {
+  biomes: ['water', 'scatter', 'grass', 'city', 'sky'],
+  water: ['biomes', 'scatter', 'fauna', 'weathering'],
+  scatter: ['trees', 'biomes', 'grass', 'props'],
+  trees: ['scatter', 'biomes', 'weathering', 'grass'],
+  grass: ['biomes', 'scatter', 'trees', 'weathering'],
+  city: ['population', 'props', 'vehicles', 'biomes'],
+  population: ['city', 'biomes', 'vehicles', 'props'],
+  props: ['city', 'vehicles', 'weathering', 'population'],
+  vehicles: ['city', 'props', 'water', 'population'],
+  fauna: ['biomes', 'water', 'trees', 'sky'],
+  weathering: ['sky', 'trees', 'city', 'grass'],
+  sky: ['weathering', 'biomes', 'water', 'fauna'],
+}
+
+// Search titles and descriptions for the built demo pages: file -> [package short, title, description].
+const DEMOS = {
+  'demos.html': [null, 'Live demos · threejs-worldgen procedural worlds for three.js', 'Every threejs-worldgen live demo in one place: WebGPU sandboxes for procedural terrain, biomes, water, forests, grass, cities, traffic, wildlife, weather and sky.'],
+  'index.html': ['grass', 'threejs-grass demo · Infinite WebGPU grass for three.js', 'Live three.js WebGPU demo of threejs-grass: infinite, terrain-aware grass with wind, interaction, 12 presets, LOD tiles and a terrain painter.'],
+  'r3f.html': ['grass', 'threejs-grass React Three Fiber demo · WebGPU grass in R3F', 'The threejs-grass <Grass /> component in React Three Fiber: infinite WebGPU grass on procedural terrain with wind, presets and a live control panel.'],
+  'terrain.html': ['biomes', 'threejs-biomes demo · Procedural terrain, biomes and planets in three.js', 'Live WebGPU sandbox for threejs-biomes: seeded climate, 20 blended biomes, mountains and rivers, and streaming LOD terrain from the ground to a planet.'],
+  'scatter.html': ['scatter', 'Procedural forest demo · threejs-scatter and threejs-trees for three.js', 'Stream a procedural forest over terrain in three.js: blue-noise placement of trees, rocks and plants with LODs and impostors, and 29 tree species.'],
+  'water.html': ['water', 'threejs-water demo · Oceans, lakes and rivers in three.js WebGPU', 'Live WebGPU sandbox for threejs-water: ocean waves, foam and shallows, lakes and carved rivers with drainage-basin hydrology on procedural terrain.'],
+  'city.html': ['city', 'threejs-city demo · Procedural cities and road networks in three.js', 'Live sandbox for threejs-city: procedural settlements with road networks, blocks, lots and buildings that flatten the terrain beneath them.'],
+  'population.html': ['population', 'threejs-population demo · Population density on an H3 hex grid', 'Live sandbox for threejs-population: population density, land use, settlement hierarchy and road networks on a hexagonal H3 grid over procedural terrain.'],
+  'props.html': ['props', 'threejs-props demo · Procedural street and countryside props for three.js', 'Live sandbox for threejs-props: procedural street lights, traffic lights, power lines, fences, signs and mailboxes placed along generated roads.'],
+  'vehicles.html': ['vehicles', 'threejs-vehicles demo · Procedural traffic, trains and boats in three.js', 'Live sandbox for threejs-vehicles: procedural animated cars, bicycles, trains, boats and aircraft on generated road, rail and water networks.'],
+  'fauna.html': ['fauna', 'threejs-fauna demo · Procedural fish schools and bird flocks in three.js', 'Live sandbox for threejs-fauna: procedural fish schools, bird flocks and wildlife that live in the biomes and waters that suit them.'],
+  'weathering.html': ['weathering', 'threejs-weathering demo · Rain, snow, lightning and wildfire in three.js', 'Live WebGPU sandbox for threejs-weathering: rain, snow, wind and lightning, wildfires that spread and regrow, and wet, snowy and burnt materials.'],
+  'world.html': [null, 'Combined world demo · threejs-worldgen procedural world in three.js', 'Every threejs-worldgen package in one WebGPU scene: procedural terrain and biomes, water, forests, grass, cities, traffic, wildlife, weather and sky.'],
+  'gallery.html': [null, 'Asset gallery · threejs-worldgen procedural assets for three.js', 'Browse the procedural assets of threejs-worldgen side by side: trees, plants, rocks, buildings, props, vehicles and animals, generated in three.js.'],
+  'particles.html': [null, 'threejs-particles demo · GPU particle systems for three.js WebGPU', 'Live sandbox for threejs-particles: compute-shader particle pools with seeded emitters, forces and lifetime curves, plus lit smoke, flames and sparks.'],
+  'sky.html': ['sky','threejs-sky demo · Day/night cycle, clouds and stars in three.js', 'Live sandbox for threejs-sky: a day/night cycle with sun and moon phases, clouds, the Milky Way, shooting stars and a Keplerian solar system.'],
+}
 
 // Package order on the homepage follows the pipeline: ground, then what grows on it, then people, then the sky.
 const ORDER = ['biomes', 'water', 'scatter', 'trees', 'grass', 'city', 'population', 'props', 'vehicles', 'fauna', 'weathering', 'sky']
@@ -25,9 +66,25 @@ pkgs.sort((a, b) => ORDER.indexOf(a.short) - ORDER.indexOf(b.short))
 
 // ---------- helpers ----------
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const warnings = []
-const hasMedia = (p) => existsSync(join(root, 'landing/media', p)) || existsSync(join(root, 'media', p))
+const mediaFile = (p) => [join(root, 'landing/media', p), join(root, 'media', p)].find(existsSync)
+const hasMedia = (p) => !!mediaFile(p)
+// ` width="…" height="…"` for a JPEG or PNG under media/, so images reserve their space before they load.
+function dims(p) {
+  const file = p && mediaFile(p)
+  if (!file) return ''
+  const b = readFileSync(file)
+  if (b.readUInt32BE(0) === 0x89504e47) return ` width="${b.readUInt32BE(16)}" height="${b.readUInt32BE(20)}"`
+  for (let i = 2; i + 9 < b.length;) {
+    if (b[i] !== 0xff || b[i + 1] === 0xff) { i++; continue }
+    const m = b[i + 1]
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return ` width="${b.readUInt16BE(i + 7)}" height="${b.readUInt16BE(i + 5)}"`
+    i += 2 + b.readUInt16BE(i + 2)
+  }
+  return ''
+}
+const ogImage = (short) => `${SITE}media/og/${short && existsSync(join(root, 'landing/media/og', `${short}.jpg`)) ? short : 'home'}.jpg`
+const pkgJson = (p) => { try { return JSON.parse(readFileSync(join(root, 'packages', p.short, 'package.json'), 'utf8')) } catch { return {} } }
 const hasDemo = (href) => existsSync(join(root, 'example', href.split(/[?#]/)[0] || 'index.html'))
 const demosOf = (p) => (p.demos ?? []).filter((d) => hasDemo(d.href))
 const docsOf = (p) => `docs/modules/${p.name}.html`
@@ -74,23 +131,24 @@ function media(m, p, prefix) {
     if (file) warnings.push(`${p.short}: missing media ${file}`)
     return `<div class="${cls}">${sketch(p, 'screenshot soon')}${tag}</div>`
   }
-  if (m.video) return `<div class="${cls}"><video muted loop playsinline preload="none" poster="${prefix}media/${m.poster}" data-src="${prefix}media/${m.video}" aria-label="${esc(m.alt)}"></video>${tag}</div>`
-  return `<div class="${cls}"><img loading="lazy" src="${prefix}media/${m.img}" alt="${esc(m.alt)}" />${tag}</div>`
+  if (m.video) return `<div class="${cls}"><video muted loop playsinline preload="none" poster="${prefix}media/${m.poster}" data-src="${prefix}media/${m.video}"${dims(m.poster)} aria-label="${esc(m.alt)}"></video>${tag}</div>`
+  return `<div class="${cls}"><img loading="lazy" decoding="async" src="${prefix}media/${m.img}"${dims(m.img)} alt="${esc(m.alt)}" />${tag}</div>`
 }
 
-const head = ({ title, description, image, accent, icon, css }) => `<!doctype html>
+// `P` is the relative path to the site root; `hero` is preloaded; `ld` is the page's JSON-LD.
+const head = ({ title, description, url, ogAlt, short, accent, icon, P, hero, ld }) => `<!doctype html>
 <html lang="en" class="no-js">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${esc(title)}</title>
-  <meta name="description" content="${esc(description)}" />
-  <meta property="og:title" content="${esc(title)}" />
-  <meta property="og:description" content="${esc(description)}" />
-  ${image ? `<meta property="og:image" content="${SITE}media/${image}" />` : ''}
-  <meta name="theme-color" content="#f4f1e8" />
-  <link rel="icon" href="${icon}" />
-  <link rel="stylesheet" href="${css}" />
+  ${seoTags({ title, description, url, image: ogImage(short), imageAlt: ogAlt, themeColor: accent })}
+  <link rel="icon" href="${icon}" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="${P}apple-touch-icon.png" />
+  <link rel="manifest" href="${P}site.webmanifest" />
+  ${hero ? `<link rel="preload" as="image" href="${P}media/${hero}" fetchpriority="high" />` : ''}
+  <link rel="stylesheet" href="${P}site.css" />
+  ${jsonLd(ld)}
 </head>
 <body style="--accent:${accent}">
   <a class="skip" href="#main">Skip to content</a>`
@@ -161,7 +219,7 @@ function lander(p) {
   const barText = p.hero?.embed && main ? '<span class="live">live · rendered in your browser</span>'
     : heroImg ? `<span class="live">${main ? `screenshot · ${esc(main.href.split(/[?#]/)[0])}` : 'screenshot'}</span>`
     : '<span class="live dev">in development</span>'
-  const stage = heroImg ? `<img src="${P}media/${heroImg}" alt="${esc(p.hero.alt)}" />` : sketch(p)
+  const stage = heroImg ? `<img src="${P}media/${heroImg}"${dims(heroImg)} fetchpriority="high" alt="${esc(p.hero.alt)}" />` : sketch(p)
   let side = 0 // alternate text left/right, counting only non-wide rows (as on the original grass lander)
   const row = (f, i) => {
     const n = String(i + 1).padStart(2, '0')
@@ -197,7 +255,20 @@ function lander(p) {
     `<a class="btn ${demos.length ? 'btn-line' : 'btn-amber'}" href="${docs}">Documentation</a>`,
     ...(dev ? [`<a class="btn btn-line" href="${GITHUB}/tree/main/packages/${p.short}">Follow on GitHub</a>`] : []),
   ]
-  return `${head({ title: p.title, description: p.description, image: heroImg, accent: p.accent, icon: favicon(p), css: P + 'site.css' })}
+  const url = `${SITE}${p.short}/`
+  const related = (RELATED[p.short] ?? []).map((s) => pkgs.find((q) => q.short === s)).filter(Boolean)
+  const ld = { '@graph': [
+    { '@type': 'SoftwareSourceCode', '@id': `${url}#software`, name: p.name, description: p.description, url,
+      codeRepository: `${GITHUB}/tree/main/packages/${p.short}`, programmingLanguage: 'TypeScript', runtimePlatform: 'Web browser (WebGPU)',
+      license: 'https://www.apache.org/licenses/LICENSE-2.0', version: pkgJson(p).version, image: ogImage(p.short), author: AUTHOR,
+      keywords: (pkgJson(p).keywords ?? ['three.js', 'WebGPU', 'React Three Fiber', 'procedural generation']).join(', '),
+      ...(dev ? { creativeWorkStatus: 'in development' } : {}) },
+    { '@type': 'BreadcrumbList', itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'threejs-worldgen', item: SITE },
+      { '@type': 'ListItem', position: 2, name: p.name, item: url },
+    ] },
+  ] }
+  return `${head({ title: p.title, description: p.description, url, ogAlt: `${p.name}: ${plain(p.pitch)}`, short: p.short, accent: p.accent, icon: favicon(p), P, hero: heroImg, ld })}
   <header class="site">
     <div class="wrap">
       <div class="brand">
@@ -221,7 +292,7 @@ function lander(p) {
         <div class="hero-top">
           <div>
             <span class="label">${esc(p.label)}</span>${dev ? '<span class="badge">In development</span>' : ''}
-            <h1>${p.headline}</h1>
+            <h1><span class="sr-only">${esc(p.name)}: </span>${p.headline}</h1>
           </div>
           <div class="hero-side">
             <p>${p.lede}</p>
@@ -271,7 +342,16 @@ function lander(p) {
 ${p.features.rows.map(row).join('\n')}
       </div>
     </section>
-
+${related.length ? `
+    <section class="related" aria-labelledby="works-with">
+      <div class="wrap">
+        <h2 id="works-with" class="reveal">Works with</h2>
+        <ul class="reveal">${related.map((q) => `
+          <li style="--accent:${q.accent}"><a href="${P}${q.short}/">${iconSvg(q)}<div><b>threejs<i>${esc(q.name.replace(/^threejs/, ''))}</i></b><span>${q.pitch}</span></div></a></li>`).join('')}
+        </ul>
+      </div>
+    </section>
+` : ''}
     <section class="final">
       <div class="wrap">
         <h2 class="reveal">${p.final.heading}</h2>
@@ -301,10 +381,11 @@ function home() {
   const card = (p) => {
     const demos = demosOf(p)
     const thumb = p.thumb && hasMedia(p.thumb) ? p.thumb : p.hero?.img && hasMedia(p.hero.img) ? p.hero.img : null
-    const img = thumb ? `<img loading="lazy" src="media/${thumb}" alt="" />` : sketch(p)
+    const alt = p.hero?.alt && thumb === p.hero.img ? p.hero.alt : `${p.name} screenshot`
+    const img = thumb ? `<img loading="lazy" decoding="async" src="media/${thumb}"${dims(thumb)} alt="${esc(`${p.name}: ${alt}`)}" />` : sketch(p)
     return `
         <li class="card reveal" style="--accent:${p.accent}">
-          <div class="thumb" aria-hidden="true">${img}</div>
+          <div class="thumb">${img}</div>
           ${p.status === 'dev' ? '<span class="badge">In development</span>' : ''}
           <div class="body">
             <h3><a href="${p.short}/">threejs<i>${esc(p.name.replace(/^threejs/, ''))}</i></a></h3>
@@ -326,8 +407,17 @@ function home() {
         </li>`
   // Homepage hero: a dedicated planet still if one has been captured, else the biomes orbit shot.
   const hero = ['biomes/planet.jpg', 'biomes/orbit.jpg'].find(hasMedia) ?? 'biomes/planet.jpg'
-  const home = { name: 'threejs-worldgen', short: 'worldgen', accent: '#1f5a35', icon: '<circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6 19c4-3 7 1 10-2s6-6 10-3M9 9c3 2 6 1 8-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="27" cy="6" r="2.2" fill="currentColor"/>' }
-  return `${head({ title: 'threejs-worldgen · Procedural worlds for three.js, from an ant to the solar system', description: 'Procedural worlds for three.js and React Three Fiber: biomes, terrain, water, forests, grass, cities, weather and sky, as small packages that share one idea of where the ground is.', image: hasMedia(hero) ? hero : 'hero.jpg', accent: home.accent, icon: favicon(home), css: 'site.css' })}
+  const home = HOME
+  const heroImg = hasMedia(hero) ? hero : 'hero.jpg'
+  const title = 'threejs-worldgen · Procedural worlds for three.js, from an ant to the solar system'
+  const description = 'Procedural worlds for three.js and React Three Fiber: biomes, terrain, water, forests, grass, cities, weather and sky, as small packages that share one idea of where the ground is.'
+  const ld = { '@graph': [
+    { '@type': 'WebSite', '@id': `${SITE}#website`, name: 'threejs-worldgen', url: SITE, description, inLanguage: 'en', author: { '@id': AUTHOR['@id'] }, publisher: { '@id': AUTHOR['@id'] } },
+    { ...AUTHOR, sameAs: [GITHUB] },
+    { '@type': 'ItemList', name: 'threejs-worldgen packages', numberOfItems: pkgs.length, itemListElement: pkgs.map((p, i) => (
+      { '@type': 'ListItem', position: i + 1, name: p.name, description: p.description, url: `${SITE}${p.short}/` })) },
+  ] }
+  return `${head({ title, description, url: SITE, ogAlt: `threejs-worldgen: screenshots of ${pkgs.length} procedural world packages for three.js`, short: 'home', accent: home.accent, icon: 'favicon.svg', P: '', hero: heroImg, ld })}
   <header class="site">
     <div class="wrap">
       <a class="logo" href="./" aria-label="threejs-worldgen home">${iconSvg(home)}<span>threejs<i>-worldgen</i></span></a>
@@ -348,7 +438,7 @@ function home() {
         <div class="hero-top">
           <div>
             <span class="label">WebGPU · three.js · React Three Fiber</span>
-            <h1>Procedural <em>worlds,</em> from an ant to the solar system.</h1>
+            <h1><span class="sr-only">threejs-worldgen: </span>Procedural <em>worlds,</em> from an ant to the solar system.</h1>
           </div>
           <div class="hero-side">
             <p>Climate, terrain and biomes, water, forests and grass, cities and their people, weather and the sky. Each is a small package that works on its own, and every one of them agrees on where the ground is.</p>
@@ -366,7 +456,7 @@ function home() {
             <a href="demo/terrain.html">open ↗</a>
           </div>
           <div class="stage" id="stage">
-            ${hasMedia(hero) ? `<img src="media/${hero}" alt="A whole procedural planet seen from orbit, from the threejs-biomes demo" />` : '<img src="media/hero.jpg" alt="A dense meadow on rolling hills" />'}
+            <img src="media/${heroImg}"${dims(heroImg)} fetchpriority="high" alt="${hasMedia(hero) ? 'A whole procedural planet seen from orbit, from the threejs-biomes demo' : 'A dense meadow on rolling hills'}" />
           </div>
         </div>
         <div class="strip">
@@ -434,5 +524,50 @@ for (const p of pkgs) {
 cpSync(join(root, 'landing/site.css'), join(out, 'site.css'))
 cpSync(join(root, 'media'), join(out, 'media'), { recursive: true })
 cpSync(join(root, 'landing/media'), join(out, 'media'), { recursive: true })
+for (const f of ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
+  if (existsSync(join(root, 'landing', f))) cpSync(join(root, 'landing', f), join(out, f))
+  else warnings.push(`missing landing/${f} (run node landing/og.mjs)`)
+}
+writeFileSync(join(out, 'site.webmanifest'), JSON.stringify({
+  name: 'threejs-worldgen', short_name: 'worldgen', description: 'Procedural worlds for three.js and React Three Fiber',
+  start_url: './', scope: './', display: 'browser', background_color: '#f4f1e8', theme_color: HOME.accent,
+  icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml' }, { src: 'icon-192.png', sizes: '192x192', type: 'image/png' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }],
+}, null, 2) + '\n')
+
+// Demo pages (built by Vite into <out>/demo): inject the same head tags between <!-- seo --> markers (idempotent).
+const demoDir = join(out, 'demo')
+const demos = existsSync(demoDir) ? readdirSync(demoDir).filter((f) => f.endsWith('.html')).sort() : []
+for (const f of demos) {
+  let html = readFileSync(join(demoDir, f), 'utf8').replace(/\n\s*<!-- seo -->[\s\S]*?<!-- \/seo -->/, '')
+  const current = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? f
+  if (!DEMOS[f]) warnings.push(`demo/${f}: no entry in DEMOS, using a generic title and description`)
+  const [short, title, description] = DEMOS[f] ?? [null, `${current} · threejs-worldgen live demo`, `${current}: a live WebGPU demo from threejs-worldgen, procedural worlds for three.js and React Three Fiber.`]
+  const p = pkgs.find((q) => q.short === short)
+  const tags = seoTags({ title, description, url: `${SITE}demo/${f}`, image: ogImage(short), imageAlt: `${p?.name ?? 'threejs-worldgen'} live demo`, themeColor: p?.accent ?? HOME.accent })
+  html = html.replace(/<html(?![^>]*\blang=)/, '<html lang="en"').replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>
+    <!-- seo -->
+    ${tags.replace(/\n  /g, '\n    ')}
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <!-- /seo -->`)
+  writeFileSync(join(demoDir, f), html)
+}
+
+// sitemap.xml: homepage, landers, demos and the docs entry pages. TypeDoc writes docs/sitemap.xml with every API page.
+const docsModules = existsSync(join(out, 'docs/modules')) ? readdirSync(join(out, 'docs/modules')).filter((f) => f.endsWith('.html')).sort().map((f) => `docs/modules/${f}`) : []
+const docsIndex = existsSync(join(out, 'docs/index.html')) ? ['docs/'] : []
+const today = new Date().toISOString().slice(0, 10)
+const urls = ['', ...pkgs.map((p) => `${p.short}/`), ...demos.map((f) => `demo/${f}`), ...docsIndex, ...docsModules]
+writeFileSync(join(out, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((u) => `  <url><loc>${SITE}${u}</loc><lastmod>${today}</lastmod></url>`).join('\n')}
+</urlset>
+`)
+writeFileSync(join(out, 'robots.txt'), `User-agent: *
+Allow: /
+
+Sitemap: ${SITE}sitemap.xml
+${existsSync(join(out, 'docs/sitemap.xml')) ? `Sitemap: ${SITE}docs/sitemap.xml\n` : ''}`)
+
 for (const w of warnings) console.warn('warning:', w)
 console.log(`landing: wrote ${out}/index.html and ${pkgs.length} landers (${pkgs.map((p) => p.short).join(', ')})`)

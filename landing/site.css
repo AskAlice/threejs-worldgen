@@ -162,6 +162,18 @@ footer a:hover { color: var(--ink); }
 .foundations > div { padding: 22px 24px; border-radius: 16px; border: 1px dashed rgba(20, 39, 26, .3); color: var(--muted); font-size: 15px; }
 .foundations b { display: block; color: var(--ink); font: 650 19px/1.2 var(--display); margin-bottom: 6px; }
 .foundations a { color: var(--accent); font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* "Works with" row on the landers: links to related packages. */
+.related { padding: 0 0 110px; }
+.related h2 { font-size: clamp(30px, 3.6vw, 44px); }
+.related ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.related a { display: flex; gap: 14px; height: 100%; padding: 18px 20px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); text-decoration: none; transition: border-color .2s; }
+.related a:hover { border-color: var(--accent); }
+.related svg { flex: none; width: 30px; height: 30px; }
+.related b { display: block; font: 650 18px/1.2 var(--display); }
+.related b i { font-style: normal; color: var(--accent); }
+.related span { display: block; margin-top: 4px; color: var(--muted); font-size: 14px; line-height: 1.5; }
 
 /* Homepage: how they fit together */
 .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 48px 0 0; padding: 0; list-style: none; counter-reset: step; }
