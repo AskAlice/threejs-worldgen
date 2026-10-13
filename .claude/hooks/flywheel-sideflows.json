@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "rules": [
+    { "id": "hard-bug", "flow": "/diagnosing-bugs", "signals": ["bug", "error", "crash", "crashes", "stack trace", "regression", "flaky", "doesn't work", "does not work", "slow", "perf"] },
+    { "id": "too-big", "flow": "/wayfinder", "signals": ["huge", "multi-week", "epic", "rewrite", "migration", "too big", "roadmap"] },
+    { "id": "architecture", "flow": "/improve-codebase-architecture", "signals": ["refactor", "messy", "tangled", "tech debt", "architecture", "hard to change"] },
+    { "id": "design-question", "flow": "/prototype", "signals": ["mockup", "what should it look like", "ui options", "state machine", "does this flow work"] },
+    { "id": "context-full", "flow": "/handoff", "signals": ["running out of context", "new session", "pick this up later", "hand off", "handoff"] },
+    { "id": "confused", "flow": "/wait-what", "signals": ["what do you mean", "i don't follow", "huh", "confused"] },
+    { "id": "idea", "flow": "/grill-me", "signals": ["should we", "thinking about", "idea", "plan", "not sure whether"] },
+    { "id": "review", "flow": "/code-review", "signals": ["review", "before i merge", "check my diff"] }
+  ]
+}

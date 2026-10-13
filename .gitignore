@@ -6,3 +6,6 @@ dist
 site
 .remember
 .scratch/
+.claude/flywheel-state.json
+.claude/flywheel-feedback.json
+.claude/flywheel-hook.log
