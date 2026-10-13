@@ -201,7 +201,8 @@ export class Corn {
   private fieldBounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0 }
   private frame = 0
   private retired: { attributes: InstancedBufferAttribute[]; geometries: InstancedBufferGeometry[]; frame: number }[] = []
-  private previous = new WeakMap<Object3D, Vector3>()
+  /** Each interactor's position at the frame it was last seen. */
+  private previous = new WeakMap<Object3D, { p: Vector3; frame: number }>()
   private sunSearched = false
   private autoSun: DirectionalLight | null = null
   private unhook = () => {}
@@ -540,27 +541,29 @@ export class Corn {
   /** Stamps every interactor near the ground into the flatten map, along the path it moved since last frame. */
   private flattenUnderInteractors() {
     const s = this.settings
+    const frame = this.frame // update() advances it once per call
     if (s.interactionStrength <= 0) return
     for (const it of s.interactors) {
       const obj = interactorObject(it)
       if (!obj || !(it.radius > 0)) continue
       const p = obj.getWorldPosition(_p)
       const ground = this.sampleHeight(p.x, p.z)
-      const last = this.previous.get(obj)
-      if (!last) this.previous.set(obj, p.clone())
-      if (ground !== ground || p.y - ground > s.height + it.radius) {
-        last?.copy(p)
-        continue
+      let last = this.previous.get(obj)
+      // Only a position from the previous frame draws a track: after a pause (interaction off, interactor
+      // removed and added back) the track restarts where the interactor is, instead of a stripe from where it was.
+      const from = last && last.frame === frame - 1 ? last.p : p
+      if (!last) this.previous.set(obj, (last = { p: p.clone(), frame }))
+      if (!(ground !== ground || p.y - ground > s.height + it.radius)) {
+        const dx = p.x - from.x
+        const dz = p.z - from.z
+        const steps = Math.min(64, Math.ceil(Math.hypot(dx, dz) / (it.radius * 0.5)))
+        for (let k = 1; k <= Math.max(1, steps); k++) {
+          const t = steps ? k / steps : 1
+          this.flattenMap.stamp(from.x + dx * t, from.z + dz * t, it.radius, dx, dz)
+        }
       }
-      const from = last ?? p
-      const dx = p.x - from.x
-      const dz = p.z - from.z
-      const steps = Math.min(64, Math.ceil(Math.hypot(dx, dz) / (it.radius * 0.5)))
-      for (let k = 1; k <= Math.max(1, steps); k++) {
-        const t = steps ? k / steps : 1
-        this.flattenMap.stamp(from.x + dx * t, from.z + dz * t, it.radius, dx, dz)
-      }
-      last?.copy(p)
+      last.p.copy(p)
+      last.frame = frame
     }
   }
 
@@ -667,7 +670,7 @@ const UP = new Vector3(0, 1, 0)
  * One corn plant, modelled 2.4 m tall (instances scale it): a tapering stalk, alternating arching leaves with a
  * folded midrib and wavy margins, a branched tassel and up to two ears with silk. `detail` 0 (near) … 2 (far) uses
  * fewer, wider leaves and drops the small parts. Attributes: position, normal, uv, aPart = (part, node height
- * 0..1), see {@link createCornMaterial}. Exposed for custom instancing; Corn creates these for you.
+ * 0..1), see `createCornMaterial`. Exposed for custom instancing; Corn creates these for you.
  */
 export function createCornGeometry(detail: number): BufferGeometry {
   const b = new Builder()
@@ -786,7 +789,7 @@ export function createCornGeometry(detail: number): BufferGeometry {
 
 /**
  * The canopy surface of a set of fields: each field's polygon on a `resolution` m grid (cells clipped exactly at
- * the outline), draped on the terrain, plus a wall skirt along the outline. See {@link createCanopyMaterial}.
+ * the outline), draped on the terrain, plus a wall skirt along the outline. See `createCanopyMaterial`.
  */
 export function createCanopyGeometry(fields: readonly CornField[], resolution: number, height: HeightFn): BufferGeometry {
   const pos: number[] = []

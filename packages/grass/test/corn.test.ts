@@ -95,6 +95,11 @@ test('corn: an interactor flattens its radius along the path it drives', () => {
   tractor.position.set(3, 0, 3)
   corn.update(0)
   assert.equal(corn.flattened(3, 3), 0)
+  // Back on: the track restarts where the tractor is now, with no stripe from where it was before the pause.
+  corn.set({ interactionStrength: 1 })
+  corn.update(0)
+  assert.equal(corn.flattened(3, 3), 1)
+  assert.equal(corn.flattened(4.5, 2.25), 0, 'no stripe back to the position before interaction was off')
   corn.dispose()
 })
 
