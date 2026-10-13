@@ -5,7 +5,7 @@
 <p><b><a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html?scene">Live demo</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html">Vehicle gallery</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles-r3f.html">React Three Fiber demo</a> · <a href="https://askalice.github.io/threejs-worldgen/vehicles/">Landing page</a> · <a href="https://askalice.github.io/threejs-worldgen/docs/modules/threejs-vehicles.html">API docs</a></b></p>
 <!-- demo-cards:end -->
 
-Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
+Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
 
 Every vehicle is a seeded, low-poly generator, so the variety looks random but never is.
 
@@ -107,7 +107,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 
 | Type | Parameters (defaults) |
 |---|---|
-| `car` | `style` (`mixed`, sedan, hatchback, suv, truck, van, bus), `size 1` |
+| `car` | `style` (`mixed`, sedan, hatchback, suv, truck, van, bus, compact, retroWagon, vintage, electricSaloon, roadster, muscle), `size 1` |
 | `bicycle` | `style` (`mixed`, road, city, mountain), `rider true` |
 | `train` | `car` (`locomotive`, passenger, freight), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
 | `fishing-boat` | `length 13`, `outriggers true` |
@@ -118,6 +118,21 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | `airplane` | `style` (`airliner`, light, mixed), `length 38`, `engines 2` |
 | `fighter-jet` | `style` (`mixed`, delta, twin-tail), `length 16` |
 | `rocket` | `height 60`, `stages 2`, `boosters 0`, `fins true`, `pad true` |
+
+### Car lookalikes
+
+Six car styles match the proportions and silhouettes of well-known cars, under generic names and with no badges, logos or names anywhere. Each is within a few per cent of its reference's published length, width (without mirrors), height and wheelbase, listed in `CAR_REFERENCES`:
+
+| Style | Looks like | Signature details |
+|---|---|---|
+| `compact` | a current compact sedan | wedge profile, long sloping rear glass, slim swept lamps, wide lower grille |
+| `retroWagon` | a 2000s retro wagon | tall upright glasshouse, separate front wings, upright chrome grille |
+| `vintage` | a 1910s touring car | upright radiator, open tub under a folding top, wooden-spoked wheels, running boards, bucket lamps |
+| `electricSaloon` | a large electric liftback | no grille, glass roof, flush handles, aero wheel covers, no tailpipe |
+| `roadster` | a front-engined convertible GT | long bonnet, open cockpit set back, rear haunches, twin round tail lamps, quad tailpipes |
+| `muscle` | a full-size muscle sedan | flat bonnet, full-width grille, thick C pillar, full-width tail lamp |
+
+Bodies are smooth lofted surfaces (superellipse cross-sections along the length, wheel arches rolled into them), not stacked boxes. Paint is metallic under a clear coat, glass and chrome are reflective, and colours and trims (wheels, roof, grille) are seeded per vehicle. Every model lists its tailpipes in `vents` (empty for electric ones).
 
 ## Fleet options
 

@@ -1,14 +1,15 @@
 import * as THREE from 'three/webgpu'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { RoadGraph } from 'threejs-city'
 import { DEFAULT_FLEET, DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, defaultParams, type FleetGroup, type FleetImpl, type VehicleImpl, type VehicleType } from 'threejs-vehicles/react'
 import type { Choices, Ranges } from './leva-options'
-import { Daylight, View, mount, useHud, useOptions } from './r3f-shared'
+import { Daylight, View, mount, useHud, useOptions, type V3 } from './r3f-shared'
+import { GALLERY_ROWS, rowPosition, skyEnvironment } from './vehicles-rows'
 
 // threejs-vehicles in React Three Fiber. Gallery: a <Vehicle> per type, with shared settings and each
-// type's own parameters. Traffic: one <Fleet> on a threejs-city RoadGraph street grid, with planes
+// type's own parameters, plus the real-scale rows (car lookalikes, pickups, trucks, tractors) behind it. Traffic: one <Fleet> on a threejs-city RoadGraph street grid, with planes
 // overhead and a rocket launch. Every control is a component prop; the instances are never remounted.
 const { type: _t, params: _p, tint: _c, heading: _h, ...SHARED } = { ...DEFAULT_VEHICLE, speed: 6 }
 
@@ -37,8 +38,21 @@ function Exhibit({ type, index, turntable, settings }: { type: VehicleType; inde
   )
 }
 
+/** Reflections for paint, glass and metal: the sky gradient as the scene environment. */
+function SkyEnvironment() {
+  const { gl, scene } = useThree()
+  useEffect(() => skyEnvironment(gl as unknown as THREE.WebGPURenderer, scene), [gl, scene])
+  return null
+}
+
 function Gallery({ night }: { night: number }) {
-  const { turntable } = useControls('Gallery', { turntable: true })
+  const { turntable, frame } = useControls('Gallery', { turntable: true, frame: { value: 'all types', options: ['all types', ...GALLERY_ROWS.map((r) => r.name)] } })
+  const view = useMemo(() => {
+    const r = GALLERY_ROWS.findIndex((row) => row.name === frame)
+    if (r < 0) return { position: [0, 26, 52] as V3, target: [0, 2, 0] as V3 }
+    const [x0, z] = rowPosition(r, 0), [x1] = rowPosition(r, GALLERY_ROWS[r].items.length - 1)
+    return { position: [(x0 + x1) / 2 + 4, 6, z + Math.abs(x1 - x0) * 0.9 + 6] as V3, target: [(x0 + x1) / 2, 0.8, z] as V3 }
+  }, [frame])
   const shared = useOptions('All vehicles', SHARED, {
     ranges: { speed: [0, 30], lights: [0, 1], crumple: [0, 0.5], period: [20, 300, 1], seed: [1, 100, 1], wetness: [0, 1], snow: [0, 1], burn: [0, 1], damage: [0, 1], heat: [0, 1] },
   })
@@ -47,13 +61,26 @@ function Gallery({ night }: { night: number }) {
   useHud(() => `threejs-vehicles · <Vehicle> × ${VEHICLE_TYPES.length}, each at ~9 m for comparison\none InstancedMesh per part (body, wheels, fans, stages), one material`)
   return (
     <>
-      <Daylight night={night} target={[0, 0, 0]} extent={60} />
+      <Daylight night={night} target={[0, 0, 30]} extent={90} />
       <gridHelper args={[120, 60, '#6d8aa0', '#86a3b8']} />
+      <SkyEnvironment />
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 80]} receiveShadow>
+        <planeGeometry args={[400, 400]} />
+        <meshStandardNodeMaterial color="#8b8d8f" roughness={0.92} />
+      </mesh>
+      {GALLERY_ROWS.flatMap((row, r) => row.items.map((item, i) => {
+        const [x, z] = rowPosition(r, i)
+        return (
+          <group key={`${row.name}-${i}`} position={[x, 0, z]}>
+            <Vehicle type={item.type} seed={11 + r * 17 + i} {...shared} params={item.params} lights={Math.max(shared.lights, night)} />
+          </group>
+        )
+      }))}
       {VEHICLE_TYPES.map((type, i) => {
         const { tint, ...params } = perType[type] ?? {}
         return <Exhibit key={type} type={type} index={i} turntable={turntable} settings={{ ...shared, params, tint, lights: Math.max(shared.lights, night) }} />
       })}
-      <View position={[0, 26, 52]} target={[0, 2, 0]} />
+      <View position={view.position} target={view.target} />
     </>
   )
 }

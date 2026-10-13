@@ -1,7 +1,9 @@
 /**
- * A small typed-array mesh builder for low-poly, flat-shaded vehicles. Every face carries a colour and a
- * style: `paint` (1 = takes the per-instance tint, 0 = keeps its own colour) and `glow` (lit at night:
- * headlights, windows). Faces are oriented away from a given inside point, so winding never needs care.
+ * A small typed-array mesh builder for vehicles: flat-shaded primitives for hard-edged parts, and smooth
+ * (shared-normal) lofted surfaces, lathes and rounded boxes for bodywork. Every face carries a colour
+ * and a style: `paint` (1 = takes the per-instance tint, 0 = keeps its own colour), `glow` (lit at night:
+ * headlights, windows) and a `finish` (plain, glass, chrome, brushed steel, rubber). Faces are oriented
+ * away from a given inside point, so winding never needs care.
  */
 
 /** A 3D point or vector. */
@@ -17,7 +19,16 @@ export interface Paint {
   paint: number
   /** Night glow 0…1 (headlights 1, lit windows ~0.3). */
   glow: number
+  /** Surface finish (see {@link FINISH}); default plain. */
+  finish?: number
 }
+
+/**
+ * Surface finishes the vehicle material knows: `plain` (painted surfaces get clear coat), `glass`
+ * (smooth, reflective), `chrome` (polished metal), `brushed` (anisotropic stainless steel, brushed
+ * along the vehicle's length) and `rubber` (matte).
+ */
+export const FINISH = { plain: 0, glass: 1, chrome: 2, brushed: 3, rubber: 4 } as const
 
 /** Plain mesh data: everything a `BufferGeometry` needs, as typed arrays. */
 export interface MeshData {
@@ -27,7 +38,7 @@ export interface MeshData {
   normal: Float32Array
   /** Linear RGB per vertex. */
   color: Float32Array
-  /** (paint, glow) per vertex. */
+  /** (paint, glow, finish) per vertex. */
   style: Float32Array
   /** Triangle indices. */
   index: Uint32Array
@@ -43,9 +54,12 @@ export function rgb(hex: string): RGB {
 }
 
 /** A {@link Paint} from a hex colour. */
-export function paint(hex: string, paintAmount = 0, glow = 0): Paint {
-  return { color: rgb(hex), paint: paintAmount, glow }
+export function paint(hex: string, paintAmount = 0, glow = 0, finish = 0): Paint {
+  return { color: rgb(hex), paint: paintAmount, glow, finish }
 }
+
+/** `sign(v) · |v|^p`: superellipse coordinates. */
+export const sgnpow = (v: number, p: number): number => Math.sign(v) * Math.abs(v) ** p
 
 /** One cross-section of a {@link MeshBuilder.loft}. */
 export interface Section {
@@ -148,7 +162,7 @@ export class MeshBuilder {
       this.pos.push(p[0], p[1], p[2])
       this.nor.push(nx, ny, nz)
       this.col.push(s.color[0], s.color[1], s.color[2])
-      this.sty.push(s.paint, s.glow)
+      this.sty.push(s.paint, s.glow, s.finish ?? 0)
     }
     for (let i = 1; i < pts.length - 1; i++) this.idx.push(base, base + i, base + i + 1)
     return this
@@ -305,6 +319,114 @@ export class MeshBuilder {
     return this
   }
 
+  /**
+   * A smooth-shaded surface through a grid of points: `rows[i][j]`, rows along the length, points around
+   * (`closed`: each row is a ring). Normals are averaged over the grid, so curved bodywork shows no
+   * facets; `paintOf(i, j)` colours the cell between rows i, i+1 and points j, j+1 (colour edges stay
+   * crisp). Faces are turned outwards (away from each row's centre); `caps` closes the first and last
+   * ring with flat faces.
+   */
+  surface(rows: Vec3[][], paintOf: (i: number, j: number) => Paint, closed = true, caps: [Paint | null, Paint | null] = [null, null]): this {
+    const nr = rows.length, nc = rows[0]?.length ?? 0
+    if (nr < 2 || nc < 2) return this
+    const P = rows.map((row) => row.map((p) => this.xf(p)))
+    const cells = closed ? nc : nc - 1
+    // Area-weighted face normal per cell; vertex normals average the cells round a vertex that meet the
+    // cell within the crease angle, so curved panels are smooth and sharp edges (arch lips) stay crisp.
+    const F = new Float64Array((nr - 1) * cells * 3), U = new Float64Array((nr - 1) * cells * 3)
+    const centre = P.map((row) => row.reduce((a, p) => [a[0] + p[0] / nc, a[1] + p[1] / nc, a[2] + p[2] / nc], [0, 0, 0]))
+    let out = 0
+    for (let i = 0; i < nr - 1; i++) for (let j = 0; j < cells; j++) {
+      const j1 = (j + 1) % nc
+      const a = P[i][j], b = P[i + 1][j], c = P[i + 1][j1], d = P[i][j1]
+      const n = cross(sub(c, a), sub(d, b))
+      const o = (i * cells + j) * 3, l = Math.hypot(n[0], n[1], n[2])
+      F[o] = n[0]; F[o + 1] = n[1]; F[o + 2] = n[2]
+      if (l > 1e-14) { U[o] = n[0] / l; U[o + 1] = n[1] / l; U[o + 2] = n[2] / l }
+      const m: Vec3 = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2]
+      const q = centre[i]
+      out += n[0] * (m[0] - q[0]) + n[1] * (m[1] - q[1]) + n[2] * (m[2] - q[2])
+    }
+    const sign = out < 0 ? -1 : 1
+    const cellAt = (i: number, j: number) => {
+      if (i < 0 || i >= nr - 1) return -1
+      if (closed) j = ((j % nc) + nc) % nc
+      else if (j < 0 || j >= cells) return -1
+      return i * cells + j
+    }
+    const DI = [-1, -1, 0, 0], DJ = [-1, 0, -1, 0]
+    const CR = [0, 1, 1, 0], CK = [0, 0, 1, 1]
+    for (let i = 0; i < nr - 1; i++) for (let j = 0; j < cells; j++) {
+      const s = paintOf(i, j)
+      const self = (i * cells + j) * 3
+      const fx = U[self], fy = U[self + 1], fz = U[self + 2]
+      const base = this.pos.length / 3
+      for (let q = 0; q < 4; q++) {
+        const r = i + CR[q], k = (j + CK[q]) % nc
+        const p = P[r][k]
+        let nx = 0, ny = 0, nz = 0
+        for (let t = 0; t < 4; t++) {
+          const c = cellAt(r + DI[t], k + DJ[t])
+          if (c < 0) continue
+          const o = c * 3
+          if (o !== self && U[o] * fx + U[o + 1] * fy + U[o + 2] * fz < 0.6) continue
+          nx += F[o]; ny += F[o + 1]; nz += F[o + 2]
+        }
+        const l = Math.hypot(nx, ny, nz)
+        if (l > 1e-12) { nx = (nx / l) * sign; ny = (ny / l) * sign; nz = (nz / l) * sign }
+        else if (fx || fy || fz) { nx = fx * sign; ny = fy * sign; nz = fz * sign }
+        else { nx = 0; ny = 1; nz = 0 }
+        this.pos.push(p[0], p[1], p[2])
+        this.nor.push(nx, ny, nz)
+        this.col.push(s.color[0], s.color[1], s.color[2])
+        this.sty.push(s.paint, s.glow, s.finish ?? 0)
+      }
+      // Triangles wound like the cell (a planar quad's triangles share its orientation); slivers skipped.
+      if (!(fx || fy || fz)) continue
+      if (sign > 0) this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3)
+      else this.idx.push(base, base + 2, base + 1, base, base + 3, base + 2)
+    }
+    if (closed) {
+      if (caps[0]) this.face([...rows[0]], caps[0], rows[1].reduce((a, p) => [a[0] + p[0] / nc, a[1] + p[1] / nc, a[2] + p[2] / nc], [0, 0, 0] as Vec3))
+      if (caps[1]) this.face([...rows[nr - 1]], caps[1], rows[nr - 2].reduce((a, p) => [a[0] + p[0] / nc, a[1] + p[1] / nc, a[2] + p[2] / nc], [0, 0, 0] as Vec3))
+    }
+    return this
+  }
+
+  /**
+   * A smooth solid of revolution about an axis through `c`: `profile` is a list of (radius, offset
+   * along the axis) points (tyres, hubs, headlight buckets, tanks). `paintOf(k)` colours the band
+   * between profile points k and k+1.
+   */
+  lathe(axis: Axis, c: Vec3, profile: [radius: number, offset: number][], paintOf: Paint | ((k: number) => Paint), segments = 24): this {
+    const rows = profile.map(([r, h]) => Array.from({ length: segments }, (_, k) => {
+      const a = (k / segments) * Math.PI * 2
+      return axisPoint(axis, Math.cos(a) * r, Math.sin(a) * r, h, c)
+    }))
+    const f = typeof paintOf === 'function' ? paintOf : () => paintOf
+    return this.surface(rows, (i) => f(i))
+  }
+
+  /**
+   * A smooth rounded box (superellipsoid) centred at `c` with full `size`: exponent `e` 2 = ellipsoid,
+   * higher = boxier with rounded edges (seats, mirrors, lamps, bumpers, cabs).
+   */
+  rounded(c: Vec3, size: Vec3, s: Paint, e = 4, segU = 16, segV = 8): this {
+    const p = 2 / e
+    const rows: Vec3[][] = []
+    for (let i = 0; i <= segV; i++) {
+      const phi = -Math.PI / 2 + (Math.PI * i) / segV
+      const k = Math.abs(Math.cos(phi)) ** p, z = c[2] + (size[2] / 2) * sgnpow(Math.sin(phi), p)
+      const ring: Vec3[] = []
+      for (let j = 0; j < segU; j++) {
+        const a = (j / segU) * Math.PI * 2
+        ring.push([c[0] + (size[0] / 2) * k * sgnpow(Math.cos(a), p), c[1] + (size[1] / 2) * k * sgnpow(Math.sin(a), p), z])
+      }
+      rows.push(ring)
+    }
+    return this.surface(rows, () => s)
+  }
+
   /** Number of vertices so far. */
   get vertexCount(): number {
     return this.pos.length / 3
@@ -327,6 +449,9 @@ export class MeshBuilder {
 
 function dist2(a: Vec3, b: Vec3): number {
   return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+}
+function sub(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 function cross(a: Vec3, b: Vec3): Vec3 {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]

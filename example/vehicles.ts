@@ -4,8 +4,11 @@ import { RoadGraph } from 'threejs-city'
 import { DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, circlePoints, defaultParams, type FleetEnvironment, type FleetGroup } from 'threejs-vehicles'
 import { patch, type Ranges } from './options-gui'
 import { classOf, createPanel, type PanelClass } from './panel'
+import { GALLERY_ROWS, rowPosition, skyEnvironment, threeQuarter } from './vehicles-rows'
 
-// threejs-vehicles sandbox. Default: a gallery of every vehicle type, each with its own parameters.
+// threejs-vehicles sandbox. Default: a gallery of every vehicle type, each with its own parameters, and
+// real-scale rows of the car lookalikes, pickups, trucks and tractors behind it (`?row=cars&focus=2`
+// frames one exhibit in a ¾ view).
 // `?scene`: a live scene with traffic on a road graph, a train, harbour boats, a carrier with parked
 // jets, planes overhead and a rocket launch, with weather toggles (rain, snow, wildfire, damage, night).
 const params = new URLSearchParams(location.search)
@@ -53,6 +56,18 @@ else gallery()
 
 function gallery() {
   scene.add(new THREE.GridHelper(120, 60, '#6d8aa0', '#86a3b8'))
+  skyEnvironment(renderer, scene)
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2).translate(0, -0.01, 80), new THREE.MeshStandardNodeMaterial({ color: '#8b8d8f', roughness: 0.92 }))
+  ground.receiveShadow = true
+  scene.add(ground)
+  renderer.shadowMap.enabled = true
+  sun.castShadow = true
+  sun.shadow.mapSize.set(4096, 4096)
+  sun.shadow.bias = -0.0003
+  sun.shadow.normalBias = 0.02
+  Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 1500 })
+  sun.position.set(180, 300, 260)
+  sun.target.position.set(0, 0, 50)
   const shared = structuredClone(DEFAULT_VEHICLE) as Record<string, any>
   shared.speed = 6
   for (const k of ['type', 'params', 'tint', 'heading']) delete shared[k]
@@ -72,8 +87,35 @@ function gallery() {
   })
   camera.position.set(0, 26, 52)
   controls.target.set(0, 2, 0)
-  const all = { set: (input: any) => vehicles.forEach(({ v }) => v.set(input)) }
-  const ui = { turntable: true, night: 0 }
+  // Real-scale rows, facing the camera's side of the gallery (+z), wheels turning with `speed`.
+  const rows = GALLERY_ROWS.map((row, r) => row.items.map((item, i) => {
+    const v = new Vehicle({ ...shared, type: item.type, params: item.params, seed: 11 + r * 17 + i })
+    const [x, z] = rowPosition(r, i)
+    v.object.position.set(x, 0, z)
+    v.fleet.object.traverse((o) => { o.castShadow = o.receiveShadow = true })
+    scene.add(v.object)
+    return { v, item, x, z }
+  }))
+  const rowName = params.get('row')
+  const focus = (r: number, i: number, side = 1) => {
+    const { v, x, z } = rows[r][i]
+    const m = v.fleet.sim.models[0]
+    const view = threeQuarter(x, z, m.size[2], m.size[1], side)
+    camera.position.set(...view.position)
+    controls.target.set(...view.target)
+  }
+  if (rowName) {
+    const r = Math.max(0, GALLERY_ROWS.findIndex((row) => row.name === rowName))
+    const i = params.has('focus') ? Number(params.get('focus')) : -1
+    if (i >= 0) focus(r, i, Number(params.get('side') ?? 1))
+    else {
+      const [x0, z] = rowPosition(r, 0), [x1] = rowPosition(r, GALLERY_ROWS[r].items.length - 1)
+      camera.position.set((x0 + x1) / 2 + 4, 6, z + Math.abs(x1 - x0) * 0.9 + 6)
+      controls.target.set((x0 + x1) / 2, 0.8, z)
+    }
+  }
+  const all = { set: (input: any) => [...vehicles, ...rows.flat()].forEach(({ v }) => v.set(input)) }
+  const ui = { turntable: !rowName, night: 0 }
   const classes: PanelClass[] = [
     classOf('all vehicles', all, shared, {
       ranges: { speed: [0, 30], lights: [0, 1], crumple: [0, 0.5], period: [20, 300, 1], seed: [1, 100, 1], wetness: [0, 1], snow: [0, 1], burn: [0, 1], damage: [0, 1], heat: [0, 1] },
@@ -93,7 +135,11 @@ function gallery() {
   const sandbox = gui.addFolder('sandbox')
   sandbox.add(ui, 'turntable')
   sandbox.add(ui, 'night', 0, 1, 0.01).onChange((n: number) => { setNight(n); all.set({ lights: n }) })
-  Object.assign(window, { vehicles, scene, camera })
+  const goto = { row: rowName ?? GALLERY_ROWS[0].name, exhibit: 0 }
+  const jump = () => focus(GALLERY_ROWS.findIndex((r) => r.name === goto.row), Math.min(goto.exhibit, GALLERY_ROWS.find((r) => r.name === goto.row)!.items.length - 1))
+  sandbox.add(goto, 'row', GALLERY_ROWS.map((r) => r.name)).onChange(jump)
+  sandbox.add(goto, 'exhibit', 0, 7, 1).onChange(jump)
+  Object.assign(window, { vehicles, rows, scene, camera, controls, focus, all })
   let last = performance.now()
   renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000)
@@ -103,6 +149,7 @@ function gallery() {
       if (ui.turntable) pivot.rotation.y += dt * 0.3
       v.update(dt)
     }
+    for (const { v } of rows.flat()) v.update(dt)
     renderer.render(scene, camera)
     tickFps()
     hud.textContent = `${fps.toFixed(0)} fps · ${VEHICLE_TYPES.length} vehicle types, each at ~9 m for comparison\none InstancedMesh per part (body, wheels, fans, stages), one material`

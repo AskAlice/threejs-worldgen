@@ -10,6 +10,7 @@
  */
 export * from './mesh.ts'
 export * from './models.ts'
+export * from './cars.ts'
 export * from './paths.ts'
 export * from './sim.ts'
 export * from './material.ts'

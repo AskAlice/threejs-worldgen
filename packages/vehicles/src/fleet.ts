@@ -1,6 +1,6 @@
 import {
   BufferAttribute, BufferGeometry, CylinderGeometry, DynamicDrawUsage, Euler, Group, InstancedBufferAttribute, InstancedMesh,
-  Matrix4, PlaneGeometry, Quaternion, Sphere, Vector3, type MeshBasicNodeMaterial, type MeshStandardNodeMaterial, type Object3D,
+  Matrix4, PlaneGeometry, Quaternion, Sphere, Vector3, type MeshBasicNodeMaterial, type MeshPhysicalNodeMaterial, type Object3D,
 } from 'three/webgpu'
 import { InstanceStates, type MaterialStates, type StateLook } from 'threejs-weathering'
 import { rgb, type MeshData } from './mesh.ts'
@@ -60,7 +60,15 @@ function toGeometry(data: MeshData): BufferGeometry {
   g.setAttribute('position', new BufferAttribute(data.position, 3))
   g.setAttribute('normal', new BufferAttribute(data.normal, 3))
   g.setAttribute('color', new BufferAttribute(data.color, 3))
-  g.setAttribute('vstyle', new BufferAttribute(data.style, 2))
+  g.setAttribute('vstyle', new BufferAttribute(data.style, 3))
+  // Vehicle-space (length, height) coordinates: the material derives the brushing direction of brushed
+  // steel (anisotropy) from their screen derivatives, so it follows each instance's rotation.
+  const uv = new Float32Array((data.position.length / 3) * 2)
+  for (let i = 0, n = uv.length / 2; i < n; i++) {
+    uv[i * 2] = data.position[i * 3 + 2] + data.position[i * 3] * data.normal[i * 3 + 2]
+    uv[i * 2 + 1] = data.position[i * 3 + 1]
+  }
+  g.setAttribute('uv', new BufferAttribute(uv, 2))
   g.setIndex(new BufferAttribute(data.index, 1))
   const [x0, y0, z0, x1, y1, z1] = data.bounds
   g.boundingSphere = new Sphere(new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2)
@@ -106,7 +114,7 @@ export class Fleet {
   /** Live material uniforms. */
   readonly uniforms: VehicleUniforms
   /** The single material every part shares. */
-  readonly material: MeshStandardNodeMaterial
+  readonly material: MeshPhysicalNodeMaterial
   private fxMaterial: MeshBasicNodeMaterial
   private wakeMaterial: MeshBasicNodeMaterial
   private views: PartView[] = []

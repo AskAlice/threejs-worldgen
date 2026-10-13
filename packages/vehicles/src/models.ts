@@ -1,5 +1,7 @@
 import { mulberry32, seedOf } from 'threejs-biomes'
 import { MeshBuilder, paint, type MeshData, type Paint, type Vec3 } from './mesh.ts'
+import { LOOKALIKE_STYLES, lookalikeCar, type LookalikeStyle } from './cars.ts'
+import { BODY, DARK, GLASS, GREY, HEAD, LIT, RIM, TAIL, TRIM, TYRE, WHITE, body, jitter, model, num, pick, roadWheel, str, type Rand } from './kit.ts'
 
 /** Every vehicle the package generates. */
 export type VehicleType =
@@ -60,6 +62,21 @@ export interface Exhaust {
   stage?: number
 }
 
+/**
+ * Where engine smoke leaves a vehicle (threejs-particles exhaust, see `VehicleExhaust`): car tailpipes,
+ * truck and tractor stacks, locomotive chimneys. Electric vehicles have none.
+ */
+export interface ExhaustVent {
+  /** Outlet, vehicle space. */
+  position: Vec3
+  /** Unit direction the gas leaves in, vehicle space. */
+  direction: Vec3
+  /** What comes out: faint `tailpipe` exhaust, diesel `stack` smoke, a `steam` locomotive's plume, a `diesel` locomotive's haze. */
+  kind: 'tailpipe' | 'stack' | 'steam' | 'diesel'
+  /** Outlet radius, metres. */
+  radius: number
+}
+
 /** A parking spot on a host vehicle (jets on a carrier deck). */
 export interface HostSpot {
   /** Position, host vehicle space. */
@@ -82,8 +99,10 @@ export interface VehicleModel {
   parts: ModelPart[]
   /** Distance between front and rear axles (steering), metres. */
   wheelBase: number
-  /** Engine exhausts. */
+  /** Engine exhausts (rocket plumes, afterburners). */
   exhausts: Exhaust[]
+  /** Engine smoke outlets (tailpipes, stacks, chimneys); empty for electric vehicles. */
+  vents: ExhaustVent[]
   /** Parking spots for other vehicles (carriers). */
   hosts: HostSpot[]
   /** Rocket stages (0 for everything else). */
@@ -98,59 +117,7 @@ export interface VehicleModel {
   trim: number
 }
 
-type Rand = () => number
-
-// Shared paints.
-const TYRE = paint('#1a1a1c')
-const RIM = paint('#a9aeb4')
-const TRIM = paint('#2b2c30')
-const DARK = paint('#141518')
-const GLASS = paint('#1f2c36', 0, 0.05)
-const LIT = paint('#2c3b46', 0, 0.4)
-const HEAD = paint('#fff3d2', 0, 1)
-const TAIL = paint('#b0141c', 0, 0.8)
-const BODY = paint('#ffffff', 1)
-const WHITE = paint('#eceef0')
-const GREY = paint('#9aa1a8')
-
-const pick = <T>(rand: Rand, list: readonly T[]): T => list[Math.floor(rand() * list.length) % list.length]
-const jitter = (rand: Rand, amount: number) => 1 + (rand() * 2 - 1) * amount
-const num = (p: VehicleParams, k: string) => Number(p[k])
-const str = (p: VehicleParams, k: string) => String(p[k])
-
-function model(type: VehicleType, style: string, domain: VehicleDomain, parts: ModelPart[], extra: Partial<VehicleModel> = {}): VehicleModel {
-  const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
-  for (const part of parts) for (const m of part.mounts) for (let k = 0; k < 3; k++) {
-    b[k] = Math.min(b[k], part.mesh.bounds[k] + m.position[k])
-    b[k + 3] = Math.max(b[k + 3], part.mesh.bounds[k + 3] + m.position[k])
-  }
-  return {
-    type, style, domain, parts, size: [b[3] - b[0], b[4] - b[1], b[5] - b[2]],
-    wheelBase: 0, exhausts: [], hosts: [], stages: 0, palette: ['#ffffff'], wake: 0, bank: 0, trim: 0, ...extra,
-  }
-}
-
-const body = (mesh: MeshData): ModelPart => ({ name: 'body', mesh, mounts: [{ position: [0, 0, 0] }] })
-
 // ---------------------------------------------------------------- land
-
-/** A road wheel along x: tyre, hub and a spoke bar so the spin reads. */
-function roadWheel(r: number, w: number, bike = false): MeshData {
-  const m = new MeshBuilder()
-  if (bike) {
-    m.tube('x', [0, 0, 0], r, r - w * 0.9, w, TYRE, 18)
-    m.cylinder('x', [0, 0, 0], r * 0.08, w * 2, RIM, 6)
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * Math.PI
-      m.beam([0, Math.sin(a) * (r - w), Math.cos(a) * (r - w)], [0, -Math.sin(a) * (r - w), -Math.cos(a) * (r - w)], 0.012, RIM)
-    }
-  } else {
-    m.cylinder('x', [0, 0, 0], r, w, TYRE, 12, r, TYRE)
-    m.cylinder('x', [0, 0, 0], r * 0.62, w * 1.04, RIM, 10)
-    m.box([0, 0, 0], [w * 1.1, r * 0.95, r * 0.18], DARK)
-  }
-  return m.build()
-}
 
 const CAR_STYLES = {
   sedan: { L: 4.6, W: 1.8, H: 1.45, r: 0.32, ride: 0.28, cabin: 0.48, at: -0.04, hood: 0.55, taper: 0.8, rake: 0.3 },
@@ -163,9 +130,13 @@ const CAR_STYLES = {
 const CAR_PALETTE = ['#b8282a', '#25384d', '#e9ecee', '#7f8a92', '#2a6fb0', '#168f78', '#e7b416', '#6c3c8c', '#cf5a12', '#1b1b1d', '#b9c0c6', '#2b8a4b']
 const BUS_PALETTE = ['#e7b416', '#b8282a', '#2a6fb0', '#e9ecee', '#2b8a4b']
 
+/** Styles `mixed` cars draw from (repeats weight them). */
+const MIXED_CARS = ['sedan', 'sedan', 'sedan', 'hatchback', 'hatchback', 'suv', 'suv', 'truck', 'van', 'bus', 'compact', 'compact', 'retroWagon', 'electricSaloon', 'electricSaloon', 'muscle', 'roadster']
+
 function car(p: VehicleParams, rand: Rand): VehicleModel {
   let style = str(p, 'style')
-  if (!(style in CAR_STYLES)) style = pick(rand, ['sedan', 'sedan', 'sedan', 'hatchback', 'hatchback', 'suv', 'suv', 'truck', 'van', 'bus'])
+  if (!(style in CAR_STYLES) && !(LOOKALIKE_STYLES as readonly string[]).includes(style)) style = pick(rand, MIXED_CARS)
+  if ((LOOKALIKE_STYLES as readonly string[]).includes(style)) return lookalikeCar(style as LookalikeStyle, p, rand)
   const st = CAR_STYLES[style as keyof typeof CAR_STYLES]
   const k = num(p, 'size') * jitter(rand, 0.05)
   const L = st.L * k * jitter(rand, 0.04), W = st.W * k, H = st.H * k * jitter(rand, 0.04), r = st.r * k, ride = st.ride * k
@@ -684,8 +655,8 @@ const size = { type: 'number', default: 1, min: 0.6, max: 1.6, step: 0.01 } as c
 /** Every vehicle type with its parameters (all JSON) and generator. */
 export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
   car: {
-    name: 'Car', domain: 'land', tags: ['car', 'sedan', 'hatchback', 'suv', 'truck', 'pickup', 'van', 'bus', 'traffic', 'road'],
-    params: { style: { type: 'choice', default: 'mixed', options: ['mixed', 'sedan', 'hatchback', 'suv', 'truck', 'van', 'bus'] }, size },
+    name: 'Car', domain: 'land', tags: ['car', 'sedan', 'hatchback', 'suv', 'truck', 'pickup', 'van', 'bus', 'compact', 'wagon', 'vintage', 'electric', 'roadster', 'convertible', 'muscle', 'traffic', 'road'],
+    params: { style: { type: 'choice', default: 'mixed', options: ['mixed', 'sedan', 'hatchback', 'suv', 'truck', 'van', 'bus', ...LOOKALIKE_STYLES] }, size },
     build: car,
   },
   bicycle: {

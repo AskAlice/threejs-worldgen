@@ -1,5 +1,5 @@
-import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, type Node, type NodeMaterial } from 'three/webgpu'
-import { abs, attribute, float, mix, mx_noise_float, normalGeometry, positionGeometry, positionLocal, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, type Node, type NodeMaterial } from 'three/webgpu'
+import { abs, attribute, float, mix, mx_noise_float, normalGeometry, positionGeometry, positionLocal, smoothstep, time, uniform, uv, vec2, vec3 } from 'three/tsl'
 import { applyMaterialStatesTo, type StateLook } from 'threejs-weathering'
 
 /** Creates the live uniforms shared by a fleet's vehicle material (exported so the type is documented). */
@@ -30,19 +30,33 @@ export function deformBeforeInstancing<M extends NodeMaterial>(material: M, defo
 
 /**
  * The one material every vehicle part shares. Per vertex: `color` (own colour) and `vstyle` (paint,
- * glow). Per instance: `vehicleLook` (tint rgb, heat) and `vehicleStates` (wetness, snow, burn, damage,
- * from threejs-weathering's `InstanceStates`). The tint goes in through `colorNode`, before the
- * weathering states, so snow stays white and ash stays grey on any paint. Damage also dents the body.
+ * glow, finish). Per instance: `vehicleLook` (tint rgb, heat) and `vehicleStates` (wetness, snow, burn,
+ * damage, from threejs-weathering's `InstanceStates`). The tint goes in through `colorNode`, before the
+ * weathering states, so snow stays white and ash stays grey on any paint. Painted surfaces are metallic
+ * paint under a clear coat (lost under snow, ash and heavy damage); finishes give glass, chrome, brushed
+ * stainless steel (anisotropic, brushed along the vehicle) and rubber. Damage also dents the body.
  */
-export function createVehicleMaterial(u: VehicleUniforms, look?: StateLook): MeshStandardNodeMaterial {
-  const m = new MeshStandardNodeMaterial()
+export function createVehicleMaterial(u: VehicleUniforms, look?: StateLook): MeshPhysicalNodeMaterial {
+  const m = new MeshPhysicalNodeMaterial()
   const color = attribute('color', 'vec3') as any
-  const style = attribute('vstyle', 'vec2') as any
+  const style = attribute('vstyle', 'vec3') as any
   const tint = attribute('vehicleLook', 'vec4') as any
   const st = attribute('vehicleStates', 'vec4') as any
-  m.colorNode = mix(color, tint.xyz, style.x)
-  m.roughnessNode = mix(float(0.72), float(0.3), style.x)
-  m.metalnessNode = style.x.mul(0.2)
+  const finish = (k: number): any => smoothstep(0.5, 0, abs(style.z.sub(k)))
+  const glass = finish(1), chrome = finish(2), brushed = finish(3), rubber = finish(4)
+  const painted = style.x
+  m.colorNode = mix(color, tint.xyz, painted)
+  let rough: any = mix(float(0.7), float(0.42), painted)
+  rough = mix(rough, float(0.04), glass)
+  rough = mix(rough, float(0.12), chrome)
+  rough = mix(rough, float(0.3), brushed)
+  m.roughnessNode = mix(rough, float(0.92), rubber)
+  m.metalnessNode = painted.mul(0.45).add(chrome).add(brushed).clamp(0, 1)
+  // Clear coat and brushing go under snow (on up-facing surfaces), ash and heavy damage.
+  const covered = smoothstep(0.1, 0.6, normalGeometry.y).mul(st.y).oneMinus().mul(st.z.oneMinus()).mul(st.w.mul(0.6).oneMinus())
+  m.clearcoatNode = painted.mul(covered)
+  m.clearcoatRoughnessNode = float(0.035).add(st.w.mul(0.3))
+  m.anisotropyNode = vec2(brushed.mul(0.8).mul(covered), 0)
   m.emissiveNode = color.mul(style.y).mul(u.lights).mul(4)
   const dent = mx_noise_float(positionGeometry.mul(1.3)).mul(0.5).add(0.5).mul(st.w).mul(u.crumple)
   deformBeforeInstancing(m, positionGeometry.sub(normalGeometry.mul(dent)))

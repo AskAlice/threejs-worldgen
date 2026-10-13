@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { World } from 'threejs-biomes'
 import { isPlausible } from '../../worldgen/src/assets.ts'
 import { MeshBuilder, paint, type MeshData } from '../src/mesh.ts'
-import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleType } from '../src/models.ts'
+import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type VehicleType } from '../src/models.ts'
+import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/cars.ts'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
@@ -17,7 +18,7 @@ function checkMesh(m: MeshData, label: string) {
   for (let i = 0; i < nv; i++) assert.ok(Math.abs(Math.hypot(m.normal[i * 3], m.normal[i * 3 + 1], m.normal[i * 3 + 2]) - 1) < 1e-4, `${label}: normal not unit`)
   for (const i of m.index) assert.ok(i < nv, `${label}: index out of range`)
   assert.equal(m.color.length, nv * 3)
-  assert.equal(m.style.length, nv * 2)
+  assert.equal(m.style.length, nv * 3)
 }
 
 // Expected size ranges (x width, y height, z length) in metres, loose enough for seeded variety.
@@ -306,5 +307,67 @@ test('assets: one AssetDef per type, defaults in range', () => {
       if (p.type === 'choice') assert.ok(p.options.includes(p.default), `${d.id}.${k}`)
     }
     assert.deepEqual(Object.keys(d.params), Object.keys(VEHICLE_KINDS[d.id.slice(9) as VehicleType].params))
+  }
+})
+
+/**
+ * Overall size of a model as published figures measure it: length and height of the whole vehicle,
+ * body width without mirrors (widest body point below 60 % of the height, where mirrors never are) and
+ * the wheelbase.
+ */
+function measure(m: VehicleModel): CarDimensions {
+  const b = m.parts[0].mesh
+  let w = 0
+  for (let i = 0; i < b.position.length; i += 3) if (b.position[i + 1] < 0.6 * m.size[1]) w = Math.max(w, Math.abs(b.position[i]))
+  return { length: m.size[2], width: 2 * w, height: m.size[1], wheelBase: m.wheelBase }
+}
+
+function within(label: string, got: CarDimensions, ref: CarDimensions, tol = 0.05) {
+  for (const k of ['length', 'width', 'height', 'wheelBase'] as const) {
+    assert.ok(Math.abs(got[k] / ref[k] - 1) <= tol, `${label} ${k}: ${got[k].toFixed(3)} vs ${ref[k]} (${((got[k] / ref[k] - 1) * 100).toFixed(1)} %)`)
+  }
+}
+
+test('car lookalikes: within 5 % of the reference cars, distinct, deterministic, smooth', () => {
+  const sizes = new Set<string>()
+  for (const style of LOOKALIKE_STYLES) for (const seed of [1, 7]) {
+    const m = buildVehicle('car', { style }, seed)
+    assert.equal(m.style, style)
+    for (const part of m.parts) checkMesh(part.mesh, `${style}/${part.name}`)
+    within(style, measure(m), CAR_REFERENCES[style])
+    sizes.add(m.size.map((v) => v.toFixed(2)).join())
+    // Wheels: four, two of them steered, spinning with distance.
+    const wheels = m.parts.find((p) => p.name === 'wheel')!
+    assert.equal(wheels.mounts.length, 4)
+    assert.equal(wheels.mounts.filter((t) => t.steer).length, 2)
+    // Same seed, same car (geometry, colours and trims).
+    const again = buildVehicle('car', { style }, seed)
+    m.parts.forEach((p, i) => { assert.deepEqual(p.mesh.position, again.parts[i].mesh.position); assert.deepEqual(p.mesh.color, again.parts[i].mesh.color) })
+    // Smooth bodywork: most body vertices share their position with others whose normals nearly agree.
+    const b = m.parts[0].mesh, seen = new Map<string, number[]>()
+    for (let i = 0; i < b.position.length / 3; i++) {
+      const key = [0, 1, 2].map((k) => b.position[i * 3 + k].toFixed(4)).join()
+      const list = seen.get(key) ?? []
+      list.push(i)
+      seen.set(key, list)
+    }
+    let shared = 0, smooth = 0
+    for (const list of seen.values()) for (let a = 1; a < list.length; a++) {
+      shared++
+      const i = list[0], j = list[a]
+      if (b.normal[i * 3] * b.normal[j * 3] + b.normal[i * 3 + 1] * b.normal[j * 3 + 1] + b.normal[i * 3 + 2] * b.normal[j * 3 + 2] > 0.999) smooth++
+    }
+    assert.ok(smooth / shared > 0.6, `${style}: only ${((smooth / shared) * 100).toFixed(0)} % smooth vertices`)
+  }
+  assert.equal(sizes.size, LOOKALIKE_STYLES.length, 'every style has its own proportions')
+  // Seeded colours and trims: the palette is the style's own, and seeds pick different trims.
+  const trims = new Set(Array.from({ length: 6 }, (_, s) => buildVehicle('car', { style: 'compact' }, s + 1).parts[1].mesh.color.slice(-3).join()))
+  assert.ok(trims.size > 1, 'seeded wheel trims')
+  // In the asset parameters (and so the mixed traffic pool) and with exhaust vents, except the electric saloon.
+  for (const style of LOOKALIKE_STYLES) {
+    assert.ok((VEHICLE_KINDS.car.params.style as { options: string[] }).options.includes(style))
+    const vents = buildVehicle('car', { style }).vents
+    if (style === 'electricSaloon') assert.equal(vents.length, 0)
+    else assert.ok(vents.length > 0 && vents.every((v) => v.kind === 'tailpipe' && v.position[2] < 0), style)
   }
 })
