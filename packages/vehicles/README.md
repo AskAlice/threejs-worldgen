@@ -5,7 +5,7 @@
 <p><b><a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html?scene">Live demo</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html">Vehicle gallery</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles-r3f.html">React Three Fiber demo</a> · <a href="https://askalice.github.io/threejs-worldgen/vehicles/">Landing page</a> · <a href="https://askalice.github.io/threejs-worldgen/docs/modules/threejs-vehicles.html">API docs</a></b></p>
 <!-- demo-cards:end -->
 
-Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), pickups (full-size, ute, angular stainless), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
+Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), pickups (full-size, ute, angular stainless), trucks (conventional and cab-over tractors with box, container, flatbed and tanker trailers, multi-trailer rigs, rigid box trucks), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
 
 Every vehicle is a seeded, low-poly generator, so the variety looks random but never is.
 
@@ -109,6 +109,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 |---|---|
 | `car` | `style` (`mixed`, sedan, hatchback, suv, truck, van, bus, compact, retroWagon, vintage, electricSaloon, roadster, muscle), `size 1` |
 | `pickup` | `style` (`mixed`, fullSize, ute, angular), `cab` (regular, extended, `crew`), `bed` (`short`, long), `lift 0`, `hitch false`, `load` (`none`, crates, hay, gravel), `ute` (`coupe`, tray), `painted false`, `size 1` |
+| `truck` | `cab` (`conventional`, cabOver), `sleeper true`, `axles 3`, `stacks true`, `cabColor ''`, `body` (`tractor`, rigid), `trailers 1` (1…3), `trailer` (`mixed`, box, container, flatbed, tanker), `load` (`mixed`, empty, lumber, pipes, machinery) |
 | `bicycle` | `style` (`mixed`, road, city, mountain), `rider true` |
 | `train` | `car` (`locomotive`, passenger, freight), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
 | `fishing-boat` | `length 13`, `outriggers true` |
@@ -143,9 +144,20 @@ Three body families, lookalikes with generic names:
 - `ute`: a sedan-based coupé utility with a covered tray, or (`ute: 'tray'`) a cab-chassis with an alloy drop-side tray.
 - `angular`: a flat-panelled, faceted body with a triangular roof line, light bars front and rear and black arch flares, in brushed stainless steel (anisotropic) unless `painted`. Electric, so it has no exhaust vents.
 
+### Trucks
+
+One generator covers heavy goods vehicles: a long-bonnet conventional or a cab-over tractor, day or sleeper cab, 2 to 4 axles (single steer, dual drive and trailer wheels), chrome stacks or under-body exhaust and a seeded or given `cabColor`. `body: 'rigid'` builds a box truck on its own chassis. Tractors pull 1 to 3 trailers:
+
+- `box`: a 53 ft (16.15 m) van, or 12.6 m in multi-trailer rigs;
+- `container`: a skeletal chassis with one 40 ft or two 20 ft ISO containers in seeded colours and plain liveries;
+- `flatbed`: empty or with a seeded load of lumber, pipes or a tracked excavator;
+- `tanker`: a polished or painted elliptical barrel with a catwalk.
+
+A rig is one fleet unit: the tractor drives the route and each trailer's kingpin sits on the coupling in front (the tractor's fifth wheel, or the one over the lead trailer's axles in a B-train), its axles dragged after it. Trailers therefore off-track inside on turns as real ones do. Sizes keep to road-legal limits (`TRUCK_LIMITS`: 2.6 m wide, 4.3 m high, 16.2 m trailers, 53.5 m road trains).
+
 ### Traffic pools
 
-`TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`); pickups and utes weigh into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
+`TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`): semi-trailer rigs weigh into highways, box trucks into towns, pickups and utes into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
 
 ```ts
 new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: city.graph })

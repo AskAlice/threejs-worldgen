@@ -84,6 +84,20 @@ export interface WheelLook {
  */
 export function smoothWheel(r: number, w: number, look: WheelLook): MeshData {
   const m = new MeshBuilder()
+  wheelInto(m, r, w, look)
+  return m.build()
+}
+
+/** Twin tyres on one hub (truck drive and trailer axles): outer face towards +x, `gap` metres apart. */
+export function dualWheel(r: number, w: number, look: WheelLook, gap = 0.04): MeshData {
+  const m = new MeshBuilder()
+  m.group([(w + gap) / 2, 0, 0], [0, 0, 0], () => wheelInto(m, r, w, look))
+  m.group([-(w + gap) / 2, 0, 0], [0, Math.PI, 0], () => wheelInto(m, r, w, { ...look, rim: 'steel' }))
+  return m.build()
+}
+
+/** Adds a {@link smoothWheel} to `m`. */
+export function wheelInto(m: MeshBuilder, r: number, w: number, look: WheelLook): void {
   const rr = r * look.ratio, h = w / 2
   // Tyre: tread, rounded shoulders, bulging sidewalls down to the bead at the rim.
   const prof: [number, number][] = []
@@ -128,7 +142,6 @@ export function smoothWheel(r: number, w: number, look: WheelLook): MeshData {
       else spoke(a, rr * 0.09, rr * 0.07, h * 0.3, c)
     }
   }
-  return m.build()
 }
 
 /** Monotone cubic interpolation through `(x, y)` keys (sorted by x): smooth body lines with no overshoot. */

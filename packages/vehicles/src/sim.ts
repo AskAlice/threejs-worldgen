@@ -154,7 +154,7 @@ export const DEFAULT_FLEET: FleetSettings = {
 
 /** Default cruise speeds (m/s) by type. */
 export const DEFAULT_SPEEDS: Record<VehicleType, [number, number]> = {
-  car: [9, 15], pickup: [9, 15], bicycle: [4, 7], train: [18, 26],
+  car: [9, 15], pickup: [9, 15], truck: [14, 24], bicycle: [4, 7], train: [18, 26],
   'fishing-boat': [3, 5], 'cruise-liner': [6, 9], speedboat: [12, 20], hovercraft: [10, 15], 'aircraft-carrier': [5, 8],
   airplane: [70, 85], 'fighter-jet': [140, 190], rocket: [0, 0],
 }
@@ -233,9 +233,16 @@ const _m = new Matrix4(), _m2 = new Matrix4(), _q = new Quaternion(), _e = new E
 
 const wrap = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
 
-/** Number of vehicles a group expands to (trains: locomotive + wagons per unit). */
+/** Trailers behind each truck of a group (0 for rigid trucks). */
+function trailerCount(params: VehicleParams | undefined): number {
+  if (String(params?.body ?? 'tractor') === 'rigid') return 0
+  return Math.max(1, Math.min(3, Math.round(Number(params?.trailers ?? VEHICLE_KINDS.truck.params.trailers.default))))
+}
+
+/** Number of vehicles a group expands to (trains: locomotive + wagons per unit; trucks: tractor + trailers). */
 export function groupVehicleCount(g: FleetGroup): number {
-  const per = g.type === 'train' ? 1 + Math.max(0, Math.round(Number(g.params?.wagons ?? VEHICLE_KINDS.train.params.wagons.default))) : 1
+  const per = g.type === 'train' ? 1 + Math.max(0, Math.round(Number(g.params?.wagons ?? VEHICLE_KINDS.train.params.wagons.default)))
+    : g.type === 'truck' ? 1 + trailerCount(g.params) : 1
   return Math.max(0, Math.floor(g.count)) * per
 }
 
@@ -299,6 +306,8 @@ export class FleetSim {
   private tiltDir: Float32Array
   private navSlot: Int32Array
   private exposed: Float64Array
+  /** Trailer axle positions (x, z) per vehicle, NaN until placed: the articulation state. */
+  private trail: Float64Array
   private cursor = 0
 
   /** Builds every model and places every vehicle at time 0. */
@@ -343,6 +352,10 @@ export class FleetSim {
             const car = cargo === 'mixed' ? (hash01(seed, g, u * 131 + w, 0xca) < 0.5 ? 'passenger' : 'freight') : cargo
             members.push({ type: 'train', params: { ...params, car }, salt: car === 'freight' ? w + 1 : 1 })
           }
+        } else if (spec.type === 'truck') {
+          members.push({ type: 'truck', params: { ...params, piece: 'tractor' }, salt: 0 })
+          const n = trailerCount(params)
+          for (let w = 0; w < n; w++) members.push({ type: 'truck', params: { ...params, piece: 'trailer', slot: w, trailers: n }, salt: w + 1 })
         } else members.push({ type: spec.type, params, salt: 0 })
         let behind = 0
         members.forEach((mem, k) => {
@@ -377,6 +390,7 @@ export class FleetSim {
     this.tiltDir = new Float32Array(n)
     for (let i = 0; i < n; i++) this.tiltDir[i] = hash01(seed, i, 0, 0x711) < 0.5 ? -1 : 1
     this.exposed = new Float64Array(n)
+    this.trail = new Float64Array(n * 2).fill(NaN)
     const units = unitLeader.length
     this.unitLeader = Int32Array.from(unitLeader)
     this.unitCruise = Float32Array.from(unitCruise)
@@ -394,12 +408,54 @@ export class FleetSim {
         rt.units.forEach((u, k) => { this.unitS[u] = (k / Math.max(1, rt.units.length)) * L + hash01(seed, g, k, 0x9) * (L / Math.max(1, rt.units.length)) * 0.3 })
       }
       if (r.kind === 'roads') this.placeOnRoads(rt, g)
+      if (rt.path) for (const u of rt.units) this.primeTrailers(u, rt)
     })
     this.step(0)
   }
 
+  /**
+   * Drags a rig's trailers into place along a path before the first frame: the tractor is walked up
+   * to its start over the length of the rig, so the trailers start on the path, not straight behind.
+   */
+  private primeTrailers(u: number, rt: GroupRuntime): void {
+    const lead = this.unitLeader[u], n = this.count
+    if (lead + 1 >= n || this.unit[lead + 1] !== u || !this.models[this.model[lead + 1]].hitch?.kingpin || !rt.path) return
+    let span = 0
+    for (let v = lead; v < n && this.unit[v] === u; v++) span += this.models[this.model[v]].size[2]
+    const p = this.pose, lane = rt.spec.lane ?? 0
+    for (let d = span + 10; d >= 0; d -= 0.5) {
+      const ps = rt.path.sample(this.unitS[u] - d, tmpSample)
+      const hl = Math.hypot(ps.tx, ps.tz) || 1
+      p[lead * 8] = ps.x - (ps.tz / hl) * lane; p[lead * 8 + 1] = ps.y; p[lead * 8 + 2] = ps.z + (ps.tx / hl) * lane
+      p[lead * 8 + 3] = Math.atan2(ps.tx, ps.tz)
+      for (let v = lead + 1; v < n && this.unit[v] === u; v++) this.placeTrailer(v)
+    }
+  }
+
+  /**
+   * Places trailer `v` behind the vehicle in front of it: its kingpin sits on that vehicle's coupling
+   * and its axle is dragged towards it (a tractrix), so trailers cut inside on turns (off-tracking).
+   */
+  private placeTrailer(v: number): void {
+    const p = this.pose, prev = v - 1, po = prev * 8, o = v * 8
+    const pm = this.models[this.model[prev]], m = this.models[this.model[v]]
+    const c = pm.hitch?.coupling ?? -pm.size[2] / 2
+    const yawP = p[po + 3]
+    const hx = p[po] + Math.sin(yawP) * c, hz = p[po + 2] + Math.cos(yawP) * c
+    const kp = m.hitch?.kingpin ?? 0, len = Math.max(0.5, kp - (m.hitch?.axle ?? 0))
+    const t = this.trail
+    if (!(t[v * 2] === t[v * 2])) { t[v * 2] = hx - Math.sin(yawP) * len; t[v * 2 + 1] = hz - Math.cos(yawP) * len }
+    const dx = hx - t[v * 2], dz = hz - t[v * 2 + 1], d = Math.hypot(dx, dz) || 1
+    t[v * 2] = hx - (dx / d) * len; t[v * 2 + 1] = hz - (dz / d) * len
+    const yaw = Math.atan2(dx, dz)
+    p[o] = hx - Math.sin(yaw) * kp; p[o + 1] = p[po + 1]; p[o + 2] = hz - Math.cos(yaw) * kp
+    p[o + 3] = yaw; p[o + 4] = 0; p[o + 5] = 0; p[o + 6] = 0; p[o + 7] = p[po + 7]
+    this.setAnchor(v, p[o], p[o + 1], p[o + 2], yaw)
+  }
+
   private placeOnRoads(rt: GroupRuntime, g: number): void {
     if (!this.roads) return
+    for (const v of rt.vehicles) this.trail[v * 2] = this.trail[v * 2 + 1] = NaN
     const nav = (rt.nav = new RoadNavigator(this.roads, rt.units.length, hash4(seedOf(this.settings.seed), g, 0, 0x60ad)))
     nav.leftHand = this.settings.leftHand
     nav.height = this.height
@@ -464,6 +520,7 @@ export class FleetSim {
     const p = this.pose
     const o = v * 8
     const model = this.models[this.model[v]]
+    if (model.hitch?.kingpin !== undefined && v !== this.unitLeader[u]) return this.placeTrailer(v)
     let rate = NaN
     let x = 0, y = 0, z = 0, yaw = 0, pitch = 0, roll = 0, throttle = Math.min(1, this.speed[v] / Math.max(1, this.unitCruise[u]))
     switch (route.kind) {

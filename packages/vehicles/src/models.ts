@@ -2,11 +2,12 @@ import { mulberry32, seedOf } from 'threejs-biomes'
 import { MeshBuilder, paint, type MeshData, type Paint, type Vec3 } from './mesh.ts'
 import { LOOKALIKE_STYLES, lookalikeCar, type LookalikeStyle } from './cars.ts'
 import { PICKUP_STYLES, pickup } from './pickups.ts'
+import { TRAILER_KINDS, truck } from './trucks.ts'
 import { BODY, DARK, GLASS, GREY, HEAD, LIT, RIM, TAIL, TRIM, TYRE, WHITE, body, jitter, model, num, pick, roadWheel, str, type Rand } from './kit.ts'
 
 /** Every vehicle the package generates. */
 export type VehicleType =
-  | 'car' | 'pickup' | 'bicycle' | 'train'
+  | 'car' | 'pickup' | 'truck' | 'bicycle' | 'train'
   | 'fishing-boat' | 'cruise-liner' | 'speedboat' | 'hovercraft' | 'aircraft-carrier'
   | 'airplane' | 'fighter-jet' | 'rocket'
 
@@ -116,6 +117,11 @@ export interface VehicleModel {
   bank: number
   /** Bow lift with speed (planing hulls). */
   trim: number
+  /**
+   * Articulation (trucks), vehicle-space z: where this vehicle's `kingpin` and the `axle` it pivots
+   * on are (trailers), and the `coupling` the next trailer's kingpin sits on (fifth wheels).
+   */
+  hitch?: { kingpin?: number; axle?: number; coupling?: number }
 }
 
 // ---------------------------------------------------------------- land
@@ -675,6 +681,21 @@ export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
       size,
     },
     build: pickup,
+  },
+  truck: {
+    name: 'Truck', domain: 'land', tags: ['truck', 'lorry', 'semi', 'tractor unit', 'trailer', 'container', 'flatbed', 'tanker', 'road train', 'freight', 'highway'],
+    params: {
+      cab: { type: 'choice', default: 'conventional', options: ['conventional', 'cabOver'] },
+      sleeper: { type: 'boolean', default: true },
+      axles: { type: 'number', default: 3, min: 2, max: 4, step: 1 },
+      stacks: { type: 'boolean', default: true },
+      cabColor: { type: 'color', default: '' },
+      body: { type: 'choice', default: 'tractor', options: ['tractor', 'rigid'] },
+      trailers: { type: 'number', default: 1, min: 1, max: 3, step: 1 },
+      trailer: { type: 'choice', default: 'mixed', options: ['mixed', ...TRAILER_KINDS] },
+      load: { type: 'choice', default: 'mixed', options: ['mixed', 'empty', 'lumber', 'pipes', 'machinery'] },
+    },
+    build: truck,
   },
   bicycle: {
     name: 'Bicycle', domain: 'land', tags: ['bike', 'bicycle', 'cyclist', 'road'],

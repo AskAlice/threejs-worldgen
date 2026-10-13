@@ -4,7 +4,7 @@ import { RoadGraph } from 'threejs-city'
 import { DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, circlePoints, defaultParams, type FleetEnvironment, type FleetGroup } from 'threejs-vehicles'
 import { patch, type Ranges } from './options-gui'
 import { classOf, createPanel, type PanelClass } from './panel'
-import { GALLERY_ROWS, rowPosition, skyEnvironment, threeQuarter } from './vehicles-rows'
+import { GALLERY_ROWS, JUNCTION, junctionLoop, junctionMesh, rowPosition, skyEnvironment, threeQuarter } from './vehicles-rows'
 
 // threejs-vehicles sandbox. Default: a gallery of every vehicle type, each with its own parameters, and
 // real-scale rows of the car lookalikes, pickups, trucks and tractors behind it (`?row=cars&focus=2`
@@ -65,9 +65,9 @@ function gallery() {
   sun.shadow.mapSize.set(4096, 4096)
   sun.shadow.bias = -0.0003
   sun.shadow.normalBias = 0.02
-  Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 1500 })
-  sun.position.set(180, 300, 260)
-  sun.target.position.set(0, 0, 50)
+  Object.assign(sun.shadow.camera, { left: -150, right: 150, top: 150, bottom: -150, near: 1, far: 1500 })
+  sun.position.set(230, 300, 340)
+  sun.target.position.set(50, 0, 90)
   const shared = structuredClone(DEFAULT_VEHICLE) as Record<string, any>
   shared.speed = 6
   for (const k of ['type', 'params', 'tint', 'heading']) delete shared[k]
@@ -96,6 +96,10 @@ function gallery() {
     scene.add(v.object)
     return { v, item, x, z }
   }))
+  // A road train on a loop through a large-radius junction: trailers off-track inside the kerb, not over it.
+  scene.add(junctionMesh())
+  const junction = new Fleet({ seed: 4, groups: [{ type: 'truck', count: 1, params: { trailers: 3, trailer: 'mixed', cab: 'conventional', sleeper: true }, speed: [9, 9], route: { kind: 'path', points: junctionLoop().points, closed: true, smooth: 1 } }] })
+  scene.add(junction.object)
   const rowName = params.get('row')
   const focus = (r: number, i: number, side = 1) => {
     const { v, x, z } = rows[r][i]
@@ -104,7 +108,11 @@ function gallery() {
     camera.position.set(...view.position)
     controls.target.set(...view.target)
   }
-  if (rowName) {
+  if (rowName === 'junction') {
+    const [x0, z0] = JUNCTION.min
+    camera.position.set(x0 - 45, 38, z0 - 40)
+    controls.target.set(x0 + 25, 0, z0 + 25)
+  } else if (rowName) {
     const r = Math.max(0, GALLERY_ROWS.findIndex((row) => row.name === rowName))
     const i = params.has('focus') ? Number(params.get('focus')) : -1
     if (i >= 0) focus(r, i, Number(params.get('side') ?? 1))
@@ -135,11 +143,11 @@ function gallery() {
   const sandbox = gui.addFolder('sandbox')
   sandbox.add(ui, 'turntable')
   sandbox.add(ui, 'night', 0, 1, 0.01).onChange((n: number) => { setNight(n); all.set({ lights: n }) })
-  const goto = { row: rowName ?? GALLERY_ROWS[0].name, exhibit: 0 }
+  const goto = { row: rowName && rowName !== 'junction' ? rowName : GALLERY_ROWS[0].name, exhibit: 0 }
   const jump = () => focus(GALLERY_ROWS.findIndex((r) => r.name === goto.row), Math.min(goto.exhibit, GALLERY_ROWS.find((r) => r.name === goto.row)!.items.length - 1))
   sandbox.add(goto, 'row', GALLERY_ROWS.map((r) => r.name)).onChange(jump)
   sandbox.add(goto, 'exhibit', 0, 7, 1).onChange(jump)
-  Object.assign(window, { vehicles, rows, scene, camera, controls, focus, all })
+  Object.assign(window, { vehicles, rows, junction, scene, camera, controls, focus, all })
   let last = performance.now()
   renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000)
@@ -150,6 +158,7 @@ function gallery() {
       v.update(dt)
     }
     for (const { v } of rows.flat()) v.update(dt)
+    junction.update(dt)
     renderer.render(scene, camera)
     tickFps()
     hud.textContent = `${fps.toFixed(0)} fps · ${VEHICLE_TYPES.length} vehicle types, each at ~9 m for comparison\none InstancedMesh per part (body, wheels, fans, stages), one material`

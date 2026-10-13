@@ -7,6 +7,7 @@ import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type Veh
 import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/cars.ts'
 import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
 import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
+import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
@@ -29,6 +30,7 @@ const SIZES: Record<VehicleType, [number, number][]> = {
   bicycle: [[0.3, 0.7], [1.0, 2.0], [1.4, 2.0]],
   train: [[2.8, 3.4], [3.8, 5], [16, 22]],
   pickup: [[1.7, 2.6], [1.4, 2.4], [4.8, 6.6]],
+  truck: [[2.4, 3.4], [3, TRUCK_LIMITS.height], [5.5, 10]],
   'fishing-boat': [[3, 14], [5, 14], [10, 16]],
   'cruise-liner': [[20, 32], [35, 60], [180, 220]],
   speedboat: [[2, 3], [1.5, 3], [6.5, 8.5]],
@@ -414,4 +416,84 @@ test('traffic pools: counts add up, deterministic, pickups weigh into rural and 
   assert.ok(share('rural') > 2 * share('urban') && share('dirtRoad') > share('rural'))
   // Every entry builds.
   for (const pool of Object.values(TRAFFIC_POOLS)) for (const e of pool) assert.ok(buildVehicle(e.type, e.params, 1).parts.length > 0)
+})
+
+test('trucks: every cab and trailer within road-legal sizes, rigs couple up, deterministic', () => {
+  // Width of everything below `below` metres (wheels at their mounts, mirrors left out above it) and the height.
+  const span = (m: VehicleModel, below = Infinity) => {
+    let w = 0
+    for (const part of m.parts) for (const mt of part.mounts) {
+      const pos = part.mesh.position
+      for (let i = 0; i < pos.length; i += 3) if (mt.position[1] + pos[i + 1] <= below) w = Math.max(w, Math.abs(mt.position[0]) + Math.abs(pos[i]))
+    }
+    return { width: 2 * w, height: m.size[1] }
+  }
+  for (const cab of ['conventional', 'cabOver']) for (const sleeper of [true, false]) for (const body of ['tractor', 'rigid']) for (const axles of [2, 3, 4]) for (const stacks of [true, false]) {
+    const params = { cab, sleeper, body, axles, stacks }
+    const m = buildVehicle('truck', params, 5)
+    for (const part of m.parts) checkMesh(part.mesh, `truck ${JSON.stringify(params)}`)
+    // Mirrors stick out past the legal width (as they may); everything below them stays inside it.
+    assert.ok(span(m, 1.95).width <= TRUCK_LIMITS.width + 1e-6, `${JSON.stringify(params)} width ${span(m, 1.95).width}`)
+    assert.ok(m.size[1] <= TRUCK_LIMITS.height, `${JSON.stringify(params)} height ${m.size[1]}`)
+    assert.ok(m.size[2] > 5.5 && m.size[2] < (body === 'rigid' ? 12 : 9.5), `${JSON.stringify(params)} length ${m.size[2]}`)
+    assert.equal(m.vents.length, stacks ? 2 : 1)
+    assert.ok(m.vents.every((v) => v.kind === 'stack'))
+    if (body === 'tractor') assert.ok(m.hitch?.coupling !== undefined && m.hitch.coupling < 0, 'fifth wheel behind the cab')
+    // Wheels: steer axle(s) single, the rest duals, all spinning with distance.
+    const wheels = m.parts.filter((p) => p.name === 'wheel' || p.name === 'dual').reduce((a, p) => a + p.mounts.length, 0)
+    assert.equal(wheels, axles === 4 && body === 'rigid' ? 2 * 4 : 2 * Math.min(axles, body === 'rigid' ? 3 : 4))
+  }
+  for (const trailer of TRAILER_KINDS) for (const trailers of [1, 2, 3]) for (let slot = 0; slot < trailers; slot++) {
+    const params = { piece: 'trailer', trailer, trailers, slot, load: 'mixed' }
+    const m = buildVehicle('truck', params, 9)
+    for (const part of m.parts) checkMesh(part.mesh, `trailer ${JSON.stringify(params)}`)
+    const s = span(m)
+    assert.ok(s.width <= TRUCK_LIMITS.width + 1e-6 && s.height <= TRUCK_LIMITS.height && m.size[2] <= TRUCK_LIMITS.trailer, `${JSON.stringify(params)} ${s.width} ${s.height} ${m.size[2]}`)
+    assert.ok(m.hitch?.kingpin! > 0 && m.hitch?.axle! < 0, 'kingpin ahead, axles behind')
+    assert.equal(m.hitch?.coupling !== undefined, slot < trailers - 1, 'lead trailers carry the next fifth wheel')
+    assert.equal(m.vents.length, 0)
+    assert.deepEqual(m.parts[0].mesh.position, buildVehicle('truck', params, 9).parts[0].mesh.position)
+  }
+  // Flatbed loads differ; container trailers carry ISO boxes.
+  const verts = (load: string) => buildVehicle('truck', { piece: 'trailer', trailer: 'flatbed', trailers: 1, load }, 1).parts[0].mesh.position.length
+  assert.ok(verts('lumber') > verts('empty') && verts('pipes') > verts('empty') && verts('machinery') > verts('empty'))
+  // A whole rig: one unit of tractor + trailers, within the longest road-train length.
+  const g: FleetGroup = { type: 'truck', count: 1, params: { trailers: 3, trailer: 'mixed' }, route: { kind: 'static', position: [0, 0, 0] } }
+  assert.equal(groupVehicleCount(g), 4)
+  assert.equal(groupVehicleCount({ ...g, params: { body: 'rigid', trailers: 3 } }), 1)
+  const rig = new FleetSim(settings([g]))
+  let front = -Infinity, back = Infinity
+  for (let v = 0; v < rig.count; v++) {
+    const m = rig.models[rig.model[v]], z = rig.pose[v * 8 + 2]
+    front = Math.max(front, z + m.size[2] / 2); back = Math.min(back, z - m.size[2] / 2)
+  }
+  assert.ok(front - back < TRUCK_LIMITS.rig && front - back > 30, `rig length ${(front - back).toFixed(1)}`)
+})
+
+test('truck articulation: trailers stay coupled, follow the tractor and off-track inside on curves', () => {
+  const g: FleetGroup = { type: 'truck', count: 1, params: { trailers: 3, trailer: 'box' }, speed: [12, 12], route: { kind: 'circle', center: [0, 0, 0], radius: 40 } }
+  const sim = new FleetSim(settings([g]))
+  const world = (v: number, z: number) => [sim.pose[v * 8] + Math.sin(sim.pose[v * 8 + 3]) * z, sim.pose[v * 8 + 2] + Math.cos(sim.pose[v * 8 + 3]) * z]
+  for (let i = 0; i < 400; i++) {
+    sim.step(1 / 30)
+    for (let v = 1; v < sim.count; v++) {
+      const prev = sim.models[sim.model[v - 1]], m = sim.models[sim.model[v]]
+      const [cx, cz] = world(v - 1, prev.hitch!.coupling!), [kx, kz] = world(v, m.hitch!.kingpin!)
+      assert.ok(Math.hypot(cx - kx, cz - kz) < 1e-3, `trailer ${v} uncoupled by ${Math.hypot(cx - kx, cz - kz)}`)
+      assert.ok(Number.isFinite(sim.pose[v * 8 + 3]))
+    }
+  }
+  // Steady turn: each trailer's axles run on a smaller circle than the hitch it follows.
+  let last = Infinity
+  for (let v = 1; v < sim.count; v++) {
+    const m = sim.models[sim.model[v]], [ax, az] = world(v, m.hitch!.axle!), r = Math.hypot(ax, az)
+    const prev = sim.models[sim.model[v - 1]], [hx, hz] = world(v - 1, prev.hitch!.coupling!)
+    const rh = Math.hypot(hx, hz), len = m.hitch!.kingpin! - m.hitch!.axle!
+    assert.ok(r < rh && r < last, `trailer ${v} cuts inside (${r.toFixed(2)} < ${rh.toFixed(2)})`)
+    assert.ok(Math.abs(r - Math.sqrt(rh * rh - len * len)) < 0.5, `trailer ${v} at the tractrix radius (${r.toFixed(2)} vs ${Math.sqrt(rh * rh - len * len).toFixed(2)})`)
+    last = r
+  }
+  // On a straight they line up again; same seed, same motion.
+  const run = () => { const s = new FleetSim(settings([{ ...g, route: { kind: 'path', points: [[0, 0, 0], [0, 0, 300], [200, 0, 300]], closed: false } }])); for (let i = 0; i < 300; i++) s.step(1 / 20); return [...s.pose] }
+  assert.deepEqual(run(), run())
 })
