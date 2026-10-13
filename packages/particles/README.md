@@ -74,6 +74,9 @@ import { ParticleGrid, Particles } from 'threejs-particles/react'
 |---|---|
 | `ParticleSystem` | One pool: emit, update and sort compute passes plus one instanced draw. `set`/`reset`, `setSources`, `update(renderer, dt, camera)` (or `prepare` + `sort` to batch), `particle(i)` nodes, `buffers` |
 | `ParticleGrid` | Coarse 3D grid, 4 float channels per cell: atomic `splat` (P2G), `resolve` / `resolvePasses` (advect and decay), trilinear `sample` (G2P) in any shader |
+| `MPMSolver` | MLS-MPM on WebGPU compute: `emit`, `step` (or `prepare` to batch), `set`, `setHeight`, `center`, `read`, `clear`, `dispose`. Terrain collision, deterministic fixed-point P2G |
+| `registerMPMMaterial`, `JELLY` | Material registry: Kirchhoff stress and an optional plasticity hook in TSL, their CPU twins, JSON parameters |
+| `MPMReference` | The same substep in plain TypeScript for tiny particle sets (tests, and checking the GPU) |
 | `ParticleLighting` | Sun direction and colour plus ambient sky, filled from a scene's lights, shared by systems |
 | `EmitterClock`, `spawnRate` | Deterministic ring-buffer spawn scheduling: fractional carry, serials and slots, throttled to the pool |
 | `fillSourceTable`, `pickSource` | Weighted sources: heaviest kept on overflow, prefix sums the GPU binary-searches |
@@ -123,22 +126,74 @@ Everything else is a uniform.
 | `render.sort` | Four small compute passes (GPU counting sort, 1024 depth bins) |
 | `ParticleGrid.resolution` | Grid cells: resolve cost and plume detail |
 
-## Extending: MPM snow (#18)
+## MPM (material point method)
 
-The pieces an approximate position-based MPM solver needs are already here and public:
+`MPMSolver` is a real-time MLS-MPM solver (Hu et al. 2018) on WebGPU compute: APIC transfers with quadratic
+B-splines over 3×3×3 nodes, a per-particle deformation gradient F, plastic volume ratio Jp, material id and
+temperature, and a terrain boundary from a height function. It is the core that snow (#72), water (#73) and lava
+(#74) plug into; the core ships one test material, `jelly`.
 
-- **Pools**: `system.buffers` holds `position`, `velocity`, `props` and `light`. Add per-particle state, such as
-  deformation gradient, plastic J or an APIC affine matrix, as more `instancedArray`s indexed by the same
-  `instanceIndex`.
-- **P2G**: `grid.splat(system, channel, value)` atomically adds any per-particle value (fixed point) into a cell.
-  MPM writes mass and momentum into the four channels (`x, y, z` momentum and `w` mass), with weights
-  over the 27 nearest cells instead of the nearest one.
-- **Grid update**: `grid.resolve` is the per-cell pass (today semi-Lagrangian advection and decay). An MPM grid
-  step adds gravity, divides momentum by mass and applies boundaries in the same place.
-- **G2P**: `grid.sample(p)` is trilinear in any compute or render shader. MPM gathers velocity (and the APIC affine
-  term) back to particles in its own update kernel.
-- **Neural model reduction**: the update kernel is a plain TSL `Fn`. A reduced model replaces the force sum with a
-  small MLP whose weights sit in a `uniformArray` or storage buffer.
+```ts
+import { MPMSolver } from 'threejs-particles'
 
-What's missing for MPM: the quadratic B-spline weights, a separate momentum grid with a velocity solve, and
-collision with terrain (sample a heightfield texture in the update kernel).
+const mpm = new MPMSolver(renderer, {
+  resolution: [96, 64, 96], cellSize: 0.3, origin: [-14, 0, -14],  // a 28.8 × 19.2 × 28.8 m domain
+  friction: 0.8, height: (x, z) => world.height(x, z),             // any (x, z) => y, e.g. threejs-heightfield
+})
+scene.add(mpm.object)
+mpm.emit({ center: [0, 6, 0], size: [1.8, 1.8, 1.8] })              // a jelly block: 8 particles per cell
+renderer.setAnimationLoop(() => { mpm.step(1 / 60); renderer.render(scene, camera) })
+mpm.set({ materials: { jelly: { youngs: 2e5 } }, gravity: [0, -3, 0] }) // live
+mpm.center(camera.position.x, camera.position.y, camera.position.z)    // follow (moves by whole cells, with hysteresis)
+```
+
+```tsx
+<MPM resolution={[64, 48, 64]} cellSize={0.25} height={world.height} emit={[{ center: [0, 5, 0], size: [1, 1, 1] }]} />
+```
+
+Each substep is three compute passes: **P2G** (each particle scatters mass and momentum, with its stress and APIC
+terms, into its 27 nodes), the **grid update** (momentum / mass, gravity, domain walls and terrain; it also clears
+the accumulators, so the grid is cleared every substep) and **G2P** (velocity, `C`, `F ← (I + dt·C)·F`, the
+material's plasticity hook, advection). Particles are drawn by the pool's unlit shading, coloured by volume change.
+
+- **Fixed point**: WebGPU has no float atomics, so P2G adds `round(value × 2²⁰)` as i32. Masses are normalised to
+  "full cells of 1000 kg/m³" (a particle weighs ρ/8000) and momentum to that × m/s, so a node channel overflows only
+  past 2048 units: a node's mass × speed must stay below 2048 (≈ 200× water at the 10 m/s speed limit). Resolution
+  is 1e-6 of a cell's mass. Integer sums are order-independent, so a run is deterministic on a given GPU.
+- **Time step**: `dt ≤ cfl·Δx / (maxSpeed + c)` (c: fastest sound speed of the materials) and `Δx² / (6ν)` (most
+  viscous). `substeps` is the minimum per frame; past `maxSubsteps` the simulation runs slower than real time
+  rather than going unstable. `maxSpeed` is enforced on particles, so it is a true bound.
+- **Terrain**: the height function is baked at the node columns (re-baked when the domain moves or `setHeight`).
+  Nodes inside the ground lose their inward velocity with Coulomb `friction`; particles within one cell of the
+  ground get the same friction, and none ever ends up below the (bilinear) ground.
+- **Domain**: a fixed grid at `origin`; the GPU only sees positions relative to it (floating-origin safe). Its sides
+  are slip walls (`walls`), or particles that leave it freeze.
+- **Size and damping**: a block sags about g·L/c² under its own weight, and explicit viscosity can damp its slowest
+  wobble only by roughly 1/(cells across it). The default jelly (E = 100 kPa, η = 1000 Pa·s) suits blocks of a metre
+  or two at Δx = 0.25 m; bigger bodies want a larger Δx and a stiffer material.
+
+### Materials
+
+A material is registered once and compiled into solvers whose `materials` option names it (the keys are fixed at
+construction; the parameters are live uniforms). Particles carry the material index in `buffers.state.x`.
+
+```ts
+registerMPMMaterial({
+  name: 'snow',
+  defaults: { density: 400, youngs: 1.4e5, poisson: 0.2, hardening: 10, compression: 0.025, stretch: 0.0075 },
+  stress: ({ F, J, Jp, C, temperature, dt, params }) => tau,             // Kirchhoff stress P·Fᵀ, a TSL mat3
+  plasticity: ({ F, Jp, params }) => ({ F: Fe, Jp: newJp }),           // optional, after F is advanced in G2P
+  cpu: { stress: (c) => tau9, plasticity: (c) => ({ F: Fe9, Jp }) },   // the same in plain TS (column-major 3×3)
+  soundSpeed: (p) => Math.sqrt((lambda + 2 * mu) / p.density),
+  viscosity: (p) => 0,                                                 // optional kinematic ν for the time step
+})
+const mpm = new MPMSolver(renderer, { materials: { jelly: {}, snow: { hardening: 8 } } })
+mpm.emit({ center: [0, 4, 0], size: [2, 0.5, 2], material: 'snow' })
+```
+
+Notes for the material tickets: snow needs an SVD of F (clamp the singular values, update Jp) inside its
+`plasticity`; water can keep F = J^(1/3)·I in `plasticity` and use an equation-of-state pressure as `stress`; lava
+can use `C` for viscosity and return a new `temperature` from `plasticity` (it lives in the pool's `props.x`, so
+blackbody shading reads it). `buffers.state.z/w` are free per-particle slots. `MPMReference` runs the same substep on
+the CPU, so each material can be tested against the GPU the way `test/mpm.test.ts` does for jelly
+(`example/mpm.html?check` records the GPU side).
