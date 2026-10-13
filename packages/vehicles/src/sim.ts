@@ -154,7 +154,7 @@ export const DEFAULT_FLEET: FleetSettings = {
 
 /** Default cruise speeds (m/s) by type. */
 export const DEFAULT_SPEEDS: Record<VehicleType, [number, number]> = {
-  car: [9, 15], bicycle: [4, 7], train: [18, 26],
+  car: [9, 15], pickup: [9, 15], bicycle: [4, 7], train: [18, 26],
   'fishing-boat': [3, 5], 'cruise-liner': [6, 9], speedboat: [12, 20], hovercraft: [10, 15], 'aircraft-carrier': [5, 8],
   airplane: [70, 85], 'fighter-jet': [140, 190], rocket: [0, 0],
 }

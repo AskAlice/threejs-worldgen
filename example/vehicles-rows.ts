@@ -32,6 +32,18 @@ export const GALLERY_ROWS: GalleryRow[] = [
       { type: 'car', params: { style: 'muscle' }, label: 'muscle' },
     ],
   },
+  {
+    name: 'pickups',
+    spacing: 7.5,
+    items: [
+      { type: 'pickup', params: { style: 'fullSize', cab: 'crew', bed: 'short' }, label: 'full-size, crew cab' },
+      { type: 'pickup', params: { style: 'fullSize', cab: 'regular', bed: 'long', hitch: true, load: 'hay' }, label: 'full-size, regular cab, long bed, hay' },
+      { type: 'pickup', params: { style: 'fullSize', cab: 'extended', bed: 'long', lift: 0.2, load: 'crates' }, label: 'full-size, extended cab, lifted' },
+      { type: 'pickup', params: { style: 'ute', ute: 'coupe' }, label: 'ute' },
+      { type: 'pickup', params: { style: 'ute', ute: 'tray', load: 'crates' }, label: 'cab-chassis tray ute' },
+      { type: 'pickup', params: { style: 'angular' }, label: 'angular stainless' },
+    ],
+  },
 ]
 
 /** Where row `r` stands (its z) and where its item `i` stands (x), metres. */

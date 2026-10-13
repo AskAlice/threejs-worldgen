@@ -5,7 +5,7 @@
 <p><b><a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html?scene">Live demo</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html">Vehicle gallery</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles-r3f.html">React Three Fiber demo</a> · <a href="https://askalice.github.io/threejs-worldgen/vehicles/">Landing page</a> · <a href="https://askalice.github.io/threejs-worldgen/docs/modules/threejs-vehicles.html">API docs</a></b></p>
 <!-- demo-cards:end -->
 
-Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
+Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), pickups (full-size, ute, angular stainless), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
 
 Every vehicle is a seeded, low-poly generator, so the variety looks random but never is.
 
@@ -108,6 +108,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | Type | Parameters (defaults) |
 |---|---|
 | `car` | `style` (`mixed`, sedan, hatchback, suv, truck, van, bus, compact, retroWagon, vintage, electricSaloon, roadster, muscle), `size 1` |
+| `pickup` | `style` (`mixed`, fullSize, ute, angular), `cab` (regular, extended, `crew`), `bed` (`short`, long), `lift 0`, `hitch false`, `load` (`none`, crates, hay, gravel), `ute` (`coupe`, tray), `painted false`, `size 1` |
 | `bicycle` | `style` (`mixed`, road, city, mountain), `rider true` |
 | `train` | `car` (`locomotive`, passenger, freight), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
 | `fishing-boat` | `length 13`, `outriggers true` |
@@ -133,6 +134,22 @@ Six car styles match the proportions and silhouettes of well-known cars, under g
 | `muscle` | a full-size muscle sedan | flat bonnet, full-width grille, thick C pillar, full-width tail lamp |
 
 Bodies are smooth lofted surfaces (superellipse cross-sections along the length, wheel arches rolled into them), not stacked boxes. Paint is metallic under a clear coat, glass and chrome are reflective, and colours and trims (wheels, roof, grille) are seeded per vehicle. Every model lists its tailpipes in `vents` (empty for electric ones).
+
+### Pickups
+
+Three body families, lookalikes with generic names:
+
+- `fullSize`, like the best-selling full-size pickup: regular, extended or crew cab with a short or long bed, at that truck's published lengths and wheelbases (`FULL_SIZE_DIMENSIONS`). `lift` raises it on bigger tyres with side steps, `hitch` adds a receiver and ball, `load` fills the bed with crates, hay or gravel. The car style `truck` is this body too.
+- `ute`: a sedan-based coupé utility with a covered tray, or (`ute: 'tray'`) a cab-chassis with an alloy drop-side tray.
+- `angular`: a flat-panelled, faceted body with a triangular roof line, light bars front and rear and black arch flares, in brushed stainless steel (anisotropic) unless `painted`. Electric, so it has no exhaust vents.
+
+### Traffic pools
+
+`TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`); pickups and utes weigh into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
+
+```ts
+new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: city.graph })
+```
 
 ## Fleet options
 

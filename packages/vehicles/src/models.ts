@@ -1,11 +1,12 @@
 import { mulberry32, seedOf } from 'threejs-biomes'
 import { MeshBuilder, paint, type MeshData, type Paint, type Vec3 } from './mesh.ts'
 import { LOOKALIKE_STYLES, lookalikeCar, type LookalikeStyle } from './cars.ts'
+import { PICKUP_STYLES, pickup } from './pickups.ts'
 import { BODY, DARK, GLASS, GREY, HEAD, LIT, RIM, TAIL, TRIM, TYRE, WHITE, body, jitter, model, num, pick, roadWheel, str, type Rand } from './kit.ts'
 
 /** Every vehicle the package generates. */
 export type VehicleType =
-  | 'car' | 'bicycle' | 'train'
+  | 'car' | 'pickup' | 'bicycle' | 'train'
   | 'fishing-boat' | 'cruise-liner' | 'speedboat' | 'hovercraft' | 'aircraft-carrier'
   | 'airplane' | 'fighter-jet' | 'rocket'
 
@@ -137,6 +138,7 @@ function car(p: VehicleParams, rand: Rand): VehicleModel {
   let style = str(p, 'style')
   if (!(style in CAR_STYLES) && !(LOOKALIKE_STYLES as readonly string[]).includes(style)) style = pick(rand, MIXED_CARS)
   if ((LOOKALIKE_STYLES as readonly string[]).includes(style)) return lookalikeCar(style as LookalikeStyle, p, rand)
+  if (style === 'truck') return { ...pickup({ ...defaultParams('pickup'), style: 'fullSize', size: p.size }, rand), type: 'car', style: 'truck' }
   const st = CAR_STYLES[style as keyof typeof CAR_STYLES]
   const k = num(p, 'size') * jitter(rand, 0.05)
   const L = st.L * k * jitter(rand, 0.04), W = st.W * k, H = st.H * k * jitter(rand, 0.04), r = st.r * k, ride = st.ride * k
@@ -658,6 +660,21 @@ export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
     name: 'Car', domain: 'land', tags: ['car', 'sedan', 'hatchback', 'suv', 'truck', 'pickup', 'van', 'bus', 'compact', 'wagon', 'vintage', 'electric', 'roadster', 'convertible', 'muscle', 'traffic', 'road'],
     params: { style: { type: 'choice', default: 'mixed', options: ['mixed', 'sedan', 'hatchback', 'suv', 'truck', 'van', 'bus', ...LOOKALIKE_STYLES] }, size },
     build: car,
+  },
+  pickup: {
+    name: 'Pickup', domain: 'land', tags: ['pickup', 'truck', 'ute', 'utility', 'stainless', 'farm', 'rural', 'traffic', 'road'],
+    params: {
+      style: { type: 'choice', default: 'mixed', options: ['mixed', ...PICKUP_STYLES] },
+      cab: { type: 'choice', default: 'crew', options: ['regular', 'extended', 'crew'] },
+      bed: { type: 'choice', default: 'short', options: ['short', 'long'] },
+      lift: { type: 'number', default: 0, min: 0, max: 0.3, step: 0.01 },
+      hitch: { type: 'boolean', default: false },
+      load: { type: 'choice', default: 'none', options: ['none', 'crates', 'hay', 'gravel'] },
+      ute: { type: 'choice', default: 'coupe', options: ['coupe', 'tray'] },
+      painted: { type: 'boolean', default: false },
+      size,
+    },
+    build: pickup,
   },
   bicycle: {
     name: 'Bicycle', domain: 'land', tags: ['bike', 'bicycle', 'cyclist', 'road'],

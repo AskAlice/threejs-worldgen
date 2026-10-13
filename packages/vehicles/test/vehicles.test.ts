@@ -5,6 +5,8 @@ import { isPlausible } from '../../worldgen/src/assets.ts'
 import { MeshBuilder, paint, type MeshData } from '../src/mesh.ts'
 import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type VehicleType } from '../src/models.ts'
 import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/cars.ts'
+import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
+import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
@@ -26,6 +28,7 @@ const SIZES: Record<VehicleType, [number, number][]> = {
   car: [[1.5, 2.8], [1.2, 3.4], [3.4, 12.5]],
   bicycle: [[0.3, 0.7], [1.0, 2.0], [1.4, 2.0]],
   train: [[2.8, 3.4], [3.8, 5], [16, 22]],
+  pickup: [[1.7, 2.6], [1.4, 2.4], [4.8, 6.6]],
   'fishing-boat': [[3, 14], [5, 14], [10, 16]],
   'cruise-liner': [[20, 32], [35, 60], [180, 220]],
   speedboat: [[2, 3], [1.5, 3], [6.5, 8.5]],
@@ -370,4 +373,45 @@ test('car lookalikes: within 5 % of the reference cars, distinct, deterministic,
     if (style === 'electricSaloon') assert.equal(vents.length, 0)
     else assert.ok(vents.length > 0 && vents.every((v) => v.kind === 'tailpipe' && v.position[2] < 0), style)
   }
+})
+
+test('pickups: full-size cabs and beds, utes and the angular one match their references', () => {
+  const variants: Record<string, string | number | boolean>[] = []
+  for (const key of Object.keys(FULL_SIZE_DIMENSIONS)) { const [cab, bed] = key.split('/'); variants.push({ style: 'fullSize', cab, bed }) }
+  variants.push({ style: 'ute', ute: 'coupe' }, { style: 'ute', ute: 'tray' }, { style: 'angular' })
+  for (const params of variants) {
+    const m = buildVehicle('pickup', params, 3)
+    for (const part of m.parts) checkMesh(part.mesh, `pickup ${JSON.stringify(params)}`)
+    within(`pickup ${JSON.stringify(params)}`, measure(m), pickupReference({ ...params, ute: params.ute ?? 'coupe' }))
+    assert.deepEqual(m.parts[0].mesh.position, buildVehicle('pickup', params, 3).parts[0].mesh.position, 'deterministic')
+    if (params.style === 'angular') assert.equal(m.vents.length, 0, 'electric: no exhaust')
+    else assert.ok(m.vents.length > 0 && m.vents.every((v) => v.kind === 'tailpipe'))
+  }
+  // Longer cabs and beds are longer; a lift raises it; a hitch reaches behind the bumper; a load adds to the bed.
+  const len = (p: Record<string, string | number | boolean>) => buildVehicle('pickup', { style: 'fullSize', ...p }).size
+  assert.ok(len({ cab: 'crew', bed: 'long' })[2] > len({ cab: 'crew', bed: 'short' })[2])
+  assert.ok(len({ cab: 'regular', bed: 'short' })[2] < len({ cab: 'crew', bed: 'short' })[2])
+  assert.ok(len({ lift: 0.25 })[1] > len({})[1] + 0.2)
+  assert.ok(len({ hitch: true })[2] > len({})[2] + 0.1)
+  const verts = (p: Record<string, string | number | boolean>) => buildVehicle('pickup', { style: 'fullSize', ...p }).parts[0].mesh.position.length
+  for (const load of ['crates', 'hay', 'gravel']) assert.ok(verts({ load }) > verts({}), load)
+  // The angular body is brushed stainless unless painted.
+  const finish = (m: VehicleModel, f: number) => { const st = m.parts[0].mesh.style; let n = 0; for (let i = 2; i < st.length; i += 3) if (st[i] === f) n++; return n / (st.length / 3) }
+  assert.ok(finish(buildVehicle('pickup', { style: 'angular' }), 3) > 0.5, 'brushed steel')
+  assert.equal(finish(buildVehicle('pickup', { style: 'angular', painted: true }), 3), 0)
+  // The car style `truck` is now a full-size pickup body.
+  assert.ok(buildVehicle('car', { style: 'truck' }).size[2] > 5.5)
+})
+
+test('traffic pools: counts add up, deterministic, pickups weigh into rural and dirt roads', () => {
+  const route = { kind: 'roads' } as const
+  for (const pool of Object.keys(TRAFFIC_POOLS) as (keyof typeof TRAFFIC_POOLS)[]) for (const n of [0, 1, 7, 100]) {
+    const groups = trafficGroups(pool, n, route)
+    assert.equal(groups.reduce((a, g) => a + g.count, 0), n)
+    assert.deepEqual(groups, trafficGroups(pool, n, route))
+  }
+  const share = (pool: keyof typeof TRAFFIC_POOLS) => trafficGroups(pool, 1000, route).filter((g) => g.type === 'pickup').reduce((a, g) => a + g.count, 0) / 1000
+  assert.ok(share('rural') > 2 * share('urban') && share('dirtRoad') > share('rural'))
+  // Every entry builds.
+  for (const pool of Object.values(TRAFFIC_POOLS)) for (const e of pool) assert.ok(buildVehicle(e.type, e.params, 1).parts.length > 0)
 })

@@ -36,6 +36,7 @@ export interface VehiclePlacementRule extends PlacementRule {
 /** Where each vehicle type plausibly goes. */
 export const VEHICLE_PLACEMENT: Record<VehicleType, VehiclePlacementRule> = {
   car: { network: 'road', surface: 'ground', slope: [0, 0.15], height: [0.5, 4000] },
+  pickup: { network: 'road', surface: 'ground', slope: [0, 0.2], height: [0.5, 4500] },
   bicycle: { network: 'road', surface: 'ground', slope: [0, 0.1], height: [0.5, 3000], temperature: [-5, 40] },
   train: { network: 'rail', surface: 'ground', slope: [0, 0.04], height: [1, 3500] },
   'fishing-boat': { network: 'sea', surface: 'water', depth: [3, 400] },
