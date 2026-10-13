@@ -30,7 +30,7 @@
     "packages/worldgen/src/index.ts",
     "packages/worldgen/src/react.tsx"
   ],
-  "out": "docs",
+  "out": "site/docs",
   "readme": "README.md",
   "tsconfig": "tsconfig.json",
   "excludePrivate": true,
