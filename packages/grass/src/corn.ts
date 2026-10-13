@@ -116,14 +116,14 @@ export const DEFAULT_CORN: CornSettings = {
   stubbleHeight: 0.3,
   height: 2.4,
   heightVariation: 0.1,
-  leafColor: '#3e6c14',
-  youngColor: '#6d9a35',
+  leafColor: '#3a5a2c',
+  youngColor: '#4f7a30',
   dryColor: '#a88d5c',
   tasselColor: '#b8a46a',
   soilColor: '#5a4532',
   colorVariation: 0.08,
   patchiness: 0.5,
-  translucency: 0.6,
+  translucency: 0.35,
   stiffness: 1,
   wind: { direction: [1, 0.35], strength: 0.35, scale: 0.03, speed: 0.7 },
   interactors: [],
@@ -792,6 +792,7 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
   const pos: number[] = []
   const nrm: number[] = []
   const attr: number[] = []
+  const fieldAttr: number[] = []
   const index: number[] = []
   const h = (x: number, z: number) => {
     const y = height(x, z)
@@ -802,18 +803,27 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
     return new Vector3(h(x - e, z) - h(x + e, z), 2 * e, h(x, z - e) - h(x, z + e)).normalize()
   }
   const res = Math.max(0.25, resolution)
-  for (const field of fields) {
+  for (const [f, field] of fields.entries()) {
     const poly = field.polygon
     if (poly.length < 3 || !(field.rowSpacing > 0)) continue
     const bx = -Math.sin(field.rowDirection), bz = Math.cos(field.rowDirection)
+    // Row direction (for view-dependent row shading) and a per-field shade (-1..1).
+    const fieldInfo = [bz, -bx, (hash2(f + 1, 977) / 4294967296) * 2 - 1]
+    const onOutline = (x: number, z: number) => poly.some(([ax, az], i) => {
+      const [cx, cz] = poly[(i + 1) % poly.length]
+      const dx = cx - ax, dz = cz - az
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)))
+      return Math.hypot(ax + dx * t - x, az + dz * t - z) < 1e-3
+    })
     const v0 = poly[0][0] * bx + poly[0][1] * bz
     const rows = (x: number, z: number) => (x * bx + z * bz - v0) / field.rowSpacing
     const along = (x: number, z: number) => x * bz - z * bx // metres along the rows
-    const top = (x: number, z: number) => {
+    const top = (x: number, z: number, outline = 0) => {
       const n = normalAt(x, z)
       pos.push(x, h(x, z), z)
       nrm.push(n.x, n.y, n.z)
-      attr.push(rows(x, z), along(x, z), 0, 0)
+      attr.push(rows(x, z), along(x, z), 0, outline)
+      fieldAttr.push(...fieldInfo)
       return pos.length / 3 - 1
     }
     const fb = bounds(poly)
@@ -854,11 +864,13 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
         if (clipped.length < 3) continue
         const contour = clipped.map(([x, z]) => new Vector2(x, z))
         const first = pos.length / 3
-        for (const [x, z] of clipped) top(x, z)
+        for (const [x, z] of clipped) top(x, z, onOutline(x, z) ? 1 : 0)
         for (const [a, b, c] of ShapeUtils.triangulateShape(contour, [])) index.push(first + a, first + b, first + c)
       }
     }
-    // Wall skirt along the outline, facing out; the shader raises its top edge with the canopy.
+    // Wall skirt along the outline, facing out, set in a little so the outer row of real plants stands in front
+    // of it; the shader raises its (ragged) top edge with the canopy.
+    const inset = Math.min(0.35, field.rowSpacing * 0.45)
     let area = 0
     poly.forEach(([ax, az], i) => {
       const [cx, cz] = poly[(i + 1) % poly.length]
@@ -871,10 +883,10 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
       const len = Math.hypot(cx - ax, cz - az)
       if (len < 1e-6) return
       const nxo = (sign * (cz - az)) / len, nzo = (-sign * (cx - ax)) / len
-      const steps = Math.max(1, Math.ceil(len / res))
+      const steps = Math.max(1, Math.ceil((len / res) * 2))
       let prev = -1
       for (let k = 0; k <= steps; k++) {
-        const x = ax + ((cx - ax) * k) / steps, z = az + ((cz - az) * k) / steps
+        const x = ax + ((cx - ax) * k) / steps - nxo * inset, z = az + ((cz - az) * k) / steps - nzo * inset
         const y = h(x, z)
         const dAlong = edgeLength + (len * k) / steps
         const first = pos.length / 3
@@ -882,6 +894,7 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
           pos.push(x, y, z)
           nrm.push(nxo, 0, nzo)
           attr.push(rows(x, z), dAlong, 1, w)
+          fieldAttr.push(...fieldInfo)
         }
         if (prev >= 0) index.push(prev, first, prev + 1, prev + 1, first, first + 1)
         prev = first
@@ -893,6 +906,7 @@ export function createCanopyGeometry(fields: readonly CornField[], resolution: n
   g.setAttribute('position', new Float32BufferAttribute(pos, 3))
   g.setAttribute('normal', new Float32BufferAttribute(nrm, 3))
   g.setAttribute('aCanopy', new Float32BufferAttribute(attr, 4))
+  g.setAttribute('aField', new Float32BufferAttribute(fieldAttr, 3))
   g.setIndex(index)
   return g
 }

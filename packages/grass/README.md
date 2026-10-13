@@ -964,7 +964,7 @@ corn.flattened(x, z)            // 0 standing … 1 flat
 | `stubbleHeight` | `0.3` | Stubble height in metres |
 | `height` / `heightVariation` | `2.4` / `0.1` | Mature plant height (metres) and random spread |
 | `leafColor`, `youngColor`, `dryColor`, `tasselColor`, `soilColor` | | Colours (CSS strings) |
-| `colorVariation` / `patchiness` / `translucency` | `0.08` / `0.5` / `0.6` | Per-plant and field-scale variation, back-lit glow |
+| `colorVariation` / `patchiness` / `translucency` | `0.08` / `0.5` / `0.35` | Per-plant and field-scale variation, back-lit glow |
 | `stiffness` / `wind` | `1` / grass-style | Same `WindOptions` as grass |
 | `interactors` / `interactionStrength` | `[]` / `1` | Same `Interactor`s as grass: they push plants aside and flatten what they pass over |
 | `flattenResolution` | `0.5` | Metres per texel of the flatten map |
