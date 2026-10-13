@@ -20,6 +20,7 @@ Infinite, terrain-aware grass for **three.js** and **react-three-fiber**, built 
 - **Interaction**: up to 16 objects push grass aside.
 - **Grass maps**: control where grass grows and how tall it is, for paths, clearings and fields.
 - **Terrain painter**: paint coverage and height directly on the terrain.
+- **Corn**: row-planted corn fields from farm polygons, with growth stages, harvest stubble, the same wind and interactors (a tractor flattens a track that stays down), and a canopy that carries whole fields from the air.
 - **Realistic shading**: clumping, field-scale colour patches, back-lit translucency, tinted sheen, root occlusion, shadows.
 
 ```ts
@@ -76,7 +77,8 @@ All of these were captured from the demos. Click any image to open the live demo
   - [Terrain helpers: `createHeightSampler`, `bakeHeightfield`, `raycastHeight`, `slopeAt`, `HeightFn`, `Terrain`](#terrain-helpers)
   - [Geometry: `createBladeGeometry`, `createBillboardGeometry`](#geometry)
   - [Shader access: `GrassUniforms`, `GrassMapSample`, `MAX_INTERACTORS`](#shader-access)
-  - [React: `<Grass>`, `GrassProps`, `GrassImpl`](#react)
+  - [Corn: `Corn`, `CornField`, `CornSettings`, `FlattenMap`, `plantRows`](#corn)
+  - [React: `<Grass>`, `GrassProps`, `GrassImpl`, `<Corn>`](#react)
 - [Performance tips](#performance-tips)
 - [Running the demos](#running-the-demos)
 
@@ -95,7 +97,7 @@ Entry points:
 | Import | Contents |
 |---|---|
 | `threejs-grass` | Everything framework-agnostic |
-| `threejs-grass/react` | The `<Grass>` component, plus everything from `threejs-grass` (the class is exported as `GrassImpl`) |
+| `threejs-grass/react` | The `<Grass>` and `<Corn>` components, plus everything from `threejs-grass` (the classes are exported as `GrassImpl` and `CornImpl`) |
 
 ## Quick start: three.js
 
@@ -922,6 +924,64 @@ const treeMaterial = useMemo(() => {
 
 ---
 
+### Corn
+
+Corn is the tall, row-planted variant of the grass: same instancing, wind and `Interactor`s. Plants (stalk, 12
+alternating arching leaves with a folded midrib, tassel, one or two ears with silk) are planted on a row lattice
+inside field polygons, built in chunks around the camera, and thinned over four levels of detail. A canopy surface
+stands in for the plants that thinning drops: it lies on the soil near the camera and rises to the top of the
+leaves with distance, so a field reads the same from 2 m and from 200 m up. Its rows and leaf streaks are filtered
+by the pixel footprint, so they fade to their average instead of shimmering (no moiré, no sparkle).
+
+```ts
+const corn = await Corn.create({
+  camera, scene, renderer, terrain,
+  fields: [{ polygon: [[0, 0], [200, -8], [210, 150], [-6, 160]], rowDirection: -0.04, rowSpacing: 0.76 }],
+  growth: 0.8,
+  interactors: [{ object: tractor, radius: 1.4 }],
+})
+corn.set({ harvested: true })   // stubble
+corn.flattened(x, z)            // 0 standing … 1 flat
+```
+
+**Fields** (`CornField`, plain JSON, the shape threejs-city's farm planner hands over):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `polygon` | `[x, z][]` | Outline in world metres, either winding, closed implicitly |
+| `rowDirection` | `number` | Direction the rows run, radians from +X towards +Z |
+| `rowSpacing` | `number` | Distance between rows in metres (0.76 = 30 in) |
+
+**Settings** (`Corn.create`, `corn.set`, `corn.reset`, `<Corn>` props; defaults in `DEFAULT_CORN`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `fields` | `[]` | `CornField`s to plant |
+| `plantSpacing` | `0.18` | Metres between plants in a row |
+| `seed` | `1` | Layout seed (the layout is deterministic from it) |
+| `growth` | `0.8` | 0 seedling, ~0.65 full height, 0.8 mature with tassels and ears, 1 dry and brown |
+| `harvested` | `false` | Only stubble is left |
+| `stubbleHeight` | `0.3` | Stubble height in metres |
+| `height` / `heightVariation` | `2.4` / `0.1` | Mature plant height (metres) and random spread |
+| `leafColor`, `youngColor`, `dryColor`, `tasselColor`, `soilColor` | | Colours (CSS strings) |
+| `colorVariation` / `patchiness` / `translucency` | `0.08` / `0.5` / `0.6` | Per-plant and field-scale variation, back-lit glow |
+| `stiffness` / `wind` | `1` / grass-style | Same `WindOptions` as grass |
+| `interactors` / `interactionStrength` | `[]` / `1` | Same `Interactor`s as grass: they push plants aside and flatten what they pass over |
+| `flattenResolution` | `0.5` | Metres per texel of the flatten map |
+| `chunkSize` / `canopyResolution` | `16` / `1` | Plant chunk size and canopy grid size, metres |
+| `lods` | 10 m ×1, 30 m ×0.6, 60 m ×0.35, 100 m ×0.2 | Four `CornLOD`s (`distance`, `density`); plants end at the last |
+| `castShadow` / `shadowDistance` / `receiveShadow` | `true` / `25` / `true` | Shadows |
+| `sun`, `debugLods`, `buildBudget` | `null`, `false`, `3` | As for grass |
+
+Interactors flatten corn for good: each frame they stamp the strip they drove since the last frame into a
+`FlattenMap` (stalks fall along the direction of travel, splayed outwards), and neighbours just outside are pushed
+aside. `corn.flatten(x, z, radius, dirX?, dirZ?)` knocks corn down from anything else; `corn.clearFlattened()`
+stands it back up. `plantRows(fields, minX, minZ, maxX, maxZ, { plantSpacing, seed })` is the layout on its own
+(sorted by LOD rank), `createCornGeometry(detail)` and `createCanopyGeometry(fields, resolution, heightFn)` the
+meshes. In React, `<Corn>` takes the same settings as props (the class is `CornImpl`).
+
+---
+
 ### React
 
 ```ts
@@ -1002,7 +1062,7 @@ renderer.setAnimationLoop(() => {
 
 ```bash
 npm install     # from the threejs-worldgen repo root
-npm run dev     # http://localhost:5173 (three.js + lil-gui) and /r3f.html (React + leva)
+npm run dev     # http://localhost:5173 (three.js + lil-gui) and /r3f.html (React + leva); corn: /corn.html, /corn-r3f.html
 npm test        # terrain baking / ray-march checks
 npm run build   # ESM + .d.ts into packages/*/dist/
 ```

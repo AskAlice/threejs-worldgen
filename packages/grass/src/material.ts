@@ -94,7 +94,28 @@ export function sampleGrassMap(u: GrassUniforms, worldXZ: Node<'vec2'>, vertexSt
   return { coverage: mix(float(1), s.r, inMap), height: mix(float(1), s.g.mul(2), inMap) }
 }
 
-const LOD_COLORS = [new Color('#ff4d4d'), new Color('#ffd23f'), new Color('#4dd96b'), new Color('#4da6ff')]
+/** Wind uniforms shared by grass and corn. */
+export type WindUniforms = Pick<GrassUniforms, 'windDirection' | 'windScale' | 'windSpeed'>
+
+/**
+ * Wind at a world XZ position: `gust` (0..1) and a sideways `swirl` (XZ). Every vertex evaluates this, so it is
+ * one noise call plus cheap trigonometry:
+ * - gusts: domain-warped scrolling noise, shaped so calm troughs separate distinct gust fronts
+ * - a travelling ripple along the wind direction
+ * - sideways swirl, so fields don't sway in lockstep
+ */
+export function windGust(u: WindUniforms, xz: Node<'vec2'>) {
+  const windUv0 = xz.mul(u.windScale).sub(u.windDirection.mul(time.mul(u.windSpeed)))
+  const warp = vec2(sin(windUv0.y.mul(1.7).add(time.mul(0.23))), sin(windUv0.x.mul(1.3).sub(time.mul(0.31)))).mul(0.35)
+  const gustNoise = mx_noise_float(windUv0.add(warp))
+  const ripple = sin(dot(xz, u.windDirection).mul(u.windScale.mul(9)).sub(time.mul(u.windSpeed).mul(5)))
+  const gust = clamp(smoothstep(-0.25, 0.7, gustNoise).mul(0.8).add(ripple.mul(0.2)).add(0.1), 0, 1)
+  const across = vec2(u.windDirection.y.negate(), u.windDirection.x)
+  const swirl = across.mul(sin(dot(xz, across).mul(u.windScale.mul(6)).add(time.mul(u.windSpeed).mul(1.7)).add(gustNoise.mul(3))).mul(0.25).mul(gust))
+  return { gust, swirl }
+}
+
+const LOD_COLORS =[new Color('#ff4d4d'), new Color('#ffd23f'), new Color('#4dd96b'), new Color('#4da6ff')]
 
 /**
  * One material, two shapes:
@@ -148,17 +169,7 @@ export function createGrassMaterial(u: GrassUniforms, billboard: boolean) {
   const facingT = vec2(sin(twistedYaw), cos(twistedYaw))
   const sideT = vec2(cos(twistedYaw), sin(twistedYaw).negate())
 
-  // Wind. Every vertex evaluates this, so it is one noise call plus cheap trigonometry:
-  // - gusts: domain-warped scrolling noise, shaped so calm troughs separate distinct gust fronts
-  // - a travelling ripple along the wind direction
-  // - sideways swirl, so fields don't sway in lockstep
-  const windUv0 = root.xz.mul(u.windScale).sub(u.windDirection.mul(time.mul(u.windSpeed)))
-  const warp = vec2(sin(windUv0.y.mul(1.7).add(time.mul(0.23))), sin(windUv0.x.mul(1.3).sub(time.mul(0.31)))).mul(0.35)
-  const gustNoise = mx_noise_float(windUv0.add(warp))
-  const ripple = sin(dot(root.xz, u.windDirection).mul(u.windScale.mul(9)).sub(time.mul(u.windSpeed).mul(5)))
-  const gust = clamp(smoothstep(-0.25, 0.7, gustNoise).mul(0.8).add(ripple.mul(0.2)).add(0.1), 0, 1)
-  const across = vec2(u.windDirection.y.negate(), u.windDirection.x)
-  const swirl = across.mul(sin(dot(root.xz, across).mul(u.windScale.mul(6)).add(time.mul(u.windSpeed).mul(1.7)).add(gustNoise.mul(3))).mul(0.25).mul(gust))
+  const { gust, swirl } = windGust(u, root.xz)
 
   const interaction = Fn(() => {
     const push = vec2(0).toVar()

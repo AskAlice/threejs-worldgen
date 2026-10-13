@@ -2,10 +2,11 @@ import {
   BufferGeometry, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3,
   type Camera, type DirectionalLight, type MeshPhysicalNodeMaterial, type Node, type Object3D,
 } from 'three/webgpu'
-import { createGrassMaterial, createGrassUniforms, MAX_INTERACTORS, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material'
-import { presets, type GrassStyle, type PresetName } from './presets'
+import { createGrassMaterial, createGrassUniforms, MAX_INTERACTORS, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material.ts'
+import { presets, type GrassStyle, type PresetName } from './presets.ts'
 import { createHeightSampler, slopeAt, type HeightFn, type Terrain } from 'threejs-heightfield'
-import type { GrassMap } from './grass-map'
+import type { GrassMap } from './grass-map.ts'
+import { hash2, mulberry32, valueNoise } from './random.ts'
 
 /**
  * One of the four levels of detail. Density is interpolated linearly between consecutive LODs, so
@@ -675,35 +676,13 @@ export class Grass {
     let sun = this.settings.sun
     if (!sun && !this.sunSearched && this.object.parent) {
       this.sunSearched = true
-      let root: Object3D = this.object
-      while (root.parent) root = root.parent
-      root.traverse((o) => {
-        if (!this.autoSun && (o as DirectionalLight).isDirectionalLight) this.autoSun = o as DirectionalLight
-      })
+      this.autoSun = findSun(this.object)
     }
-    sun ??= this.autoSun
-    if (!sun) return
-    sun.updateWorldMatrix(true, false)
-    sun.target.updateWorldMatrix(true, false)
-    const u = this.uniforms
-    u.sunDirection.value.setFromMatrixPosition(sun.matrixWorld).sub(_t.setFromMatrixPosition(sun.target.matrixWorld)).normalize()
-    u.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity)
+    writeSun(this.uniforms, sun ?? this.autoSun)
   }
 
   private updateInteractors() {
-    const slots = this.uniforms.interactors.array as unknown as { set: (x: number, y: number, z: number, w: number) => void }[]
-    const list = this.settings.interactors
-    this.uniforms.interactorCount.value = Math.min(list.length, MAX_INTERACTORS)
-    for (let i = 0; i < MAX_INTERACTORS; i++) {
-      const it = list[i]
-      const obj = it && ('isObject3D' in it.object ? it.object : it.object.current)
-      if (!obj) {
-        slots[i].set(0, 0, 0, 0)
-        continue
-      }
-      obj.getWorldPosition(_v)
-      slots[i].set(_v.x, _v.y, _v.z, it.radius)
-    }
+    writeInteractors(this.uniforms, this.settings.interactors)
   }
 
   private clearTiles() {
@@ -734,6 +713,47 @@ export class Grass {
 
 const _v = new Vector3()
 const _t = new Vector3()
+
+/** The interactor's object, or `null` while a React ref is unmounted. */
+export function interactorObject(it: Interactor | undefined): Object3D | null {
+  return (it && ('isObject3D' in it.object ? it.object : it.object.current)) ?? null
+}
+
+/** Copies interactor positions and radii into the shader slots (shared by grass and corn). */
+export function writeInteractors(u: Pick<GrassUniforms, 'interactors' | 'interactorCount'>, list: Interactor[]) {
+  const slots = u.interactors.array as unknown as { set: (x: number, y: number, z: number, w: number) => void }[]
+  u.interactorCount.value = Math.min(list.length, MAX_INTERACTORS)
+  for (let i = 0; i < MAX_INTERACTORS; i++) {
+    const it = list[i]
+    const obj = interactorObject(it)
+    if (!obj) {
+      slots[i].set(0, 0, 0, 0)
+      continue
+    }
+    obj.getWorldPosition(_v)
+    slots[i].set(_v.x, _v.y, _v.z, it.radius)
+  }
+}
+
+/** The first DirectionalLight in the scene `object` belongs to. */
+export function findSun(object: Object3D): DirectionalLight | null {
+  let root: Object3D = object
+  while (root.parent) root = root.parent
+  let found: DirectionalLight | null = null
+  root.traverse((o) => {
+    if (!found && (o as DirectionalLight).isDirectionalLight) found = o as DirectionalLight
+  })
+  return found
+}
+
+/** Points the translucency uniforms at `sun` (no-op without one). */
+export function writeSun(u: Pick<GrassUniforms, 'sunDirection' | 'sunColor'>, sun: DirectionalLight | null) {
+  if (!sun) return
+  sun.updateWorldMatrix(true, false)
+  sun.target.updateWorldMatrix(true, false)
+  u.sunDirection.value.setFromMatrixPosition(sun.matrixWorld).sub(_t.setFromMatrixPosition(sun.target.matrixWorld)).normalize()
+  u.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity)
+}
 /** Frames to wait before freeing a replaced tile geometry (see `Grass.retire`). */
 const RETIRE_AFTER_FRAMES = 60
 /** Cells are built with this many times the blades they currently need. */
@@ -813,33 +833,4 @@ function disposeInstanced(geometry: InstancedBufferGeometry) {
   geometry.deleteAttribute('position')
   geometry.deleteAttribute('uv')
   geometry.dispose()
-}
-
-/** Smooth 2D value noise in [-1, 1]. */
-function valueNoise(x: number, z: number) {
-  const xi = Math.floor(x)
-  const zi = Math.floor(z)
-  const tx = x - xi
-  const tz = z - zi
-  const sx = tx * tx * (3 - 2 * tx)
-  const sz = tz * tz * (3 - 2 * tz)
-  const h = (a: number, b: number) => (hash2(a, b) / 4294967296) * 2 - 1
-  const top = h(xi, zi) + (h(xi + 1, zi) - h(xi, zi)) * sx
-  const bottom = h(xi, zi + 1) + (h(xi + 1, zi + 1) - h(xi, zi + 1)) * sx
-  return top + (bottom - top) * sz
-}
-
-function hash2(x: number, z: number) {
-  let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(z | 0, 0x165667b1)
-  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
-  return (h ^ (h >>> 13)) >>> 0
-}
-
-function mulberry32(seed: number) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
 }

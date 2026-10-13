@@ -1,6 +1,6 @@
 import { DataTexture, LinearFilter, Mesh, MeshBasicNodeMaterial, Raycaster, RingGeometry, Vector2 } from 'three/webgpu'
 import { raycastHeight } from 'threejs-heightfield'
-import type { Grass } from './grass'
+import type { Grass } from './grass.ts'
 
 /** Options for {@link GrassMap}. */
 export interface GrassMapOptions {
@@ -168,6 +168,10 @@ export class TerrainPainter {
   brush: Brush
   /** Brush outline that follows the terrain under the pointer. */
   readonly cursor: Mesh
+  /** Field whose `grassMap` is painted. */
+  readonly grass: Grass
+  /** Element receiving pointer events. */
+  readonly domElement: HTMLElement
 
   private painting = false
   private raycaster = new Raycaster()
@@ -179,7 +183,9 @@ export class TerrainPainter {
    * @param brush Initial brush settings.
    * @throws If the grass has no `grassMap`.
    */
-  constructor(readonly grass: Grass, readonly domElement: HTMLElement, brush: Partial<Brush> = {}) {
+  constructor(grass: Grass, domElement: HTMLElement, brush: Partial<Brush> = {}) {
+    this.grass = grass
+    this.domElement = domElement
     if (!grass.settings.grassMap) throw new Error('TerrainPainter: set a `grassMap` on the Grass first.')
     this.brush = { mode: 'erase', radius: 3, strength: 0.25, ...brush }
     this.cursor = new Mesh(
