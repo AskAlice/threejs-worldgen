@@ -11,7 +11,8 @@ const grass = (f: (x: number, z: number, out: FireCellInfo) => void = () => {}):
     return out
   },
 })
-const calm: FireInput = { size: 400, cellSize: 4, jitter: 0.3, fallback: { wind: [0, 0], moisture: 0.06 }, lightning: { enabled: false } }
+// Uniform landscapes: no patchy fuel or moisture unless a test asks for it.
+const calm: FireInput = { size: 400, cellSize: 4, jitter: 0.3, fallback: { wind: [0, 0], moisture: 0.06 }, lightning: { enabled: false }, variation: { fuel: 0, moisture: 0 } }
 
 // Burnt or burning extent from the ignition point along +x and −x.
 function extent(sim: FireSim, dir: 1 | -1, z = 0): number {

@@ -1,0 +1,77 @@
+/**
+ * React Three Fiber entry point: `<Particles>` and `<ParticleGrid>`, plus everything from
+ * `threejs-particles` (the classes are re-exported as `ParticleSystemImpl` and `ParticleGridImpl`).
+ *
+ * @module threejs-particles/react
+ */
+import { createContext, useContext, useEffect, useImperativeHandle, useMemo, type ReactNode, type Ref } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import type { Renderer } from 'three/webgpu'
+import { ParticleGrid as ParticleGridImpl, type GridOptions } from './grid.ts'
+import { ParticleLighting, ParticleSystem as ParticleSystemImpl } from './system.ts'
+import type { DeepPartial, ParticleInput } from './options.ts'
+
+export * from './index.ts'
+/** The imperative {@link ParticleSystemImpl | ParticleSystem} class. */
+export { ParticleSystem as ParticleSystemImpl } from './system.ts'
+/** The imperative {@link ParticleGridImpl | ParticleGrid} class. */
+export { ParticleGrid as ParticleGridImpl } from './grid.ts'
+
+const GridContext = createContext<ParticleGridImpl | null>(null)
+
+/** Props of `<ParticleGrid>`: every {@link GridOptions} setting plus children. */
+export interface ParticleGridProps extends DeepPartial<GridOptions> {
+  /** Receives the {@link ParticleGridImpl} instance. */
+  ref?: Ref<ParticleGridImpl | null>
+  /** `<Particles>` that read the grid. */
+  children?: ReactNode
+}
+
+/**
+ * A coarse grid shared by the `<Particles>` inside it: they read its heat (lift) and density (smoke
+ * self-shadowing). Splats are up to you (see `ParticleGrid.splat`); the grid resolves once per frame
+ * after its children update.
+ */
+export function ParticleGrid({ ref, children, ...options }: ParticleGridProps): React.JSX.Element {
+  const { gl } = useThree()
+  const grid = useMemo(() => new ParticleGridImpl(options), [JSON.stringify(options.resolution)])
+  useEffect(() => () => grid.dispose(), [grid])
+  useEffect(() => void grid.set(options))
+  useFrame((_, dt) => grid.resolve(gl as unknown as Renderer, dt), 1)
+  useImperativeHandle(ref, () => grid, [grid])
+  return <GridContext.Provider value={grid}>{children}</GridContext.Provider>
+}
+
+/** Props of `<Particles>`: every {@link ParticleInput} setting plus the ones below. */
+export interface ParticlesProps extends ParticleInput {
+  /** Shared light (default: one per system, filled from the scene each frame). */
+  lighting?: ParticleLighting
+  /** Weighted sources (`SOURCE_STRIDE` floats each), for `emitter.shape: 'sources'`. */
+  sources?: ArrayLike<number> | null
+  /** Most sources. */
+  maxSources?: number
+  /** Receives the {@link ParticleSystemImpl} instance. */
+  ref?: Ref<ParticleSystemImpl | null>
+}
+
+/**
+ * A GPU particle system. Props are the full truth (`reset` on every render); the structural ones
+ * (`capacity`, `render.shading`, `render.blending`, `render.sort`, `render.shadowSteps`,
+ * `render.lightSteps`) rebuild it. Inside `<ParticleGrid>` it reads that grid.
+ */
+export function Particles({ lighting, sources, maxSources, ref, ...options }: ParticlesProps): React.JSX.Element {
+  const { gl, scene, camera } = useThree()
+  const grid = useContext(GridContext)
+  const r = options.render
+  const structure = JSON.stringify([options.capacity, r?.shading, r?.blending, r?.sort, r?.shadowSteps, r?.lightSteps, maxSources])
+  const impl = useMemo(() => new ParticleSystemImpl({ ...options, grid, lighting, maxSources }), [structure, grid, lighting])
+  useEffect(() => () => impl.dispose(), [impl])
+  useEffect(() => void impl.reset(options))
+  useEffect(() => void (sources && impl.setSources(sources)), [impl, sources])
+  useFrame((_, dt) => {
+    if (!lighting) impl.lighting.fromScene(scene)
+    impl.update(gl as unknown as Renderer, dt, camera)
+  })
+  useImperativeHandle(ref, () => impl, [impl])
+  return <primitive object={impl.object} />
+}

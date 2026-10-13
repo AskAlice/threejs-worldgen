@@ -11,6 +11,7 @@
     "packages/scatter",
     "packages/trees",
     "packages/water",
+    "packages/particles",
     "packages/weathering",
     "packages/fauna",
     "packages/city",

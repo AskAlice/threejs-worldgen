@@ -1,7 +1,8 @@
 import { ClampToEdgeWrapping, DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, Vector4, type Node } from 'three/webgpu'
-import { positionWorld, step, texture, uniform, vec2 } from 'three/tsl'
+import { positionWorld, step, uniform } from 'three/tsl'
 import { STATE_CHANNELS, type MaterialStates, type StateChannel } from './states.ts'
 import type { ClimatePoint, SurfaceSample, Weather } from './weather.ts'
+import { smoothSample } from './sampling.ts'
 import { merge, resolve } from './util.ts'
 
 /** Where a {@link StateField} lies and how fine it is. Plain JSON. */
@@ -270,7 +271,7 @@ export class StateField {
   node(xz: Node<'vec2'> = positionWorld.xz): StateNodes {
     const uv = xz.sub(this.bounds.xy).div(this.bounds.zw)
     const inside = step(0, uv.x).mul(step(uv.x, 1)).mul(step(0, uv.y)).mul(step(uv.y, 1))
-    const s = texture(this.texture, vec2(uv.x, uv.y)).mul(inside)
+    const s = (smoothSample(this.texture, uv, this.bounds.zw, xz, this.texel) as Node<'vec4'>).mul(inside)
     return { wetness: s.x, snow: s.y, burn: s.z, damage: s.w }
   }
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { readdirSync } from 'node:fs'
 
 const src = (p: string) => fileURLToPath(new URL(`../packages/${p}`, import.meta.url))
-const packages = ['heightfield', 'biomes', 'population', 'scatter', 'trees', 'water', 'weathering', 'fauna', 'city', 'props', 'vehicles', 'sky', 'grass', 'worldgen']
+const packages = ['heightfield', 'biomes', 'population', 'scatter', 'trees', 'water', 'particles', 'weathering', 'fauna', 'city', 'props', 'vehicles', 'sky', 'grass', 'worldgen']
 const name = (dir: string) => (dir === 'worldgen' ? 'threejs-worldgen' : `threejs-${dir}`)
 
 export default defineConfig({

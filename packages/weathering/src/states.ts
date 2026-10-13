@@ -1,6 +1,6 @@
 import { Color, type MeshStandardNodeMaterial, type Node, type UniformNode } from 'three/webgpu'
 import {
-  cameraPosition, dFdx, dFdy, dot, float, materialColor, materialEmissive, materialMetalness, materialNormal, materialOpacity,
+  cameraPosition, clamp, dFdx, dFdy, dot, float, fwidth, length, materialColor, max, materialEmissive, materialMetalness, materialNormal, materialOpacity,
   materialRoughness, mix, mx_noise_float, mx_worley_noise_vec2, normalView, normalWorld, positionView, positionWorld, smoothstep,
   step, time, uniform, vec2, vec3, vertexColor,
 } from 'three/tsl'
@@ -23,10 +23,10 @@ export type MaterialStates = Record<StateChannel, number>
 
 /**
  * The material-state contract as TSL nodes: the four float states, plus optional `heat` (0…1, "on fire
- * right now"), which drives the ember glow. Any field may be left out: missing states cost nothing (no
+ * right now"), which drives the ember glow, and `ash` (0…1, white ash vs black char where burnt). Any field may be left out: missing states cost nothing (no
  * shader code is generated for them). Numbers are accepted as constants.
  */
-export type MaterialStateNodes = Partial<Record<StateChannel | 'heat', Node<'float'> | number>>
+export type MaterialStateNodes = Partial<Record<StateChannel | 'heat' | 'ash', Node<'float'> | number>>
 
 /** Look of the four states. Plain JSON; every value is live through {@link StateLook.uniforms}. */
 export interface StateLookOptions {
@@ -283,15 +283,34 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
   const damage = asState(states.damage)
   const burn = asState(states.burn)
   const heat = asState(states.heat)
+  const ash = asState(states.ash)
   const wet = asState(states.wetness)
   const snow = asState(states.snow)
+
+  // Anti-aliasing: every pattern fades to its mean as its wavelength nears the pixel footprint, and
+  // every threshold is as soft as one pixel of its input. No sparkle, no stair steps.
+  const footprint = max(length(fwidth(p)), 1e-5)
+  const resolved = (wavelength: Node<'float'> | number) => smoothstep(2, 8, asFloat(wavelength).div(footprint))
+  const aaStep = (edge: Node<'float'> | number, v: Node<'float'>) => {
+    const w = max(fwidth(v), 1e-4)
+    return smoothstep(asFloat(edge).sub(w), asFloat(edge).add(w), v)
+  }
+  // Domain-warped, mildly anisotropic, multi-scale noise with mean 0 (about ±0.5), octaves faded by footprint.
+  const warped = (wavelengths: number[], amps: number[], salt: number) => {
+    const w0 = wavelengths[0]
+    const warp = vec3(mx_noise_float(p.div(w0 * 2.3).add(salt)), 0, mx_noise_float(p.div(w0 * 2.3).add(salt + 31.7))).mul(w0 * 0.45)
+    const q = p.add(warp)
+    let sum: Node<'float'> = float(0)
+    wavelengths.forEach((l, i) => { sum = sum.add(mx_noise_float(q.mul(vec3(1 / l, 1 / l, 0.7 / l)).add(salt * (i + 1))).mul(amps[i]).mul(resolved(l))) })
+    return sum
+  }
 
   if (damage) {
     // Cracks along Worley cell borders that spread as damage grows, dents, grime.
     const cells = mx_worley_noise_vec2(p.mul(u.crackScale))
-    const grow = smoothstep(0.05, 0.5, damage.add(mx_noise_float(p.mul(0.7)).mul(0.25)))
-    const crack = smoothstep(u.crackWidth, 0, cells.y.sub(cells.x)).mul(grow)
-    const dent = mx_noise_float(p.mul(0.9)).mul(u.dentStrength).mul(damage)
+    const grow = smoothstep(0.05, 0.5, damage.add(warped([1.4], [0.25], 3.1)))
+    const crack = smoothstep(u.crackWidth, 0, cells.y.sub(cells.x)).mul(grow).mul(resolved(float(1).div(u.crackScale)))
+    const dent = mx_noise_float(p.mul(0.9)).mul(u.dentStrength).mul(damage).mul(resolved(1.1))
     color = mix(color, u.crackColor, crack.mul(0.85)).mul(damage.mul(0.18).oneMinus())
     roughness = roughness.add(damage.mul(0.12)).add(crack.mul(0.25)).clamp(0, 1)
     normal = bump(normal, dent.mul(0.04).sub(crack.mul(0.012)))
@@ -303,21 +322,30 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
 
   if (burn || heat) {
     const b = burn ?? float(0)
-    const patch = mx_noise_float(p.mul(1.3)).mul(0.5).add(0.5)
-    const char = smoothstep(0.1, 0.6, b.add(patch.sub(0.5).mul(0.5)))
-    color = mix(color, color.mul(u.scorchColor).mul(2.2), smoothstep(0, 0.25, b).mul(0.7))
-    color = mix(color, u.charColor, char)
-    color = mix(color, u.ashColor, smoothstep(0.85, 1, b).mul(smoothstep(0.6, 0.8, patch)).mul(0.7))
-    roughness = mix(roughness, float(0.95), char)
-    metalness = metalness.mul(char.oneMinus())
+    // The scar edge: crisp at the scale of the fire front, broken up at small scales only near the edge.
+    const n = warped([14, 3.5, 0.9], [0.55, 0.3, 0.15], 7.3)
+    const edgeBand = b.mul(b.oneMinus()).mul(4).add(0.12)
+    const v = b.add(n.mul(0.24).mul(edgeBand))
+    const charred = aaStep(0.45, v)
+    const scorched = smoothstep(0.03, 0.4, b).mul(charred.oneMinus())
+    // Real burn scars keep the ground's structure: char and ash are dark and pale versions of it.
+    const lum = dot(color, vec3(0.2126, 0.7152, 0.0722))
+    const charCol = mix(u.charColor, color.mul(0.18), 0.4)
+    const ashCol = mix(u.ashColor, u.charColor, 0.35).mul(lum.mul(0.6).add(0.7))
+    // Ash is a partial, softly varying share over the char (never a flat sheet): heavier where more fuel burnt.
+    const ashAmt = clamp((ash ?? float(0)).mul(n.mul(0.5).add(0.45)), 0, 0.6).mul(smoothstep(0.6, 1, b))
+    color = mix(color, color.mul(u.scorchColor).mul(2.2), scorched.mul(0.55))
+    color = mix(color, mix(charCol, ashCol, ashAmt), charred)
+    roughness = mix(roughness, float(0.95), charred)
+    metalness = metalness.mul(charred.oneMinus())
     if (heat) {
-      // Glowing cracks in the char, flickering over time.
+      // Glowing cracks in the char, faded to their mean where too small to resolve, flickering slowly.
       const cells = mx_worley_noise_vec2(p.mul(u.emberScale))
-      const cracks = smoothstep(0.18, 0, cells.y.sub(cells.x))
-      const flicker = mx_noise_float(p.mul(u.emberScale.mul(0.5)).add(vec3(0, t.mul(1.3), 0))).mul(0.5).add(0.5)
-      const glow = heat.mul(cracks.mul(0.8).add(0.2)).mul(flicker.mul(0.7).add(0.3))
+      const cracks = mix(float(0.12), smoothstep(0.12, 0, cells.y.sub(cells.x)), resolved(float(1).div(u.emberScale)))
+      const flicker = mx_noise_float(p.mul(u.emberScale.mul(0.15)).add(vec3(0, t.mul(0.9), 0))).mul(0.5).add(0.5)
+      const glow = heat.mul(heat).mul(heat).mul(cracks).mul(flicker.mul(0.6).add(0.4))
       emissive = emissive.add(u.emberColor.mul(u.emberIntensity).mul(glow))
-      color = mix(color, u.charColor, heat.mul(0.6))
+      color = mix(color, u.charColor, heat.mul(0.5))
     }
     if (ctx.foliage && burn) {
       const mask = ctx.foliage === true ? float(1) : ctx.foliage
@@ -334,25 +362,28 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
     if (ctx.streaks !== false) {
       const vertical = smoothstep(0.75, 0.3, up.abs())
       const s = mx_noise_float(vec3(p.x.mul(u.streakScale), p.y.mul(u.streakScale.mul(0.12)).add(t.mul(0.15)), p.z.mul(u.streakScale)))
-      const streak = smoothstep(0.1, 0.6, s).mul(vertical).mul(wet).mul(u.streaks)
+      const streak = smoothstep(0.1, 0.6, s).mul(vertical).mul(wet).mul(u.streaks).mul(resolved(float(1).div(u.streakScale)))
       color = color.mul(streak.mul(0.3).oneMinus())
       roughness = roughness.mul(streak.mul(0.6).oneMinus())
     }
     if (ctx.puddles !== false) {
+      // Puddles collect on flat ground in broad, warped low spots (not a blotch pattern).
       const flat = smoothstep(0.9, 0.98, up)
-      const pattern = mx_noise_float(vec3(p.x.mul(u.puddleScale), 3.7, p.z.mul(u.puddleScale))).mul(0.5).add(0.5)
-      const puddle = flat.mul(smoothstep(0, 0.06, wet.mul(u.puddles).sub(pattern)))
-      color = mix(color, color.mul(0.45), puddle)
+      const scale = float(1).div(max(u.puddleScale, 1e-3))
+      const low = warped([12, 4], [0.7, 0.3], 19.1).mul(scale.div(3).min(1)).add(0.5)
+      // Only properly wet ground pools water; puddles darken a little and mostly turn glossy.
+      const puddle = flat.mul(aaStep(low, wet.mul(u.puddles).sub(0.35)))
+      color = mix(color, color.mul(0.72), puddle)
       roughness = mix(roughness, float(0.03), puddle)
       normal = mix(normal, nGeo, puddle).normalize()
     }
   }
 
   if (snow) {
-    const edge = mx_noise_float(p.mul(u.snowScale))
+    const edge = warped([3, 0.8], [0.7, 0.3], 23.9).mul(2)
     const threshold = snow.mul(u.snowReach.add(1)).oneMinus()
     const cover = smoothstep(threshold, threshold.add(0.12), up.add(edge.mul(u.snowBreakup))).mul(smoothstep(0, 0.08, snow))
-    const sparkle = smoothstep(0.8, 0.92, mx_noise_float(p.mul(u.sparkleScale).add(cameraPosition.mul(0.05)))).mul(cover).mul(u.sparkle)
+    const sparkle = smoothstep(0.8, 0.92, mx_noise_float(p.mul(u.sparkleScale).add(cameraPosition.mul(0.05)))).mul(cover).mul(u.sparkle).mul(resolved(float(1).div(u.sparkleScale)))
     color = mix(color, u.snowColor.mul(up.mul(0.12).add(0.88)), cover).add(sparkle)
     roughness = mix(roughness, u.snowRoughness, cover).sub(sparkle.mul(0.4)).clamp(0.02, 1)
     normal = mix(normal, nGeo, cover.mul(0.85)).normalize()

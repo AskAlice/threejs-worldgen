@@ -13,6 +13,8 @@
     "packages/trees/src/react.tsx",
     "packages/water/src/index.ts",
     "packages/water/src/react.tsx",
+    "packages/particles/src/index.ts",
+    "packages/particles/src/react.tsx",
     "packages/weathering/src/index.ts",
     "packages/weathering/src/react.tsx",
     "packages/fauna/src/index.ts",

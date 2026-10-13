@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Vector3 } from 'three/webgpu'
+import { Vector3, type Renderer } from 'three/webgpu'
 import type { World } from 'threejs-biomes'
 import { Weather as WeatherImpl, createWeatherSample, type Strike, type WeatherInput, type WeatherSample } from './weather.ts'
 import { StateField, type StateFieldOptions } from './state-field.ts'
@@ -201,15 +201,16 @@ export interface WildfireProps extends WildfireInput {
 
 /**
  * A wildfire driven by the nearest `<Weather>` (wind, fuel moisture, lightning). Writes burn scars into
- * the weather's state field. Props are the full truth (`reset` on every render); scheduled ignitions
+ * the weather's state field; flames, smoke and embers are GPU particles (WebGPU). Props are the full truth (`reset` on every render); scheduled ignitions
  * added with `ignite()` are kept unless you pass `ignitions`.
  */
 export function Wildfire({ world, landscape, ref, ...options }: WildfireProps): React.JSX.Element {
   const { weather, clock, field, origin } = useWeather()
+  const { gl, camera } = useThree()
   const impl = useMemo(() => new WildfireImpl({ world: world === undefined ? weather.world : world, weather, landscape, field, ...options }), [weather, world, landscape, field])
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.reset(options))
-  useFrame(() => impl.setOrigin(origin).update(clock.time))
+  useFrame((_, delta) => impl.setOrigin(origin).attach(gl as unknown as Renderer, camera).update(clock.time, 8, delta))
   useImperativeHandle(ref, () => impl, [impl])
   return <primitive object={impl.object} />
 }

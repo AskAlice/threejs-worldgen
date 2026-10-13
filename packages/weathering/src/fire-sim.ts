@@ -76,8 +76,25 @@ export interface FireOptions {
     /** Forest (surface + crown). */
     tree: number
   }
-  /** Wind effect: spread × exp(windCoefficient × wind component along the spread direction in m/s). */
+  /** Wind effect on the head fire: head spread × exp(windCoefficient × wind speed in m/s). */
   windCoefficient: number
+  /** Share of the weather's (10 m) wind that blows at flame height (≈ 0.3 under forest, 0.5 in the open). */
+  midflame: number
+  /**
+   * Cap on the fire's length-to-breadth ratio. Spread is elliptical: Anderson (1983)
+   * LB = 0.936·e^(0.2566·U) + 0.461·e^(−0.1548·U) − 0.397 (U = midflame wind, mph), with the ignition
+   * at the rear focus, so the head runs, the flanks are slow and the backing fire crawls.
+   */
+  maxLengthToBreadth: number
+  /** Seeded, spatially correlated variation, so fronts finger and edges are ragged. */
+  variation: {
+    /** Fuel load ± share. */
+    fuel: number
+    /** Fuel moisture ± share. */
+    moisture: number
+    /** Patch size, metres. */
+    scale: number
+  }
   /** Slope effect: spread × exp(slopeCoefficient × rise/run); uphill runs, downhill crawls. */
   slopeCoefficient: number
   /** Fuel moisture (fraction of dry weight) at which fire stops spreading (Rothermel's Mx). */
@@ -156,6 +173,9 @@ export const DEFAULT_FIRE: FireOptions = {
   startTime: 0,
   spread: { grass: 0.9, shrub: 0.35, tree: 0.12 },
   windCoefficient: 0.13,
+  midflame: 0.3,
+  maxLengthToBreadth: 8,
+  variation: { fuel: 0.35, moisture: 0.3, scale: 48 },
   slopeCoefficient: 3.5,
   moistureOfExtinction: 0.3,
   minFuel: 0.05,
@@ -295,6 +315,7 @@ export class FireSim {
   private ignitionFuel = new Float32Array(0)
   private residual = new Float32Array(0)
   private burntTick = new Int32Array(0)
+  private moistureVariation = new Float32Array(0)
   private windX = new Float32Array(0)
   private windZ = new Float32Array(0)
   private lastRefresh = -1
@@ -386,6 +407,11 @@ export class FireSim {
   burntAge(index: number): number {
     const s = this.state[index]
     return s === FIRE_STATE.burnt || s === FIRE_STATE.regrowing ? (this.tickIndex - this.burntTick[index]) * this.options.tick : Infinity
+  }
+
+  /** Seconds since cell `index` caught fire, or `Infinity` if it is not burning. */
+  burningFor(index: number): number {
+    return this.state[index] === FIRE_STATE.burning ? this.burnTotal[index] - this.burnLeft[index] : Infinity
   }
 
   /** Wind velocity `[x, z]` (m/s) the cell saw at the last weather refresh. */
@@ -495,6 +521,9 @@ export class FireSim {
       const i = burning[b]
       const ci = i % this.cols, cj = (i - ci) / this.cols
       const wx = this.windX[i], wz = this.windZ[i]
+      const speed = Math.hypot(wx, wz)
+      const head = Math.min(20, Math.exp(o.windCoefficient * speed))
+      const e = ellipseEccentricity(speed * o.midflame, o.maxLengthToBreadth)
       for (let q = 0; q < 8; q++) {
         const di = NDI[q], dj = NDJ[q]
         const ni = ci + di, nj = cj + dj
@@ -502,7 +531,9 @@ export class FireSim {
         const k = nj * this.cols + ni
         if (!this.canBurn(k)) continue
         const d = c * NLEN[q]
-        const wind = Math.min(20, Math.exp((o.windCoefficient * (wx * di + wz * dj)) / NLEN[q]))
+        // Elliptical spread from the rear focus: head × (1 − e) / (1 − e·cosθ), θ from the wind.
+        const cos = speed > 1e-6 ? (wx * di + wz * dj) / (NLEN[q] * speed) : 0
+        const wind = (head * (1 - e)) / (1 - e * cos)
         const rise = Math.max(-1, Math.min(1.5, (this.elevation[k] - this.elevation[i]) / d))
         const slope = Math.max(0.25, Math.exp(o.slopeCoefficient * rise))
         this.ignition[k] += (this.rateOfSpread(k) * wind * slope * dt) / d
@@ -664,7 +695,7 @@ export class FireSim {
     if (!weather) {
       this.windX.fill(o.fallback.wind[0])
       this.windZ.fill(o.fallback.wind[1])
-      this.moisture.fill(o.fallback.moisture)
+      for (let i = 0; i < n; i++) this.moisture[i] = o.fallback.moisture * this.moistureVariation[i]
       return
     }
     const time = o.startTime + key * o.tick
@@ -693,7 +724,7 @@ export class FireSim {
       }
       this.windX[i] = lerp4(0)
       this.windZ[i] = lerp4(1)
-      this.moisture[i] = lerp4(2)
+      this.moisture[i] = lerp4(2) * this.moistureVariation[i]
     }
   }
 
@@ -718,6 +749,7 @@ export class FireSim {
     this.burntTick = new Int32Array(n)
     this.windX = new Float32Array(n)
     this.windZ = new Float32Array(n)
+    this.moistureVariation = new Float32Array(n)
     this.coarse = Math.max(2, Math.ceil((cols * o.cellSize) / 500) + 1) // weather is km-scale: ~500 m samples
     this.coarseClimate = []
     o.ignitions.sort((a, b) => a[2] - b[2])
@@ -730,9 +762,13 @@ export class FireSim {
       else Object.assign(info, { elevation: 0, firebreak: false, grass: o.fuel.grassLoad, shrub: 0, tree: 0 })
       this.elevation[i] = info.elevation
       this.firebreak[i] = info.firebreak ? 1 : 0
-      this.capacity[i * 3] = info.grass
-      this.capacity[i * 3 + 1] = info.shrub
-      this.capacity[i * 3 + 2] = info.tree
+      // Patchy fuel and moisture (correlated noise, seeded): fingers and ragged edges instead of rings.
+      const v = o.variation
+      const fuelK = Math.max(0, 1 + v.fuel * patchNoise(x, z, v.scale, this.seed, 11))
+      this.moistureVariation[i] = Math.max(0, 1 + v.moisture * patchNoise(x, z, v.scale * 0.8, this.seed, 23))
+      this.capacity[i * 3] = info.grass * fuelK
+      this.capacity[i * 3 + 1] = info.shrub * fuelK
+      this.capacity[i * 3 + 2] = info.tree * fuelK
       this.threshold[i] = Math.max(0.1, 1 + o.jitter * (hash01(i % cols, Math.floor(i / cols), this.seed, 5) * 2 - 1))
     }
     // Steep ground is bare rock; firebreak lines and roads cut through.
@@ -803,6 +839,32 @@ export function moistureDamping(r: number): number {
   if (!(r < 1)) return 0
   const x = Math.max(0, r)
   return Math.max(0, 1 - 2.59 * x + 5.11 * x * x - 3.52 * x * x * x)
+}
+
+/** Length-to-breadth ratio of a wind-driven fire (Anderson 1983) for midflame wind `u` (m/s), capped at `max`. */
+export function lengthToBreadth(u: number, max = 8): number {
+  const mph = Math.max(0, u) * 2.23694
+  return Math.min(Math.max(1, max), Math.max(1, 0.936 * Math.exp(0.2566 * mph) + 0.461 * Math.exp(-0.1548 * mph) - 0.397))
+}
+
+/** Eccentricity of the spread ellipse for midflame wind `u` (m/s). */
+function ellipseEccentricity(u: number, max: number): number {
+  const lb = lengthToBreadth(u, max)
+  return Math.sqrt(1 - 1 / (lb * lb))
+}
+
+/** Seeded value noise in −1…1 (two octaves, smooth), patches about `scale` metres across. */
+function patchNoise(x: number, z: number, scale: number, seed: number, salt: number): number {
+  const octave = (s: number, k: number) => {
+    const fx = x / s, fz = z / s
+    const i = Math.floor(fx), j = Math.floor(fz)
+    const tx = fx - i, tz = fz - j
+    const u = tx * tx * (3 - 2 * tx), w = tz * tz * (3 - 2 * tz)
+    const h = (a: number, b: number) => hash01(a, b, seed, salt + k) * 2 - 1
+    return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - w) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * w
+  }
+  const s = Math.max(1, scale)
+  return octave(s, 0) * 0.65 + octave(s * 0.37, 1) * 0.35
 }
 
 function smooth(a: number, b: number, x: number): number {

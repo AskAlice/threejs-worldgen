@@ -92,6 +92,12 @@
       ],
       "threejs-fauna/react": [
         "./packages/fauna/src/react.tsx"
+      ],
+      "threejs-particles": [
+        "./packages/particles/src/index.ts"
+      ],
+      "threejs-particles/react": [
+        "./packages/particles/src/react.tsx"
       ]
     },
     "allowImportingTsExtensions": true,

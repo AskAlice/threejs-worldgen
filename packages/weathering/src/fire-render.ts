@@ -1,84 +1,140 @@
-import {
-  AdditiveBlending, ClampToEdgeWrapping, Color, DataTexture, Group, LinearFilter, Mesh, MeshBasicNodeMaterial, PointLight, RGBAFormat,
-  UnsignedByteType, Vector3, Vector4, type InstancedBufferAttribute, type InstancedBufferGeometry, type Node,
-} from 'three/webgpu'
-import { abs, fract, instancedBufferAttribute, length, max, mix, mx_noise_float, normalize, positionGeometry, positionWorld, sin, smoothstep, step, texture, uniform, uv, vec2, vec3 } from 'three/tsl'
-import { hash01, seedOf, type DeepPartial } from 'threejs-biomes'
-import { FIRE_STATE, FireSim, type FireEnvironment, type FireInput, type FireOptions } from './fire-sim.ts'
-import { axisBillboard, createQuadInstances, sphereBillboard } from './particles.ts'
+import { ClampToEdgeWrapping, DataTexture, Group, LinearFilter, PointLight, RGBAFormat, UnsignedByteType, Vector3, Vector4, type Camera, type ComputeNode, type Node, type Object3D, type Renderer } from 'three/webgpu'
+import { positionWorld, step, uniform } from 'three/tsl'
+import { bloom as bloomNode } from 'three/addons/tsl/display/BloomNode.js'
+import { ParticleGrid, ParticleLighting, ParticleSystem, blackbodyColor, type ParticleInput } from 'threejs-particles'
+import type { DeepPartial } from 'threejs-biomes'
+import { FireSim, type FireEnvironment, type FireInput, type FireOptions } from './fire-sim.ts'
+import { collectFireSources, createFireSources, plumeOcclusion, smokeTransmittance, type FireSources } from './fire-front.ts'
+import { smoothSample } from './sampling.ts'
 import type { StateField } from './state-field.ts'
-import { merge, mod, resolve } from './util.ts'
+import { merge, resolve } from './util.ts'
 
-/** Look of a {@link Wildfire}. Plain JSON. */
+/** Look of a {@link Wildfire}. Plain JSON. Particle counts, quality steps, `haze.enabled` and `grid` rebuild the particle systems. */
 export interface WildfireLook {
-  /** Flame billboards on burning cells. */
+  /** Flame tongues from the active front: velocity-stretched, noise-shaped, blackbody-coloured. */
   flames: {
-    /** Most flames drawn. */
+    /** Most flame particles alive (GPU pool). */
     max: number
-    /** Flames per burning cell at full heat. */
-    perCell: number
-    /** Flame height at full heat, metres. */
+    /** Flames per second per unit of front intensity. */
+    rate: number
+    /** Flame width in grass, metres (shrubs and trees scale it up). */
+    size: number
+    /** Height / width of a flame tongue. */
     height: number
-    /** Flame width, metres. */
-    width: number
-    /** Outer colour (`#rrggbb`). */
-    color: string
-    /** Core colour (`#rrggbb`). */
-    core: string
-    /** Brightness (additive; > 1 blooms). */
+    /** Life range, seconds (short: flames lick and vanish). */
+    life: [number, number]
+    /** Temperature range at the base, kelvin (≈ 1100 K deep red … 1800 K orange-yellow; radiance ∝ T⁴, hotter is whiter). */
+    temperature: [number, number]
+    /** HDR brightness multiplier. */
     intensity: number
+    /** Flaming time scale, seconds, for 1 kg/m² of fuel (heavier fuel flames longer; Gaussian fall-off). */
+    flaming: number
+    /** Tree flames spawn up to this high: crown fire, metres. */
+    crownHeight: number
+    /** Curl-noise turbulence, m/s² (licking and flicker). */
+    turbulence: number
   }
-  /** Smoke puffs rising from burning and freshly burnt cells. */
+  /** The smoke plume: lit, alpha-blended, depth-sorted volumetric puffs that rise and bend downwind. */
   smoke: {
-    /** Most puffs drawn. */
+    /** Most smoke particles alive. */
     max: number
-    /** Puffs per burning cell. */
-    perCell: number
-    /** Puff size when fully grown, metres. */
+    /** Puffs per second per unit of smoke weight. */
+    rate: number
+    /** Puff size at birth, metres (grows over life). */
     size: number
-    /** Rise speed, m/s. */
+    /** Life range, seconds. */
+    life: [number, number]
+    /** Buoyancy (how hard hot smoke rises). */
     rise: number
-    /** Life of a puff, seconds (also how long burnt cells keep smoking). */
-    life: number
-    /** Colour (`#rrggbb`). */
-    color: string
-    /** Opacity. */
+    /** Opacity multiplier. */
     opacity: number
+    /** Albedo of clean smoke: wet, fresh or light fuel (`#rrggbb`). */
+    clean: string
+    /** Albedo of dirty smoke: heavy, dry, woody fuel (`#rrggbb`). */
+    dirty: string
+    /** Seconds burnt-out cells keep giving off faint wisps. */
+    linger: number
+    /** Per-pixel self-shadow taps towards the sun (0…4). */
+    shadowSteps: number
+    /** Per-particle shadow steps through the plume's density grid (0…8). */
+    lightSteps: number
+    /** Per-pixel noise detail 0…1. */
+    detail: number
+    /** Height above the front (metres) where an intense fire's plume caps into bright pyrocumulus. 0 = never. */
+    capHeight: number
+    /** Front intensity (sum over cells) above which the plume caps. */
+    capIntensity: number
   }
-  /** Glowing embers lofted by the fire. */
+  /** Embers: thin bright streaks lofted by the plume and carried downwind, cooling as they go. */
   embers: {
-    /** Most embers drawn. */
+    /** Most embers alive. */
     max: number
-    /** Embers per burning cell at full heat. */
-    perCell: number
-    /** Ember size, metres. */
+    /** Embers per second per unit of front intensity (woody fuel throws more). */
+    rate: number
+    /** Ember width, metres. */
     size: number
-    /** Rise speed, m/s. */
-    rise: number
-    /** Life of an ember, seconds. */
-    life: number
-    /** Colour (`#rrggbb`). */
-    color: string
-    /** Brightness. */
+    /** Life range, seconds. */
+    life: [number, number]
+    /** HDR brightness. */
     intensity: number
   }
-  /** A point light at the fire's heart. */
+  /** Screen-space heat haze above the front (refraction). Off by default. */
+  haze: {
+    /** Draw it. */
+    enabled: boolean
+    /** Most haze particles. */
+    max: number
+    /** Refraction strength (fraction of the screen). */
+    strength: number
+  }
+  /** Ground glow, written into the `heat` texture channel other materials read. */
+  glow: {
+    /** At the flaming front, 0…1. */
+    front: number
+    /** Sparse smouldering spots inside the burn, 0…1. */
+    smoulder: number
+  }
+  /** A flickering point light at the front. Colour follows the flames' blackbody temperature. */
   light: {
-    /** Intensity per unit of total heat (square-rooted). */
+    /** Intensity per unit of front intensity (square-rooted). */
     intensity: number
-    /** Colour (`#rrggbb`). */
-    color: string
     /** Range, metres (0 = infinite). */
     distance: number
+    /** Flicker depth 0…1. */
+    flicker: number
+  }
+  /** The coarse plume grid: heat lifts the smoke into a column; density self-shadows it. */
+  grid: {
+    /** Use a grid (costs three small compute passes per frame). */
+    enabled: boolean
+    /** Cells along x, y, z. */
+    resolution: [number, number, number]
+    /** Height above the fire's highest ground, metres. */
+    height: number
+  }
+  /** Optional bloom for your post pipeline (see {@link Wildfire.bloom}). Off by default. */
+  bloom: {
+    /** Add bloom in {@link Wildfire.bloom}. */
+    enabled: boolean
+    /** Strength. */
+    strength: number
+    /** Radius 0…1. */
+    radius: number
+    /** HDR threshold (only flames and embers bloom). */
+    threshold: number
   }
 }
 
-/** Default wildfire look. */
+/** Default wildfire look (about 30k GPU particles in total). */
 export const DEFAULT_WILDFIRE_LOOK: WildfireLook = {
-  flames: { max: 6000, perCell: 4, height: 3, width: 2.2, color: '#ff5a10', core: '#ffd27a', intensity: 3 },
-  smoke: { max: 3000, perCell: 1, size: 16, rise: 2.5, life: 40, color: '#45403b', opacity: 0.4 },
-  embers: { max: 4000, perCell: 3, size: 0.09, rise: 3.5, life: 6, color: '#ff8a2a', intensity: 8 },
-  light: { intensity: 60, color: '#ff8a3a', distance: 400 },
+  flames: { max: 10000, rate: 10, size: 1.6, height: 2.6, life: [0.5, 1.2], temperature: [1750, 2100], intensity: 0.45, flaming: 25, crownHeight: 10, turbulence: 7 },
+  smoke: { max: 10000, rate: 2.5, size: 40, life: [45, 90], rise: 0.4, opacity: 0.6, clean: '#e6e3de', dirty: '#5a4d42', linger: 240, shadowSteps: 2, lightSteps: 4, detail: 1, capHeight: 300, capIntensity: 40 },
+  embers: { max: 5000, rate: 6, size: 0.05, life: [2, 7], intensity: 5 },
+  haze: { enabled: false, max: 1500, strength: 0.006 },
+  glow: { front: 0.9, smoulder: 0.35 },
+  light: { intensity: 40, distance: 500, flicker: 0.35 },
+  grid: { enabled: true, resolution: [40, 24, 40], height: 900 },
+  bloom: { enabled: false, strength: 0.35, radius: 0.4, threshold: 1.2 },
 }
 
 /** Partial settings for {@link Wildfire}: simulation settings plus the look. */
@@ -91,31 +147,50 @@ export type WildfireInput = FireInput & {
 export interface WildfireConfig extends WildfireInput, FireEnvironment {
   /** A state field to write burn scars into (its `burn` channel, inside the fire region). */
   field?: StateField | null
+  /** The WebGPU renderer for the particle compute passes. Default: picked up from the first render. */
+  renderer?: Renderer | null
+  /** Camera for particle sorting and smoke occlusion. Default: picked up from the first render. */
+  camera?: Camera | null
 }
 
 /** A wildfire's material-state nodes (see {@link Wildfire.node}). */
 export interface FireNodes {
   /** Burn scar 0…1 (the `burn` state). */
   burn: Node<'float'>
-  /** Fire intensity 0…1 (the `heat` input: ember glow). */
+  /** Ground glow 0…1: a band at the flaming front, sparse spots in the smouldering interior (the `heat` input). */
   heat: Node<'float'>
+  /** Share 0…1 of white ash vs black char (heavy fuel burnt right through; the `ash` input). */
+  ash: Node<'float'>
 }
 
-/** Seconds after which the particle animation clock wraps (float32 precision). */
-const PERIOD = 3600
+/** The fire's particle systems. */
+export interface WildfireSystems {
+  /** Flame tongues. */
+  flames: ParticleSystem
+  /** Smoke plume. */
+  smoke: ParticleSystem
+  /** Embers. */
+  embers: ParticleSystem
+  /** Heat haze (when `look.haze.enabled`). */
+  haze: ParticleSystem | null
+}
 
 /**
- * A rendered wildfire: a {@link FireSim} plus instanced flames, smoke and embers (three draw calls in
- * total), a light at the fire's heart, a data texture of heat and burn scars for other materials
- * ({@link Wildfire.node}), and burn scars written into a {@link StateField}.
+ * A rendered wildfire: a {@link FireSim} drawn with `threejs-particles` GPU systems. Flames and embers
+ * come only from the active front (recently ignited cells, weighted by intensity), smoke from the front
+ * plus wisps from smouldering and freshly burnt ground; a coarse grid carries the fire's heat up into a
+ * plume that bends downwind and self-shadows. Also a flickering light at the front, a data texture of
+ * ground glow, burn scars and ash for other materials ({@link Wildfire.node}), burn scars written into a
+ * {@link StateField}, and a smoke-occlusion estimate for sky and lighting.
  *
  * @example
  * ```ts
- * const fire = new Wildfire({ world, weather, field, center: [0, 0], size: 1024 })
+ * const fire = new Wildfire({ world, weather, field, renderer, camera, center: [0, 0], size: 1024 })
  * scene.add(fire.object)
  * fire.ignite(30, -10)
  * // each frame: fire.update(time); field.update()
- * applyMaterialStatesTo(terrainMaterial, { ...field.node(), heat: fire.node().heat })
+ * applyMaterialStatesTo(terrainMaterial, { ...field.node(), ...fire.node() })
+ * pipeline.outputNode = fire.bloom(pass(scene, camera))        // with look.bloom.enabled
  * ```
  */
 export class Wildfire {
@@ -127,45 +202,44 @@ export class Wildfire {
   look: WildfireLook
   /** State field receiving burn scars, if any. */
   field: StateField | null
-  /** Light at the fire's heart. */
-  readonly light = new PointLight('#ff8a3a', 0, 400, 1)
-  /** Per-cell data (R heat, G burn scar, B fuel share, A state / 3), linear filtered. */
+  /** Light at the front. */
+  readonly light = new PointLight('#ff8a3a', 0, 500, 1.6)
+  /** Per-cell data (R ground glow, G burn scar, B ash share, A front intensity), linear filtered. */
   readonly texture: DataTexture
+  /** Sun and sky light the smoke is lit by (filled from the scene every update). */
+  readonly lighting = new ParticleLighting()
   /** Shader uniforms. */
   readonly uniforms = {
-    /** Animation clock (time modulo 3600 s). */ time: uniform(0),
-    /** Mean wind over the fire, (x, 0, z) m/s. */ wind: uniform(new Vector3()),
     /** Grid minimum relative to render zero (xy) and size (zw). */ bounds: uniform(new Vector4()),
-    /** Flame height. */ flameHeight: uniform(3),
-    /** Flame width. */ flameWidth: uniform(2),
-    /** Flame colour. */ flameColor: uniform(new Color()),
-    /** Flame core colour. */ flameCore: uniform(new Color()),
-    /** Flame brightness. */ flameIntensity: uniform(3),
-    /** Smoke size. */ smokeSize: uniform(16),
-    /** Smoke rise. */ smokeRise: uniform(2.5),
-    /** Smoke life. */ smokeLife: uniform(40),
-    /** Smoke colour. */ smokeColor: uniform(new Color()),
-    /** Smoke opacity. */ smokeOpacity: uniform(0.4),
-    /** Ember size. */ emberSize: uniform(0.1),
-    /** Ember rise. */ emberRise: uniform(3.5),
-    /** Ember life. */ emberLife: uniform(6),
-    /** Ember colour. */ emberColor: uniform(new Color()),
-    /** Ember brightness. */ emberIntensity: uniform(8),
+    /** Mean wind over the front, (x, 0, z) m/s. */ wind: uniform(new Vector3()),
+    /** How much the plume dims the sun at the camera, 0…1 (see {@link Wildfire.smokeOcclusionAt}). */ smokeOcclusion: uniform(0),
   }
+  /** The particle systems (rebuilt when counts or quality change). */
+  systems!: WildfireSystems
+  /** The plume grid, if `look.grid.enabled`. */
+  grid: ParticleGrid | null = null
 
+  private renderer: Renderer | null
+  private camera: Camera | null
+  private root: Object3D | null = null
   private origin: [number, number, number] = [0, 0, 0]
-  private flames!: Mesh<InstancedBufferGeometry, MeshBasicNodeMaterial>
-  private smoke!: Mesh<InstancedBufferGeometry, MeshBasicNodeMaterial>
-  private embers!: Mesh<InstancedBufferGeometry, MeshBasicNodeMaterial>
-  private countsKey = ''
+  private sources: FireSources
+  private splats: ComputeNode[] = []
+  private structureKey = ''
   private builtVersion = -1
   private gridKey = ''
+  private lastNow = -1
+  private clock = 0
+  private bloomPass: ReturnType<typeof bloomNode> | null = null
 
   /** Creates a wildfire. Simulation settings not given use `DEFAULT_FIRE`, the look {@link DEFAULT_WILDFIRE_LOOK}. */
-  constructor({ world, frame, weather, landscape, field, look, ...fire }: WildfireConfig) {
+  constructor({ world, frame, weather, landscape, field, look, renderer, camera, ...fire }: WildfireConfig) {
     this.sim = new FireSim(fire, { world, frame, weather, landscape })
     this.field = field ?? null
+    this.renderer = renderer ?? null
+    this.camera = camera ?? null
     this.look = resolve(DEFAULT_WILDFIRE_LOOK, look)
+    this.sources = createFireSources(0)
     this.texture = new DataTexture(new Uint8Array(4), 1, 1, RGBAFormat, UnsignedByteType)
     this.texture.magFilter = this.texture.minFilter = LinearFilter
     this.texture.wrapS = this.texture.wrapT = ClampToEdgeWrapping
@@ -208,86 +282,135 @@ export class Wildfire {
     return this
   }
 
-  /** Fire intensity 0…1 at (x, z) (CPU). */
-  heatAt(x: number, z: number): number {
-    const i = this.sim.index(x, z)
-    return i < 0 ? 0 : this.sim.heat(i)
+  /** Uses this renderer and camera for the particle passes (otherwise they are picked up from the first render). */
+  attach(renderer: Renderer | null, camera?: Camera | null): this {
+    this.renderer = renderer
+    if (camera !== undefined) this.camera = camera
+    return this
   }
 
-  /** `burn` (scar) and `heat` as TSL nodes at a render-space XZ position (default `positionWorld.xz`). Zero outside the grid. */
+  /** Ground glow 0…1 at (x, z) (CPU). */
+  heatAt(x: number, z: number): number {
+    const i = this.sim.index(x, z)
+    return i < 0 ? 0 : (this.sources.texture[i * 4] ?? 0) / 255
+  }
+
+  /**
+   * How much the smoke plume dims the sun at frame position (x, z), 0…1 (a Gaussian plume from the
+   * front, bent downwind). Sky and lighting can read it, or the live {@link Wildfire.uniforms}
+   * `smokeOcclusion` at the camera.
+   */
+  smokeOcclusionAt(x: number, z: number): number {
+    const s = this.sources
+    if (s.front <= 0) return 0
+    return plumeOcclusion(x, z, s.center[0] + this.sim.minX, s.center[2] + this.sim.minZ, s.wind[0], s.wind[1], s.smokeTotal)
+  }
+
+  /** Sunlight transmittance (linear RGB) through the plume at (x, z): dims and reddens. */
+  sunTransmittance(x: number, z: number, out: [number, number, number] = [1, 1, 1]): [number, number, number] {
+    return smokeTransmittance(this.smokeOcclusionAt(x, z), out)
+  }
+
+  /**
+   * `burn`, `heat` and `ash` as TSL nodes at a render-space XZ position (default `positionWorld.xz`),
+   * zero outside the grid. Sampled with a smooth, slightly warped filter so cell edges never show.
+   */
   node(xz: Node<'vec2'> = positionWorld.xz): FireNodes {
     const b = this.uniforms.bounds
     const p = xz.sub(b.xy).div(b.zw)
     const inside = step(0, p.x).mul(step(p.x, 1)).mul(step(0, p.y)).mul(step(p.y, 1))
-    const s = texture(this.texture, vec2(p.x, p.y))
-    return { burn: s.y.mul(inside), heat: s.x.mul(inside) }
+    const s = smoothSample(this.texture, p, b.zw, xz, this.sim.options.cellSize) as Node<'vec4'>
+    return { burn: s.y.mul(inside), heat: s.x.mul(inside), ash: s.z.mul(inside) }
   }
 
   /**
-   * Runs the simulation towards `time` seconds and refreshes the particles, texture, light and field.
-   * Spends at most `budget` milliseconds simulating per call; a big fire or a fast clock catches up over
-   * the next frames instead of stalling one.
+   * Adds bloom to a post-processing colour node when `look.bloom.enabled` (else returns it unchanged).
+   * Rebuild your pipeline's output node after toggling `enabled`; strength, radius and threshold are live.
    */
-  update(time: number, budget = 8): void {
+  bloom(color: Node<'vec4'>): Node<'vec4'> {
+    const L = this.look.bloom
+    if (!L.enabled) return color
+    this.bloomPass = bloomNode(color, L.strength, L.radius, L.threshold)
+    return color.add(this.bloomPass) as Node<'vec4'>
+  }
+
+  /**
+   * Runs the simulation towards `time` seconds, refreshes the sources, texture, light and field, and
+   * advances the GPU particles by `dt` real seconds (default: measured). Spends at most `budget`
+   * milliseconds simulating per call; a big fire or a fast clock catches up over the next frames.
+   */
+  update(time: number, budget = 8, dt?: number): void {
     const sim = this.sim
     sim.runTo(time, budget)
-    this.uniforms.time.value = mod(time, PERIOD)
+    const now = performance.now()
+    const step = dt ?? (this.lastNow < 0 ? 0 : Math.min(0.1, (now - this.lastNow) / 1000))
+    this.lastNow = now
+    this.clock = (this.clock + step) % 3600
     const gridKey = `${sim.cols}|${sim.minX}|${sim.minZ}|${sim.options.cellSize}`
     if (gridKey !== this.gridKey) {
       this.gridKey = gridKey
-      this.texture.image = { data: new Uint8Array(sim.cols * sim.rows * 4), width: sim.cols, height: sim.rows }
+      this.sources = createFireSources(sim.cols * sim.rows)
+      this.texture.image = { data: this.sources.texture, width: sim.cols, height: sim.rows }
       this.texture.dispose()
       this.placeGroup()
+      this.structureKey = '' // grid bounds follow the sim
+      this.applyLook()
       this.builtVersion = -1
     }
-    if (sim.version === this.builtVersion) return
-    this.builtVersion = sim.version
-    this.rebuild()
+    if (sim.version !== this.builtVersion) {
+      this.builtVersion = sim.version
+      this.rebuild()
+    }
+    this.animate(step)
   }
 
   private rebuild() {
-    const sim = this.sim
-    const L = this.look
-    const n = sim.cols * sim.rows
-    const c = sim.options.cellSize
-    const seed = seedOf(sim.options.seed)
-    const tex = this.texture.image.data as Uint8Array
-    const f = this.writer(this.flames), s = this.writer(this.smoke), e = this.writer(this.embers)
-    let heatSum = 0, hx = 0, hz = 0, hy = 0, wx = 0, wz = 0
-    for (let i = 0; i < n; i++) {
-      const heat = sim.heat(i)
-      const scar = sim.scar(i)
-      let cap = 0, fuel = 0
-      for (let k = 0; k < 3; k++) { cap += sim.capacity[i * 3 + k]; fuel += sim.fuel[i * 3 + k] }
-      tex[i * 4] = Math.round(heat * 255)
-      tex[i * 4 + 1] = Math.round(scar * 255)
-      tex[i * 4 + 2] = Math.round((cap > 0 ? fuel / cap : 0) * 255)
-      tex[i * 4 + 3] = sim.state[i] * 85
-      const age = sim.burntAge(i)
-      const smoke = heat > 0 ? heat : age < L.smoke.life ? 0.6 * (1 - age / L.smoke.life) : 0
-      if (heat <= 0 && smoke <= 0) continue
-      const [x0, z0] = sim.center(i)
-      const lx = x0 - sim.minX, lz = z0 - sim.minZ
-      const place = (w: ReturnType<Wildfire['writer']>, k: number, value: number, salt: number) => {
-        const x = lx + (hash01(i, k, seed, salt) - 0.5) * c, z = lz + (hash01(i, k, seed, salt + 1) - 0.5) * c
-        w.push(x, sim.elevationAt(x + sim.minX, z + sim.minZ), z, value)
-      }
-      if (heat > 0) {
-        const [vx, vz] = sim.windAt(i)
-        heatSum += heat; hx += lx * heat; hz += lz * heat; hy += sim.elevation[i] * heat; wx += vx * heat; wz += vz * heat
-        for (let k = 0; k < Math.max(1, Math.ceil(L.flames.perCell * heat)); k++) place(f, k, heat, 10)
-        for (let k = 0; k < Math.ceil(L.embers.perCell * heat); k++) place(e, k, heat, 20)
-      }
-      if (sim.state[i] === FIRE_STATE.burning || smoke > 0.05) for (let k = 0; k < L.smoke.perCell; k++) place(s, k, smoke, 30)
-    }
-    f.done(); s.done(); e.done()
+    const s = collectFireSources(this.sim, { flaming: this.look.flames.flaming, crownHeight: this.look.flames.crownHeight, linger: this.look.smoke.linger, frontGlow: this.look.glow.front, smoulderGlow: this.look.glow.smoulder }, this.sources)
     this.texture.needsUpdate = true
-    if (heatSum > 0) {
-      this.light.position.set(hx / heatSum, hy / heatSum + 4, hz / heatSum)
-      this.uniforms.wind.value.set(wx / heatSum, 0, wz / heatSum)
-    }
-    this.light.intensity = L.light.intensity * Math.sqrt(heatSum)
+    const sys = this.systems
+    sys.flames.setSources(s.flames, s.flameCount)
+    sys.embers.setSources(s.flames === s.embers ? s.flames : s.embers, s.emberCount)
+    sys.smoke.setSources(s.smoke, s.smokeCount)
+    sys.haze?.setSources(s.flames, s.flameCount)
+    this.uniforms.wind.value.set(s.wind[0], 0, s.wind[1])
+    for (const p of [sys.flames, sys.smoke, sys.embers, sys.haze]) p?.uniforms.wind.value.set(s.wind[0], 0, s.wind[1])
+    for (const p of [sys.flames, sys.smoke, sys.embers]) p.uniforms.emitPosition.value.y = s.center[1]
+    sys.smoke.uniforms.capHeight.value = s.front >= this.look.smoke.capIntensity ? this.look.smoke.capHeight : 0
+    if (this.grid) this.grid.uniforms.velocity.value.set(s.wind[0], this.grid.options.rise, s.wind[1])
     if (this.field) this.writeField()
+  }
+
+  private animate(dt: number) {
+    const s = this.sources, L = this.look
+    // Flickering light at the front, coloured by the flames' mean blackbody temperature.
+    const t = this.clock
+    const flicker = 1 + L.light.flicker * (0.5 * Math.sin(t * 11.3) + 0.3 * Math.sin(t * 17.9 + 1.3) + 0.2 * Math.sin(t * 29.1 + 2.1)) * 0.6
+    if (s.front > 0) this.light.position.set(s.center[0], s.center[1] + 6, s.center[2])
+    const kelvin = L.flames.temperature[0] + (L.flames.temperature[1] - L.flames.temperature[0]) * Math.min(1, s.front / Math.max(1, this.sources.flameCount) * 1.5)
+    const [r, g, b] = blackbodyColor(kelvin * 0.85)
+    this.light.color.setRGB(r, g, b)
+    this.light.intensity = L.light.intensity * Math.sqrt(s.front) * flicker
+
+    const renderer = this.renderer
+    if (!renderer) return
+    if (!this.root) {
+      let root: Object3D = this.object
+      while (root.parent) root = root.parent
+      if (root !== this.object) this.root = root
+    }
+    if (this.root) this.lighting.fromScene(this.root)
+    if (this.camera) {
+      this.camera.updateMatrixWorld()
+      const e = this.camera.matrixWorld.elements
+      this.uniforms.smokeOcclusion.value = this.smokeOcclusionAt(e[12] + this.origin[0], e[14] + this.origin[2])
+    }
+    // One batched compute submission: every system's emit + update, then the grid's splats and resolve.
+    const sys = this.systems
+    const nodes: ComputeNode[] = []
+    for (const p of [sys.haze, sys.smoke, sys.flames, sys.embers]) if (p) nodes.push(...p.prepare(renderer, dt, this.camera))
+    if (this.grid) nodes.push(...this.splats, ...this.grid.resolvePasses(dt))
+    if (nodes.length) renderer.compute(nodes)
+    sys.smoke.sort(renderer)
   }
 
   // Burn scars into the field's `burn` channel wherever the fire grid covers it.
@@ -305,140 +428,136 @@ export class Wildfire {
     field.touch()
   }
 
-  private writer(mesh: Mesh<InstancedBufferGeometry, MeshBasicNodeMaterial>) {
-    const attr = mesh.geometry.getAttribute('aData') as InstancedBufferAttribute
-    const out = attr.array as Float32Array
-    const max = out.length / 4
-    let count = 0
-    return {
-      push(x: number, y: number, z: number, w: number) {
-        if (count >= max) return
-        out[count * 4] = x; out[count * 4 + 1] = y; out[count * 4 + 2] = z; out[count * 4 + 3] = w
-        count++
-      },
-      done() {
-        mesh.geometry.instanceCount = count
-        attr.clearUpdateRanges()
-        attr.addUpdateRange(0, count * 4)
-        attr.needsUpdate = true
-      },
-    }
-  }
-
   private placeGroup() {
     this.object.position.set(this.sim.minX - this.origin[0], -this.origin[1], this.sim.minZ - this.origin[2])
     this.uniforms.bounds.value.set(this.sim.minX - this.origin[0], this.sim.minZ - this.origin[2], this.sim.cols * this.sim.options.cellSize, this.sim.rows * this.sim.options.cellSize)
   }
 
   private applyLook(): this {
-    const L = this.look, u = this.uniforms
-    u.flameHeight.value = L.flames.height
-    u.flameWidth.value = L.flames.width
-    u.flameColor.value.set(L.flames.color)
-    u.flameCore.value.set(L.flames.core)
-    u.flameIntensity.value = L.flames.intensity
-    u.smokeSize.value = L.smoke.size
-    u.smokeRise.value = L.smoke.rise
-    u.smokeLife.value = L.smoke.life
-    u.smokeColor.value.set(L.smoke.color)
-    u.smokeOpacity.value = L.smoke.opacity
-    u.emberSize.value = L.embers.size
-    u.emberRise.value = L.embers.rise
-    u.emberLife.value = L.embers.life
-    u.emberColor.value.set(L.embers.color)
-    u.emberIntensity.value = L.embers.intensity
-    this.light.color.set(L.light.color)
+    const L = this.look
     this.light.distance = L.light.distance
-    const key = JSON.stringify([L.flames.max, L.smoke.max, L.embers.max, this.sim.options.seed])
-    if (key !== this.countsKey) {
-      this.countsKey = key
-      this.disposeMeshes()
-      const seed = seedOf(this.sim.options.seed)
-      this.flames = this.particleMesh(L.flames.max, seed + 1, 0, (g) => this.flameMaterial(g))
-      this.smoke = this.particleMesh(L.smoke.max, seed + 2, -0.5, (g) => this.smokeMaterial(g))
-      this.embers = this.particleMesh(L.embers.max, seed + 3, -0.5, (g) => this.emberMaterial(g))
+    const key = JSON.stringify([L.flames.max, L.smoke.max, L.embers.max, L.haze.enabled, L.haze.max, L.smoke.shadowSteps, L.smoke.lightSteps, L.grid, this.sim.options.seed, this.sim.cols])
+    if (key !== this.structureKey) {
+      this.structureKey = key
+      this.build()
       this.builtVersion = -1
+    }
+    const s = this.systems
+    s.flames.set(this.flameOptions())
+    s.smoke.set(this.smokeOptions())
+    s.embers.set(this.emberOptions())
+    s.haze?.set(this.hazeOptions())
+    if (this.bloomPass) {
+      this.bloomPass.strength.value = L.bloom.strength
+      this.bloomPass.radius.value = L.bloom.radius
+      this.bloomPass.threshold.value = L.bloom.threshold
     }
     this.placeGroup()
     return this
   }
 
-  private particleMesh(max: number, seed: number, y0: number, material: (g: InstancedBufferGeometry) => MeshBasicNodeMaterial) {
-    const g = createQuadInstances(max, seed, y0, true)
-    const mesh = new Mesh(g, material(g))
-    mesh.frustumCulled = false // spread over the whole grid; drawn only while something burns
-    this.object.add(mesh)
-    return mesh
+  private build() {
+    this.disposeSystems()
+    const L = this.look, sim = this.sim
+    const span = sim.cols * sim.options.cellSize
+    this.grid = null
+    if (L.grid.enabled) {
+      let lo = Infinity, hi = -Infinity
+      for (let i = 0; i < sim.elevation.length; i++) { lo = Math.min(lo, sim.elevation[i]); hi = Math.max(hi, sim.elevation[i]) }
+      if (!Number.isFinite(lo)) lo = hi = 0
+      const pad = span * 0.6
+      this.grid = new ParticleGrid({
+        resolution: L.grid.resolution, min: [-pad, lo - 10, -pad], size: [span + pad * 2, hi - lo + 10 + L.grid.height, span + pad * 2],
+        advect: [1, 0, 0, 0], decay: [0.012, 0, 0, 0], rise: 5,
+      })
+    }
+    const base = { seed: sim.options.seed, grid: this.grid, lighting: this.lighting, maxSources: Math.min(8192, sim.cols * sim.rows) }
+    const sys: WildfireSystems = {
+      flames: new ParticleSystem({ ...base, ...this.flameOptions(), capacity: L.flames.max, render: { ...this.flameOptions().render, shading: 'flame', blending: 'premultiplied' } }),
+      smoke: new ParticleSystem({ ...base, ...this.smokeOptions(), capacity: L.smoke.max, render: { ...this.smokeOptions().render, shading: 'smoke', blending: 'alpha', sort: true, shadowSteps: L.smoke.shadowSteps, lightSteps: L.smoke.lightSteps } }),
+      embers: new ParticleSystem({ ...base, ...this.emberOptions(), capacity: L.embers.max, render: { ...this.emberOptions().render, shading: 'spark', blending: 'additive' } }),
+      haze: L.haze.enabled ? new ParticleSystem({ ...base, grid: null, ...this.hazeOptions(), capacity: L.haze.max, render: { ...this.hazeOptions().render, shading: 'haze', blending: 'alpha' } }) : null,
+    }
+    // Draw order: haze refracts the opaque scene, then smoke, then additive flames and embers on top.
+    sys.haze && (sys.haze.object.renderOrder = 1)
+    sys.smoke.object.renderOrder = 2
+    sys.flames.object.renderOrder = 3
+    sys.embers.object.renderOrder = 4
+    for (const p of [sys.haze, sys.smoke, sys.flames, sys.embers]) if (p) this.object.add(p.object)
+    // Capture the renderer and camera from the first render if they weren't given.
+    sys.flames.object.onBeforeRender = (renderer, _scene, camera) => {
+      this.renderer ??= renderer as unknown as Renderer
+      this.camera ??= camera
+    }
+    this.systems = sys
+    this.splats = []
+    if (this.grid) {
+      const g = this.grid
+      this.splats.push(g.splat(sys.flames, 0, (p) => p.temperature.sub(400).max(0).div(1200).mul(0.0015))) // heat per second
+      const cell = g.cellSize()
+      const cellVolume = cell.x * cell.y * cell.z
+      this.splats.push(g.splat(sys.smoke, 1, (p) => p.size.mul(p.size).mul(p.size).mul(0.12 / cellVolume).mul(p.t.oneMinus())))
+    }
   }
 
-  private attributes(g: InstancedBufferGeometry) {
+  private flameOptions(): ParticleInput {
+    const F = this.look.flames, c = this.sim.options.cellSize
     return {
-      data: instancedBufferAttribute(g.getAttribute('aData') as InstancedBufferAttribute, 'vec4') as Node<'vec4'>,
-      rand: instancedBufferAttribute(g.getAttribute('aRand') as InstancedBufferAttribute, 'vec4') as Node<'vec4'>,
+      seed: this.sim.options.seed, rate: F.rate, maxPerFrame: 4096, life: F.life,
+      emitter: { shape: 'sources', size: [c * 0.5, 0.2, c * 0.5], velocity: [0, 1.5, 0], spread: 0.8, temperature: F.temperature },
+      forces: { gravity: 0, buoyancy: 0.32, ambientTemperature: 300, cooling: 1.1, windShear: 0.2, drag: 2.4, turbulence: F.turbulence, turbulenceScale: 2.5, turbulenceSpeed: 1.4, gridLift: 0 },
+      curves: { size: [0.55, 1, 0.9, 0.6], opacity: [0, 1, 0.9, 0.5, 0], color: ['#ffffff'] },
+      render: { size: F.size, sizeRandom: [0.45, 1.7], aspect: F.height, stretch: 0.12, intensity: F.intensity, blackbody: true, softness: 1.5, detail: 1, detailDistance: 900 },
     }
   }
 
-  private flameMaterial(g: InstancedBufferGeometry) {
-    const u = this.uniforms
-    const { data, rand } = this.attributes(g)
-    const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending })
-    m.name = 'Flames'
-    const heat = data.w
-    const lean = normalize(vec3(u.wind.x.mul(0.08), 1, u.wind.z.mul(0.08)))
-    m.positionNode = axisBillboard(data.xyz, lean, positionGeometry, u.flameWidth.mul(rand.y.mul(0.6).add(0.7)), u.flameHeight.mul(heat).mul(rand.x.mul(0.8).add(0.6)))
-    const p = uv()
-    const n = mx_noise_float(vec3(p.x.mul(2.5).add(rand.z.mul(10)), p.y.mul(2).sub(u.time.mul(rand.w.mul(1.2).add(2))), rand.w.mul(7)))
-    const across = abs(p.x.sub(0.5).add(n.mul(0.15).mul(p.y))).mul(2)
-    const profile = max(p.y.oneMinus().pow(0.6), 0.01)
-    const shape = smoothstep(1, 0.55, across.div(profile)).mul(smoothstep(0, 0.08, p.y)).mul(smoothstep(1, 0.7, p.y.add(n.mul(0.25))))
-    m.colorNode = mix(u.flameColor, u.flameCore, smoothstep(0.35, 1, shape.mul(p.y.oneMinus()))).mul(u.flameIntensity)
-    m.opacityNode = shape
-    return m
-  }
-
-  private smokeMaterial(g: InstancedBufferGeometry) {
-    const u = this.uniforms
-    const { data, rand } = this.attributes(g)
-    const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
-    m.name = 'Smoke'
-    const age = fract(u.time.div(u.smokeLife.mul(rand.x.mul(0.4).add(0.8))).add(rand.y))
-    const travel = age.mul(u.smokeLife)
-    const center = data.xyz.add(vec3(u.wind.x, u.smokeRise, u.wind.z).mul(travel)).add(vec3(rand.z.sub(0.5), 0, rand.w.sub(0.5)).mul(travel).mul(0.3))
-    m.positionNode = sphereBillboard(center, positionGeometry, u.smokeSize.mul(age.mul(1.1).add(0.25)))
-    const d = length(uv().sub(0.5))
-    const puff = smoothstep(0.5, 0.1, d.add(mx_noise_float(vec3(uv().mul(3), rand.x.mul(9).add(age))).mul(0.12)))
-    m.colorNode = mix(u.flameColor.mul(0.6), u.smokeColor, smoothstep(0, 0.15, age))
-    m.opacityNode = puff.mul(smoothstep(0, 0.08, age)).mul(age.oneMinus()).mul(u.smokeOpacity).mul(data.w)
-    return m
-  }
-
-  private emberMaterial(g: InstancedBufferGeometry) {
-    const u = this.uniforms
-    const { data, rand } = this.attributes(g)
-    const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending })
-    m.name = 'Embers'
-    const age = fract(u.time.div(u.emberLife.mul(rand.x.mul(0.6).add(0.7))).add(rand.y))
-    const travel = age.mul(u.emberLife)
-    const swirl = vec3(sin(travel.mul(1.7).add(rand.z.mul(30))), 0, sin(travel.mul(1.3).add(rand.w.mul(30)))).mul(1.5)
-    const center = data.xyz.add(vec3(u.wind.x, u.emberRise.mul(rand.w.mul(0.8).add(0.6)), u.wind.z).mul(travel)).add(swirl)
-    m.positionNode = sphereBillboard(center, positionGeometry, u.emberSize)
-    m.colorNode = u.emberColor.mul(u.emberIntensity).mul(age.oneMinus())
-    m.opacityNode = smoothstep(0.5, 0.2, length(uv().sub(0.5))).mul(data.w)
-    return m
-  }
-
-  private disposeMeshes() {
-    for (const m of [this.flames, this.smoke, this.embers]) {
-      if (!m) continue
-      m.removeFromParent()
-      m.geometry.dispose()
-      m.material.dispose()
+  private smokeOptions(): ParticleInput {
+    const S = this.look.smoke, c = this.sim.options.cellSize
+    return {
+      seed: `${this.sim.options.seed}-smoke`, rate: S.rate, maxPerFrame: 1024, life: S.life,
+      emitter: { shape: 'sources', size: [c * 0.5, 1, c * 0.5], velocity: [0, 2.5, 0], spread: 0.8, temperature: [520, 620] },
+      forces: { gravity: 0, buoyancy: S.rise, ambientTemperature: 290, cooling: 0.018, windShear: 0.5, drag: 0.18, turbulence: 2.2, turbulenceScale: 45, turbulenceSpeed: 0.05, gridLift: 3 },
+      curves: { size: [0.5, 0.9, 1.4, 2, 2.7, 3.4], opacity: [0, 0.75, 0.9, 0.8, 0.5, 0], color: ['#ffffff'] },
+      render: {
+        size: S.size, sizeRandom: [0.75, 1.3], aspect: 1, stretch: 0, opacity: S.opacity, softness: 6, detail: S.detail, detailDistance: 1600,
+        absorption: 1.6, anisotropy: 0.5, silverLining: 0.35, albedo: [S.clean, S.dirty], glow: '#ff6420', glowStrength: 1.6,
+      },
     }
+  }
+
+  private emberOptions(): ParticleInput {
+    const E = this.look.embers, c = this.sim.options.cellSize
+    return {
+      seed: `${this.sim.options.seed}-embers`, rate: E.rate, maxPerFrame: 2048, life: E.life,
+      emitter: { shape: 'sources', size: [c * 0.5, 1, c * 0.5], velocity: [0, 5, 0], spread: 4.5, temperature: [1500, 1900] },
+      forces: { gravity: 3.2, buoyancy: 0.05, ambientTemperature: 300, cooling: 0.32, windShear: 0.7, drag: 0.9, turbulence: 10, turbulenceScale: 7, turbulenceSpeed: 0.6, gridLift: 2.5 },
+      curves: { size: [1], opacity: [0, 1, 1, 0.7, 0], color: ['#ffffff'] },
+      render: { size: E.size, sizeRandom: [0.6, 1.4], aspect: 1, stretch: 0.07, intensity: E.intensity, blackbody: true, softness: 0.3, detail: 0 },
+    }
+  }
+
+  private hazeOptions(): ParticleInput {
+    const H = this.look.haze, c = this.sim.options.cellSize
+    return {
+      seed: `${this.sim.options.seed}-haze`, rate: 0.8, maxPerFrame: 512, life: [0.8, 1.8],
+      emitter: { shape: 'sources', size: [c * 0.5, 0, c * 0.5], velocity: [0, 3, 0], spread: 0.5, temperature: [300, 300] },
+      forces: { gravity: 0, buoyancy: 0, drag: 0.5, turbulence: 2, turbulenceScale: 4, turbulenceSpeed: 0.5, gridLift: 0 },
+      curves: { size: [0.8, 1.2], opacity: [0, 1, 0.8, 0], color: ['#ffffff'] },
+      render: { size: 7, sizeRandom: [0.8, 1.2], aspect: 1.6, stretch: 0, refraction: H.strength, softness: 2, detail: 1, detailDistance: 250 },
+    }
+  }
+
+  private disposeSystems() {
+    const s = this.systems
+    if (!s) return
+    for (const p of [s.flames, s.smoke, s.embers, s.haze]) p?.dispose()
+    for (const n of this.splats) n.dispose()
+    this.grid?.dispose()
   }
 
   /** Removes the fire from the scene and frees GPU resources. */
   dispose(): void {
-    this.disposeMeshes()
+    this.disposeSystems()
     this.texture.dispose()
     this.object.removeFromParent()
   }
