@@ -3,6 +3,7 @@
   "name": "threejs-worldgen",
   "entryPoints": [
     "packages/heightfield/src/index.ts",
+    "packages/heightfield/src/react.tsx",
     "packages/biomes/src/index.ts",
     "packages/biomes/src/react.tsx",
     "packages/scatter/src/index.ts",
