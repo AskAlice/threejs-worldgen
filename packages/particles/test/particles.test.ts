@@ -66,6 +66,13 @@ test('sources: weighted picks follow the weights; overflow keeps the heaviest', 
   const moving = fillSourceTable(createSourceTable(8), src, undefined, motion)
   assert.deepEqual([...moving.motion.subarray(0, 8)], [1, 2, 3, 0.5, 4, 5, 6, 0.25])
   assert.deepEqual([...fillSourceTable(createSourceTable(1), src, undefined, motion).motion.subarray(0, 4)], [4, 5, 6, 0.25])
+  // Refreshing every frame reuses the table's scratch list, and overflow still keeps the heaviest in order.
+  const order = small.order
+  fillSourceTable(small, src)
+  assert.equal(small.order, order)
+  const many = new Float32Array(Array.from({ length: 6 }, (_, i) => [i, 0, 0, [1, 5, 2, 5, 3, 0][i], 0, 0, 0, 1]).flat())
+  const three = fillSourceTable(createSourceTable(3), many)
+  assert.deepEqual([...three.positions.subarray(0, 12)].filter((_, k) => k % 4 === 0), [1, 3, 4])
 })
 
 test('per-particle random numbers are seeded, in [0, 1) and well spread', () => {

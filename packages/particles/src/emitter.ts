@@ -79,6 +79,8 @@ export interface SourceTable {
   data: Float32Array
   /** Velocity xyz and opacity per source (default 0, 0, 0, 1). */
   motion: Float32Array
+  /** Scratch list of the sources kept, reused by {@link fillSourceTable} (no garbage per refresh). */
+  order: number[]
   /** Inclusive prefix sum of weights per source. */
   cdf: Float32Array
 }
@@ -86,7 +88,7 @@ export interface SourceTable {
 /** An empty table for up to `max` sources. */
 export function createSourceTable(max: number): SourceTable {
   const n = Math.max(1, Math.floor(max))
-  return { count: 0, total: 0, positions: new Float32Array(n * 4), data: new Float32Array(n * 4), motion: new Float32Array(n * 4), cdf: new Float32Array(n) }
+  return { count: 0, total: 0, positions: new Float32Array(n * 4), data: new Float32Array(n * 4), motion: new Float32Array(n * 4), order: [], cdf: new Float32Array(n) }
 }
 
 /** Most sources a table holds. */
@@ -102,11 +104,15 @@ export function sourceCapacity(table: SourceTable): number {
  */
 export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, count = Math.floor(sources.length / SOURCE_STRIDE), motion?: ArrayLike<number> | null): SourceTable {
   const max = sourceCapacity(table)
-  let order: number[] = []
+  const order = (table.order ??= [])
+  order.length = 0
   for (let i = 0; i < count; i++) if (sources[i * SOURCE_STRIDE + 3] > 0) order.push(i)
   if (order.length > max) {
-    order.sort((a, b) => sources[b * SOURCE_STRIDE + 3] - sources[a * SOURCE_STRIDE + 3] || a - b)
-    order = order.slice(0, max).sort((a, b) => a - b)
+    sorting = sources
+    order.sort(heaviestFirst)
+    sorting = null
+    order.length = max
+    order.sort(ascending)
   }
   let total = 0
   for (let k = 0; k < order.length; k++) {
@@ -123,6 +129,11 @@ export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, 
   table.total = total
   return table
 }
+
+// Comparators shared by every refresh (no closure per call); `sorting` is the list being sorted.
+let sorting: ArrayLike<number> | null = null
+const heaviestFirst = (a: number, b: number) => sorting![b * SOURCE_STRIDE + 3] - sorting![a * SOURCE_STRIDE + 3] || a - b
+const ascending = (a: number, b: number) => a - b
 
 /** The source a uniform random `u` in [0, 1) picks: the first whose prefix sum exceeds `u × total` (what the GPU does). */
 export function pickSource(table: SourceTable, u: number): number {

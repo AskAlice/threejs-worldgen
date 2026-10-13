@@ -9,7 +9,8 @@ import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
 import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
 import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
 import { TRACTOR_IMPLEMENTS, fieldRoute, wheelFootprints } from '../src/tractor.ts'
-import { DEFAULT_EXHAUST, condensation, createExhaustBuffers, createExhaustState, exhaustSources, type ExhaustSettings } from '../src/exhaust.ts'
+import { DEFAULT_EXHAUST, VehicleExhaust, condensation, createExhaustBuffers, createExhaustState, exhaustSources, type ExhaustSettings } from '../src/exhaust.ts'
+import { Fleet } from '../src/fleet.ts'
 import { MOTION_STRIDE, SOURCE_STRIDE, spawnRate } from 'threejs-particles'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
@@ -645,4 +646,35 @@ test('truck articulation on open (back and forth) paths: trailers stay behind th
     }
     assert.ok(legs >= 4, `drove ${legs} legs`)
   }
+})
+
+test('exhaust: the GPU source table follows maxVents, selection buffers are reused', () => {
+  const fleet = new Fleet({ groups: [{ type: 'car', count: 3, params: { style: 'sedan' }, route: { kind: 'static', position: [0, 0, 0] } }] })
+  const exhaust = new VehicleExhaust(fleet, { maxVents: 8 })
+  assert.equal(exhaust.particles.sources.cdf.length, 8)
+  const before = exhaust.particles
+  exhaust.set({ temperature: -3 })
+  assert.equal(exhaust.particles, before, 'live settings keep the pool')
+  exhaust.set({ maxVents: 40.4 })
+  assert.equal(exhaust.particles.sources.cdf.length, 40, 'raising maxVents resizes the source table')
+  assert.notEqual(exhaust.particles, before)
+  exhaust.dispose()
+  fleet.dispose()
+  // The per-frame selection reuses the state's buffers.
+  const sim = new FleetSim(settings([{ type: 'car', count: 50, params: { style: 'sedan' }, variants: 1, speed: [0, 0], route: { kind: 'static', position: [0, 0, 0], spacing: 6 } }]))
+  const state = createExhaustState(sim.count), out = createExhaustBuffers(16)
+  exhaustSources(sim, { x: 0, y: 0, z: 0 }, { ...DEFAULT_EXHAUST, maxVents: 16 }, state, 1 / 30, out)
+  const bufs = [state.dist, state.pick]
+  const first = [...out.vehicle]
+  exhaustSources(sim, { x: 0, y: 0, z: 0 }, { ...DEFAULT_EXHAUST, maxVents: 16 }, state, 1 / 30, out)
+  assert.equal(state.dist, bufs[0]); assert.equal(state.pick, bufs[1])
+  assert.deepEqual([...out.vehicle], first)
+  assert.deepEqual(first, Array.from({ length: 16 }, (_, i) => i), 'the nearest 16, nearest first')
+  // Seen from the far end, and with ties (all at one spot: lowest index first).
+  exhaustSources(sim, { x: 400, y: 0, z: 0 }, { ...DEFAULT_EXHAUST, maxVents: 16 }, state, 1 / 30, out)
+  assert.deepEqual([...out.vehicle], Array.from({ length: 16 }, (_, i) => 49 - i))
+  const pile = new FleetSim(settings([{ type: 'car', count: 30, params: { style: 'sedan' }, variants: 1, speed: [0, 0], route: { kind: 'static', position: [0, 0, 0], spacing: 1e-9 } }]))
+  const few = createExhaustBuffers(10)
+  exhaustSources(pile, { x: 5, y: 0, z: 5 }, { ...DEFAULT_EXHAUST, maxVents: 10 }, createExhaustState(pile.count), 1 / 30, few)
+  assert.deepEqual([...few.vehicle], Array.from({ length: 10 }, (_, i) => i))
 })

@@ -191,6 +191,8 @@ export class ParticleSystem {
   private readonly updateNode: ComputeNode
   private readonly sorter: CountingSort | null
   private readonly sourceNodes: { positions: any; data: any; motion: any; cdf: any }
+  /** Source buffers and floats per source, uploaded by {@link ParticleSystem.setSources}. */
+  private readonly sourceUploads: [node: any, size: number][]
   private readonly structureKey: string
   private warned = false
   private camera: Camera | null = null
@@ -214,6 +216,7 @@ export class ParticleSystem {
     const n = this.capacity
     this.buffers = { position: instancedArray(n, 'vec4'), velocity: instancedArray(n, 'vec4'), props: instancedArray(n, 'vec4'), light: instancedArray(n, 'vec4') }
     this.sourceNodes = { positions: instancedArray(this.sources.positions, 'vec4'), data: instancedArray(this.sources.data, 'vec4'), motion: instancedArray(this.sources.motion, 'vec4'), cdf: instancedArray(this.sources.cdf, 'float') }
+    this.sourceUploads = [[this.sourceNodes.positions, 4], [this.sourceNodes.data, 4], [this.sourceNodes.motion, 4], [this.sourceNodes.cdf, 1]]
     this.emitNode = this.buildEmit()
     this.updateNode = this.buildUpdate()
     this.sorter = r.sort ? this.buildSort() : null
@@ -253,7 +256,8 @@ export class ParticleSystem {
   setSources(sources: ArrayLike<number>, count?: number, motion?: ArrayLike<number> | null): this {
     fillSourceTable(this.sources, sources, count, motion)
     const k = this.sources.count
-    for (const [node, size] of [[this.sourceNodes.positions, 4], [this.sourceNodes.data, 4], [this.sourceNodes.motion, 4], [this.sourceNodes.cdf, 1]] as const) {
+    for (let i = 0; i < this.sourceUploads.length; i++) {
+      const [node, size] = this.sourceUploads[i]
       const attr = node.value
       attr.clearUpdateRanges()
       attr.addUpdateRange(0, Math.max(1, k * size))

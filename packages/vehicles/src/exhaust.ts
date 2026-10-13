@@ -33,7 +33,7 @@ export interface VentLook {
 export interface ExhaustSettings {
   /** Emit at all. */
   enabled: boolean
-  /** Particle pool size (shared by every vehicle). Changing it rebuilds the GPU buffers. */
+  /** Particle pool size (shared by every vehicle). Changing it (or `maxVents`) rebuilds the GPU buffers. */
   capacity: number
   /** No smoke from vehicles farther than this from the camera, metres; it fades out over the last 40 %. */
   maxDistance: number
@@ -75,17 +75,51 @@ export const DEFAULT_EXHAUST: ExhaustSettings = {
   },
 }
 
-/** Per-vehicle state the emission reads between frames (acceleration from speed differences). */
+/** Per-vehicle state the emission reads between frames (acceleration from speed differences), and reused selection buffers. */
 export interface ExhaustState {
   /** Speed last frame, m/s. */
   speed: Float32Array
   /** Smoothed acceleration, m/s². */
   accel: Float32Array
+  /** Distance to the eye this frame (scratch). */
+  dist: Float32Array
+  /** Candidate vehicles, the nearest first after selection (scratch). */
+  pick: Int32Array
 }
 
 /** A fresh {@link ExhaustState} for `count` vehicles. */
 export function createExhaustState(count: number): ExhaustState {
-  return { speed: new Float32Array(count).fill(NaN), accel: new Float32Array(count) }
+  return { speed: new Float32Array(count).fill(NaN), accel: new Float32Array(count), dist: new Float32Array(count), pick: new Int32Array(count) }
+}
+
+/** Vehicle `a` comes before `b`: nearer, or as near with a lower index (deterministic). */
+const nearer = (dist: Float32Array, a: number, b: number) => dist[a] < dist[b] || (dist[a] === dist[b] && a < b)
+
+/**
+ * Moves the `k` nearest of `pick[0…n)` (by distance, then index) to the front, nearest first, in place:
+ * a quickselect, then an insertion sort of just those `k`.
+ */
+function nearestFirst(pick: Int32Array, dist: Float32Array, n: number, k: number): void {
+  k = Math.min(k, n)
+  let lo = 0, hi = n - 1
+  while (k < n && lo < hi) {
+    const pivot = pick[(lo + hi) >> 1]
+    let i = lo, j = hi
+    while (i <= j) {
+      while (nearer(dist, pick[i], pivot)) i++
+      while (nearer(dist, pivot, pick[j])) j--
+      if (i <= j) { const t = pick[i]; pick[i] = pick[j]; pick[j] = t; i++; j-- }
+    }
+    if (k - 1 <= j) hi = j
+    else if (k - 1 >= i) lo = i
+    else break
+  }
+  for (let i = 1; i < k; i++) {
+    const x = pick[i]
+    let j = i - 1
+    while (j >= 0 && nearer(dist, x, pick[j])) { pick[j + 1] = pick[j]; j-- }
+    pick[j + 1] = x
+  }
 }
 
 /** Where {@link exhaustSources} writes: `SOURCE_STRIDE` floats per source and `MOTION_STRIDE` per motion, as `ParticleSystem.setSources` takes them. */
@@ -128,19 +162,22 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
   if (!settings.enabled) return 0
   const max = Math.min(settings.maxVents, out.vehicle.length)
   const reach = settings.maxDistance
-  const order: number[] = []
-  const dist = new Float32Array(n)
+  if (state.pick.length < n) { state.pick = new Int32Array(n); state.dist = new Float32Array(n) }
+  const { pick, dist } = state
+  let candidates = 0
   for (let v = 0; v < n; v++) {
     if (!sim.models[sim.model[v]].vents.length) continue
     const d = Math.hypot(p[v * 8] - eye.x, p[v * 8 + 1] - eye.y, p[v * 8 + 2] - eye.z)
     if (d >= reach) continue
     dist[v] = d
-    order.push(v)
+    pick[candidates++] = v
   }
-  order.sort((a, b) => dist[a] - dist[b] || a - b)
+  // Only the nearest `max` vehicles can be used (each has at least one vent): select, don't sort all.
+  nearestFirst(pick, dist, candidates, max)
   const vis = condensation(settings.temperature, settings.humidity)
   let k = 0
-  for (const v of order) {
+  for (let c0 = 0; c0 < candidates; c0++) {
+    const v = pick[c0]
     if (k >= max) break
     const m = sim.models[sim.model[v]], o = v * 8
     const yaw = p[o + 3], c = Math.cos(yaw), s = Math.sin(yaw), speed = sim.speed[v]
@@ -220,6 +257,7 @@ export class VehicleExhaust {
   private state: ExhaustState
   private buffers: ExhaustBuffers
   private builtCapacity = -1
+  private builtMaxVents = -1
   private sim: FleetSim | null = null
 
   constructor(fleet: Fleet, input: ExhaustInput = {}) {
@@ -261,12 +299,16 @@ export class VehicleExhaust {
   private apply(): this {
     const s = this.settings
     s.capacity = Math.max(64, Math.round(s.capacity))
-    if (s.capacity !== this.builtCapacity) {
+    const maxVents = Math.max(1, Math.round(s.maxVents))
+    // The GPU source table is sized at construction: a new vent budget needs a new system (otherwise
+    // extra sources would be dropped by weight instead of by distance).
+    if (s.capacity !== this.builtCapacity || maxVents !== this.builtMaxVents) {
       this.particles?.dispose()
-      this.particles = new ParticleSystem({ ...this.particleOptions(), maxSources: Math.max(1, Math.round(s.maxVents)) })
+      this.particles = new ParticleSystem({ ...this.particleOptions(), maxSources: maxVents })
       this.particles.object.name = 'vehicle-exhaust'
       this.fleet.object.add(this.particles.object)
       this.builtCapacity = s.capacity
+      this.builtMaxVents = maxVents
     } else this.particles.set(this.particleOptions())
     return this
   }
