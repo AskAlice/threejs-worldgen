@@ -14,7 +14,7 @@ export default {
   hero: { img: 'weathering/hero.jpg', alt: 'A wildfire front burning through a conifer forest, smoke drifting downwind' },
   thumb: 'weathering/thumb.jpg',
   demos: [{ label: 'three.js demo', href: 'weathering.html' }],
-  stats: [['4', 'material states'], ['24k', 'raindrops, one draw call'], ['27', 'fuel models'], ['3', 'draw calls per wildfire']],
+  stats: [['4', 'material states'], ['24k', 'raindrops, one draw call'], ['22', 'burnable fuel models'], ['3', 'draw calls per wildfire']],
   install: 'npm i threejs-weathering threejs-biomes three',
   code: {
     heading: 'Weather in <em>a few lines.</em>',

@@ -22,6 +22,8 @@ const HOME = { accent: '#1f5a35', icon: '<circle cx="16" cy="16" r="11" fill="no
 
 const pkgs = await Promise.all(readdirSync(join(root, 'landing/packages')).filter((f) => f.endsWith('.mjs'))
   .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default))
+// The homepage mosaic shows the package cards; threejs-heightfield sits in the foundations note instead (see build.mjs).
+const cards = pkgs.filter((p) => p.short !== 'heightfield')
 const mediaFile = (p) => [join(root, 'landing/media', p), join(root, 'media', p)].find(existsSync)
 // Hero, else thumbnail, else the first screenshot in the package's media folder.
 const shotOf = (p) => [p.hero?.img, p.thumb].filter(Boolean).map(mediaFile).find(Boolean)
@@ -62,7 +64,7 @@ function mosaic(shots) {
   return page(`<div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:4px">${cells}</div>
   <div class="shade" style="background:linear-gradient(90deg, rgba(8,12,10,.92) 0%, rgba(8,12,10,.7) 50%, rgba(8,12,10,.25) 100%)"></div>
   <div class="txt" style="width:900px">
-    <div class="brand">${svg(HOME.icon, '#9fd0ad')}${pkgs.length} packages · one seed per world</div>
+    <div class="brand">${svg(HOME.icon, '#9fd0ad')}${cards.length} packages · one seed per world</div>
     <h1>threejs<i style="color:#9fd0ad">-worldgen</i></h1>
     <p>Procedural worlds for three.js and React Three Fiber: terrain and biomes, water, forests, grass, cities, weather and sky.</p>
     <div class="tags">WebGPU · three.js · React Three Fiber</div>
@@ -123,7 +125,7 @@ async function shoot(html, w, h, format, quality) {
 try {
   await connect()
   const jobs = pkgs.map((p) => [p.short, shotOf(p) ? card(p, shotOf(p)) : null])
-  jobs.push(['home', mosaic(pkgs.map(shotOf).filter(Boolean))])
+  jobs.push(['home', mosaic(cards.map(shotOf).filter(Boolean))])
   for (const [name, html] of jobs) {
     if (!html) { console.warn(`og: no screenshot for ${name}, skipped (the site falls back to home.jpg)`); continue }
     let jpg

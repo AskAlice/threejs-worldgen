@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { join, resolve } from 'node:path'
-import { SITE, GITHUB, esc, plain, seoTags, jsonLd } from './seo.mjs'
+import { SITE, GITHUB, ORDER, esc, plain, seoTags, jsonLd } from './seo.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const out = resolve(root, process.argv[2] ?? 'site')
@@ -36,6 +36,7 @@ const RELATED = {
   fauna: ['biomes', 'water', 'trees', 'sky'],
   weathering: ['sky', 'trees', 'city', 'grass'],
   sky: ['weathering', 'biomes', 'water', 'fauna'],
+  heightfield: ['grass', 'scatter', 'biomes'],
 }
 
 // Search titles and descriptions for the built demo pages: file -> [package short, title, description].
@@ -55,14 +56,21 @@ const DEMOS = {
   'world.html': [null, 'Combined world demo · threejs-worldgen procedural world in three.js', 'Every threejs-worldgen package in one WebGPU scene: procedural terrain and biomes, water, forests, grass, cities, traffic, wildlife, weather and sky.'],
   'gallery.html': [null, 'Asset gallery · threejs-worldgen procedural assets for three.js', 'Browse the procedural assets of threejs-worldgen side by side: trees, plants, rocks, buildings, props, vehicles and animals, generated in three.js.'],
   'particles.html': [null, 'threejs-particles demo · GPU particle systems for three.js WebGPU', 'Live sandbox for threejs-particles: compute-shader particle pools with seeded emitters, forces and lifetime curves, plus lit smoke, flames and sparks.'],
+  'heightfield.html': ['heightfield', 'threejs-heightfield sandbox · Height lookup, slope and ray-marching', 'Live WebGPU sandbox for threejs-heightfield: a height function and meshes baked into heightfields, sampled on a grid coloured by slope, with ray-marching under the pointer.'],
+  'city-r3f.html': ['city', 'threejs-city React Three Fiber demo · Procedural cities in R3F', 'The threejs-city <City> component in React Three Fiber: a procedural settlement on a threejs-biomes world, with every option as a live leva control.'],
+  'props-r3f.html': ['props', 'threejs-props React Three Fiber demo · Street and road props in R3F', 'The threejs-props <Props> and <RoadPath> components in React Three Fiber: instanced street lights, fences, signs and power lines along roads, with live controls.'],
+  'vehicles-r3f.html': ['vehicles', 'threejs-vehicles React Three Fiber demo · Procedural traffic in R3F', 'The threejs-vehicles <Vehicle> and <Fleet> components in React Three Fiber: a gallery of every vehicle type and live traffic on a street grid, with planes overhead.'],
+  'population-r3f.html': ['population', 'threejs-population React Three Fiber demo · H3 population maps in R3F', 'usePopulation and the <PopulationOverlay> hex map of threejs-population in React Three Fiber: density, land use and night lights, with every option live.'],
+  'fauna-r3f.html': ['fauna', 'threejs-fauna React Three Fiber demo · Fish schools and bird flocks in R3F', 'The threejs-fauna <Fish> and <Fauna> components in React Three Fiber: all 12 fish species side by side, then fish schools and bird flocks at a river mouth.'],
   'sky.html': ['sky','threejs-sky demo · Day/night cycle, clouds and stars in three.js', 'Live sandbox for threejs-sky: a day/night cycle with sun and moon phases, clouds, the Milky Way, shooting stars and a Keplerian solar system.'],
 }
 
-// Package order on the homepage follows the pipeline: ground, then what grows on it, then people, then the sky.
-const ORDER = ['biomes', 'water', 'scatter', 'trees', 'grass', 'city', 'population', 'props', 'vehicles', 'fauna', 'weathering', 'sky']
+// Package order: ORDER in landing/seo.mjs. threejs-heightfield gets a lander but no homepage card: the homepage links
+// it from the foundations note.
 const pkgs = await Promise.all(readdirSync(join(root, 'landing/packages')).filter((f) => f.endsWith('.mjs'))
   .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default))
 pkgs.sort((a, b) => ORDER.indexOf(a.short) - ORDER.indexOf(b.short))
+const cards = pkgs.filter((p) => p.short !== 'heightfield')
 
 // ---------- helpers ----------
 
@@ -297,7 +305,7 @@ function lander(p) {
           <div class="hero-side">
             <p>${p.lede}</p>
             <div class="cta">
-              ${main ? `<a class="btn btn-amber" href="${P}demo/${main.href}">Open the live demo</a>` : `<a class="btn btn-amber" href="#features">See what's planned</a>`}
+              ${main ? `<a class="btn btn-amber" href="${P}demo/${main.href}">Open the live demo</a>` : `<a class="btn btn-amber" href="#features">${dev ? "See what's planned" : 'See what it does'}</a>`}
               <a class="btn btn-line" href="${docs}">Read the docs</a>
             </div>
           </div>
@@ -417,7 +425,7 @@ function home() {
     { '@type': 'ItemList', name: 'threejs-worldgen packages', numberOfItems: pkgs.length, itemListElement: pkgs.map((p, i) => (
       { '@type': 'ListItem', position: i + 1, name: p.name, description: p.description, url: `${SITE}${p.short}/` })) },
   ] }
-  return `${head({ title, description, url: SITE, ogAlt: `threejs-worldgen: screenshots of ${pkgs.length} procedural world packages for three.js`, short: 'home', accent: home.accent, icon: 'favicon.svg', P: '', hero: heroImg, ld })}
+  return `${head({ title, description, url: SITE, ogAlt: `threejs-worldgen: screenshots of ${cards.length} procedural world packages for three.js`, short: 'home', accent: home.accent, icon: 'favicon.svg', P: '', hero: heroImg, ld })}
   <header class="site">
     <div class="wrap">
       <a class="logo" href="./" aria-label="threejs-worldgen home">${iconSvg(home)}<span>threejs<i>-worldgen</i></span></a>
@@ -460,7 +468,7 @@ function home() {
           </div>
         </div>
         <div class="strip">
-          <div><b>${pkgs.length}</b><span>packages</span></div>
+          <div><b>${cards.length}</b><span>packages</span></div>
           <div><b>20</b><span>blended biomes</span></div>
           <div><b>1 cm → 1 AU</b><span>one camera, every scale</span></div>
           <div><b>1</b><span>seed per world</span></div>
@@ -477,10 +485,10 @@ function home() {
           </div>
           <p class="intro reveal">Every package is plain three.js first, with an optional React Three Fiber component, fully parametric and deterministic from a seed. New here? <a href="grass/" style="color:var(--accent);font-weight:600">threejs-grass</a> is the most complete.</p>
         </div>
-        <ul class="cards">${pkgs.map(card).join('')}
+        <ul class="cards">${cards.map(card).join('')}
         </ul>
         <div class="foundations reveal">
-          <div><b>Foundations: threejs-heightfield</b>Bakes any mesh into a fast <code>(x, z) =&gt; y</code> lookup with slope and ray-marching. It's the ground every other package stands on. <a href="docs/modules/threejs-heightfield.html">Docs →</a></div>
+          <div><b>Foundations: threejs-heightfield</b>Bakes any mesh into a fast <code>(x, z) =&gt; y</code> lookup with slope and ray-marching. It's the ground every other package stands on. <a href="heightfield/">Overview →</a> <a href="docs/modules/threejs-heightfield.html">Docs →</a></div>
           <div><b>Umbrella: threejs-worldgen</b>One <code>&lt;World&gt;</code> that composes all of the above with biome-driven grass and a scale-aware camera. Work in progress. <a href="docs/modules/threejs-worldgen.html">Docs →</a></div>
         </div>
       </div>
