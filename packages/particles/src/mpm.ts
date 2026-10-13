@@ -1,13 +1,13 @@
-import { StorageBufferAttribute, Vector3, type ComputeNode, type Renderer } from 'three/webgpu'
+import { StorageBufferAttribute, Vector3, Vector4, type ComputeNode, type Renderer } from 'three/webgpu'
 import {
-  Fn, If, atomicAdd, atomicLoad, atomicStore, clamp, determinant, dot, float, floor, instanceIndex, instancedArray, int, ivec2, ivec3, length,
-  mat3, max, min, select, storage, uniform, vec2, vec3, vec4,
+  Fn, If, Loop, atomicAdd, atomicLoad, atomicStore, clamp, determinant, dot, float, floor, instanceIndex, instancedArray, int, ivec2, ivec3, length,
+  mat3, max, min, select, storage, uniform, uniformArray, vec2, vec3, vec4,
 } from 'three/tsl'
 import { particleRandom } from './emitter.ts'
 import { mpmMaterial, type MPMMaterial } from './mpm-materials.ts'
 import {
-  MPM_CONTACT_SKIN, MPM_DENSITY_UNIT, MPM_FIXED, MPM_PPC_AXIS, bakeMPMHeights, mpmEmitPositions, mpmTimeStep, resolveMPMOptions,
-  type MPMEmit, type MPMHeightFn, type MPMInput, type MPMOptions, type MPMParticleData,
+  MPM_CONTACT_SKIN, MPM_DENSITY_UNIT, MPM_FIXED, MPM_MAX_COLLIDERS, MPM_PPC_AXIS, bakeMPMFriction, bakeMPMHeights, mpmEmitPositions, mpmTimeStep, packMPMColliders, resolveMPMOptions,
+  type MPMCollider, type MPMEmit, type MPMFrictionFn, type MPMHeightFn, type MPMInput, type MPMOptions, type MPMParticleData,
 } from './mpm-reference.ts'
 import { merge, seedOf } from './options.ts'
 import { ParticleSystem } from './system.ts'
@@ -34,7 +34,7 @@ export interface MPMBuffers {
   state: any
   /** Grid after the last substep: xyz velocity (m/s), w mass (normalised units), one vec4 per node. */
   grid: any
-  /** Terrain height per node column (x + z·nx), metres above `origin[1]`. */
+  /** Terrain height per node column (x + z·nx), metres above `origin[1]`; then (from nx·nz) the friction multiplier per column. */
   heights: any
 }
 
@@ -90,6 +90,7 @@ export class MPMSolver {
     /** Domain walls on (1) or off (0). */ walls: uniform(1),
     /** Domain move, metres (applied by the shift pass). */ shift: uniform(new Vector3()),
     /** Colour ramp: key = 0.5 + (J − 1) × strainScale. */ strainScale: uniform(4),
+    /** Colliders in use (see {@link MPMSolver.setColliders}). */ colliders: uniform(0, 'int'),
   }
   /** Per material: its parameters as uniforms, and particle mass in normalised units. */
   readonly params: { values: Record<string, any>; mass: any }[]
@@ -102,6 +103,11 @@ export class MPMSolver {
   private readonly g2pNode: ComputeNode
   private readonly shiftNode: ComputeNode
   private height: MPMHeightFn | null
+  private frictionFn: MPMFrictionFn | null = null
+  private colliderList: MPMCollider[] = []
+  private readonly colliderData = new Float32Array(MPM_MAX_COLLIDERS * 12)
+  // A uniform array, not a storage buffer: G2P already binds 8 storage buffers, WebGPU's default per-stage limit.
+  private readonly colliderNode = uniformArray(Array.from({ length: MPM_MAX_COLLIDERS * 3 }, () => new Vector4()), 'vec4')
   private head = 0
   private serial = 0
   private shiftPending = false
@@ -133,7 +139,7 @@ export class MPMSolver {
     const [nx, ny, nz] = this.resolution
     const cells = nx * ny * nz
     const n = this.capacity
-    this.heightData = new Float32Array(nx * nz)
+    this.heightData = new Float32Array(nx * nz * 2) // heights, then friction multipliers (one binding: G2P is at 8)
     const pb = this.particles.buffers
     this.buffers = {
       position: pb.position, velocity: pb.velocity, props: pb.props,
@@ -171,6 +177,24 @@ export class MPMSolver {
   }
 
   /**
+   * Scales the terrain `friction` by `friction(x, z)` (world metres, ≥ 0) per node column, e.g. a weak layer under a
+   * slab that releases while the snow around it holds. Re-baked when the domain moves; `null` for 1 everywhere.
+   */
+  setFriction(friction: MPMFrictionFn | null): this {
+    this.frictionFn = friction
+    return this.bakeHeights()
+  }
+
+  /**
+   * Sets the kinematic colliders (spheres or capsules, world metres; at most `MPM_MAX_COLLIDERS`), e.g. feet or
+   * wheels, each frame as they move. Give them their `velocity` so they push material along (footprints, tracks).
+   */
+  setColliders(colliders: readonly MPMCollider[]): this {
+    this.colliderList = [...colliders]
+    return this
+  }
+
+  /**
    * Moves the domain so it is centred on a world position (e.g. the camera), by whole cells and only once the
    * position is more than a quarter of the domain off centre. Particles keep their world positions.
    */
@@ -200,11 +224,12 @@ export class MPMSolver {
     for (let p = 0; p < k; p++) {
       const s = (this.head + p) % this.capacity
       P.set([pos[p * 3] - o.origin[0], pos[p * 3 + 1] - o.origin[1], pos[p * 3 + 2] - o.origin[2], 0.5], s * 4)
-      V.set([vel[0], vel[1], vel[2], 1], s * 4)
+      const pv = spec.velocities, q = p * 3
+      V.set(pv ? [pv[q] ?? 0, pv[q + 1] ?? 0, pv[q + 2] ?? 0, 1] : [vel[0], vel[1], vel[2], 1], s * 4)
       Q.set([spec.temperature ?? 293, 1, particleRandom(this.serial + p, 15, seed), 0], s * 4)
       A.fill(0, s * 12, s * 12 + 12)
       F.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], s * 12)
-      S.set([id, 1, 0, 0], s * 4)
+      S.set([id, 1, spec.tag ?? 0, 0], s * 4)
     }
     // Upload only the slots written (one or two runs around the ring).
     const runs: [number, number][] = [[this.head, Math.min(k, this.capacity - this.head)]]
@@ -246,6 +271,9 @@ export class MPMSolver {
     if (!this.substeps || !this.count) return nodes
     this.uniforms.dt.value = sub
     this.uniforms.stressScale.value = -sub / ((MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3 / 4) * this.options.cellSize ** 2)
+    const colliders = packMPMColliders(this.colliderList, this.options.origin, this.options.friction, this.colliderData)
+    for (let k = 0; k < colliders * 3; k++) (this.colliderNode.array[k] as Vector4).fromArray(this.colliderData, k * 4)
+    this.uniforms.colliders.value = colliders
     for (let s = 0; s < substeps; s++) nodes.push(this.p2gNode, this.gridNode, this.g2pNode)
     this.time += sub * substeps
     return nodes
@@ -325,6 +353,7 @@ export class MPMSolver {
 
   private bakeHeights(): this {
     bakeMPMHeights(this.height, this.options, this.heightData)
+    bakeMPMFriction(this.frictionFn, this.options, this.heightData, this.resolution[0] * this.resolution[2])
     this.buffers.heights.value.needsUpdate = true
     return this
   }
@@ -421,8 +450,9 @@ export class MPMSolver {
           const x0 = imax(x.sub(1), int(0)), x1 = imin(x.add(1), int(nx - 1)), z0 = imax(z.sub(1), int(0)), z1 = imin(z.add(1), int(nz - 1))
           const hx = H.element(z.mul(nx).add(x1)).sub(H.element(z.mul(nx).add(x0))).div(float(x1.sub(x0)).mul(u.dx))
           const hz = H.element(z1.mul(nx).add(x)).sub(H.element(z0.mul(nx).add(x))).div(float(z1.sub(z0)).mul(u.dx))
-          v.assign(friction(v, vec3(hx.negate(), 1, hz.negate()).normalize(), u.friction, false))
+          v.assign(friction(v, vec3(hx.negate(), 1, hz.negate()).normalize(), u.friction.mul(H.element(z.mul(nx).add(x).add(nx * nz))), false))
         })
+        this.collide(vec3(float(x), float(y), float(z)).mul(u.dx), v, false)
       })
       this.buffers.grid.element(n).assign(vec4(v, m.div(MPM_FIXED)))
     })().compute(this.resolution[0] * this.resolution[1] * this.resolution[2], [64])
@@ -468,16 +498,19 @@ export class MPMSolver {
           v.mulAssign(min(float(1), u.maxSpeed.div(max(length(v), 1e-9))))
           // Particle contact on top of the grid boundary: friction within the skin, never below the ground.
           const g0 = this.ground(P.xz)
+          const mu = u.friction.mul(this.frictionAt(P.xz)).toVar()
           If(P.y.lessThan(g0.x.add(u.dx.mul(MPM_CONTACT_SKIN))), () => {
-            v.assign(friction(v, vec3(g0.y.negate(), 1, g0.z.negate()).normalize(), u.friction, true))
+            v.assign(friction(v, vec3(g0.y.negate(), 1, g0.z.negate()).normalize(), mu, true))
           })
+          this.collide(P.xyz, v, false)
           const pos = P.xyz.add(v.mul(u.dt)).toVar()
+          this.collide(pos, v, true) // out of the colliders, then never under the ground
           const g1: any = this.ground(pos.xz).toVar()
           If(pos.y.lessThan(g1.x), () => {
             // Out along the ground normal (exact for a plane), not straight up.
             const nrm = vec3(g1.y.negate(), 1, g1.z.negate()).toVar()
             pos.addAssign(nrm.mul(g1.x.sub(pos.y).div(dot(nrm, nrm))))
-            v.assign(friction(v, nrm.normalize(), u.friction, false))
+            v.assign(friction(v, nrm.normalize(), mu, false))
           })
           const J = determinant(F)
           b.position.element(i).assign(vec4(pos, clamp(J.sub(1).mul(u.strainScale).add(0.5), 0, 1)))
@@ -494,6 +527,13 @@ export class MPMSolver {
     })().compute(this.capacity, [64])
   }
 
+  // Friction multiplier of the node column nearest local (x, z), as `nearestColumn` on the CPU.
+  private frictionAt(xz: any): any {
+    const [nx, , nz] = this.resolution
+    const c: any = (clamp as any)(ivec2(floor(xz.mul(this.uniforms.invDx).add(0.5)) as any), ivec2(0, 0), ivec2(nx - 1, nz - 1)).toVar()
+    return this.buffers.heights.element(c.y.mul(nx).add(c.x).add(nx * nz))
+  }
+
   // Bilinear ground under local (x, z): vec3(height, dh/dx, dh/dz), as `groundAt` on the CPU.
   private ground(xz: any): any {
     const [nx, , nz] = this.resolution
@@ -507,6 +547,24 @@ export class MPMSolver {
     const hx = h10.sub(h00).mul(f.y.oneMinus()).add(h11.sub(h01).mul(f.y)).mul(u.invDx)
     const hz = h01.sub(h00).mul(f.x.oneMinus()).add(h11.sub(h10).mul(f.x)).mul(u.invDx)
     return vec3(h, hx, hz)
+  }
+
+  // The colliders (as `collideMPM` on the CPU): Coulomb projection of the velocity var `v` relative to each collider
+  // containing local point `x`; with `push`, the var `x` also moves out to the surface.
+  private collide(x: any, v: any, push: boolean): void {
+    const K: any = this.colliderNode
+    Loop(this.uniforms.colliders, ({ i }: { i: any }) => {
+      const A = K.element(i.mul(3)).toVar(), B = K.element(i.mul(3).add(1)).toVar(), vc = K.element(i.mul(3).add(2)).xyz.toVar()
+      const ab = B.xyz.sub(A.xyz).toVar(), ax = x.sub(A.xyz).toVar()
+      const t = clamp(dot(ax, ab).div(max(dot(ab, ab), 1e-12)), 0, 1)
+      const d = ax.sub(ab.mul(t)).toVar()
+      const len = length(d).toVar()
+      If(len.lessThan(A.w), () => {
+        const n = select(len.greaterThan(1e-9), d.div(max(len, 1e-9)), vec3(0, 1, 0)).toVar()
+        v.assign(friction(v.sub(vc), n, B.w, false).add(vc))
+        if (push) x.addAssign(n.mul(A.w.sub(len)))
+      })
+    })
   }
 
   private buildShift(): ComputeNode {

@@ -197,3 +197,125 @@ can use `C` for viscosity and return a new `temperature` from `plasticity` (it l
 blackbody shading reads it). `buffers.state.z/w` are free per-particle slots. `MPMReference` runs the same substep on
 the CPU, so each material can be tested against the GPU the way `test/mpm.test.ts` does for jelly
 (`example/mpm.html?check` records the GPU side).
+
+### Snow
+
+`SNOW` (the `snow` material) is Stomakhin et al. 2013. It has three parts:
+- **Fixed-corotated elasticity:** τ = 2μ(F − R)Fᵀ + λ(J − 1)J·I, with R from the SVD of F.
+- **Plasticity:** the singular values of F are clamped to [1 − θc, 1 + θs], and the plastic volume ratio Jp takes what
+  the clamp removed.
+- **Hardening:** μ and λ scale by exp(ξ(1 − Jp)), so compacted snow stiffens and stretched snow crumbles.
+
+Two real-time bounds go beyond the paper:
+- **`maxHardening`** caps that factor. The time step assumes fully hardened snow, so the cap sets the substeps.
+- **`maxDensity`** is the densest the snow compacts to (Jp ≥ density / maxDensity). Past it the squeeze stays elastic
+  and pushes back.
+
+The 3×3 SVD (`svd3`, `svd3Node`, in `mpm-svd.ts`) is one branch-free implementation that runs on plain numbers and
+on TSL nodes, so the CPU reference and the GPU do the same maths. It uses Jacobi on AᵀA, then a Givens QR of A·V
+(McAdams et al. 2011), and stays exact for rank-deficient and reflected matrices.
+
+| Preset | density | E (Pa) | ν | θc | θs | ξ | maxHardening | maxDensity |
+|---|---|---|---|---|---|---|---|---|
+| `SNOW_PRESETS.powder` | 150 | 35 000 | 0.2 | 0.015 | 0.01 | 6 | 4 | 550 |
+| `SNOW_PRESETS.packed` (paper reference, the default) | 400 | 140 000 | 0.2 | 0.025 | 0.0075 | 10 | 3 | 650 |
+| `SNOW_PRESETS.wet` | 500 | 80 000 | 0.3 | 0.045 | 0.015 | 5 | 3 | 700 |
+
+```ts
+import { MPMSolver, MPMSnowSurface, SNOW_PRESETS } from 'threejs-particles'
+
+const mpm = new MPMSolver(renderer, { cellSize: 0.1, resolution: [72, 28, 56], origin, height, materials: { snow: SNOW_PRESETS.powder } })
+mpm.emit({ positions: snowLayer, material: 'snow' })     // e.g. a Δx/2 lattice from the ground up
+mpm.object.visible = false                               // drawn as a snow cover instead:
+const snow = new MPMSnowSurface(renderer, mpm, { edgeDepth: 0.35 })
+scene.add(snow.object)
+renderer.setAnimationLoop(() => {
+  mpm.setColliders([{ a: heel, b: toe, radius: 0.05, velocity: footVelocity }]) // feet, wheels: spheres or capsules
+  mpm.step(1 / 60); snow.update(); renderer.render(scene, camera)
+})
+```
+
+- **Colliders** (`setColliders`, also on `MPMReference.colliders`) take up to 8 kinematic spheres or capsules.
+  - They are core features, usable with any material. They act on grid nodes and on particles: inward velocity
+    relative to the collider gets a Coulomb projection, and particles are pushed out.
+  - Give a moving collider its velocity. A rolling wheel's contact patch is still, so it gets only its vertical
+    velocity.
+- **Friction map** (`setFriction((x, z) => multiplier)`, also on `MPMReference`) scales the terrain friction per node
+  column. Use it for a weak layer under a slab. MPM bonds any snow that shares grid nodes, so a slab only lets go
+  once a fracture of at least 1.5 cells separates it (the demo removes the snow along the slab's outline on release).
+- **`MPMSnowSurface`** draws the snow particles as a continuous, lit snow cover. Each frame:
+  1. Compute passes splat each particle's current volume (rest volume × det F × Jp) into a column grid at the
+     particle spacing.
+  2. Each column's depth is capped by its top particle, so pushed-in footprint floors show and airborne snow makes no
+     spikes.
+  3. The depth is lightly smoothed and drawn as a displaced heightfield.
+
+  It blends to `edgeDepth` (static snow outside the domain) at the walls. Compacted snow is a little greyer and
+  smoother (by mean Jp). On debris (columns whose particles disagree on Jp), each particle block in
+  `buffers.state.z` (0…255, e.g. Voronoi cells of the snowpack assigned at emission) is drawn at its own height, so
+  the debris breaks into angular blocks that travel with the snow.
+- **`snowMaterial`** is a `MeshSSSNodeMaterial`. Use it for static snow next to the simulated patch.
+  - It shades white, rough snow with faint blue translucency.
+  - Fine detail is in the normal only, never albedo, and fades out by `fwidth`. It has two parts: faint wind texture,
+    stretched along a wandering, domain-warped direction (`relief`), and sparse ~6 mm glinting grains with a glossy,
+    tilted clearcoat (`glints`).
+- `example/mpm-snow.html` shows footprints or wheel tracks in powder; `?scene=avalanche` releases a slab onto a
+  runout. `?check` records the GPU side of `test/mpm-snow.test.ts`.
+
+### Water (MPM): rain splashes, puddles, spray and waterfalls
+
+`mpm-water.ts` registers `water`, a weakly compressible fluid: Kirchhoff stress `τ = −J·p(J)·I + μ·J·(C + Cᵀ)` with
+the Tait equation of state `p = K·(J^−γ − 1)` (`bulk`, `gamma`; sound speed √(Kγ/ρ) ≈ 12 m/s by default), viscosity
+`μ`, and no shear stiffness. Its plasticity hook resets `F` to `J^(1/3)·I` with J clamped to [0.6, 1]. It stores no
+expansion, so spray lands at rest volume and the fluid can't creep denser than its pressure sees.
+`WATER_PRESETS.clear` and `.muddy` pair the material with a matching surface look.
+
+```ts
+import { FluidSurface, MPMSolver, PuddleField, SplashEmitter, WATER_PRESETS } from 'threejs-particles'
+
+const mpm = new MPMSolver(renderer, { cellSize: 0.05, resolution: [96, 48, 96], friction: 0.05, walls: false,
+  materials: { water: WATER_PRESETS.clear.material }, height })
+const fluid = new FluidSurface(mpm, { ...WATER_PRESETS.clear.surface, envMap: scene.environment })
+scene.add(fluid.object)                                          // the solver's own sprites can be hidden
+const puddles = new PuddleField({ resolution: [96, 96], cellSize: 0.05, origin: [-2.4, -2.4] }, height)
+const rain = new SplashEmitter(mpm, { rain: 12, radius: 2 }, { height, puddles })
+renderer.setAnimationLoop(() => {
+  rain.set({ center: [camera.position.x, camera.position.z] }).update(1 / 60)
+  renderer.compute([...mpm.prepare(1 / 60), ...rain.prepare()])
+  fluid.render(renderer, camera)                                 // offscreen passes, then the scene
+  renderer.render(scene, camera)
+})
+```
+
+- **`FluidSurface`** renders screen-space fluid. The passes are:
+  - sphere-impostor depth and additive thickness;
+  - a separable bilateral depth blur that filters the residual from the local slope, so a pool seen at a grazing angle
+    stays a plane;
+  - a full-screen composite in your scene. It rebuilds normals and shades:
+    - Fresnel reflection of `envMap` (or a sky gradient);
+    - a capped GGX sun highlight;
+    - refraction of the scene's colour buffer;
+    - Beer–Lambert absorption and turbid scattering;
+    - translucent whitewater, streaked along the fall in falling water.
+
+  Spray is decided from the solver's grid: where a particle's node is nearly empty and it moves fast, it is drawn as
+  soft, motion-blurred mist splats (`spray`, `mist`, `shutter`). Slow sparse water is drawn as a faint wet film.
+  Tagged particles (rain splashes) are small round drops (`tagRadius`). Edges are anti-aliased by `fwidth`.
+- **`PuddleField`** is a CPU height field of standing water. Rain adds to it, and an explicit, mass-conserving
+  relaxation of the water surface runs it downhill and levels it into low spots. It also handles infiltration,
+  evaporation and a surface `wetness`. `depth` and `wetness` are row-major arrays from (minX, minZ), like
+  threejs-weathering's state field.
+- **`SplashEmitter`** spawns seeded rain impacts near the camera. Each impact makes a few MPM particles: a crown and a
+  jet on a puddle, a low scatter on dry ground. The impacts feed the puddles. Its `prepare()` returns a retire pass that
+  removes landed splash particles, stray lone water at rest (`soak`) and, with `retireOutside`, water that left the
+  domain.
+- The core's `MPMEmit` gained `velocities` (per particle) and `tag` (stored in `buffers.state.z`).
+- **Resolution**: one MPM particle at Δx = 5 cm holds about 16 mL, roughly 500 raindrops. So splashes are drawn as
+  drops, not resolved as crowns, and a jet narrower than about two cells clings to a slope instead of springing clear.
+- **Demo**: `example/mpm-water.html` has:
+  - a dam break onto terrain;
+  - rain splashing and filling puddles that drain and dry when it stops;
+  - a stream falling 0.6 m off a ledge into a plunge pool and away down a bed.
+
+  `?view=dam|fall|rain`, `?muddy`, `?soak=<minutes>`, `?pause=<s>`, `?rain=0`, `?dam=0` and `?fall=0` set it up;
+  `?check` records the GPU side of `test/mpm-water.test.ts`.

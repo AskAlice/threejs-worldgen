@@ -7,6 +7,8 @@ import { merge, seedOf, type DeepPartial } from './options.ts'
 
 /** A `(x, z) => y` terrain height, world metres (e.g. threejs-heightfield's `HeightFn` or `world.height`). */
 export type MPMHeightFn = (x: number, z: number) => number
+/** A `(x, z) => multiplier` of the solver's `friction` over the terrain, world metres (e.g. a weak layer under a slab). */
+export type MPMFrictionFn = (x: number, z: number) => number
 
 /** Every setting of an {@link MPMSolver}. Plain JSON. */
 export interface MPMOptions {
@@ -180,6 +182,10 @@ export interface MPMEmit {
   positions?: ArrayLike<number>
   /** Initial velocity, m/s. */
   velocity?: [number, number, number]
+  /** Per-particle initial velocities (x, y, z each, in emission order; e.g. a splash crown), overriding `velocity`. */
+  velocities?: ArrayLike<number>
+  /** A per-particle tag for custom passes, stored in `buffers.state.z` (GPU only; default 0). */
+  tag?: number
   /** Material name (one of the solver's `materials`; default the first). */
   material?: string
   /** Initial temperature, kelvin. */
@@ -228,6 +234,24 @@ export function bakeMPMHeights(height: MPMHeightFn | null, o: Pick<MPMOptions, '
 }
 
 /**
+ * Terrain friction multipliers at the grid's node columns (`x + z·nx`), written into `out` from `offset`: `friction(x, z)`
+ * clamped to ≥ 0, or 1 everywhere without a function.
+ */
+export function bakeMPMFriction(friction: MPMFrictionFn | null, o: Pick<MPMOptions, 'resolution' | 'cellSize' | 'origin'>, out: Float32Array = new Float32Array(o.resolution[0] * o.resolution[2]), offset = 0): Float32Array {
+  const [nx, , nz] = o.resolution
+  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+    const m = friction ? friction(o.origin[0] + i * o.cellSize, o.origin[2] + k * o.cellSize) : 1
+    out[offset + k * nx + i] = Number.isFinite(m) ? Math.max(0, m) : 1
+  }
+  return out
+}
+
+/** Index of the node column nearest local (x, z), clamped to the grid (where a particle reads the friction map). */
+export function nearestColumn(nx: number, nz: number, dx: number, x: number, z: number): number {
+  return Math.min(nz - 1, Math.max(0, Math.floor(z / dx + 0.5))) * nx + Math.min(nx - 1, Math.max(0, Math.floor(x / dx + 0.5)))
+}
+
+/**
  * Ground height and slope under a local position, bilinear between the baked node heights (the same surface
  * the GPU keeps particles above). Returns [height, dh/dx, dh/dz].
  */
@@ -252,6 +276,64 @@ export function projectFriction(v: number[], n: number[], friction: number, keep
   const s = lt <= -friction * vn ? 0 : 1 + (friction * vn) / lt
   const k = keepNormal ? vn : 0
   return [t[0] * s + k * n[0], t[1] * s + k * n[1], t[2] * s + k * n[2]]
+}
+
+/**
+ * A kinematic collider for {@link MPMSolver.setColliders} (e.g. a character's feet or vehicle wheels): a sphere, or
+ * a capsule from `a` to `b`. Material inside it loses the velocity it has into the collider relative to the
+ * collider's own velocity (Coulomb friction along the surface), and particles are pushed out to its surface.
+ */
+export interface MPMCollider {
+  /** Sphere centre, or one end of the capsule's axis, world metres. */
+  a: [number, number, number]
+  /** Other end of the capsule's axis, world metres (default `a`: a sphere). */
+  b?: [number, number, number]
+  /** Radius, metres. */
+  radius: number
+  /** Velocity, m/s (default still): a moving collider pushes material along, a receding one lets go. */
+  velocity?: [number, number, number]
+  /** Coulomb friction against it (default the solver's `friction`). */
+  friction?: number
+}
+
+/** Most colliders a solver takes at once (the rest are ignored). */
+export const MPM_MAX_COLLIDERS = 8
+
+/**
+ * Packs colliders into 12 floats each (a.xyz radius, b.xyz friction, velocity.xyz 0), positions local to `origin`
+ * (what the GPU reads and {@link collideMPM} takes). Returns how many (at most {@link MPM_MAX_COLLIDERS}).
+ */
+export function packMPMColliders(colliders: readonly MPMCollider[], origin: readonly number[], friction: number, out: Float32Array | Float64Array): number {
+  const n = Math.min(colliders.length, MPM_MAX_COLLIDERS, Math.floor(out.length / 12))
+  for (let c = 0; c < n; c++) {
+    const k = colliders[c], b = k.b ?? k.a, v = k.velocity ?? [0, 0, 0]
+    out.set([k.a[0] - origin[0], k.a[1] - origin[1], k.a[2] - origin[2], Math.max(0, k.radius), b[0] - origin[0], b[1] - origin[1], b[2] - origin[2], k.friction ?? friction, v[0], v[1], v[2], 0], c * 12)
+  }
+  return n
+}
+
+/**
+ * Applies packed colliders (see {@link packMPMColliders}) to velocity `v` at local point `x`, in place: inside a
+ * collider, the velocity relative to it gets the Coulomb projection against the surface normal; with `push`, `x` also
+ * moves out to the surface. Grid nodes use it without `push`, particles with it after advecting (as on the GPU).
+ */
+export function collideMPM(packed: ArrayLike<number>, count: number, x: number[], v: number[], push = false): void {
+  for (let c = 0; c < count; c++) {
+    const o = c * 12
+    const ab = [packed[o + 4] - packed[o], packed[o + 5] - packed[o + 1], packed[o + 6] - packed[o + 2]]
+    const ax = [x[0] - packed[o], x[1] - packed[o + 1], x[2] - packed[o + 2]]
+    const t = Math.min(1, Math.max(0, (ax[0] * ab[0] + ax[1] * ab[1] + ax[2] * ab[2]) / Math.max(ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2], 1e-12)))
+    const d = [ax[0] - t * ab[0], ax[1] - t * ab[1], ax[2] - t * ab[2]]
+    const len = Math.hypot(d[0], d[1], d[2]), r = packed[o + 3]
+    if (len >= r) continue
+    const n = len > 1e-9 ? [d[0] / len, d[1] / len, d[2] / len] : [0, 1, 0]
+    const vc = [packed[o + 8], packed[o + 9], packed[o + 10]]
+    const rel = projectFriction([v[0] - vc[0], v[1] - vc[1], v[2] - vc[2]], n, packed[o + 7])
+    for (let a = 0; a < 3; a++) {
+      v[a] = rel[a] + vc[a]
+      if (push) x[a] += n[a] * (r - len)
+    }
+  }
 }
 
 /** Particle state arrays (the reference's own, and what {@link MPMSolver.read} returns from the GPU). */
@@ -292,8 +374,14 @@ export class MPMReference {
   readonly grid: Float64Array
   /** Simulated seconds. */
   time = 0
+  /** Kinematic colliders, world metres (as {@link MPMSolver.setColliders}). */
+  colliders: MPMCollider[] = []
+  /** Friction multiplier per node column (see {@link MPMReference.setFriction}). */
+  readonly frictionMap: Float32Array
   private serial = 0
   private acc: Int32Array | null = null
+  private readonly packed = new Float64Array(MPM_MAX_COLLIDERS * 12)
+  private colliderCount = 0
 
   /** A reference solver with `capacity` particle slots; `height` is the terrain (none by default). */
   constructor(input: MPMInput = {}, height: MPMHeightFn | null = null) {
@@ -306,6 +394,7 @@ export class MPMReference {
       deformation: new Float64Array(n * 9), Jp: new Float64Array(n), temperature: new Float64Array(n), material: new Int32Array(n),
     }
     this.heights = bakeMPMHeights(height, this.options)
+    this.frictionMap = bakeMPMFriction(null, this.options)
     this.grid = new Float64Array(nx * ny * nz * 4)
   }
 
@@ -320,7 +409,7 @@ export class MPMReference {
       const s = d.count + p
       for (let a = 0; a < 3; a++) {
         d.position[s * 3 + a] = pos[p * 3 + a] - o.origin[a]
-        d.velocity[s * 3 + a] = spec.velocity?.[a] ?? 0
+        d.velocity[s * 3 + a] = spec.velocities ? (spec.velocities[p * 3 + a] ?? 0) : (spec.velocity?.[a] ?? 0)
       }
       d.affine.fill(0, s * 9, s * 9 + 9)
       d.deformation.set(identity3(), s * 9)
@@ -331,6 +420,12 @@ export class MPMReference {
     d.count += k
     this.serial += pos.length / 3
     return k
+  }
+
+  /** Scales the terrain friction by `friction(x, z)` per node column, as {@link MPMSolver.setFriction}; `null` for 1. */
+  setFriction(friction: MPMFrictionFn | null): this {
+    bakeMPMFriction(friction, this.options, this.frictionMap)
+    return this
   }
 
   /** Advances a frame of `frameDt` seconds in substeps (see {@link mpmTimeStep}); returns the substeps. */
@@ -347,6 +442,8 @@ export class MPMReference {
     const dx = o.cellSize, inv = 1 / dx
     const acc = (this.acc ??= new Int32Array(nx * ny * nz * 4)).fill(0)
     const params = this.materials.map((m) => o.materials[m])
+    this.colliderCount = packMPMColliders(this.colliders, o.origin, o.friction, this.packed)
+    const packed = this.packed, colliders = this.colliderCount
     const base = [0, 0, 0], fx = [0, 0, 0], w = new Float64Array(9) // w[i * 3 + axis]
     // Quadratic B-spline weights of particle p; false when its 3×3×3 stencil leaves the grid (frozen).
     const kernel = (p: number) => {
@@ -426,19 +523,22 @@ export class MPMReference {
       // Particle contact on top of the grid boundary: friction within the skin, and never below the (bilinear) ground.
       const x = [d.position[p * 3], d.position[p * 3 + 1], d.position[p * 3 + 2]]
       let [h, hx, hz] = groundAt(this.heights, nx, nz, dx, x[0], x[2])
+      const mu = o.friction * this.frictionMap[nearestColumn(nx, nz, dx, x[0], x[2])]
       if (x[1] < h + MPM_CONTACT_SKIN * dx) {
         const len = Math.hypot(hx, 1, hz)
-        const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], o.friction, true)
+        const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], mu, true)
         v[0] = vf[0]; v[1] = vf[1]; v[2] = vf[2]
       }
+      collideMPM(packed, colliders, x, v)
       for (let a = 0; a < 3; a++) x[a] += dt * v[a]
+      collideMPM(packed, colliders, x, v, true) // out of the colliders, then (below) never under the ground
       ;[h, hx, hz] = groundAt(this.heights, nx, nz, dx, x[0], x[2])
       if (x[1] < h) {
         // Out along the ground normal (exact for a plane), not straight up, which would also slide it along a slope.
         const l2 = hx * hx + 1 + hz * hz, depth = (h - x[1]) / l2, n = [-hx, 1, -hz]
         for (let a = 0; a < 3; a++) x[a] += n[a] * depth
         const len = Math.sqrt(l2)
-        const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], o.friction)
+        const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], mu)
         v[0] = vf[0]; v[1] = vf[1]; v[2] = vf[2]
       }
       d.position.set(x, p * 3)
@@ -488,8 +588,9 @@ export class MPMReference {
       const x0 = Math.max(x - 1, 0), x1 = Math.min(x + 1, nx - 1), z0 = Math.max(z - 1, 0), z1 = Math.min(z + 1, nz - 1)
       const hx = (H[z * nx + x1] - H[z * nx + x0]) / ((x1 - x0) * dx), hz = (H[z1 * nx + x] - H[z0 * nx + x]) / ((z1 - z0) * dx)
       const len = Math.hypot(hx, 1, hz)
-      v = projectFriction(v, [-hx / len, 1 / len, -hz / len], o.friction)
+      v = projectFriction(v, [-hx / len, 1 / len, -hz / len], o.friction * this.frictionMap[z * nx + x])
     }
+    collideMPM(this.packed, this.colliderCount, [x * dx, y * dx, z * dx], v)
     return v
   }
 }
