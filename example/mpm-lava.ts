@@ -218,10 +218,11 @@ async function sandbox() {
       while (layerClock >= DX / 2) { emitLayer(); layerClock -= DX / 2 } // one particle layer per spacing of outflow
     }
     sky.update()
-    // The terrain's aerial perspective follows the sky's sun and horizon colour.
-    terrain.uniforms.sunDirection.value.set(...sky.state.sunDirection)
+    // The terrain's aerial perspective (when its material has one) follows the sky's sun and horizon colour.
+    const aerial = terrain.uniforms as { sunDirection?: { value: THREE.Vector3 }; hazeColor?: { value: THREE.Color } }
+    aerial.sunDirection?.value.set(...sky.state.sunDirection)
     const fog = sky.lighting?.fogColor
-    if (fog) terrain.uniforms.hazeColor.value.setRGB(fog[0], fog[1], fog[2])
+    if (fog) aerial.hazeColor?.value.setRGB(fog[0], fog[1], fog[2])
     lava.setEnvironment(scene.environment)
     lighting.fromScene(scene)
     lava.uniforms.environmentIntensity.value = scene.environmentIntensity

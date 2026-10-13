@@ -193,7 +193,7 @@ export class PuddleField {
 
   /**
    * Advances `dt` seconds with rain falling at `rain` mm/h (0: dry weather) in fixed internal steps. Past
-   * {@link PUDDLE_MAX_STEPS} steps (fast-forward) the steps lengthen instead: water and time stay exact, levelling lags.
+   * 64 steps (fast-forward) the steps lengthen instead: water and time stay exact, levelling lags.
    */
   update(dt: number, rain = 0): this {
     const step = this.stepTime, total = this.carry + Math.max(0, dt)
