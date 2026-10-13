@@ -1,0 +1,1392 @@
+{
+ "$comment": "CC0 assets for threejs-trees. Fetched (not committed) by `node scripts/fetch-assets.mjs` into assets/cc0/. Poly Haven files are downloaded once from dl.polyhaven.org (the API is only used to author this list); ambientCG zips are unpacked and only the listed maps kept.",
+ "version": 1,
+ "budgetMB": 150,
+ "assets": [
+  {
+   "id": "island_tree_02",
+   "type": "model",
+   "title": "Island Tree 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/island_tree_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "olive"
+   ],
+   "variants": "single",
+   "entry": "island_tree_02/island_tree_02_1k.gltf",
+   "alphaMaps": [
+    "island_tree_02/textures/island_tree_02_leaves_alpha_1k.png"
+   ],
+   "dimensions": [
+    8.49,
+    4.08,
+    3.41
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/island_tree_02/island_tree_02_1k.gltf",
+     "path": "island_tree_02/island_tree_02_1k.gltf",
+     "size": 8545,
+     "md5": "825057164e987894cbfc6c462977fa71",
+     "sha256": "d8c5d9ead41cdbef91a648f40ff60470faa19eb3a7010e59e44cb1a01250f75d"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_nor_gl_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_nor_gl_1k.jpg",
+     "size": 1157226,
+     "md5": "d8b8bc86de9934a743fc9b0a5470e695",
+     "sha256": "1580d5a42d02f4ede51bfb03972ab0aef3d8acafbd3692276879171007bb70ec"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_diff_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_diff_1k.jpg",
+     "size": 738738,
+     "md5": "b7435527d9628527ce47d89fc1468e9a",
+     "sha256": "8fc20397ab5d514c119d7a025868414d78e436138d3867a4b7ba12334a72ec3a"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_arm_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_arm_1k.jpg",
+     "size": 688305,
+     "md5": "e487f91bcb37a2a1109ef6234f1db27e",
+     "sha256": "ada61dd4fad023e699b6314b8b76590017b301719bf74ffc9e20b95893ed62b6"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_leaves_nor_gl_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_leaves_nor_gl_1k.jpg",
+     "size": 379443,
+     "md5": "a08ffb98b5ffb7dfa682e05a1639c642",
+     "sha256": "07ba461c0c95da4e49a42981766bdb6191d4c3c4d815796c082266dcc3cecdb8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_leaves_diff_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_leaves_diff_1k.jpg",
+     "size": 191886,
+     "md5": "1356cbb5a5dd1318f9f2a01eddbf03e1",
+     "sha256": "f56d762a1507754752abf164cc12acbc1e87ce87fa609ac44b98a1b0037c89d8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_leaves_arm_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_leaves_arm_1k.jpg",
+     "size": 489476,
+     "md5": "27b06c4a53ff115ed7d51ee94e417257",
+     "sha256": "90da3a072dbcb052715b1313b9dbc69a4aa8a09a31a4b3868411a2bb51d72037"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_branches_nor_gl_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_branches_nor_gl_1k.jpg",
+     "size": 819101,
+     "md5": "789084affb01f4a22290a848558f5e12",
+     "sha256": "2d67393ba76a0f49cf965fa0c99d8c16268e71e87b1203d35539bfdb971a514e"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_branches_diff_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_branches_diff_1k.jpg",
+     "size": 528304,
+     "md5": "7792907fe2b2b748c129a2384192a579",
+     "sha256": "bee5ec22196e9e31ad0c95a5a9b4636571cc0124d5bb27a92f1e307d289cc60d"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/island_tree_02/island_tree_02_branches_arm_1k.jpg",
+     "path": "island_tree_02/textures/island_tree_02_branches_arm_1k.jpg",
+     "size": 484806,
+     "md5": "5b6f5b3838f4a8f60fea14fa3a3fef9f",
+     "sha256": "9e3f82263247ce4f619692cea4c4f6fe9936ff465a86623481849062642c7d05"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/island_tree_02/island_tree_02.bin",
+     "path": "island_tree_02/island_tree_02.bin",
+     "size": 40686576,
+     "md5": "7fa9d6ee752b670cabb65053a5c6395b",
+     "sha256": "427d69ccc1ea12d1fb9c6af89691563b4a097f39a6f34c15be6e45ef5e5fd4ce"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/island_tree_02/island_tree_02_leaves_alpha_1k.png",
+     "path": "island_tree_02/textures/island_tree_02_leaves_alpha_1k.png",
+     "size": 57438,
+     "md5": "5ad9fb9a06e70c069bd3d3ba23577375",
+     "sha256": "f4341f147988dbe6b58d9ca841a8f0e4bcff25bc40d05f9877da82006d489c39"
+    }
+   ]
+  },
+  {
+   "id": "searsia_lucida",
+   "type": "model",
+   "title": "Searsia Lucida",
+   "rock": false,
+   "source": "https://polyhaven.com/a/searsia_lucida",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "thornShrub",
+    "shrub"
+   ],
+   "variants": "nodes",
+   "entry": "searsia_lucida/searsia_lucida_1k.gltf",
+   "alphaMaps": [
+    "searsia_lucida/textures/searsia_lucida_alpha_1k.png"
+   ],
+   "dimensions": [
+    4.78,
+    2.84,
+    2.34
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/searsia_lucida/searsia_lucida_1k.gltf",
+     "path": "searsia_lucida/searsia_lucida_1k.gltf",
+     "size": 31443,
+     "md5": "befd961f4f139131eda7dfca952e8d78",
+     "sha256": "ebdc8d776c058b9a6f9a04c57ca0540368531febd3bfa007d2e2d8af8d368f67"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/searsia_lucida/searsia_lucida.bin",
+     "path": "searsia_lucida/searsia_lucida.bin",
+     "size": 17913396,
+     "md5": "aa4c42ee903a3ac22d53386d82480e6d",
+     "sha256": "e0be13cac215725de1f8438d96e1010049d655512a0608c36eabe2ba5abff851"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/searsia_lucida/searsia_lucida_nor_gl_1k.jpg",
+     "path": "searsia_lucida/textures/searsia_lucida_nor_gl_1k.jpg",
+     "size": 793264,
+     "md5": "a1e95f7d4cb702b8c6ddfedaafbadcc5",
+     "sha256": "d28556973d1cbf96c5327341be7a71da66ac63ed97b31f22162376a9f95b0041"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/searsia_lucida/searsia_lucida_diff_1k.jpg",
+     "path": "searsia_lucida/textures/searsia_lucida_diff_1k.jpg",
+     "size": 498655,
+     "md5": "d41a7089a41122ddc4edc96288105ecd",
+     "sha256": "5d99ed106c6629d91cf5d29f067c1fd10ff4894df40634abb6c4694c59d3c764"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/searsia_lucida/searsia_lucida_arm_1k.jpg",
+     "path": "searsia_lucida/textures/searsia_lucida_arm_1k.jpg",
+     "size": 580075,
+     "md5": "979fb34427cc5b5580ce89feaff65ef9",
+     "sha256": "f7bf2359e932d3633ac99a5f9e6a507eda439b64937eb6774585da3d0fb6d3d7"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/searsia_lucida/searsia_lucida_alpha_1k.png",
+     "path": "searsia_lucida/textures/searsia_lucida_alpha_1k.png",
+     "size": 54408,
+     "md5": "dd64ebe2b0c5cabf6b8eb2e11df1c4a0",
+     "sha256": "2306c054f7188aa34fdbfd1be725899159c82730c1a5c14fcc56ef7353107006"
+    }
+   ]
+  },
+  {
+   "id": "wild_rooibos_bush",
+   "type": "model",
+   "title": "Wild Rooibos Bush",
+   "rock": false,
+   "source": "https://polyhaven.com/a/wild_rooibos_bush",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "dwarfShrub"
+   ],
+   "variants": "nodes",
+   "entry": "wild_rooibos_bush/wild_rooibos_bush_1k.gltf",
+   "alphaMaps": [
+    "wild_rooibos_bush/textures/wild_rooibos_bush_alpha_1k.png"
+   ],
+   "dimensions": [
+    2.29,
+    0.85,
+    0.54
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wild_rooibos_bush/wild_rooibos_bush_1k.gltf",
+     "path": "wild_rooibos_bush/wild_rooibos_bush_1k.gltf",
+     "size": 23122,
+     "md5": "589911681acc2ebac68ff12ded20460d",
+     "sha256": "7f3fb17e4606e33d0bc4239c4901c9610b4bd17fe26b6780ba11ab4493f25d29"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wild_rooibos_bush/wild_rooibos_bush_nor_gl_1k.jpg",
+     "path": "wild_rooibos_bush/textures/wild_rooibos_bush_nor_gl_1k.jpg",
+     "size": 463170,
+     "md5": "78a6bd59ce4a2e21fb01cadf382a1338",
+     "sha256": "ffd557b4cb732d24988d41741398df150567f3ac9d1433f11b88d60158c953d4"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wild_rooibos_bush/wild_rooibos_bush_diff_1k.jpg",
+     "path": "wild_rooibos_bush/textures/wild_rooibos_bush_diff_1k.jpg",
+     "size": 374003,
+     "md5": "47ee13b7a87d2aff07c0ec708a33f6ab",
+     "sha256": "d963cdaf769bc39bb57295d518b37cd9456168cf5e3b82fd59f58c98d3faf596"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wild_rooibos_bush/wild_rooibos_bush_arm_1k.jpg",
+     "path": "wild_rooibos_bush/textures/wild_rooibos_bush_arm_1k.jpg",
+     "size": 367273,
+     "md5": "bd65f1b013b7df7d75ef87d9a66b669c",
+     "sha256": "e0e512f263b8f1fe1c485e61912ba1ce5d42b397cf9a4e2b1786677e732bb84b"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wild_rooibos_bush/wild_rooibos_bush.bin",
+     "path": "wild_rooibos_bush/wild_rooibos_bush.bin",
+     "size": 1236928,
+     "md5": "0d6c39ac444bac0381ecdff32a191a9c",
+     "sha256": "7a3471b4d110fe9927f4a200191eae86fa3c0a08f8e8e797d22e94a1703322e1"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/wild_rooibos_bush/wild_rooibos_bush_alpha_1k.png",
+     "path": "wild_rooibos_bush/textures/wild_rooibos_bush_alpha_1k.png",
+     "size": 90888,
+     "md5": "f58e9c4d8874751b2a02dcc65c11c655",
+     "sha256": "6a9fcd7a62aab1366b0ae50273c4a638591e932049a647ccadce6687ce657b72"
+    }
+   ]
+  },
+  {
+   "id": "fern_02",
+   "type": "model",
+   "title": "Fern 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/fern_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "fern"
+   ],
+   "variants": "nodes",
+   "entry": "fern_02/fern_02_1k.gltf",
+   "alphaMaps": [
+    "fern_02/textures/fern_02_alpha_1k.png"
+   ],
+   "dimensions": [
+    1.97,
+    1.72,
+    0.43
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/fern_02/fern_02_1k.gltf",
+     "path": "fern_02/fern_02_1k.gltf",
+     "size": 6899,
+     "md5": "cf276874d37bfb73c299504a6b355b77",
+     "sha256": "33974295ee19670af4877705fc7d91f33f42d6302f0d44a625e072271223031f"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_arm_1k.jpg",
+     "path": "fern_02/textures/fern_02_arm_1k.jpg",
+     "size": 280359,
+     "md5": "1bbb2b22951f450720d28e17d93a2987",
+     "sha256": "ebfb5d76ce9cbdaec20bcd22dce9b755f0b1b8650ef29ca13555e3e6961025d7"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_diff_1k.jpg",
+     "path": "fern_02/textures/fern_02_diff_1k.jpg",
+     "size": 315705,
+     "md5": "82c18a6cfd5ae91c37c0e078f591181c",
+     "sha256": "a828a6e7b4c01c826911e2eac4b3afc7457dab7b3b392a31c681ed88b7d50029"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_nor_gl_1k.jpg",
+     "path": "fern_02/textures/fern_02_nor_gl_1k.jpg",
+     "size": 367222,
+     "md5": "43aed63dff79554f6064627515afd9d7",
+     "sha256": "45bce132c6e96a0864bc89ab5da51361ab3f4afa83a6669ae499ab5ca811f621"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fern_02/fern_02.bin",
+     "path": "fern_02/fern_02.bin",
+     "size": 176176,
+     "md5": "c061e9255f7d36ae9ce0e92ef3e100b2",
+     "sha256": "fe1abb762bcbbc7ad9e86925c8080437a62add257d9280e9142fdc85c226e64c"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/fern_02/fern_02_alpha_1k.png",
+     "path": "fern_02/textures/fern_02_alpha_1k.png",
+     "size": 114589,
+     "md5": "1421e5e36946c23a7ddcc907de89025c",
+     "sha256": "ea3c64284c7ebdeedf484d2d816eae92825ec526140c3bb83859ddc7a64001f9"
+    }
+   ]
+  },
+  {
+   "id": "grass_medium_02",
+   "type": "model",
+   "title": "Grass Medium 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/grass_medium_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers"
+   ],
+   "species": [
+    "tallGrassTuft"
+   ],
+   "variants": "nodes",
+   "entry": "grass_medium_02/grass_medium_02_1k.gltf",
+   "alphaMaps": [
+    "grass_medium_02/textures/grass_medium_02_alpha_1k.png"
+   ],
+   "dimensions": [
+    3.58,
+    1.41,
+    1.45
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/grass_medium_02/grass_medium_02_1k.gltf",
+     "path": "grass_medium_02/grass_medium_02_1k.gltf",
+     "size": 8864,
+     "md5": "dd8f166a6399238553bc3b2931677b68",
+     "sha256": "7037f8d2dfc6aeec0bf72f4eeb96cfa3f6b3a5e6c6f0bc5de537c055b2fd5d04"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_02/grass_medium_02_nor_gl_1k.jpg",
+     "path": "grass_medium_02/textures/grass_medium_02_nor_gl_1k.jpg",
+     "size": 118146,
+     "md5": "90b4c27b0c0ff058bd37b88bb70784c1",
+     "sha256": "0b464550366ed72a6cad9c357e19ac4c83fc9adc87272771479138129853b300"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_02/grass_medium_02_diff_1k.jpg",
+     "path": "grass_medium_02/textures/grass_medium_02_diff_1k.jpg",
+     "size": 161235,
+     "md5": "4bb5230e09358d60dd767331685b2d36",
+     "sha256": "91ae99005b449011aceb207a68a937258fd9bfd66ff367d344c50398b1df389c"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_02/grass_medium_02_arm_1k.jpg",
+     "path": "grass_medium_02/textures/grass_medium_02_arm_1k.jpg",
+     "size": 241181,
+     "md5": "2b7a7e6f8b71fd2da62cf172d4784bbb",
+     "sha256": "f0d57bfd95bff7710526b49d47cf2326ee3796e425639d53b983d1472480b57d"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/grass_medium_02/grass_medium_02.bin",
+     "path": "grass_medium_02/grass_medium_02.bin",
+     "size": 272048,
+     "md5": "145041ae03fe02783a0adbd1cdcb4988",
+     "sha256": "aa8493bc1544a89e08bf440c7ba361042bfe6ea48b1fefc7e4af2dfff42fdf4a"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/grass_medium_02/grass_medium_02_alpha_1k.png",
+     "path": "grass_medium_02/textures/grass_medium_02_alpha_1k.png",
+     "size": 110617,
+     "md5": "b231cd6a1b5eb7ae21e7c2e626f8318c",
+     "sha256": "15976877b3dbd22cd496a9549f1eb7d86710846a3631fb87eedbf046519e339f"
+    }
+   ]
+  },
+  {
+   "id": "dandelion_01",
+   "type": "model",
+   "title": "Dandelion 01",
+   "rock": false,
+   "source": "https://polyhaven.com/a/dandelion_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "flowers"
+   ],
+   "variants": "nodes",
+   "entry": "dandelion_01/dandelion_01_1k.gltf",
+   "alphaMaps": [
+    "dandelion_01/textures/dandelion_01_alpha_1k.png"
+   ],
+   "dimensions": [
+    4.21,
+    0.26,
+    0.17
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dandelion_01/dandelion_01_1k.gltf",
+     "path": "dandelion_01/dandelion_01_1k.gltf",
+     "size": 8915,
+     "md5": "9e470fe32469a68b70f6a7ecc01e2af4",
+     "sha256": "68f804fe29f641f37b03c470cf9065d34aacd1b4f580ed6f35385626c2bb42b7"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dandelion_01/dandelion_01.bin",
+     "path": "dandelion_01/dandelion_01.bin",
+     "size": 1676648,
+     "md5": "a44fda5ce48c4f194791dc0d2e2b1312",
+     "sha256": "ccff5a564f56a69374c09c25ae86c3684c46329309b4eef4569255b1ad54bdd0"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_nor_gl_1k.jpg",
+     "path": "dandelion_01/textures/dandelion_01_nor_gl_1k.jpg",
+     "size": 495857,
+     "md5": "4957d07cc135503ed860a7cf7ce330f1",
+     "sha256": "fd69513a4803145f634b5ace49fed8709e454b3026d060687071757a72c33250"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_diff_1k.jpg",
+     "path": "dandelion_01/textures/dandelion_01_diff_1k.jpg",
+     "size": 470035,
+     "md5": "3516eea45aea05ed60188266abf68323",
+     "sha256": "17e49d535dfce890e539038a80eaa77d90dab5f1781350266dd8f736ee7370d6"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_arm_1k.jpg",
+     "path": "dandelion_01/textures/dandelion_01_arm_1k.jpg",
+     "size": 448489,
+     "md5": "60cf149fef7e3a787561312ccd863db1",
+     "sha256": "dad70c20756581fd795548f52a23580d94a2af538664dbbfe64e66a76e4eebb6"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/dandelion_01/dandelion_01_alpha_1k.png",
+     "path": "dandelion_01/textures/dandelion_01_alpha_1k.png",
+     "size": 130962,
+     "md5": "0602f861e5f2639060a6093a9c2cf446",
+     "sha256": "8fa462009b79d58741ba058418cd0ac7e9ec61b049b601f1351179204256c8eb"
+    }
+   ]
+  },
+  {
+   "id": "cheiridopsis_succulent",
+   "type": "model",
+   "title": "Cheiridopsis Succulent",
+   "rock": false,
+   "source": "https://polyhaven.com/a/cheiridopsis_succulent",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "succulent"
+   ],
+   "variants": "nodes",
+   "entry": "cheiridopsis_succulent/cheiridopsis_succulent_1k.gltf",
+   "alphaMaps": [
+    "cheiridopsis_succulent/textures/cheiridopsis_succulent_alpha_1k.png"
+   ],
+   "dimensions": [
+    2.16,
+    0.96,
+    0.27
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/cheiridopsis_succulent/cheiridopsis_succulent_1k.gltf",
+     "path": "cheiridopsis_succulent/cheiridopsis_succulent_1k.gltf",
+     "size": 21966,
+     "md5": "57d2405eaab419e2f786153776cd6d8a",
+     "sha256": "4db4005db3e8fea6fc7b99cddbd0904fd3f5f5ddceccbabe05b7fa04ede9bcd8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/cheiridopsis_succulent/cheiridopsis_succulent_nor_gl_1k.jpg",
+     "path": "cheiridopsis_succulent/textures/cheiridopsis_succulent_nor_gl_1k.jpg",
+     "size": 724619,
+     "md5": "a731447a99c54f4c844ec77c57e2594b",
+     "sha256": "aa2167206898b59410af2d7823c77a8b1f5409a659121ff4c7c82978a7b9f2b4"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/cheiridopsis_succulent/cheiridopsis_succulent_diff_1k.jpg",
+     "path": "cheiridopsis_succulent/textures/cheiridopsis_succulent_diff_1k.jpg",
+     "size": 526293,
+     "md5": "d752f6ee06c3c5f1b8eabed21498e086",
+     "sha256": "b58531b626a09af4e74e5c9763f5133cf92bed1ade2801936ebc901b54b4f245"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/cheiridopsis_succulent/cheiridopsis_succulent_arm_1k.jpg",
+     "path": "cheiridopsis_succulent/textures/cheiridopsis_succulent_arm_1k.jpg",
+     "size": 484264,
+     "md5": "95bb867b029422654d248554f3d6f5a1",
+     "sha256": "f008b584bec837d7b6472cf682c31e2a3620d180070d61c79f4adb5dbb9a2269"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/cheiridopsis_succulent/cheiridopsis_succulent.bin",
+     "path": "cheiridopsis_succulent/cheiridopsis_succulent.bin",
+     "size": 2504328,
+     "md5": "2cebafe46a5d6a949c11e75471d56328",
+     "sha256": "9f6dcd10acd9799d0cfe17edbaf3350f10028f2ecde152aafde86bd95513d347"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/cheiridopsis_succulent/cheiridopsis_succulent_alpha_1k.png",
+     "path": "cheiridopsis_succulent/textures/cheiridopsis_succulent_alpha_1k.png",
+     "size": 19603,
+     "md5": "f927592ec82ee3863896b56414293ea9",
+     "sha256": "a116a204847a3e1c461b90ceec5000e03700a0293768bd3c1e2c8e3ea620753e"
+    }
+   ]
+  },
+  {
+   "id": "boulder_01",
+   "type": "model",
+   "title": "Boulder 01",
+   "rock": true,
+   "source": "https://polyhaven.com/a/boulder_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers"
+   ],
+   "species": [
+    "boulder",
+    "cliffChunk"
+   ],
+   "variants": "single",
+   "entry": "boulder_01/boulder_01_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    1.27,
+    1.83,
+    1
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01_1k.gltf",
+     "path": "boulder_01/boulder_01_1k.gltf",
+     "size": 2773,
+     "md5": "26e2eef4a1f68c9557c65cd375b21d6c",
+     "sha256": "51487934db898b4c24072780a451e34eca5c02e3ada24a62bbc600bbc4019e92"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_arm_1k.jpg",
+     "path": "boulder_01/textures/boulder_01_arm_1k.jpg",
+     "size": 659386,
+     "md5": "d632159982cc3121ed3d69b89a122146",
+     "sha256": "c57187c5746b6be913fa53846cb44ff78743e7ca5000f131c9627b99563c2b87"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_diff_1k.jpg",
+     "path": "boulder_01/textures/boulder_01_diff_1k.jpg",
+     "size": 987467,
+     "md5": "25f8a843f13369d56d37f49db05ea8c3",
+     "sha256": "c38f0e918f6dc16b8d386ba3cdd89805c78320c119a1ceec85856f82b09a65b8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+     "path": "boulder_01/boulder_01.bin",
+     "size": 2938808,
+     "md5": "27a19fa031d8b4c3a09261f19c444dc5",
+     "sha256": "7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_nor_gl_1k.jpg",
+     "path": "boulder_01/textures/boulder_01_nor_gl_1k.jpg",
+     "size": 1183552,
+     "md5": "0c4da644d901144b53e4fe2446f3c389",
+     "sha256": "0810cf6e89d89bb6eb065b4d2e2855288f5dcbd2c15c6e40ab90d462021b50aa"
+    }
+   ]
+  },
+  {
+   "id": "namaqualand_boulder_04",
+   "type": "model",
+   "title": "Namaqualand Boulder 04",
+   "rock": true,
+   "source": "https://polyhaven.com/a/namaqualand_boulder_04",
+   "license": "CC0-1.0",
+   "authors": [
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "boulder"
+   ],
+   "variants": "single",
+   "entry": "namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    2.52,
+    2.5,
+    1.9
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf",
+     "path": "namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf",
+     "size": 2818,
+     "md5": "7cc9f708bf5792f89af6638465cac3b4",
+     "sha256": "04c858a3bdb22873efa988633e0c0d9d1468055f34c94d47742f75165a192078"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_arm_1k.jpg",
+     "path": "namaqualand_boulder_04/textures/namaqualand_boulder_04_arm_1k.jpg",
+     "size": 600523,
+     "md5": "03f2b36ad3349fc1768dbd20c9b07403",
+     "sha256": "b9556284b65a603cee0c282f1a13f1642ac64cd586db14caa065e7322ec95db2"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_diff_1k.jpg",
+     "path": "namaqualand_boulder_04/textures/namaqualand_boulder_04_diff_1k.jpg",
+     "size": 886013,
+     "md5": "0ef2c0fe9eaca715efad500c13ce140c",
+     "sha256": "1673e031ebcf5015206fec10bec676e55b049705b01fcef6bb2b2fb79e8de54c"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_nor_gl_1k.jpg",
+     "path": "namaqualand_boulder_04/textures/namaqualand_boulder_04_nor_gl_1k.jpg",
+     "size": 906782,
+     "md5": "e642a0c62a3b33adf953a7832f9231ae",
+     "sha256": "a7042070d6e369c80d818b7e787b977bf84c1f78b0c83e3ecf690ac2fa17d291"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_04/namaqualand_boulder_04.bin",
+     "path": "namaqualand_boulder_04/namaqualand_boulder_04.bin",
+     "size": 1319676,
+     "md5": "bd83376dfe39432568dc13a8fb738953",
+     "sha256": "99ba28ddc8da9ba24e1a419e69ed05f14c4b483bf06268a8a77495545985318a"
+    }
+   ]
+  },
+  {
+   "id": "rock_moss_set_01",
+   "type": "model",
+   "title": "Rock Moss Set 01",
+   "rock": true,
+   "source": "https://polyhaven.com/a/rock_moss_set_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Kless Gyzen"
+   ],
+   "species": [
+    "rock",
+    "scree"
+   ],
+   "variants": "nodes",
+   "entry": "rock_moss_set_01/rock_moss_set_01_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    8,
+    6.95,
+    1.77
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+     "path": "rock_moss_set_01/rock_moss_set_01_1k.gltf",
+     "size": 9987,
+     "md5": "75113cc1c21806cca5d8badad4737af7",
+     "sha256": "c36675aca9c6b2be7785c2534cf413b03ec82a5a2a5407a2b1c0cdb0346c9727"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_nor_gl_1k.jpg",
+     "path": "rock_moss_set_01/textures/rock_moss_set_01_nor_gl_1k.jpg",
+     "size": 209975,
+     "md5": "eb7ebd31ad08e78d0497900652ff1568",
+     "sha256": "eb4aad3f207f1dc5b624d74ae240372171626a66912bd71adf7bd3e518181d6e"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_moss_set_01/rock_moss_set_01.bin",
+     "path": "rock_moss_set_01/rock_moss_set_01.bin",
+     "size": 1466380,
+     "md5": "207a51c9f56d34732e9814bbf9cc07b1",
+     "sha256": "de8360e6175879aaf02c171911069cf5f1852547f9ca7f10e440085dbcc3315e"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_rough_1k.jpg",
+     "path": "rock_moss_set_01/textures/rock_moss_set_01_rough_1k.jpg",
+     "size": 82624,
+     "md5": "ed9d8a2c863262f76f881346e8047c6a",
+     "sha256": "4d6ec46623abd8e2cdb855f59c7ce31873ad61b36b60e4de579e9e776a497c6b"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_diff_1k.jpg",
+     "path": "rock_moss_set_01/textures/rock_moss_set_01_diff_1k.jpg",
+     "size": 168099,
+     "md5": "b8742301e6b4bc5683d2de712e83f772",
+     "sha256": "40cea65d8aa4ee73a93b04af19963834d061eee9779c3fc2c1cba76eef812ccc"
+    }
+   ]
+  },
+  {
+   "id": "rock_07",
+   "type": "model",
+   "title": "Rock 07",
+   "rock": true,
+   "source": "https://polyhaven.com/a/rock_07",
+   "license": "CC0-1.0",
+   "authors": [
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "pebble"
+   ],
+   "variants": "single",
+   "entry": "rock_07/rock_07_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    0.17,
+    0.32,
+    0.14
+   ],
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_07/rock_07_1k.gltf",
+     "path": "rock_07/rock_07_1k.gltf",
+     "size": 2979,
+     "md5": "2bdb563c126a9d284e60e94951759e2f",
+     "sha256": "efcc2dcaa133ff8ad5c865dc2135772e8f5dbc83fa38db2ee2cf25382436b6e6"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_07/rock_07.bin",
+     "path": "rock_07/rock_07.bin",
+     "size": 468936,
+     "md5": "817b2cfd1626cb06f18a825f87f58ec3",
+     "sha256": "e4a532a6d6cf4a08c288f501b790f32cba0528136a29959ce774c3cd39369e7e"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_07/rock_07_arm_1k.jpg",
+     "path": "rock_07/textures/rock_07_arm_1k.jpg",
+     "size": 309735,
+     "md5": "530bfd2a510fe6f778bb1198a2395574",
+     "sha256": "1ed76e9a8542c76bdc6b7b018720ae1f52cd75d9f5ae719f613de3f5032cf4da"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_07/rock_07_diff_1k.jpg",
+     "path": "rock_07/textures/rock_07_diff_1k.jpg",
+     "size": 635452,
+     "md5": "b68ac1824bb3bd3867641b830ad02099",
+     "sha256": "8ff1965aa1664cc4abcc0131c44ee2b97ab14d6e131d7a51429ff261eeb101c8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_07/rock_07_nor_gl_1k.jpg",
+     "path": "rock_07/textures/rock_07_nor_gl_1k.jpg",
+     "size": 766986,
+     "md5": "d3a2a0df0db0177c4df8ef644b003652",
+     "sha256": "57cb2210951aeb376164fce5f7c65f03e5599def04873b56cad0f173c275d78d"
+    }
+   ]
+  },
+  {
+   "id": "jolcham_oak_bark_01",
+   "type": "bark",
+   "title": "Jolcham Oak Bark 01",
+   "source": "https://polyhaven.com/a/jolcham_oak_bark_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "oak",
+    "apple",
+    "olive"
+   ],
+   "tile": [
+    1,
+    2
+   ],
+   "maps": {
+    "color": "jolcham_oak_bark_01/jolcham_oak_bark_01_diff_1k.jpg",
+    "normal": "jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_1k.jpg",
+    "arm": "jolcham_oak_bark_01/jolcham_oak_bark_01_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_1k.jpg",
+     "path": "jolcham_oak_bark_01/jolcham_oak_bark_01_diff_1k.jpg",
+     "size": 1936622,
+     "md5": "a74acddb27c17674d94498c1be7f0495",
+     "sha256": "08c26b3ea38718dfc3902d0889ac06e2ce0ae9cddb31d8988723eee1780a71c8"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_1k.jpg",
+     "path": "jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_1k.jpg",
+     "size": 2691523,
+     "md5": "3a61a7a22aeee8482e915eab7810b64d",
+     "sha256": "bdc5a310b183fdb3dee4c2c8871b15f57f2fbbaf68253a73303d8320976b1826"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_1k.jpg",
+     "path": "jolcham_oak_bark_01/jolcham_oak_bark_01_arm_1k.jpg",
+     "size": 1901069,
+     "md5": "0edea92614a13c42a37f7a9b9f798b82",
+     "sha256": "db24dfda99d304a8f3d7660f838d76106259a00ac386709732cd3c9196b7667f"
+    }
+   ]
+  },
+  {
+   "id": "bark_willow_02",
+   "type": "bark",
+   "title": "Bark Willow 02",
+   "source": "https://polyhaven.com/a/bark_willow_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "maple",
+    "acacia",
+    "mangrove",
+    "deadSnag",
+    "shrub",
+    "dwarfShrub",
+    "thornShrub",
+    "berryBush"
+   ],
+   "tile": [
+    2.15,
+    2.15
+   ],
+   "maps": {
+    "color": "bark_willow_02/bark_willow_02_diff_1k.jpg",
+    "normal": "bark_willow_02/bark_willow_02_nor_gl_1k.jpg",
+    "arm": "bark_willow_02/bark_willow_02_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow_02/bark_willow_02_diff_1k.jpg",
+     "path": "bark_willow_02/bark_willow_02_diff_1k.jpg",
+     "size": 998966,
+     "md5": "384e25dd87b6b606458c9aa5f84735aa",
+     "sha256": "95e1380566834aab220bd8ea9a5287f3bfff46910c18017fcb46ebbbe832024f"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow_02/bark_willow_02_nor_gl_1k.jpg",
+     "path": "bark_willow_02/bark_willow_02_nor_gl_1k.jpg",
+     "size": 1358916,
+     "md5": "eb381e522a4053d6ca4ce7e31c77dcd3",
+     "sha256": "7d6f905fe7225d96741d191f6ee61c0681603570d28f14e7678df6a3019bc48d"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow_02/bark_willow_02_arm_1k.jpg",
+     "path": "bark_willow_02/bark_willow_02_arm_1k.jpg",
+     "size": 951173,
+     "md5": "1cc9a7e2be789f369bb0d51232923976",
+     "sha256": "bd11e0f6c91a8e39062f187a17441e1fc7c44997f1d34f3f5323d9e00ea152b5"
+    }
+   ]
+  },
+  {
+   "id": "chinese_hackberry_bark",
+   "type": "bark",
+   "title": "Chinese Hackberry Bark",
+   "source": "https://polyhaven.com/a/chinese_hackberry_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "beech",
+    "birch",
+    "baobab",
+    "jungleEmergent"
+   ],
+   "tile": [
+    1.8,
+    1.8
+   ],
+   "maps": {
+    "color": "chinese_hackberry_bark/chinese_hackberry_bark_diff_1k.jpg",
+    "normal": "chinese_hackberry_bark/chinese_hackberry_bark_nor_gl_1k.jpg",
+    "arm": "chinese_hackberry_bark/chinese_hackberry_bark_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/chinese_hackberry_bark/chinese_hackberry_bark_diff_1k.jpg",
+     "path": "chinese_hackberry_bark/chinese_hackberry_bark_diff_1k.jpg",
+     "size": 1466689,
+     "md5": "3751924f9dae48280cfa3dc93daac5d5",
+     "sha256": "dea0ece8e153a614331f51291eefdee71b8f5948395eecb40ffcd9aa67016913"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/chinese_hackberry_bark/chinese_hackberry_bark_nor_gl_1k.jpg",
+     "path": "chinese_hackberry_bark/chinese_hackberry_bark_nor_gl_1k.jpg",
+     "size": 1699657,
+     "md5": "3e861642534bf6bac2f37fb7ae98c6ce",
+     "sha256": "ae3f3ebb2fc36dd7eb714e78657c3f1bf1e7a67a921675cda2fd808c00fc0706"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/chinese_hackberry_bark/chinese_hackberry_bark_arm_1k.jpg",
+     "path": "chinese_hackberry_bark/chinese_hackberry_bark_arm_1k.jpg",
+     "size": 1189738,
+     "md5": "881d6c69af4771c4ccf93b92d2257fe4",
+     "sha256": "267cb0cf42b8487447ded9c9751323c9d99d0a034a93df5af47839fa87ca950a"
+    }
+   ]
+  },
+  {
+   "id": "pine_bark",
+   "type": "bark",
+   "title": "Pine Bark",
+   "source": "https://polyhaven.com/a/pine_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "species": [
+    "pine",
+    "spruce",
+    "fir"
+   ],
+   "tile": [
+    2,
+    2
+   ],
+   "maps": {
+    "color": "pine_bark/pine_bark_diff_1k.jpg",
+    "normal": "pine_bark/pine_bark_nor_gl_1k.jpg",
+    "arm": "pine_bark/pine_bark_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/pine_bark/pine_bark_diff_1k.jpg",
+     "path": "pine_bark/pine_bark_diff_1k.jpg",
+     "size": 837641,
+     "md5": "7bb38cccfc647aeaf2f5b6488c815e75",
+     "sha256": "89ddfbff0388d30caff902ba600cdf75eb1e651ca71ece6594b5a9b27abb47ab"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/pine_bark/pine_bark_nor_gl_1k.jpg",
+     "path": "pine_bark/pine_bark_nor_gl_1k.jpg",
+     "size": 1178440,
+     "md5": "7b971070fc986e517b5d2795cec0f4e0",
+     "sha256": "666e5f175a010f12577687dd8029125bff99110e6a97958afb295b34266437db"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/pine_bark/pine_bark_arm_1k.jpg",
+     "path": "pine_bark/pine_bark_arm_1k.jpg",
+     "size": 810100,
+     "md5": "8f47278dc2643509cd1f9d9268214097",
+     "sha256": "1ba20ec25c9f43327d6aa0ea809917854cff553ad7f21fb548e853a5b5ec701a"
+    }
+   ]
+  },
+  {
+   "id": "metasequoia_bark",
+   "type": "bark",
+   "title": "Metasequoia Bark",
+   "source": "https://polyhaven.com/a/metasequoia_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "redwood",
+    "cypress"
+   ],
+   "tile": [
+    1.94,
+    1.94
+   ],
+   "maps": {
+    "color": "metasequoia_bark/metasequoia_bark_diff_1k.jpg",
+    "normal": "metasequoia_bark/metasequoia_bark_nor_gl_1k.jpg",
+    "arm": "metasequoia_bark/metasequoia_bark_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metasequoia_bark/metasequoia_bark_diff_1k.jpg",
+     "path": "metasequoia_bark/metasequoia_bark_diff_1k.jpg",
+     "size": 869551,
+     "md5": "1998b04f629be6dc663e9ef151fbb2bc",
+     "sha256": "38821f7d363a5df6ed29a36c6fa331be22290f01ebfd9ce1619edaf165739a77"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metasequoia_bark/metasequoia_bark_nor_gl_1k.jpg",
+     "path": "metasequoia_bark/metasequoia_bark_nor_gl_1k.jpg",
+     "size": 1077934,
+     "md5": "07c99aa7dfcd295f600319ff7ccf07db",
+     "sha256": "4f5d765c31965b37ec2aa3b803a3e0e29c6c8edb8df2e7040a2907df65cb062f"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metasequoia_bark/metasequoia_bark_arm_1k.jpg",
+     "path": "metasequoia_bark/metasequoia_bark_arm_1k.jpg",
+     "size": 771422,
+     "md5": "ac0eb12b91c6a435ced5432d1e49930d",
+     "sha256": "4fbc4aad045702408b2e3060875d7b666ccb8fc0a00b9a3994bec8c549a18404"
+    }
+   ]
+  },
+  {
+   "id": "palm_bark",
+   "type": "bark",
+   "title": "Palm Bark",
+   "source": "https://polyhaven.com/a/palm_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "palm"
+   ],
+   "tile": [
+    1.86,
+    1.86
+   ],
+   "maps": {
+    "color": "palm_bark/palm_bark_diff_1k.jpg",
+    "normal": "palm_bark/palm_bark_nor_gl_1k.jpg",
+    "arm": "palm_bark/palm_bark_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_bark/palm_bark_diff_1k.jpg",
+     "path": "palm_bark/palm_bark_diff_1k.jpg",
+     "size": 707281,
+     "md5": "89e6474313f1547e3c12c4b68410ee39",
+     "sha256": "80cbe5ee11af799db082cdb342601a70b81a5f54b98eb587e87dcb5bf5e1f395"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_bark/palm_bark_nor_gl_1k.jpg",
+     "path": "palm_bark/palm_bark_nor_gl_1k.jpg",
+     "size": 1307345,
+     "md5": "47c13a26ef585fbb0d93f5593f8f711f",
+     "sha256": "4b558654ea5f92e61fe5be5d3df2f79aedd7e5f0e230a08954c1794a6a20dc25"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_bark/palm_bark_arm_1k.jpg",
+     "path": "palm_bark/palm_bark_arm_1k.jpg",
+     "size": 741466,
+     "md5": "94ac0d9506483f206b67e20b3e4b590f",
+     "sha256": "cff5fae37959d26cfb64385d184650f900ff1250612f9dc395de2425b2761cfa"
+    }
+   ]
+  },
+  {
+   "id": "forest_leaves_02",
+   "type": "ground",
+   "title": "Forest Leaves 02",
+   "source": "https://polyhaven.com/a/forest_leaves_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "species": [],
+   "tile": [
+    3,
+    3
+   ],
+   "maps": {
+    "color": "forest_leaves_02/forest_leaves_02_diffuse_1k.jpg",
+    "normal": "forest_leaves_02/forest_leaves_02_nor_gl_1k.jpg",
+    "arm": "forest_leaves_02/forest_leaves_02_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_leaves_02/forest_leaves_02_diffuse_1k.jpg",
+     "path": "forest_leaves_02/forest_leaves_02_diffuse_1k.jpg",
+     "size": 437891,
+     "md5": "13e9bfac07cb72ca143e153cc2f589a8",
+     "sha256": "2bac85cdc76927fa7dc311037bbbc4dfa2633ea56eb0a24c9cabe163a68c9aa5"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_leaves_02/forest_leaves_02_nor_gl_1k.jpg",
+     "path": "forest_leaves_02/forest_leaves_02_nor_gl_1k.jpg",
+     "size": 577163,
+     "md5": "72002432222467c74cd9980cbddb25a4",
+     "sha256": "cf6a40ab24f44d3e891a92a1c252416ed1192af54ac92a5704bdfbda0805e290"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_leaves_02/forest_leaves_02_arm_1k.jpg",
+     "path": "forest_leaves_02/forest_leaves_02_arm_1k.jpg",
+     "size": 313980,
+     "md5": "876b7f364943f65c104c7b3127097596",
+     "sha256": "af70dcaa5f6c8770504132b5a3c25e9b9b5b431148c8796226492c8fff2bd6eb"
+    }
+   ]
+  },
+  {
+   "id": "forrest_ground_01",
+   "type": "ground",
+   "title": "Forest Ground 01",
+   "source": "https://polyhaven.com/a/forrest_ground_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "species": [],
+   "tile": [
+    2,
+    2
+   ],
+   "maps": {
+    "color": "forrest_ground_01/forrest_ground_01_diff_1k.jpg",
+    "normal": "forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg",
+    "arm": "forrest_ground_01/forrest_ground_01_arm_1k.jpg"
+   },
+   "files": [
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_diff_1k.jpg",
+     "path": "forrest_ground_01/forrest_ground_01_diff_1k.jpg",
+     "size": 833711,
+     "md5": "236e7d928f5e357a194fd92de189cbe4",
+     "sha256": "3dd6875cb3908e022a3c45ebbffa5e84c670ff2691fbbb6dc9ea4bff88523800"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg",
+     "path": "forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg",
+     "size": 1428763,
+     "md5": "ba4265df25aea293913d004b69ef9ab0",
+     "sha256": "32528a7cdee962cc0b248ee4023a74d0df175737ea90e1eb425122351e0bdab4"
+    },
+    {
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_arm_1k.jpg",
+     "path": "forrest_ground_01/forrest_ground_01_arm_1k.jpg",
+     "size": 296969,
+     "md5": "0bca8bef07d3c48faea4aae3fac9a757",
+     "sha256": "22eb09a2ed951377f339c08be9f1665f0db7391ed9ba0b0e91e55aea2dbef315"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet016",
+   "type": "leaves",
+   "title": "Leaf Set 016 (oak)",
+   "source": "https://ambientcg.com/view?id=LeafSet016",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "oak"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet016/color.jpg",
+    "opacity": "LeafSet016/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet016_1K-JPG.zip",
+     "path": "LeafSet016/LeafSet016_1K-JPG.zip",
+     "extract": {
+      "LeafSet016_1K-JPG_Color.jpg": "LeafSet016/color.jpg",
+      "LeafSet016_1K-JPG_Opacity.jpg": "LeafSet016/opacity.jpg"
+     },
+     "sha256": "c624926d28eeabc266ee942a1a0dc4aa559b10d575f3a37ecaa71915cde02220"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet005",
+   "type": "leaves",
+   "title": "Leaf Set 005 (beech)",
+   "source": "https://ambientcg.com/view?id=LeafSet005",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "beech"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet005/color.jpg",
+    "opacity": "LeafSet005/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet005_1K-JPG.zip",
+     "path": "LeafSet005/LeafSet005_1K-JPG.zip",
+     "extract": {
+      "LeafSet005_1K-JPG_Color.jpg": "LeafSet005/color.jpg",
+      "LeafSet005_1K-JPG_Opacity.jpg": "LeafSet005/opacity.jpg"
+     },
+     "sha256": "ac5ceba2e80cae4b829e02dbc61eac0fdf1b538e804b3f73bf9493375ee72d86"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet010",
+   "type": "leaves",
+   "title": "Leaf Set 010 (maple)",
+   "source": "https://ambientcg.com/view?id=LeafSet010",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "maple"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet010/color.jpg",
+    "opacity": "LeafSet010/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet010_1K-JPG.zip",
+     "path": "LeafSet010/LeafSet010_1K-JPG.zip",
+     "extract": {
+      "LeafSet010_1K-JPG_Color.jpg": "LeafSet010/color.jpg",
+      "LeafSet010_1K-JPG_Opacity.jpg": "LeafSet010/opacity.jpg"
+     },
+     "sha256": "b72dbfeac10c42cbe17d34b4d744c19acdc818c064159ee9258e7e77648f3792"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet024",
+   "type": "leaves",
+   "title": "Leaf Set 024",
+   "source": "https://ambientcg.com/view?id=LeafSet024",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "birch",
+    "apple",
+    "shrub",
+    "berryBush",
+    "dwarfShrub",
+    "thornShrub",
+    "mangrove",
+    "acacia",
+    "baobab"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet024/color.jpg",
+    "opacity": "LeafSet024/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet024_1K-JPG.zip",
+     "path": "LeafSet024/LeafSet024_1K-JPG.zip",
+     "extract": {
+      "LeafSet024_1K-JPG_Color.jpg": "LeafSet024/color.jpg",
+      "LeafSet024_1K-JPG_Opacity.jpg": "LeafSet024/opacity.jpg"
+     },
+     "sha256": "5038f0dfb53647b2eed16adb9043f530f82a4fde3321f91ae59df74ba2f7ace1"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet022",
+   "type": "leaves",
+   "title": "Leaf Set 022",
+   "source": "https://ambientcg.com/view?id=LeafSet022",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "olive"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet022/color.jpg",
+    "opacity": "LeafSet022/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet022_1K-JPG.zip",
+     "path": "LeafSet022/LeafSet022_1K-JPG.zip",
+     "extract": {
+      "LeafSet022_1K-JPG_Color.jpg": "LeafSet022/color.jpg",
+      "LeafSet022_1K-JPG_Opacity.jpg": "LeafSet022/opacity.jpg"
+     },
+     "sha256": "b2bb1712d006c88272d7b588fa5b2c9a0a4ddf2f00bd1e1ff9703fd23c2e0eea"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet018",
+   "type": "leaves",
+   "title": "Leaf Set 018",
+   "source": "https://ambientcg.com/view?id=LeafSet018",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "jungleEmergent"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet018/color.jpg",
+    "opacity": "LeafSet018/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet018_1K-JPG.zip",
+     "path": "LeafSet018/LeafSet018_1K-JPG.zip",
+     "extract": {
+      "LeafSet018_1K-JPG_Color.jpg": "LeafSet018/color.jpg",
+      "LeafSet018_1K-JPG_Opacity.jpg": "LeafSet018/opacity.jpg"
+     },
+     "sha256": "47874a3a882a337a89fb5ebad890bf8f1449f39ccad5cd8056a48358d6568295"
+    }
+   ]
+  },
+  {
+   "id": "LeafSet019",
+   "type": "leaves",
+   "title": "Leaf Set 019 (conifer sprays)",
+   "source": "https://ambientcg.com/view?id=LeafSet019",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "spruce",
+    "fir",
+    "cypress",
+    "redwood"
+   ],
+   "orientation": "left",
+   "kind": "spray",
+   "maps": {
+    "color": "LeafSet019/color.jpg",
+    "opacity": "LeafSet019/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=LeafSet019_1K-JPG.zip",
+     "path": "LeafSet019/LeafSet019_1K-JPG.zip",
+     "extract": {
+      "LeafSet019_1K-JPG_Color.jpg": "LeafSet019/color.jpg",
+      "LeafSet019_1K-JPG_Opacity.jpg": "LeafSet019/opacity.jpg"
+     },
+     "sha256": "3654e5cd156ee99192ca0d006f08bdb6d1470f6a9686be2dfad625b37a135d55"
+    }
+   ]
+  },
+  {
+   "id": "PineNeedles001",
+   "type": "leaves",
+   "title": "Pine Needles 001",
+   "source": "https://ambientcg.com/view?id=PineNeedles001",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "pine"
+   ],
+   "orientation": "right",
+   "kind": "fascicle",
+   "maps": {
+    "color": "PineNeedles001/color.jpg",
+    "opacity": "PineNeedles001/opacity.jpg"
+   },
+   "files": [
+    {
+     "url": "https://ambientcg.com/get?file=PineNeedles001_1K-JPG.zip",
+     "path": "PineNeedles001/PineNeedles001_1K-JPG.zip",
+     "extract": {
+      "PineNeedles001_1K-JPG_Color.jpg": "PineNeedles001/color.jpg",
+      "PineNeedles001_1K-JPG_Opacity.jpg": "PineNeedles001/opacity.jpg"
+     },
+     "sha256": "dd79d67b8d5f9491c60d6611c44f160af76a3e6823bf1b3b2e3df6d483ee829b"
+    }
+   ]
+  }
+ ]
+}
