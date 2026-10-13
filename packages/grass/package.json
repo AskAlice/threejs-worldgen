@@ -10,10 +10,12 @@
   ],
   "exports": {
     ".": {
+      "worldgen-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./react": {
+      "worldgen-source": "./src/react.tsx",
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
     }

@@ -1,0 +1,622 @@
+{
+ "version": 1,
+ "generated": "2026-10-11T22:17:33.203Z",
+ "bytes": 123732379,
+ "assets": [
+  {
+   "id": "island_tree_02",
+   "type": "model",
+   "title": "Island Tree 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/island_tree_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "olive"
+   ],
+   "variants": "single",
+   "entry": "island_tree_02/island_tree_02_1k.gltf",
+   "alphaMaps": [
+    "island_tree_02/textures/island_tree_02_leaves_alpha_1k.png"
+   ],
+   "dimensions": [
+    8.49,
+    4.08,
+    3.41
+   ]
+  },
+  {
+   "id": "searsia_lucida",
+   "type": "model",
+   "title": "Searsia Lucida",
+   "rock": false,
+   "source": "https://polyhaven.com/a/searsia_lucida",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "thornShrub",
+    "shrub"
+   ],
+   "variants": "nodes",
+   "entry": "searsia_lucida/searsia_lucida_1k.gltf",
+   "alphaMaps": [
+    "searsia_lucida/textures/searsia_lucida_alpha_1k.png"
+   ],
+   "dimensions": [
+    4.78,
+    2.84,
+    2.34
+   ]
+  },
+  {
+   "id": "wild_rooibos_bush",
+   "type": "model",
+   "title": "Wild Rooibos Bush",
+   "rock": false,
+   "source": "https://polyhaven.com/a/wild_rooibos_bush",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "dwarfShrub"
+   ],
+   "variants": "nodes",
+   "entry": "wild_rooibos_bush/wild_rooibos_bush_1k.gltf",
+   "alphaMaps": [
+    "wild_rooibos_bush/textures/wild_rooibos_bush_alpha_1k.png"
+   ],
+   "dimensions": [
+    2.29,
+    0.85,
+    0.54
+   ]
+  },
+  {
+   "id": "fern_02",
+   "type": "model",
+   "title": "Fern 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/fern_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "fern"
+   ],
+   "variants": "nodes",
+   "entry": "fern_02/fern_02_1k.gltf",
+   "alphaMaps": [
+    "fern_02/textures/fern_02_alpha_1k.png"
+   ],
+   "dimensions": [
+    1.97,
+    1.72,
+    0.43
+   ]
+  },
+  {
+   "id": "grass_medium_02",
+   "type": "model",
+   "title": "Grass Medium 02",
+   "rock": false,
+   "source": "https://polyhaven.com/a/grass_medium_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers"
+   ],
+   "species": [
+    "tallGrassTuft"
+   ],
+   "variants": "nodes",
+   "entry": "grass_medium_02/grass_medium_02_1k.gltf",
+   "alphaMaps": [
+    "grass_medium_02/textures/grass_medium_02_alpha_1k.png"
+   ],
+   "dimensions": [
+    3.58,
+    1.41,
+    1.45
+   ]
+  },
+  {
+   "id": "dandelion_01",
+   "type": "model",
+   "title": "Dandelion 01",
+   "rock": false,
+   "source": "https://polyhaven.com/a/dandelion_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers",
+    "Rob Tuytel"
+   ],
+   "species": [
+    "flowers"
+   ],
+   "variants": "nodes",
+   "entry": "dandelion_01/dandelion_01_1k.gltf",
+   "alphaMaps": [
+    "dandelion_01/textures/dandelion_01_alpha_1k.png"
+   ],
+   "dimensions": [
+    4.21,
+    0.26,
+    0.17
+   ]
+  },
+  {
+   "id": "cheiridopsis_succulent",
+   "type": "model",
+   "title": "Cheiridopsis Succulent",
+   "rock": false,
+   "source": "https://polyhaven.com/a/cheiridopsis_succulent",
+   "license": "CC0-1.0",
+   "authors": [
+    "James Ray Cock",
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "succulent"
+   ],
+   "variants": "nodes",
+   "entry": "cheiridopsis_succulent/cheiridopsis_succulent_1k.gltf",
+   "alphaMaps": [
+    "cheiridopsis_succulent/textures/cheiridopsis_succulent_alpha_1k.png"
+   ],
+   "dimensions": [
+    2.16,
+    0.96,
+    0.27
+   ]
+  },
+  {
+   "id": "boulder_01",
+   "type": "model",
+   "title": "Boulder 01",
+   "rock": true,
+   "source": "https://polyhaven.com/a/boulder_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rico Cilliers"
+   ],
+   "species": [
+    "boulder",
+    "cliffChunk"
+   ],
+   "variants": "single",
+   "entry": "boulder_01/boulder_01_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    1.27,
+    1.83,
+    1
+   ]
+  },
+  {
+   "id": "namaqualand_boulder_04",
+   "type": "model",
+   "title": "Namaqualand Boulder 04",
+   "rock": true,
+   "source": "https://polyhaven.com/a/namaqualand_boulder_04",
+   "license": "CC0-1.0",
+   "authors": [
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "boulder"
+   ],
+   "variants": "single",
+   "entry": "namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    2.52,
+    2.5,
+    1.9
+   ]
+  },
+  {
+   "id": "rock_moss_set_01",
+   "type": "model",
+   "title": "Rock Moss Set 01",
+   "rock": true,
+   "source": "https://polyhaven.com/a/rock_moss_set_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Kless Gyzen"
+   ],
+   "species": [
+    "rock",
+    "scree"
+   ],
+   "variants": "nodes",
+   "entry": "rock_moss_set_01/rock_moss_set_01_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    8,
+    6.95,
+    1.77
+   ]
+  },
+  {
+   "id": "rock_07",
+   "type": "model",
+   "title": "Rock 07",
+   "rock": true,
+   "source": "https://polyhaven.com/a/rock_07",
+   "license": "CC0-1.0",
+   "authors": [
+    "Jenelle van Heerden"
+   ],
+   "species": [
+    "pebble"
+   ],
+   "variants": "single",
+   "entry": "rock_07/rock_07_1k.gltf",
+   "alphaMaps": [],
+   "dimensions": [
+    0.17,
+    0.32,
+    0.14
+   ]
+  },
+  {
+   "id": "jolcham_oak_bark_01",
+   "type": "bark",
+   "title": "Jolcham Oak Bark 01",
+   "source": "https://polyhaven.com/a/jolcham_oak_bark_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "oak",
+    "apple",
+    "olive"
+   ],
+   "tile": [
+    1,
+    2
+   ],
+   "maps": {
+    "color": "jolcham_oak_bark_01/jolcham_oak_bark_01_diff_1k.jpg",
+    "normal": "jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_1k.jpg",
+    "arm": "jolcham_oak_bark_01/jolcham_oak_bark_01_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "bark_willow_02",
+   "type": "bark",
+   "title": "Bark Willow 02",
+   "source": "https://polyhaven.com/a/bark_willow_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "maple",
+    "acacia",
+    "mangrove",
+    "deadSnag",
+    "shrub",
+    "dwarfShrub",
+    "thornShrub",
+    "berryBush"
+   ],
+   "tile": [
+    2.15,
+    2.15
+   ],
+   "maps": {
+    "color": "bark_willow_02/bark_willow_02_diff_1k.jpg",
+    "normal": "bark_willow_02/bark_willow_02_nor_gl_1k.jpg",
+    "arm": "bark_willow_02/bark_willow_02_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "chinese_hackberry_bark",
+   "type": "bark",
+   "title": "Chinese Hackberry Bark",
+   "source": "https://polyhaven.com/a/chinese_hackberry_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "beech",
+    "birch",
+    "baobab",
+    "jungleEmergent"
+   ],
+   "tile": [
+    1.8,
+    1.8
+   ],
+   "maps": {
+    "color": "chinese_hackberry_bark/chinese_hackberry_bark_diff_1k.jpg",
+    "normal": "chinese_hackberry_bark/chinese_hackberry_bark_nor_gl_1k.jpg",
+    "arm": "chinese_hackberry_bark/chinese_hackberry_bark_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "pine_bark",
+   "type": "bark",
+   "title": "Pine Bark",
+   "source": "https://polyhaven.com/a/pine_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Dimitrios Savva"
+   ],
+   "species": [
+    "pine",
+    "spruce",
+    "fir"
+   ],
+   "tile": [
+    2,
+    2
+   ],
+   "maps": {
+    "color": "pine_bark/pine_bark_diff_1k.jpg",
+    "normal": "pine_bark/pine_bark_nor_gl_1k.jpg",
+    "arm": "pine_bark/pine_bark_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "metasequoia_bark",
+   "type": "bark",
+   "title": "Metasequoia Bark",
+   "source": "https://polyhaven.com/a/metasequoia_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "redwood",
+    "cypress"
+   ],
+   "tile": [
+    1.94,
+    1.94
+   ],
+   "maps": {
+    "color": "metasequoia_bark/metasequoia_bark_diff_1k.jpg",
+    "normal": "metasequoia_bark/metasequoia_bark_nor_gl_1k.jpg",
+    "arm": "metasequoia_bark/metasequoia_bark_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "palm_bark",
+   "type": "bark",
+   "title": "Palm Bark",
+   "source": "https://polyhaven.com/a/palm_bark",
+   "license": "CC0-1.0",
+   "authors": [
+    "Charlotte Baglioni"
+   ],
+   "species": [
+    "palm"
+   ],
+   "tile": [
+    1.86,
+    1.86
+   ],
+   "maps": {
+    "color": "palm_bark/palm_bark_diff_1k.jpg",
+    "normal": "palm_bark/palm_bark_nor_gl_1k.jpg",
+    "arm": "palm_bark/palm_bark_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "forest_leaves_02",
+   "type": "ground",
+   "title": "Forest Leaves 02",
+   "source": "https://polyhaven.com/a/forest_leaves_02",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "species": [],
+   "tile": [
+    3,
+    3
+   ],
+   "maps": {
+    "color": "forest_leaves_02/forest_leaves_02_diffuse_1k.jpg",
+    "normal": "forest_leaves_02/forest_leaves_02_nor_gl_1k.jpg",
+    "arm": "forest_leaves_02/forest_leaves_02_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "forrest_ground_01",
+   "type": "ground",
+   "title": "Forest Ground 01",
+   "source": "https://polyhaven.com/a/forrest_ground_01",
+   "license": "CC0-1.0",
+   "authors": [
+    "Rob Tuytel"
+   ],
+   "species": [],
+   "tile": [
+    2,
+    2
+   ],
+   "maps": {
+    "color": "forrest_ground_01/forrest_ground_01_diff_1k.jpg",
+    "normal": "forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg",
+    "arm": "forrest_ground_01/forrest_ground_01_arm_1k.jpg"
+   }
+  },
+  {
+   "id": "LeafSet016",
+   "type": "leaves",
+   "title": "Leaf Set 016 (oak)",
+   "source": "https://ambientcg.com/view?id=LeafSet016",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "oak"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet016/color.jpg",
+    "opacity": "LeafSet016/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet005",
+   "type": "leaves",
+   "title": "Leaf Set 005 (beech)",
+   "source": "https://ambientcg.com/view?id=LeafSet005",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "beech"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet005/color.jpg",
+    "opacity": "LeafSet005/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet010",
+   "type": "leaves",
+   "title": "Leaf Set 010 (maple)",
+   "source": "https://ambientcg.com/view?id=LeafSet010",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "maple"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet010/color.jpg",
+    "opacity": "LeafSet010/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet024",
+   "type": "leaves",
+   "title": "Leaf Set 024",
+   "source": "https://ambientcg.com/view?id=LeafSet024",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "birch",
+    "apple",
+    "shrub",
+    "berryBush",
+    "dwarfShrub",
+    "thornShrub",
+    "mangrove",
+    "acacia",
+    "baobab"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet024/color.jpg",
+    "opacity": "LeafSet024/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet022",
+   "type": "leaves",
+   "title": "Leaf Set 022",
+   "source": "https://ambientcg.com/view?id=LeafSet022",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "olive"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet022/color.jpg",
+    "opacity": "LeafSet022/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet018",
+   "type": "leaves",
+   "title": "Leaf Set 018",
+   "source": "https://ambientcg.com/view?id=LeafSet018",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "jungleEmergent"
+   ],
+   "orientation": "up",
+   "kind": "broad",
+   "maps": {
+    "color": "LeafSet018/color.jpg",
+    "opacity": "LeafSet018/opacity.jpg"
+   }
+  },
+  {
+   "id": "LeafSet019",
+   "type": "leaves",
+   "title": "Leaf Set 019 (conifer sprays)",
+   "source": "https://ambientcg.com/view?id=LeafSet019",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "spruce",
+    "fir",
+    "cypress",
+    "redwood"
+   ],
+   "orientation": "left",
+   "kind": "spray",
+   "maps": {
+    "color": "LeafSet019/color.jpg",
+    "opacity": "LeafSet019/opacity.jpg"
+   }
+  },
+  {
+   "id": "PineNeedles001",
+   "type": "leaves",
+   "title": "Pine Needles 001",
+   "source": "https://ambientcg.com/view?id=PineNeedles001",
+   "license": "CC0-1.0",
+   "authors": [
+    "ambientCG (Lennart Demes)"
+   ],
+   "species": [
+    "pine"
+   ],
+   "orientation": "right",
+   "kind": "fascicle",
+   "maps": {
+    "color": "PineNeedles001/color.jpg",
+    "opacity": "PineNeedles001/opacity.jpg"
+   }
+  }
+ ]
+}

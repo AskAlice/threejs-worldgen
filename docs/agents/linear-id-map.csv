@@ -1,0 +1,55 @@
+linear_id,github_number,title
+ASK-7,4,"Epic: Water — oceans, lakes and rivers (threejs-water)"
+ASK-25,5,"A landing page per package, like threejs-grass's"
+ASK-34,6,"Epic: Weather and material states — wet, snowy, on fire (wildfires), damaged"
+ASK-40,7,Invalid world options (e.g. scale 0 from a GUI or shared URL) produce NaN terrain and crash the tab
+ASK-248,8,Snow/ash tinted by InstancedMesh.instanceColor — tint instances via colorNode
+ASK-5,9,"Epic: Biomes, mountains and terrain (threejs-biomes)"
+ASK-6,10,Epic: Camera scale from a playable ant to solar-system orbital mechanics
+ASK-8,11,"Epic: Trees, forests, savannas and rocks (threejs-scatter + threejs-trees)"
+ASK-9,12,Epic: Cities and settlements (threejs-city)
+ASK-10,13,"Epic: Sky and space — day/night, lunar cycles, Milky Way, shooting stars, solar system (threejs-sky)"
+ASK-11,14,Rule: every feature is parametric with great but optional React Three Fiber support
+ASK-12,15,"Epic: threejs-worldgen umbrella — one <World> composing everything, biome-driven grass, world demos"
+ASK-13,16,"Epic: Docs — demo thumbnails, per-package landing pages, live sandboxes"
+ASK-14,17,Epic: npm publishing and tagged GitHub releases
+ASK-15,18,Real-time snow/particle physics: approximate MPM with neural model reduction (INR hyper-reduction)
+ASK-16,19,Voxelisation slider: one optional float from smooth (0) to Minecraft (1)
+ASK-17,20,Epic: Houdini-style ragdoll + MoGraph/Mixamo animation hybrid for crowd agents
+ASK-18,21,"Track work in Linear via a Claude hook (copied from spacial-shell, no GitHub issues on the public repo)"
+ASK-19,22,Day/night cycle driven by planet rotation
+ASK-20,23,Lunar cycles: moon orbit with real phases and moonlight
+ASK-21,24,Milky Way and procedural star field
+ASK-22,25,Occasional shooting stars
+ASK-23,26,Solar system and orbital mechanics view
+ASK-24,27,Prominent demo links with thumbnails in the docs and READMEs
+ASK-26,28,Live sandboxes for every package
+ASK-27,29,Ragdoll joint limits and motors (threejs-ragdoll)
+ASK-28,30,"States, triggers and blending (threejs-character)"
+ASK-29,31,Crowds of agents (threejs-crowd)
+ASK-30,32,Publish threejs-grass 0.2.0 (blocked on NPM_TOKEN secret)
+ASK-31,33,Bounded maps: GPU hydraulic erosion
+ASK-32,34,"Epic: Parametric scenery assets matched to biomes (vegetation, fauna, roads, props, buildings)"
+ASK-33,35,"Epic: Animated vehicles — land, rail, sea, air and space"
+ASK-35,36,Epic: Population density on a hexagonal hierarchical grid (H3-like): rural cells and urban centres
+ASK-36,37,Fuzzy-searchable asset gallery for spawning and placing assets
+ASK-37,38,"Options menu categorised by package, then by class/struct"
+ASK-38,39,"Rule: generation is never random — seeded and procedural, but looks random"
+ASK-39,40,Terrain looks like blurry photos — needs detail and realistic shading
+ASK-41,41,Rule: optimized instancing and buffer geometry wherever possible
+ASK-42,42,"Atmosphere layers (troposphere … ionosphere, Kármán line), sparse Gaussian clouds, apogee/perigee, lit nights and city lights"
+ASK-247,43,WebGPU per-object binding buffers recreated every frame in scatter forests (shadow pass)
+ASK-249,44,Impostor (far-LOD) trees ignore weather states — no snow/wet/burn at distance
+ASK-250,45,threejs-city: adopt threejs-props RoadSurface materials and decorateRoads
+ASK-251,46,Agent browser checks pin the CPU (Chrome >400%)
+ASK-252,47,scatter demo: intermittent TypeError in Scatter.ensurePool at startup; measure impostor-weather fps cost
+ASK-253,48,Move PlacementRule/isPlausible/AssetDef from threejs-worldgen into threejs-biomes (break the cycle)
+ASK-254,49,threejs-water: speckled foam and z-fighting at lake/river edges on near-flat ground; demo ocean overhangs terrain patch
+ASK-255,50,Wildfire looks like tapioca — rebuild on a shared GPU particle system (threejs-particles)
+ASK-256,51,Zoom-out detail gap: planet becomes one flat colour between terrain patch and visible atmosphere
+ASK-257,52,Photoreal vegetation (MSFS 2020 look): CC0 PBR textures + photogrammetry trees + upgraded procedural trees
+ASK-258,53,"Convincing water: FFT ocean, PBR shading, absorption, Jacobian foam, distance filtering; fix blurry-to-noise load-in"
+ASK-259,54,"Rule: no jaggies or sparkle — procedural AA (fwidth), smooth state fields, anisotropic filtering, Earth-like palettes"
+ASK-260,55,"Planet from orbit looks nothing like Earth — Earth-like continents, ocean, climate belts, atmosphere and clouds"
+ASK-261,56,threejs-photoreal: shared render pipeline with the three.js equivalents of Blender's realism settings
+ASK-262,57,"SEO, page metadata and social share cards for the docs site"

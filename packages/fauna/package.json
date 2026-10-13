@@ -1,0 +1,59 @@
+{
+  "name": "threejs-fauna",
+  "version": "0.1.0",
+  "description": "Procedural animals for three.js: fish schools, birds and wildlife that live in the right biomes",
+  "type": "module",
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "worldgen-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "worldgen-source": "./src/react.tsx",
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/react.tsx --format esm --dts --clean --external three --external react --external @react-three/fiber",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "threejs-heightfield": "^0.1.0",
+    "threejs-biomes": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@react-three/fiber": ">=9",
+    "react": ">=19",
+    "three": ">=0.186.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@react-three/fiber": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AskAlice/threejs-worldgen.git",
+    "directory": "packages/fauna"
+  },
+  "homepage": "https://askalice.github.io/threejs-worldgen/",
+  "keywords": [
+    "three",
+    "threejs",
+    "webgpu",
+    "tsl",
+    "procedural",
+    "react-three-fiber",
+    "fauna"
+  ]
+}

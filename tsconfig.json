@@ -15,16 +15,99 @@
       "threejs-heightfield": [
         "./packages/heightfield/src/index.ts"
       ],
+      "threejs-biomes": [
+        "./packages/biomes/src/index.ts"
+      ],
+      "threejs-biomes/react": [
+        "./packages/biomes/src/react.tsx"
+      ],
+      "threejs-scatter": [
+        "./packages/scatter/src/index.ts"
+      ],
+      "threejs-scatter/react": [
+        "./packages/scatter/src/react.tsx"
+      ],
+      "threejs-trees": [
+        "./packages/trees/src/index.ts"
+      ],
+      "threejs-trees/react": [
+        "./packages/trees/src/react.tsx"
+      ],
+      "threejs-water": [
+        "./packages/water/src/index.ts"
+      ],
+      "threejs-water/react": [
+        "./packages/water/src/react.tsx"
+      ],
+      "threejs-city": [
+        "./packages/city/src/index.ts"
+      ],
+      "threejs-city/react": [
+        "./packages/city/src/react.tsx"
+      ],
       "threejs-grass": [
         "./packages/grass/src/index.ts"
       ],
       "threejs-grass/react": [
         "./packages/grass/src/react.tsx"
+      ],
+      "threejs-worldgen": [
+        "./packages/worldgen/src/index.ts"
+      ],
+      "threejs-worldgen/react": [
+        "./packages/worldgen/src/react.tsx"
+      ],
+      "threejs-sky": [
+        "./packages/sky/src/index.ts"
+      ],
+      "threejs-sky/react": [
+        "./packages/sky/src/react.tsx"
+      ],
+      "threejs-weathering": [
+        "./packages/weathering/src/index.ts"
+      ],
+      "threejs-weathering/react": [
+        "./packages/weathering/src/react.tsx"
+      ],
+      "threejs-population": [
+        "./packages/population/src/index.ts"
+      ],
+      "threejs-population/react": [
+        "./packages/population/src/react.tsx"
+      ],
+      "threejs-props": [
+        "./packages/props/src/index.ts"
+      ],
+      "threejs-props/react": [
+        "./packages/props/src/react.tsx"
+      ],
+      "threejs-vehicles": [
+        "./packages/vehicles/src/index.ts"
+      ],
+      "threejs-vehicles/react": [
+        "./packages/vehicles/src/react.tsx"
+      ],
+      "threejs-fauna": [
+        "./packages/fauna/src/index.ts"
+      ],
+      "threejs-fauna/react": [
+        "./packages/fauna/src/react.tsx"
+      ],
+      "threejs-particles": [
+        "./packages/particles/src/index.ts"
+      ],
+      "threejs-particles/react": [
+        "./packages/particles/src/react.tsx"
       ]
-    }
+    },
+    "allowImportingTsExtensions": true,
+    "customConditions": [
+      "worldgen-source"
+    ]
   },
   "include": [
     "packages/*/src",
+    "packages/*/test",
     "example"
   ],
   "exclude": [

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>threejs-heightfield · sandbox</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #9cb8cc; font: 12px/1.4 ui-monospace, monospace; color: #fff }
+      #hud { position: fixed; left: 10px; top: 10px; background: #0009; padding: 6px 8px; border-radius: 4px; pointer-events: none; white-space: pre; z-index: 10 }
+      #help { position: fixed; left: 10px; bottom: 10px; background: #0009; padding: 6px 8px; border-radius: 4px }
+    </style>
+  </head>
+  <body>
+    <div id="hud">loading…</div>
+    <div id="help">drag: orbit · wheel: zoom · move the pointer over the ground: raycastHeight · marker colour: slopeAt (green flat → red 45°+)</div>
+    <script type="module" src="./heightfield.ts"></script>
+  </body>
+</html>

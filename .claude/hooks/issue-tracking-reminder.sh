@@ -1,0 +1,7 @@
+#!/bin/sh
+# UserPromptSubmit hook: remind the agent of the conversation-tracking rule on every prompt.
+# Never blocks; prints the reminder as additionalContext. Procedure: .claude/issue-tracker.md.
+# The tracker itself is defined in docs/agents/issue-tracker.md, so this hook never names one.
+cat <<'JSON'
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"threejs-worldgen tracking rule: if this prompt reports a bug, proposes a feature or design idea, states a rule/invariant, or you discover a bug while working, file it or update its existing issue IN THIS SAME REPLY in the issue tracker described in docs/agents/issue-tracker.md (labels: docs/agents/triage-labels.md). Search first and update instead of duplicating. Body = current summary with the user's request paraphrased under Request (issues are public: no verbatim chat, tokens, private URLs or local paths), plus cause/decisions/repro/acceptance criteria; add a dated comment for new detail. Hierarchy: milestone -> epic -> story -> task as sub-issues; one category role and one state role (ready-for-agent when fully specified, needs-info when cause or design is open), plus project:threejs-worldgen and package:<name> or area:<name> labels. End the reply with `Tracked: #n (few-word description, new), #m (…, updated)`. When several tickets in the current milestone are independent (disjoint packages/files), work them with parallel subagents; keep coupled ones sequential. Procedure: .claude/issue-tracker.md."}}
+JSON

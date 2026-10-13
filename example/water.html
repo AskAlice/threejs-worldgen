@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>threejs-water · sandbox</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #9cc4e4; font: 12px/1.4 ui-monospace, monospace; color: #fff }
+      #hud { position: fixed; left: 10px; top: 10px; background: #0009; padding: 6px 8px; border-radius: 4px; pointer-events: none; white-space: pre; z-index: 10 }
+      #help { position: fixed; left: 10px; bottom: 10px; background: #0009; padding: 6px 8px; border-radius: 4px }
+      #help a { color: #cfe }
+    </style>
+  </head>
+  <body>
+    <div id="hud">building terrain…</div>
+    <div id="help">drag: orbit · wheel: zoom · <a href="?">coast</a> · <a href="?planet">planet (ant ↔ orbit)</a></div>
+    <script type="module" src="./water.ts"></script>
+  </body>
+</html>

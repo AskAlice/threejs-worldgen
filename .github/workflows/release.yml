@@ -7,18 +7,18 @@ on:
 
 permissions:
   contents: write # create the GitHub release
-  id-token: write # npm provenance attestation
+  id-token: write # npm trusted publishing (OIDC); provenance is attached automatically
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false # npm's advice: never cache in release builds
       - run: npm ci
       - name: Tag matches the package version
         run: |
@@ -28,9 +28,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build # dependencies' dist/ is needed for the package's .d.ts build
-      - run: npm publish --provenance -w "$PACKAGE"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # No token: npm authenticates this workflow through the trusted publisher that
+      # scripts/publish-all.sh sets up for each package (npm trust github ... --file release.yml).
+      - run: npm publish -w "$PACKAGE"
       - run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

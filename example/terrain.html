@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>threejs-biomes · sandbox</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 12px/1.4 ui-monospace, monospace; color: #fff }
+      #hud { position: fixed; left: 10px; top: 10px; background: #0009; padding: 6px 8px; border-radius: 4px; pointer-events: none; white-space: pre }
+      #map { position: fixed; left: 10px; bottom: 10px; width: 220px; height: 220px; border: 1px solid #fff4; image-rendering: pixelated }
+      #help { position: fixed; right: 260px; bottom: 10px; background: #0009; padding: 6px 8px; border-radius: 4px }
+    </style>
+  </head>
+  <body>
+    <div id="hud"></div>
+    <canvas id="map" width="256" height="256"></canvas>
+    <div id="help">drag: orbit · right-drag / WASD: move · wheel: zoom (ant ↔ orbit) · M: map mode</div>
+    <script type="module" src="./terrain.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>threejs-sky · sandbox</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font: 12px/1.4 ui-monospace, monospace; color: #fff }
+      #hud { position: fixed; left: 10px; top: 10px; z-index: 10; background: #0009; padding: 6px 8px; border-radius: 4px; pointer-events: none; white-space: pre }
+      #help { position: fixed; left: 10px; bottom: 10px; background: #0009; padding: 6px 8px; border-radius: 4px }
+    </style>
+  </head>
+  <body>
+    <div id="hud">loading…</div>
+    <div id="help">drag: orbit · wheel: zoom from ant scale to past the moon · views and time of day in the "sandbox" folder</div>
+    <script type="module" src="./sky.ts"></script>
+  </body>
+</html>

@@ -3,10 +3,36 @@
   "name": "threejs-worldgen",
   "entryPoints": [
     "packages/heightfield/src/index.ts",
+    "packages/biomes/src/index.ts",
+    "packages/biomes/src/react.tsx",
+    "packages/population/src/index.ts",
+    "packages/population/src/react.tsx",
+    "packages/scatter/src/index.ts",
+    "packages/scatter/src/react.tsx",
+    "packages/trees/src/index.ts",
+    "packages/trees/src/react.tsx",
+    "packages/water/src/index.ts",
+    "packages/water/src/react.tsx",
+    "packages/particles/src/index.ts",
+    "packages/particles/src/react.tsx",
+    "packages/weathering/src/index.ts",
+    "packages/weathering/src/react.tsx",
+    "packages/fauna/src/index.ts",
+    "packages/fauna/src/react.tsx",
+    "packages/city/src/index.ts",
+    "packages/city/src/react.tsx",
+    "packages/props/src/index.ts",
+    "packages/props/src/react.tsx",
+    "packages/vehicles/src/index.ts",
+    "packages/vehicles/src/react.tsx",
+    "packages/sky/src/index.ts",
+    "packages/sky/src/react.tsx",
     "packages/grass/src/index.ts",
-    "packages/grass/src/react.tsx"
+    "packages/grass/src/react.tsx",
+    "packages/worldgen/src/index.ts",
+    "packages/worldgen/src/react.tsx"
   ],
-  "out": "docs",
+  "out": "site/docs",
   "readme": "README.md",
   "tsconfig": "tsconfig.json",
   "excludePrivate": true,
@@ -29,5 +55,10 @@
     "TypeAlias",
     "Constructor"
   ],
-  "treatWarningsAsErrors": true
+  "treatWarningsAsErrors": true,
+  "hostedBaseUrl": "https://askalice.github.io/threejs-worldgen/docs/",
+  "plugin": [
+    "./scripts/typedoc-seo.mjs"
+  ],
+  "favicon": "landing/favicon.svg"
 }

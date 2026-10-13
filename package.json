@@ -1,24 +1,41 @@
 {
-  "name": "threejs-worldgen",
+  "name": "threejs-worldgen-monorepo",
   "private": true,
   "description": "Procedural terrain and scenery packages for three.js and react-three-fiber",
   "type": "module",
   "license": "Apache-2.0",
   "workspaces": [
     "packages/heightfield",
-    "packages/grass"
+    "packages/biomes",
+    "packages/population",
+    "packages/scatter",
+    "packages/trees",
+    "packages/water",
+    "packages/particles",
+    "packages/weathering",
+    "packages/fauna",
+    "packages/city",
+    "packages/props",
+    "packages/vehicles",
+    "packages/sky",
+    "packages/grass",
+    "packages/worldgen"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
     "dev": "vite example",
     "typecheck": "tsc --noEmit",
-    "test": "node --test packages/*/test/*.test.ts",
+    "test": "node --conditions=worldgen-source --test packages/*/test/*.test.ts example/*.test.ts landing/*.test.mjs scripts/*.test.mjs .claude/hooks/*.test.mjs",
     "docs": "typedoc",
-    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && cp landing/index.html site/ && mkdir -p site/media && cp media/* landing/media/* site/media/"
+    "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && node landing/build.mjs && node landing/check.mjs",
+    "publish:all": "scripts/publish-all.sh",
+    "readme:cards": "node landing/readme-cards.mjs",
+    "check:options": "node --conditions=worldgen-source scripts/options-coverage.mjs"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
