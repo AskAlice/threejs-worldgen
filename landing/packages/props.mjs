@@ -13,7 +13,7 @@ export default {
   lede: 'threejs-props is in development, but usable today: <code>decorateRoads()</code> lines a road network with street lights, signs, mailboxes, power poles and fences, and <code>Props</code> draws them all as instanced meshes. Every prop is seeded, so each one looks different but rebuilds the same.',
   hero: { img: 'props/hero.jpg', alt: 'A town junction lined with street lights, traffic lights, bins and hydrants, pylons in the distance' },
   thumb: 'props/thumb.jpg',
-  demos: [{ label: 'three.js demo', href: 'props.html' }],
+  demos: [{ label: 'three.js demo', href: 'props.html' }, { label: 'React Three Fiber demo', href: 'props-r3f.html' }],
   stats: [['14', 'prop kinds'], ['32', 'styles across them'], ['4', 'road surfaces'], ['1', 'mesh per shape and material']],
   install: 'npm i threejs-props threejs-biomes three',
   code: {

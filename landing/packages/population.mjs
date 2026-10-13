@@ -13,7 +13,7 @@ export default {
   lede: 'Population density on a hexagonal hierarchical grid, read from your <code>threejs-biomes</code> world. Cities, towns, villages and farmsteads land where people would live, sized by rank and joined by roads, rail and power lines.',
   hero: { img: 'population/hero.jpg', alt: 'Hexagonal population density prisms over a procedural landscape' },
   thumb: 'population/thumb.jpg',
-  demos: [{ label: 'three.js demo', href: 'population.html' }],
+  demos: [{ label: 'three.js demo', href: 'population.html' }, { label: 'React Three Fiber demo', href: 'population-r3f.html' }],
   stats: [['1.5M', 'people by default'], ['4', 'tiers of central places'], ['5', 'network types'], ['4', 'map modes']],
   install: 'npm i threejs-population threejs-biomes three',
   code: {

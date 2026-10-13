@@ -13,7 +13,7 @@ export default {
   lede: 'Settlements placed where the land suits them, with roads that follow the terrain, blocks, lots and buildings that match the climate. One call to <code>City.create()</code> or one <code>&lt;City /&gt;</code>, and the ground is flattened under all of it.',
   hero: { img: 'city/hero.jpg', alt: 'Aerial view of a procedural city beside a river' },
   thumb: 'city/thumb.jpg',
-  demos: [{ label: 'three.js demo', href: 'city.html' }],
+  demos: [{ label: 'three.js demo', href: 'city.html' }, { label: 'React Three Fiber demo', href: 'city-r3f.html' }],
   stats: [['~3,600', 'buildings in a 1.5 km city'], ['4', 'size classes'], ['6', 'architectures'], ['0', 'texture assets']],
   install: 'npm i threejs-city threejs-biomes three',
   code: {

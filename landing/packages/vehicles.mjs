@@ -13,10 +13,8 @@ export default {
   lede: 'threejs-vehicles is in development, but usable today. It generates eleven vehicle types from seeds and parameters and moves whole fleets along road networks, rails, harbour loops, flight paths, launch pads and carrier decks.',
   hero: { img: 'vehicles/hero.jpg', alt: 'Traffic in a town street grid with a train on the railway around it' },
   thumb: 'vehicles/thumb.jpg',
-  demos: [
-    { label: 'three.js demo', href: 'vehicles.html?scene' },
-    { label: 'Vehicle gallery', href: 'vehicles.html' },
-  ],
+  demos: [{ label: 'three.js demo', href: 'vehicles.html?scene' },
+    { label: 'Vehicle gallery', href: 'vehicles.html' }, { label: 'React Three Fiber demo', href: 'vehicles-r3f.html' }],
   stats: [['11', 'vehicle types'], ['5', 'domains, land to space'], ['6', 'route kinds'], ['1', 'material for a whole fleet']],
   install: 'npm i threejs-vehicles three',
   code: {
