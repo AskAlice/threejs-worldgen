@@ -52,6 +52,7 @@ renderer.setAnimationLoop(() => {
 
 flames.set({ forces: { wind: [6, 0, 1] } }) // every setting is live except the structural ones below
 smoke.setSources(points)                    // emitter.shape 'sources': 8 floats each (x, y, z, weight, data×4)
+smoke.setSources(points, count, motion)     // optional motion: 4 floats each (velocity xyz added to the emitter's, opacity), for moving emitters
 ```
 
 It needs the WebGPU backend (compute). On the WebGL 2 fallback the systems hide themselves.

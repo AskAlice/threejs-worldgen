@@ -27,6 +27,7 @@
   "dependencies": {
     "threejs-heightfield": "^0.1.0",
     "threejs-biomes": "^0.1.0",
+    "threejs-particles": "^0.1.0",
     "threejs-water": "^0.1.0",
     "threejs-weathering": "^0.1.0"
   },

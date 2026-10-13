@@ -2,7 +2,7 @@
 // family (lookalike cars, pickups, trucks, tractors), lined up side by side at the same scale.
 import * as THREE from 'three/webgpu'
 import { mix, normalize, positionLocal, smoothstep, vec3 } from 'three/tsl'
-import type { VehicleParams, VehicleType } from 'threejs-vehicles'
+import { circlePoints, type Fleet, type FleetGroup, type VehicleParams, type VehicleType } from 'threejs-vehicles'
 
 /** One exhibit in a row. */
 export interface RowItem {
@@ -186,5 +186,54 @@ export function fieldMesh(): THREE.Group {
   for (let i = 0; i < furrow.count; i++) furrow.setMatrixAt(i, m.makeTranslation(cx - w / 2 + 0.4 + i * 0.75, cy + 0.03, cz))
   furrow.receiveShadow = true
   group.add(furrow)
+  return group
+}
+
+/**
+ * Smoke and exhaust beside the gallery: a steam train and a diesel freight on two circular tracks, a
+ * truck that stops and pulls away on a loop, cars circling and a few idling, all in cold, humid air.
+ */
+export const SMOKE = { center: [-150, 0, 260] as [number, number, number], steam: 70, diesel: 86, cars: 50 }
+
+/** The fleet groups of the smoke scene (group 2 is the truck that pulls away). */
+export function smokeGroups(): FleetGroup[] {
+  const [cx, , cz] = SMOKE.center
+  // A stadium loop: straights along x joined by 16 m half circles.
+  const stadium: [number, number, number][] = []
+  for (const [x0, a0] of [[cx + 20, -Math.PI / 2], [cx - 20, Math.PI / 2]] as const) for (let k = 0; k <= 12; k++) {
+    const a = a0 + (k / 12) * Math.PI
+    stadium.push([x0 + Math.cos(a) * 16, 0.05, cz + Math.sin(a) * 16])
+  }
+  return [
+    { type: 'train', count: 1, params: { traction: 'steam', wagons: 3, cargo: 'passenger' }, speed: [7, 7], route: { kind: 'path', points: circlePoints([cx, 0.4, cz], SMOKE.steam, 96), closed: true, smooth: 1 } },
+    { type: 'train', count: 1, params: { traction: 'diesel', wagons: 5, cargo: 'freight' }, speed: [12, 12], route: { kind: 'path', points: circlePoints([cx, 0.4, cz], SMOKE.diesel, 96, true), closed: true, smooth: 1 } },
+    { type: 'truck', count: 1, params: { trailers: 1, trailer: 'container', stacks: true }, speed: [12, 12], route: { kind: 'path', points: stadium, closed: true, smooth: 4 } },
+    { type: 'car', count: 8, variants: 6, speed: [6, 9], route: { kind: 'circle', center: [cx, 0.05, cz], radius: SMOKE.cars } },
+    { type: 'car', count: 4, params: { style: 'compact' }, speed: [0, 0], route: { kind: 'static', position: [cx - 6, 0.05, cz + 27], heading: Math.PI / 2, spacing: 3.2 } },
+  ]
+}
+
+/** The truck of the smoke scene stops for 5 s and pulls away, every 15 s of fleet time. */
+export function pullAway(fleet: Fleet): void {
+  const v = fleet.sim.vehiclesOf(2)[0]
+  if (v === undefined) return
+  fleet.sim.unitCruise[fleet.sim.unit[v]] = fleet.sim.time % 15 < 5 ? 0 : 12
+}
+
+/** Track beds for the two trains and asphalt for the cars and the truck. */
+export function smokeMesh(): THREE.Group {
+  const [cx, , cz] = SMOKE.center
+  const group = new THREE.Group()
+  const ring = (r: number, w: number, y: number, color: string) => {
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(r - w / 2, r + w / 2, 192).rotateX(-Math.PI / 2), new THREE.MeshStandardNodeMaterial({ color, roughness: 0.9 }))
+    mesh.position.set(cx, y, cz)
+    mesh.receiveShadow = true
+    group.add(mesh)
+  }
+  for (const r of [SMOKE.steam, SMOKE.diesel]) { ring(r, 4.2, 0.03, '#6f6a62'); ring(r - 0.72, 0.12, 0.42, '#8d9298'); ring(r + 0.72, 0.12, 0.42, '#8d9298') }
+  ring(SMOKE.cars, 8, 0.02, '#3d3e40')
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(80, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardNodeMaterial({ color: '#3d3e40', roughness: 0.9 }))
+  road.position.set(cx, 0.015, cz)
+  group.add(road)
   return group
 }

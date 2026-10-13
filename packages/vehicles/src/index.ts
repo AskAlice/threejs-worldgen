@@ -4,7 +4,8 @@
  * airliners and light aircraft, fighter jets and multi-stage rockets. Seeded low-poly generators,
  * instanced fleets that follow road networks, rails, shipping lanes and flight paths, wheels, fans and
  * propellers that turn, boats that bob and leave wakes, planes that bank, rockets that drop stages, and
- * wet, snowy, burning and damaged states through threejs-weathering.
+ * wet, snowy, burning and damaged states through threejs-weathering, and engine smoke, steam and
+ * exhaust through threejs-particles.
  *
  * @module threejs-vehicles
  */
@@ -14,6 +15,7 @@ export * from './cars.ts'
 export * from './pickups.ts'
 export * from './trucks.ts'
 export * from './tractor.ts'
+export * from './exhaust.ts'
 export * from './traffic.ts'
 export * from './paths.ts'
 export * from './sim.ts'

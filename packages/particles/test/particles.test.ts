@@ -60,6 +60,12 @@ test('sources: weighted picks follow the weights; overflow keeps the heaviest', 
   assert.equal(pickSource(createSourceTable(4), 0.5), -1)
   picks = []
   void SOURCE_STRIDE
+  // Motion (velocity, opacity) travels with its source; without it sources are still and opaque.
+  assert.deepEqual([...t.motion.subarray(0, 8)], [0, 0, 0, 1, 0, 0, 0, 1])
+  const motion = new Float32Array([1, 2, 3, 0.5, 0, 0, 0, 0, 4, 5, 6, 0.25])
+  const moving = fillSourceTable(createSourceTable(8), src, undefined, motion)
+  assert.deepEqual([...moving.motion.subarray(0, 8)], [1, 2, 3, 0.5, 4, 5, 6, 0.25])
+  assert.deepEqual([...fillSourceTable(createSourceTable(1), src, undefined, motion).motion.subarray(0, 4)], [4, 5, 6, 0.25])
 })
 
 test('per-particle random numbers are seeded, in [0, 1) and well spread', () => {

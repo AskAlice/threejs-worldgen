@@ -9,6 +9,8 @@ import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
 import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
 import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
 import { TRACTOR_IMPLEMENTS, fieldRoute, wheelFootprints } from '../src/tractor.ts'
+import { DEFAULT_EXHAUST, condensation, createExhaustBuffers, createExhaustState, exhaustSources, type ExhaustSettings } from '../src/exhaust.ts'
+import { MOTION_STRIDE, SOURCE_STRIDE, spawnRate } from 'threejs-particles'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
@@ -546,4 +548,78 @@ test('tractors: plausible wheels and track, implements, footprints that match th
   // Field routes: closed, rows the given spacing apart.
   const route = fieldRoute([10, 0, 20], 6, 5, 40)
   assert.ok(route.kind === 'path' && route.closed && route.points.length > 12)
+})
+
+test('exhaust: emitters on every vent, none for electric vehicles, budget and distance respected', () => {
+  const at = (x: number): FleetGroup['route'] => ({ kind: 'static', position: [x, 0, 0] })
+  const groups: FleetGroup[] = [
+    ...(['sedan', 'bus', ...LOOKALIKE_STYLES] as string[]).map((style, i): FleetGroup => ({ type: 'car', count: 1, params: { style }, speed: [0, 0], route: at(i * 8) })),
+    ...(['fullSize', 'ute', 'angular'] as string[]).map((style, i): FleetGroup => ({ type: 'pickup', count: 1, params: { style }, speed: [0, 0], route: at(100 + i * 8) })),
+    { type: 'truck', count: 1, params: { trailers: 1 }, speed: [0, 0], route: at(130) },
+    { type: 'tractor', count: 1, speed: [0, 0], route: at(140) },
+    ...(['steam', 'diesel', 'electric'] as string[]).map((traction, i): FleetGroup => ({ type: 'train', count: 1, params: { traction, wagons: 0 }, speed: [0, 0], route: at(160 + i * 10) })),
+  ]
+  const sim = new FleetSim(settings(groups))
+  const s: ExhaustSettings = { ...structuredClone(DEFAULT_EXHAUST), temperature: -5, humidity: 0.9, maxVents: 500, maxDistance: 1000 }
+  const out = createExhaustBuffers(500), state = createExhaustState(sim.count)
+  const n = exhaustSources(sim, { x: 90, y: 2, z: 30 }, s, state, 1 / 30, out)
+  for (let v = 0; v < sim.count; v++) {
+    const m = sim.models[sim.model[v]]
+    const mine = Array.from({ length: n }, (_, k) => k).filter((k) => out.vehicle[k] === v)
+    const electric = m.style === 'electricSaloon' || m.style === 'angular' || m.style === 'electric' || m.style.startsWith('trailer')
+    if (electric) { assert.equal(mine.length, 0, `${m.type}/${m.style} emits`); continue }
+    assert.ok(m.vents.length > 0, `${m.type}/${m.style} has vents`)
+    assert.equal(mine.length, m.vents.length, `${m.type}/${m.style}: one emitter per vent`)
+    m.vents.forEach((vent, i) => {
+      const k = mine[i], o = v * 8, yaw = sim.pose[o + 3]
+      const x = sim.pose[o] + Math.cos(yaw) * vent.position[0] + Math.sin(yaw) * vent.position[2]
+      const z = sim.pose[o + 2] - Math.sin(yaw) * vent.position[0] + Math.cos(yaw) * vent.position[2]
+      assert.ok(Math.hypot(out.sources[k * SOURCE_STRIDE] - x, out.sources[k * SOURCE_STRIDE + 2] - z) < 1e-4, 'at the vent')
+      assert.ok(Math.abs(out.sources[k * SOURCE_STRIDE + 1] - sim.pose[o + 1] - vent.position[1]) < 1e-4)
+      assert.ok(out.sources[k * SOURCE_STRIDE + 3] > 0, 'weighted')
+      const opacity = out.motion[k * MOTION_STRIDE + 3]
+      assert.ok(opacity > 0 && opacity <= 1)
+    })
+  }
+  // Moving vehicles hand their velocity to the particles.
+  const moving = new FleetSim(settings([{ type: 'car', count: 1, params: { style: 'sedan' }, speed: [10, 10], route: { kind: 'path', points: [[0, 0, 0], [0, 0, 500]], closed: false } }]))
+  for (let i = 0; i < 60; i++) moving.step(1 / 30)
+  const one = createExhaustBuffers(4)
+  exhaustSources(moving, { x: 0, y: 2, z: 0 }, s, createExhaustState(1), 1 / 30, one)
+  assert.ok(Math.abs(one.motion[2] - (10 - s.kinds.tailpipe.speed)) < 0.2, `forward speed inherited, minus the gas blown back (${one.motion[2]})`)
+  // Budget: the nearest `maxVents` vents of 200 cars, and nothing past maxDistance.
+  const crowd = new FleetSim(settings([{ type: 'car', count: 200, params: { style: 'sedan' }, variants: 1, speed: [0, 0], route: { kind: 'static', position: [0, 0, 0], spacing: 6 } }]))
+  const small = createExhaustBuffers(64)
+  const count = exhaustSources(crowd, { x: 0, y: 2, z: 0 }, { ...s, maxVents: 64, maxDistance: 600 }, createExhaustState(crowd.count), 1 / 30, small)
+  assert.equal(count, 64)
+  const used = new Set(small.vehicle.subarray(0, count))
+  for (let v = 0; v < 64; v++) assert.ok(used.has(v), 'nearest first')
+  const near = exhaustSources(crowd, { x: 0, y: 2, z: 0 }, { ...s, maxVents: 500, maxDistance: 300 }, createExhaustState(crowd.count), 1 / 30, createExhaustBuffers(500))
+  assert.ok(near > 0 && near <= 51, `only vehicles within 300 m (${near})`)
+  let total = 0
+  for (let k = 0; k < count; k++) total += small.sources[k * SOURCE_STRIDE + 3]
+  assert.ok(spawnRate(1, total, s.capacity, (s.life[0] + s.life[1]) / 2) <= s.capacity / ((s.life[0] + s.life[1]) / 2) + 1e-6, 'the pool never overruns')
+  // Condensation shows in cold, humid air; warm dry air hides it.
+  assert.ok(condensation(-5, 0.9) > 0.8 && condensation(25, 0.3) < 0.05)
+})
+
+test('exhaust: steam chuffs with the wheels, engines smoke harder pulling away', () => {
+  const s = structuredClone(DEFAULT_EXHAUST)
+  const loco = new FleetSim(settings([{ type: 'train', count: 1, params: { traction: 'steam', wagons: 0 }, speed: [3, 3], route: { kind: 'path', points: circlePoints([0, 0, 0], 200, 64), closed: true } }]))
+  const weights: number[] = []
+  const state = createExhaustState(1), buf = createExhaustBuffers(4)
+  for (let i = 0; i < 120; i++) {
+    loco.step(1 / 60)
+    exhaustSources(loco, { x: 0, y: 0, z: 0 }, s, state, 1 / 60, buf)
+    weights.push(buf.sources[3])
+  }
+  assert.ok(Math.max(...weights) > 2 * Math.min(...weights), 'beats at low speed')
+  // A truck: idling, then pulling away (cruise speed set), smokes more and darker while accelerating.
+  const truck = new FleetSim(settings([{ type: 'truck', count: 1, params: { trailers: 1 }, speed: [0, 0], route: { kind: 'path', points: [[0, 0, 0], [0, 0, 1000]], closed: false } }]))
+  const st = createExhaustState(truck.count), b = createExhaustBuffers(8)
+  for (let i = 0; i < 30; i++) { truck.step(1 / 30); exhaustSources(truck, { x: 0, y: 0, z: 0 }, s, st, 1 / 30, b) }
+  const idle = b.sources[3], idleAlpha = b.motion[3]
+  truck.unitCruise[0] = 20
+  for (let i = 0; i < 30; i++) { truck.step(1 / 30); exhaustSources(truck, { x: 0, y: 0, z: 0 }, s, st, 1 / 30, b) }
+  assert.ok(b.sources[3] > 2 * idle && b.motion[3] > idleAlpha, `pulling away: ${b.sources[3].toFixed(1)} vs ${idle.toFixed(1)}`)
 })

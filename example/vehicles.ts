@@ -1,10 +1,10 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoadGraph } from 'threejs-city'
-import { DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, WheelInteractors, circlePoints, defaultParams, fieldRoute, type FleetEnvironment, type FleetGroup } from 'threejs-vehicles'
+import { DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, VehicleExhaust, WheelInteractors, circlePoints, defaultParams, fieldRoute, type FleetEnvironment, type FleetGroup } from 'threejs-vehicles'
 import { patch, type Ranges } from './options-gui'
 import { classOf, createPanel, type PanelClass } from './panel'
-import { FIELD, GALLERY_ROWS, JUNCTION, fieldMesh, junctionLoop, junctionMesh, rowPosition, skyEnvironment, threeQuarter } from './vehicles-rows'
+import { FIELD, GALLERY_ROWS, JUNCTION, SMOKE, fieldMesh, junctionLoop, junctionMesh, pullAway, rowPosition, skyEnvironment, smokeGroups, smokeMesh, threeQuarter } from './vehicles-rows'
 
 // threejs-vehicles sandbox. Default: a gallery of every vehicle type, each with its own parameters, and
 // real-scale rows of the car lookalikes, pickups, trucks and tractors behind it (`?row=cars&focus=2`
@@ -114,6 +114,11 @@ function gallery() {
     marks.count = prints.interactors.length
     marks.instanceMatrix.needsUpdate = true
   }
+  // Smoke and exhaust: a steam and a diesel train, a truck pulling away, cars in cold, humid air.
+  scene.add(smokeMesh())
+  const smoke = new Fleet({ seed: 3, groups: smokeGroups() })
+  scene.add(smoke.object)
+  const exhaust = new VehicleExhaust(smoke, { temperature: -4, humidity: 0.85 })
   const rowName = params.get('row')
   const focus = (r: number, i: number, side = 1) => {
     const { v, x, z } = rows[r][i]
@@ -122,7 +127,10 @@ function gallery() {
     camera.position.set(...view.position)
     controls.target.set(...view.target)
   }
-  if (rowName === 'field') {
+  if (rowName === 'smoke') {
+    camera.position.set(SMOKE.center[0] + 70, 32, SMOKE.center[2] - 95)
+    controls.target.set(SMOKE.center[0], 4, SMOKE.center[2] - 20)
+  } else if (rowName === 'field') {
     camera.position.set(FIELD.center[0] + 40, 30, FIELD.center[2] - 55)
     controls.target.set(FIELD.center[0], 0, FIELD.center[2] - 10)
   } else if (rowName === 'junction') {
@@ -142,6 +150,13 @@ function gallery() {
   const all = { set: (input: any) => [...vehicles, ...rows.flat()].forEach(({ v }) => v.set(input)) }
   const ui = { turntable: !rowName, night: 0 }
   const classes: PanelClass[] = [
+    classOf('exhaust (smoke scene)', exhaust, structuredClone(exhaust.settings) as Record<string, any>, {
+      ranges: {
+        capacity: [1000, 50000, 100], maxDistance: [50, 2000, 10], maxVents: [8, 1024, 1], temperature: [-30, 40, 0.5], humidity: [0, 1], intensity: [0, 4], wind: [-10, 10, 0.1], life: [0.5, 15, 0.1],
+        rate: [0, 200, 1], size: [0.05, 4], opacity: [0, 1], tint: [0, 1], heat: [0, 3], speed: [0, 20, 0.1],
+      },
+      arrays: true,
+    }),
     classOf('all vehicles', all, shared, {
       ranges: { speed: [0, 30], lights: [0, 1], crumple: [0, 0.5], period: [20, 300, 1], seed: [1, 100, 1], wetness: [0, 1], snow: [0, 1], burn: [0, 1], damage: [0, 1], heat: [0, 1] },
     }),
@@ -164,7 +179,7 @@ function gallery() {
   const jump = () => focus(GALLERY_ROWS.findIndex((r) => r.name === goto.row), Math.min(goto.exhibit, GALLERY_ROWS.find((r) => r.name === goto.row)!.items.length - 1))
   sandbox.add(goto, 'row', GALLERY_ROWS.map((r) => r.name)).onChange(jump)
   sandbox.add(goto, 'exhibit', 0, 7, 1).onChange(jump)
-  Object.assign(window, { vehicles, rows, junction, field, prints, scene, camera, controls, focus, all })
+  Object.assign(window, { vehicles, rows, junction, field, prints, smoke, exhaust, scene, camera, controls, focus, all })
   let last = performance.now()
   renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000)
@@ -179,6 +194,9 @@ function gallery() {
     field.update(dt)
     prints.update()
     showPrints()
+    pullAway(smoke)
+    smoke.update(dt)
+    exhaust.update(renderer, dt, camera)
     renderer.render(scene, camera)
     tickFps()
     hud.textContent = `${fps.toFixed(0)} fps · ${VEHICLE_TYPES.length} vehicle types, each at ~9 m for comparison\none InstancedMesh per part (body, wheels, fans, stages), one material`

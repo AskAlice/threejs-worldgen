@@ -5,6 +5,7 @@ import { PICKUP_STYLES, pickup } from './pickups.ts'
 import { TRAILER_KINDS, truck } from './trucks.ts'
 import { TRACTOR_FAMILIES, TRACTOR_IMPLEMENTS, tractor } from './tractor.ts'
 import { BODY, DARK, GLASS, GREY, HEAD, LIT, RIM, TAIL, TRIM, TYRE, WHITE, body, jitter, model, num, pick, roadWheel, str, type Rand } from './kit.ts'
+import { FINISH } from './mesh.ts'
 
 /** Every vehicle the package generates. */
 export type VehicleType =
@@ -78,6 +79,8 @@ export interface ExhaustVent {
   kind: 'tailpipe' | 'stack' | 'steam' | 'diesel'
   /** Outlet radius, metres. */
   radius: number
+  /** Steam engines: metres travelled per exhaust beat (chuffs come at speed / pulse per second). */
+  pulse?: number
 }
 
 /** A parking spot on a host vehicle (jets on a carrier deck). */
@@ -184,7 +187,8 @@ function car(p: VehicleParams, rand: Rand): VehicleModel {
     name: 'wheel', mesh: roadWheel(r, ww),
     mounts: [-1, 1].flatMap((s) => [{ position: [s * wheelX, r, zf] as Vec3, spin, steer: 1 }, { position: [s * wheelX, r, zr] as Vec3, spin }]),
   }
-  return model('car', style, 'land', [body(m.build()), wheels], { wheelBase: zf - zr, palette: style === 'bus' ? BUS_PALETTE : CAR_PALETTE, bank: -0.04 })
+  const vents: ExhaustVent[] = [{ position: [W * 0.3, ride * 0.8, -L / 2 - 0.02], direction: [0, -0.15, -1], kind: style === 'bus' ? 'stack' : 'tailpipe', radius: 0.035 * k }]
+  return model('car', style, 'land', [body(m.build()), wheels], { wheelBase: zf - zr, palette: style === 'bus' ? BUS_PALETTE : CAR_PALETTE, bank: -0.04, vents })
 }
 
 function bicycle(p: VehicleParams, rand: Rand): VehicleModel {
@@ -254,7 +258,10 @@ const TRAIN_PALETTES = {
 
 function train(p: VehicleParams, rand: Rand): VehicleModel {
   const car = str(p, 'car') as 'locomotive' | 'passenger' | 'freight'
+  const traction = str(p, 'traction')
+  if (car === 'locomotive' && traction === 'steam') return steamLocomotive(p, rand)
   const k = num(p, 'size')
+  const vents: ExhaustVent[] = []
   const W = 2.95 * k, r = 0.46
   const m = new MeshBuilder()
   let L: number, style: string = car
@@ -270,6 +277,14 @@ function train(p: VehicleParams, rand: Rand): VehicleModel {
     const stripe = paint(pick(rand, ['#f4d03f', '#eceef0', '#1b1b1d', '#e67e22']))
     for (const s of [-1, 1]) m.box([s * (W / 2 + 0.01), floor + 0.7, 0], [0.02, 0.35, L * 0.98], stripe)
     for (const s of [-1, 1]) m.box([s * 0.85, floor + 0.55, L / 2 + 0.02], [0.3, 0.2, 0.05], HEAD)
+    if (traction === 'electric') {
+      // Pantograph on the roof instead of an exhaust.
+      style = 'electric'
+      m.box([0, H + 0.32, -L * 0.25], [0.8, 0.08, 0.8], DARK)
+      m.beam([0, H + 0.36, -L * 0.25 - 0.3], [0, H + 1.2, -L * 0.25 + 0.4], 0.05, GREY)
+      m.beam([0, H + 1.2, -L * 0.25 + 0.4], [0, H + 1.9, -L * 0.25 - 0.2], 0.04, GREY)
+      m.box([0, H + 1.92, -L * 0.25 - 0.2], [1.6, 0.05, 0.12], GREY)
+    } else vents.push({ position: [0, H + 0.26, L * 0.12], direction: [0, 1, 0], kind: 'diesel', radius: 0.22 * k })
   } else if (car === 'passenger') {
     L = 22 * k
     const H = 4.0 * k
@@ -318,7 +333,78 @@ function train(p: VehicleParams, rand: Rand): VehicleModel {
   const mounts: PartMount[] = []
   for (const s of [-1, 1]) for (const a of [-1, 1]) mounts.push({ position: [0, r, s * (L / 2 - 3.2 * k) + a * 1.25], spin })
   return model('train', style, 'rail', [body(m.build()), { name: 'axle', mesh: railAxle(r), mounts }], {
-    wheelBase: L - 6.4 * k, palette: TRAIN_PALETTES[car], bank: -0.02,
+    wheelBase: L - 6.4 * k, palette: TRAIN_PALETTES[car], bank: -0.02, vents,
+  })
+}
+
+/** A big spoked driving wheel pair on an axle (steam locomotives), with crank pins and counterweights. */
+function driverAxle(r: number, s: Paint): MeshData {
+  const m = new MeshBuilder()
+  for (const side of [-1, 1]) {
+    const x = side * 0.72
+    m.lathe('x', [x, 0, 0], [[r * 0.84, -0.07], [r, -0.07], [r, 0.05], [r * 1.07, 0.06], [r * 1.07, 0.08], [r * 0.84, 0.08]], DARK, 28)
+    m.cylinder('x', [x, 0, 0], r * 0.18, 0.16, s, 12)
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2
+      m.beam([x, Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16], [x, Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86], 0.05, s)
+    }
+    m.fin([[r * 0.2, -0.5], [r * 0.82, -0.62], [r * 0.82, 0.62], [r * 0.2, 0.5]], [x, 0, 0], [0, -1, 0], [0, 0, r * 0.6], 0.06, s)
+    m.cylinder('x', [x + side * 0.06, r * 0.5, 0], 0.07, 0.12, GREY, 8)
+  }
+  m.cylinder('x', [0, 0, 0], 0.1, 1.4, TRIM, 8)
+  return m.build()
+}
+
+/**
+ * A steam locomotive with its tender: smokebox, chimney and boiler with a dome, cylinders, three
+ * coupled driving axles behind a leading bogie, a cab and a coal tender on bogies. The chimney is a
+ * `steam` vent that beats four times per turn of the driving wheels.
+ */
+function steamLocomotive(p: VehicleParams, rand: Rand): VehicleModel {
+  const k = num(p, 'size')
+  const L = 21 * k, W = 2.9 * k, rD = 0.88, r = 0.46, m = new MeshBuilder()
+  const f = (d: number) => L / 2 - d * k // z at d metres behind the buffer beam
+  const black = paint('#17181a'), wheelPaint = paint(pick(rand, ['#7a1c16', '#17181a', '#1f3a26']))
+  const by = 2.65 * k, br = 0.86 * k
+  // Frames and running boards along the engine; buffer beam.
+  for (const s of [-1, 1]) m.box([s * 0.6 * k, 1.15 * k, (f(0.3) + f(12.6)) / 2], [0.08, 0.7 * k, f(0.3) - f(12.6)], black)
+  for (const s of [-1, 1]) m.box([s * 1.3 * k, 1.62 * k, (f(1.2) + f(10.2)) / 2], [0.32 * k, 0.05, f(1.2) - f(10.2)], BODY)
+  m.box([0, 1.1 * k, f(0.15)], [W * 0.95, 0.5 * k, 0.3], paint('#8f1c16'))
+  for (const s of [-1, 1]) m.cylinder('z', [s * 0.85 * k, 1.1 * k, f(-0.15)], 0.18, 0.3, black, 10)
+  // Smokebox, boiler with bands, dome, safety valves; chimney.
+  m.lathe('z', [0, by, 0], [[0.001, f(0.75)], [br * 1.04, f(0.8)], [br * 1.04, f(2.3)], [br, f(2.3)], [br, f(10.2)], [0.001, f(10.2)]], (i) => (i < 3 ? black : BODY), 32)
+  for (let i = 0; i < 4; i++) m.lathe('z', [0, by, 0], [[br * 1.01, f(3.2 + i * 1.9)], [br * 1.01, f(3.27 + i * 1.9)]], paint('#b8893a', 0, 0, FINISH.chrome), 32)
+  m.lathe('z', [0, by, f(0.78)], [[0.001, 0.02], [br * 0.8, 0.02], [br * 0.8, 0.05], [0.001, 0.05]], black, 24)
+  const chimneyZ = f(1.6), top = 4.35 * k
+  m.lathe('y', [0, 0, chimneyZ], [[0.24 * k, by + br * 0.7], [0.2 * k, by + br + 0.2], [0.22 * k, top - 0.12], [0.3 * k, top], [0.001, top]], black, 20)
+  m.rounded([0, by + br + 0.18 * k, f(5.6)], [0.62 * k, 0.55 * k, 0.75 * k], BODY, 2.4)
+  m.lathe('y', [0, by + br, f(8.8)], [[0.12, 0], [0.1, 0.35], [0.001, 0.36]], paint('#b8893a', 0, 0, FINISH.chrome), 12)
+  m.rounded([0, by + br + 0.1, f(3.6)], [0.4 * k, 0.3 * k, 0.5 * k], black, 3)
+  // Cylinders and steam chests either side at the front.
+  for (const s of [-1, 1]) {
+    m.lathe('z', [s * 1.12 * k, 1.05 * k, 0], [[0.001, f(2.3)], [0.36 * k, f(2.3)], [0.36 * k, f(3.9)], [0.001, f(3.9)]], black, 20)
+    m.box([s * 1.12 * k, 1.55 * k, f(3.1)], [0.5 * k, 0.4 * k, 1.4 * k], black)
+  }
+  // Cab with roof, windows and side sheets.
+  const c0 = f(10.0), c1 = f(12.7)
+  m.box([0, 2.55 * k, (c0 + c1) / 2], [W, 2.0 * k, c0 - c1], BODY)
+  m.rounded([0, 3.75 * k, (c0 + c1) / 2], [W + 0.2, 0.18 * k, c0 - c1 + 0.4], black, 6)
+  for (const s of [-1, 1]) m.box([s * (W / 2 + 0.01), 3.0 * k, (c0 + c1) / 2 + 0.35], [0.02, 0.6 * k, 0.9 * k], GLASS)
+  for (const s of [-1, 1]) m.box([s * 0.65 * k, 3.15 * k, c0 + 0.01], [0.55 * k, 0.5 * k, 0.03], GLASS)
+  // Tender: tank and coal bunker on two bogies.
+  const t0 = f(13.0), t1 = -L / 2 + 0.3
+  m.box([0, 2.2 * k, (t0 + t1) / 2], [W, 2.4 * k, t0 - t1], BODY)
+  m.rounded([0, 3.45 * k, (t0 + t1) / 2 + 0.6], [W - 0.3, 0.35 * k, (t0 - t1) * 0.55], paint('#1a1a1c', 0, 0, FINISH.rubber), 3, 14, 6)
+  m.box([0, 1.0 * k, (t0 + t1) / 2], [W * 0.9, 0.3, t0 - t1], black)
+  for (const s of [-1, 1]) m.box([s * 0.85, 0.95 * k, -L / 2 - 0.05], [0.3, 0.2, 0.1], TAIL)
+  m.lathe('z', [0, by + 0.95 * k, f(0.55)], [[0.001, -0.08], [0.16, -0.06], [0.18, 0.06], [0.001, 0.06]], (i) => (i >= 2 ? HEAD : black), 16)
+  const spin = (rr: number) => ({ axis: 0 as const, rate: 1 / (rr * k), by: 'distance' as const })
+  const small: PartMount[] = [f(2.0), f(3.2), f(11.3), t0 - 1.5, t0 - 3.3, t1 + 2.6, t1 + 0.8].map((z) => ({ position: [0, r, z], spin: spin(r) }))
+  const drivers: PartMount[] = [f(5.0), f(7.0), f(9.0)].map((z) => ({ position: [0, rD * k, z], spin: spin(rD) }))
+  const pulse = (2 * Math.PI * rD * k) / 4
+  return model('train', 'steam', 'rail', [body(m.build()), { name: 'axle', mesh: railAxle(r), mounts: small }, { name: 'driver', mesh: driverAxle(rD * k, wheelPaint), mounts: drivers }], {
+    wheelBase: f(2.6) - f(11.3), palette: ['#17181a', '#1f3a26', '#5a1414', '#1d2a44', '#2b4a2f'], bank: -0.02,
+    vents: [{ position: [0, top + 0.02, chimneyZ], direction: [0, 1, 0], kind: 'steam', radius: 0.22 * k, pulse }],
   })
 }
 
@@ -349,7 +435,9 @@ function fishingBoat(p: VehicleParams, rand: Rand): VehicleModel {
   if (p.outriggers) for (const s of [-1, 1]) m.beam([0, deck + L * 0.3, mz], [s * W * 1.3, deck + L * 0.12, mz - L * 0.05], 0.08, TRIM)
   m.cylinder('x', [0, deck + 0.45, -L * 0.36], 0.4, W * 0.6, paint('#d9822b'), 10)
   for (const s of [-1, 1]) m.beam([s * W * 0.35, deck, -L * 0.47], [0, deck + L * 0.32, -L * 0.42], 0.1, GREY)
+  const vents: ExhaustVent[] = [{ position: [hw * 0.3, deck + hh + 1.2, hz - L * 0.06], direction: [0, 1, 0], kind: 'stack', radius: 0.12 }]
   return model('fishing-boat', p.outriggers ? 'trawler' : 'seiner', 'sea', [body(m.build())], {
+    vents,
     palette: ['#1f5f99', '#b03a2e', '#1e8449', '#117a65', '#f4f6f6', '#d4ac0d'], wake: 1, bank: 0.08, trim: 0.05,
   })
 }
@@ -384,7 +472,8 @@ function cruiseLiner(p: VehicleParams, rand: Rand): VehicleModel {
     m.ellipsoid([s * (W * 0.47 + 0.6), top + 2.2, -L * 0.3 + (b / Math.max(1, boats - 1)) * L * 0.55], [1.1, 0.9, 3.2], paint('#e8731a'), 6, 3)
   }
   for (const s of [-1, 1]) m.box([s * W * 0.2, top * 0.75, L * 0.47], [0.4, 0.4, 0.2], paint('#fff7d6', 0, 1))
-  return model('cruise-liner', `${decks}-deck`, 'sea', [body(m.build())], { palette: ['#f4f6f7', '#1b2631', '#17202a', '#922b21', '#1f3a5f'], wake: 1.6, bank: 0.01 })
+  const vents: ExhaustVent[] = Array.from({ length: funnels }, (_, f) => ({ position: [0, deckTop + 10.6, -L * 0.22 + f * L * 0.1 - 1.5] as Vec3, direction: [0, 1, 0] as Vec3, kind: 'stack' as const, radius: W * 0.06 }))
+  return model('cruise-liner', `${decks}-deck`, 'sea', [body(m.build())], { palette: ['#f4f6f7', '#1b2631', '#17202a', '#922b21', '#1f3a5f'], wake: 1.6, bank: 0.01, vents })
 }
 
 function speedboat(p: VehicleParams, rand: Rand): VehicleModel {
@@ -718,6 +807,7 @@ export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
     name: 'Train', domain: 'rail', tags: ['train', 'locomotive', 'wagon', 'railway', 'freight', 'passenger', 'rail'],
     params: {
       car: { type: 'choice', default: 'locomotive', options: ['locomotive', 'passenger', 'freight'] },
+      traction: { type: 'choice', default: 'diesel', options: ['diesel', 'steam', 'electric'] },
       freight: { type: 'choice', default: 'mixed', options: ['mixed', 'boxcar', 'tank', 'hopper', 'container'] },
       wagons: { type: 'number', default: 5, min: 0, max: 30, step: 1 },
       cargo: { type: 'choice', default: 'passenger', options: ['passenger', 'freight', 'mixed'] },

@@ -59,10 +59,14 @@ export function spawnRate(rate: number, weight: number, capacity: number, meanLi
 /** Floats per source: position xyz, weight, then four free values (`data`, e.g. size scale, lift, tint, heat). */
 export const SOURCE_STRIDE = 8
 
+/** Floats per source in the optional motion table: velocity xyz (m/s, added to the emitter's), opacity. */
+export const MOTION_STRIDE = 4
+
 /**
  * A weighted list of spawn points that the CPU refreshes cheaply. `positions` is `count × 4` floats
- * (x, y, z, weight), `data` is `count × 4` free floats per source, `cdf` the running sum of weights
- * that the GPU binary-searches with a random number.
+ * (x, y, z, weight), `data` is `count × 4` free floats per source, `motion` is velocity and opacity per
+ * source (moving emitters: vehicle exhausts), `cdf` the running sum of weights that the GPU
+ * binary-searches with a random number.
  */
 export interface SourceTable {
   /** Sources in use. */
@@ -73,6 +77,8 @@ export interface SourceTable {
   positions: Float32Array
   /** Four free floats per source (read by the shading and forces as `source.data`). */
   data: Float32Array
+  /** Velocity xyz and opacity per source (default 0, 0, 0, 1). */
+  motion: Float32Array
   /** Inclusive prefix sum of weights per source. */
   cdf: Float32Array
 }
@@ -80,7 +86,7 @@ export interface SourceTable {
 /** An empty table for up to `max` sources. */
 export function createSourceTable(max: number): SourceTable {
   const n = Math.max(1, Math.floor(max))
-  return { count: 0, total: 0, positions: new Float32Array(n * 4), data: new Float32Array(n * 4), cdf: new Float32Array(n) }
+  return { count: 0, total: 0, positions: new Float32Array(n * 4), data: new Float32Array(n * 4), motion: new Float32Array(n * 4), cdf: new Float32Array(n) }
 }
 
 /** Most sources a table holds. */
@@ -89,11 +95,12 @@ export function sourceCapacity(table: SourceTable): number {
 }
 
 /**
- * Fills `table` from `sources` (`SOURCE_STRIDE` floats each: x, y, z, weight, d0…d3). Sources with
+ * Fills `table` from `sources` (`SOURCE_STRIDE` floats each: x, y, z, weight, d0…d3) and, optionally,
+ * `motion` (`MOTION_STRIDE` floats each: vx, vy, vz, opacity; default still and opaque). Sources with
  * weight ≤ 0 are skipped. If there are more than the table holds, the heaviest are kept (ties keep
  * the earlier one), so the selection is deterministic.
  */
-export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, count = Math.floor(sources.length / SOURCE_STRIDE)): SourceTable {
+export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, count = Math.floor(sources.length / SOURCE_STRIDE), motion?: ArrayLike<number> | null): SourceTable {
   const max = sourceCapacity(table)
   let order: number[] = []
   for (let i = 0; i < count; i++) if (sources[i * SOURCE_STRIDE + 3] > 0) order.push(i)
@@ -107,6 +114,7 @@ export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, 
     for (let c = 0; c < 4; c++) {
       table.positions[k * 4 + c] = sources[s + c]
       table.data[k * 4 + c] = sources[s + 4 + c]
+      table.motion[k * 4 + c] = motion ? motion[order[k] * MOTION_STRIDE + c] : c === 3 ? 1 : 0
     }
     total += sources[s + 3]
     table.cdf[k] = total

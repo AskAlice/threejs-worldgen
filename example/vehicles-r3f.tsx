@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { RoadGraph } from 'threejs-city'
-import { DEFAULT_FLEET, DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, defaultParams, fieldRoute, type FleetGroup, type FleetImpl, type VehicleImpl, type VehicleType } from 'threejs-vehicles/react'
+import { DEFAULT_EXHAUST, DEFAULT_FLEET, DEFAULT_VEHICLE, Exhaust, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, defaultParams, fieldRoute, type FleetGroup, type FleetImpl, type VehicleImpl, type VehicleType } from 'threejs-vehicles/react'
 import type { Choices, Ranges } from './leva-options'
 import { Daylight, View, mount, useHud, useOptions, type V3 } from './r3f-shared'
-import { FIELD, GALLERY_ROWS, JUNCTION, fieldMesh, junctionLoop, junctionMesh, rowPosition, skyEnvironment } from './vehicles-rows'
+import { FIELD, GALLERY_ROWS, JUNCTION, SMOKE, fieldMesh, junctionLoop, junctionMesh, pullAway, rowPosition, skyEnvironment, smokeGroups, smokeMesh } from './vehicles-rows'
 
 // threejs-vehicles in React Three Fiber. Gallery: a <Vehicle> per type, with shared settings and each
 // type's own parameters, plus the real-scale rows (car lookalikes, pickups, trucks, tractors) behind it. Traffic: one <Fleet> on a threejs-city RoadGraph street grid, with planes
@@ -46,10 +46,21 @@ function SkyEnvironment() {
 }
 
 function Gallery({ night }: { night: number }) {
-  const { turntable, frame } = useControls('Gallery', { turntable: true, frame: { value: 'all types', options: ['all types', ...GALLERY_ROWS.map((r) => r.name), 'junction', 'field'] } })
+  const { turntable, frame } = useControls('Gallery', { turntable: true, frame: { value: 'all types', options: ['all types', ...GALLERY_ROWS.map((r) => r.name), 'junction', 'field', 'smoke'] } })
+  const [smokeFleet, setSmokeFleet] = useState<FleetImpl | null>(null)
+  const smoke = useMemo(() => ({ mesh: smokeMesh(), groups: smokeGroups() }), [])
+  const air = useOptions('Exhaust (smoke scene)', { ...DEFAULT_EXHAUST, temperature: -4, humidity: 0.85 }, {
+    ranges: {
+      capacity: [1000, 50000, 100], maxDistance: [50, 2000, 10], maxVents: [8, 1024, 1], temperature: [-30, 40, 0.5], humidity: [0, 1], intensity: [0, 4], wind: [-10, 10, 0.1], life: [0.5, 15, 0.1],
+      rate: [0, 200, 1], size: [0.05, 4], opacity: [0, 1], tint: [0, 1], heat: [0, 3], speed: [0, 20, 0.1],
+    },
+    arrays: true,
+  }, true)
+  useFrame(() => void (smokeFleet && pullAway(smokeFleet)))
   const field = useMemo(() => ({ mesh: fieldMesh(), groups: [{ type: 'tractor', count: 1, params: { family: 'green', implement: 'seeder' }, speed: [3.5, 3.5], route: fieldRoute(FIELD.center, FIELD.rows, FIELD.spacing, FIELD.length) }] as FleetGroup[] }), [])
   const junction = useMemo(() => ({ mesh: junctionMesh(), groups: [{ type: 'truck', count: 1, params: { trailers: 3, trailer: 'mixed', cab: 'conventional', sleeper: true }, speed: [9, 9], route: { kind: 'path', points: junctionLoop().points, closed: true, smooth: 1 } }] as FleetGroup[] }), [])
   const view = useMemo(() => {
+    if (frame === 'smoke') return { position: [SMOKE.center[0] + 70, 32, SMOKE.center[2] - 95] as V3, target: [SMOKE.center[0], 4, SMOKE.center[2] - 20] as V3 }
     if (frame === 'field') return { position: [FIELD.center[0] + 40, 30, FIELD.center[2] - 55] as V3, target: [FIELD.center[0], 0, FIELD.center[2] - 10] as V3 }
     if (frame === 'junction') return { position: [JUNCTION.min[0] - 45, 38, JUNCTION.min[1] - 40] as V3, target: [JUNCTION.min[0] + 25, 0, JUNCTION.min[1] + 25] as V3 }
     const r = GALLERY_ROWS.findIndex((row) => row.name === frame)
@@ -74,6 +85,10 @@ function Gallery({ night }: { night: number }) {
       {/* A tractor working a field in rows (its WheelInteractors are what threejs-grass bends blades around). */}
       <primitive object={field.mesh} />
       <Fleet seed={2} groups={field.groups} lights={night} />
+      {/* Smoke and exhaust: a steam and a diesel train, a truck pulling away, cars in cold, humid air. */}
+      <primitive object={smoke.mesh} />
+      <Fleet ref={setSmokeFleet} seed={3} groups={smoke.groups} lights={night} />
+      {smokeFleet && <Exhaust fleet={smokeFleet} {...air} />}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 80]} receiveShadow>
         <planeGeometry args={[400, 400]} />
         <meshStandardNodeMaterial color="#8b8d8f" roughness={0.92} />

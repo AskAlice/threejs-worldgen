@@ -112,7 +112,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | `truck` | `cab` (`conventional`, cabOver), `sleeper true`, `axles 3`, `stacks true`, `cabColor ''`, `body` (`tractor`, rigid), `trailers 1` (1…3), `trailer` (`mixed`, box, container, flatbed, tanker), `load` (`mixed`, empty, lumber, pipes, machinery) |
 | `tractor` | `cab` (`cab`, rops), `implement` (`none`, plough, seeder, trailer), `family` (`mixed`, green, red, blue, orange), `load` (none, `hay`, gravel; on the trailer), `size 1` |
 | `bicycle` | `style` (`mixed`, road, city, mountain), `rider true` |
-| `train` | `car` (`locomotive`, passenger, freight), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
+| `train` | `car` (`locomotive`, passenger, freight), `traction` (`diesel`, steam, electric), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
 | `fishing-boat` | `length 13`, `outriggers true` |
 | `cruise-liner` | `length 200`, `decks 7`, `funnels 1` |
 | `speedboat` | `length 7`, `cabin false` |
@@ -168,6 +168,33 @@ grass.set({ interactors: prints.interactors })
 renderer.setAnimationLoop(() => { fleet.update(); prints.update(); renderer.render(scene, camera) })
 ```
 
+### Exhaust and smoke
+
+`VehicleExhaust` puts engine smoke on a fleet through one shared threejs-particles `ParticleSystem` (lit, soft, view-facing, depth-sorted smoke puffs). Every model lists its outlets in `vents`: car `tailpipe`s, truck, bus, tractor and ship `stack`s, a steam locomotive's chimney (`steam`) and a diesel locomotive's roof exhaust (`diesel`). Electric vehicles (the electric saloon, the angular pickup, electric locomotives) have none and emit nothing. Each frame the vents within `maxDistance` of the camera, nearest first up to `maxVents`, become moving particle sources:
+
+- a steam engine trails a dense white plume that beats four times per turn of its driving wheels (blurring into a steady plume at speed);
+- a diesel locomotive gives a thin dark haze that thickens when it accelerates;
+- truck and tractor stacks puff dark smoke when pulling away;
+- car tailpipes show mostly as condensation, clearly only in cold or humid air (`temperature`, `humidity`), with a gentle puff when idling.
+
+Particles inherit the vehicle's velocity, rise by buoyancy (the gas is hot), drift with `wind` and fade with distance; the pool never overruns its `capacity`. `exhaustSources(sim, eye, settings, state, dt, out)` is the pure, GPU-free core.
+
+```ts
+const exhaust = new VehicleExhaust(fleet, { temperature: -4, humidity: 0.85 })
+renderer.setAnimationLoop(() => { fleet.update(); exhaust.update(renderer, dt, camera); renderer.render(scene, camera) })
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `enabled` | `true` | Emit at all |
+| `capacity` | `10000` | Shared particle pool (rebuilds the GPU buffers) |
+| `maxDistance`, `maxVents` | `350`, `256` | No smoke beyond this distance (fading over the last 40 %); most vents emitting at once |
+| `temperature`, `humidity` | `12`, `0.6` | Air, °C and 0…1: cold, humid air shows tailpipe condensation |
+| `wind`, `intensity`, `life` | `[1.2, 0, 0.4]`, `1`, `[2.5, 6]` | Wind (m/s), emission multiplier, particle life (s) |
+| `kinds` | | Per vent kind: `rate`, `size`, `opacity`, `tint` (clean … soot), `heat`, `speed` |
+
+In React: `<Exhaust fleet={fleet} temperature={-4} />` from `threejs-vehicles/react`.
+
 ### Traffic pools
 
 `TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`): semi-trailer rigs weigh into highways, box trucks into towns, pickups, utes and tractors into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
@@ -187,7 +214,7 @@ new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: ci
 | `crumple`, `tilt` | `0.12`, `1` | Dent depth and list/sink at full damage |
 | `leftHand` | `false` | Drive on the left on road graphs |
 | `waves` | `null` | threejs-water `WaveOptions` boats bob on |
-| `wakes`, `exhaust`, `flames` | `true` | Boat wakes, rocket plumes and afterburners, flames on burning vehicles |
+| `wakes`, `exhaust`, `flames` | `true` | Boat wakes, rocket plumes and afterburners, flames on burning vehicles (engine smoke is `VehicleExhaust`, above) |
 | `castShadow`, `receiveShadow` | `true` | Shadows (every part is single-material, so the shadow pass works) |
 | `states` | all `0` | `wetness`, `snow`, `burn`, `damage`, `heat` (on fire), applied to every vehicle when changed |
 | `exposure` | | `rain`, `snowfall` (0…1 everywhere when no `Weather` is given), `wetRate`, `dryRate`, `snowRate`, `meltRate`, `shedSpeed`, `shedRate`, `ignition`, `burnRate`, `burnTime`, `fireDamage`, `douseTime`, `stopDamage`, `budget` (vehicles sampled per frame) |

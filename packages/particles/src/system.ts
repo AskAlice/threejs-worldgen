@@ -85,7 +85,7 @@ export interface ParticleBuffers {
   velocity: any
   /** x temperature (K), y size scale, z random 0…1, w tint (from the source). */
   props: any
-  /** Smoke lighting from the grid: x sun transmittance, y grid heat. */
+  /** x sun transmittance (smoke lighting from the grid), y grid heat, z opacity (from the source). */
   light: any
 }
 
@@ -190,7 +190,7 @@ export class ParticleSystem {
   private readonly emitNode: ComputeNode
   private readonly updateNode: ComputeNode
   private readonly sorter: CountingSort | null
-  private readonly sourceNodes: { positions: any; data: any; cdf: any }
+  private readonly sourceNodes: { positions: any; data: any; motion: any; cdf: any }
   private readonly structureKey: string
   private warned = false
   private camera: Camera | null = null
@@ -213,7 +213,7 @@ export class ParticleSystem {
 
     const n = this.capacity
     this.buffers = { position: instancedArray(n, 'vec4'), velocity: instancedArray(n, 'vec4'), props: instancedArray(n, 'vec4'), light: instancedArray(n, 'vec4') }
-    this.sourceNodes = { positions: instancedArray(this.sources.positions, 'vec4'), data: instancedArray(this.sources.data, 'vec4'), cdf: instancedArray(this.sources.cdf, 'float') }
+    this.sourceNodes = { positions: instancedArray(this.sources.positions, 'vec4'), data: instancedArray(this.sources.data, 'vec4'), motion: instancedArray(this.sources.motion, 'vec4'), cdf: instancedArray(this.sources.cdf, 'float') }
     this.emitNode = this.buildEmit()
     this.updateNode = this.buildUpdate()
     this.sorter = r.sort ? this.buildSort() : null
@@ -245,13 +245,15 @@ export class ParticleSystem {
   /**
    * Replaces the weighted spawn sources: `SOURCE_STRIDE` (8) floats each, x, y, z (local), weight,
    * then `data`: size scale, lift (spawn up to this many metres above the source), tint (0 clean …
-   * 1 dirty smoke), temperature scale. Zero-weight sources are skipped; past `maxSources` the heaviest
-   * are kept. Uploads only the used part.
+   * 1 dirty smoke), temperature scale. Optional `motion`, `MOTION_STRIDE` (4) floats per source: a
+   * velocity (m/s, added to the emitter's: particles inherit a moving source's speed) and an opacity
+   * multiplier. Zero-weight sources are skipped; past `maxSources` the heaviest are kept. Uploads only
+   * the used part.
    */
-  setSources(sources: ArrayLike<number>, count?: number): this {
-    fillSourceTable(this.sources, sources, count)
+  setSources(sources: ArrayLike<number>, count?: number, motion?: ArrayLike<number> | null): this {
+    fillSourceTable(this.sources, sources, count, motion)
     const k = this.sources.count
-    for (const [node, size] of [[this.sourceNodes.positions, 4], [this.sourceNodes.data, 4], [this.sourceNodes.cdf, 1]] as const) {
+    for (const [node, size] of [[this.sourceNodes.positions, 4], [this.sourceNodes.data, 4], [this.sourceNodes.motion, 4], [this.sourceNodes.cdf, 1]] as const) {
       const attr = node.value
       attr.clearUpdateRanges()
       attr.addUpdateRange(0, Math.max(1, k * size))
@@ -412,11 +414,12 @@ export class ParticleSystem {
         // so a value first used inside one shape's branch would be unset in the others.
         const serial = u.spawnFirst.add(instanceIndex).toVar()
         const slot = u.spawnSlot.add(instanceIndex).mod(uint(cap)).toVar()
-        const rs = Array.from({ length: 12 }, (_, k) => this.rand(serial, k).toVar())
+        const rs = Array.from({ length: 13 }, (_, k) => this.rand(serial, k).toVar())
         const r = (k: number) => rs[k]
         const signed = (k: number) => r(k).mul(2).sub(1)
         const p = vec3(u.emitPosition).toVar()
         const data = vec4(1, 0, 0, 1).toVar()
+        const motion = vec4(0, 0, 0, 1).toVar()
         const box = vec3(signed(1), signed(2), signed(3)).mul(u.emitSize).toVar()
         const dir = randomDirection(r(4), r(5)).toVar()
         If(u.shape.equal(1), () => { p.addAssign(box) })
@@ -437,16 +440,20 @@ export class ParticleSystem {
           })
           const src = s.positions.element(lo)
           data.assign(s.data.element(lo))
+          motion.assign(s.motion.element(lo))
           p.assign(src.xyz.add(box).add(vec3(0, r(6).mul(data.y), 0)))
         })
-        const v = u.emitVelocity.add(dir.mul(u.spread.mul(r(7))))
+        const v = u.emitVelocity.add(motion.xyz).add(dir.mul(u.spread.mul(r(7))))
         const life = mix(u.life.x, u.life.y, r(8))
         const temp = mix(u.temperature.x, u.temperature.y, r(9)).mul(data.w)
         const size = mix(u.sizeRandom.x, u.sizeRandom.y, r(10)).mul(data.x)
-        b.position.element(slot).assign(vec4(p, 0))
+        // Born at a random moment of the last step (already moved and aged that much), so a batch spawned
+        // in one frame spreads along its path instead of clumping into a puff per frame at low frame rates.
+        const sub = r(12).mul(u.dt)
+        b.position.element(slot).assign(vec4(p.add(v.mul(sub)), sub))
         b.velocity.element(slot).assign(vec4(v, life))
         b.props.element(slot).assign(vec4(temp, size, r(11), data.z))
-        b.light.element(slot).assign(vec4(1, 0, 0, 0))
+        b.light.element(slot).assign(vec4(1, 0, motion.w, 0))
       })
     })().compute(this.options.maxPerFrame, [64])
   }
@@ -483,7 +490,7 @@ export class ParticleSystem {
             const stepLen = cell.x.add(cell.y).add(cell.z).div(3)
             let sum: any = float(0)
             for (let k = 0; k < r.lightSteps; k++) sum = sum.add(grid.sample(p.add(L.sunDirection.mul(stepLen.mul(k + 0.75)))).y)
-            b.light.element(i).assign(vec4(exp(sum.mul(u.absorption).mul(-0.3)), heat, 0, 0))
+            b.light.element(i).assign(vec4(exp(sum.mul(u.absorption).mul(-0.3)), heat, b.light.element(i).z, 0))
           }
           b.position.element(i).assign(vec4(np, age))
           b.velocity.element(i).assign(vec4(nv, V.w))
@@ -550,7 +557,7 @@ export class ParticleSystem {
     m.positionNode = center.add(side.mul(corner.x.mul(width).mul(keep))).add(axis.mul(corner.y.mul(len).mul(keep)))
 
     const vary = (n: any): any => varying(n)
-    const vT = vary(t), vTemp = vary(Q.x), vSeed = vary(Q.z), vTint = vary(Q.w), vLight = vary(Lt.xy)
+    const vT = vary(t), vTemp = vary(Q.x), vSeed = vary(Q.z), vTint = vary(Q.w), vLight = vary(Lt.xy), vOpacity = vary(Lt.z)
     const vSide = vary(side), vAxis = vary(axis), vToCam = vary(toCam), vDist = vary(dist), vFade = vary(fade), vNear = vary(near)
     // Smoke cap: how far into the pyrocumulus top this particle is (0 below capHeight × 0.6, 1 at capHeight).
     const vCap = vary(select(u.capHeight.greaterThan(0), smoothstep(u.capHeight.mul(0.45), u.capHeight, center.y.sub(u.emitPosition.y)), float(0)))
@@ -647,14 +654,14 @@ export class ParticleSystem {
         const hot = pow(clamp(vTemp.sub(u.ambientTemperature).sub(130).div(360), 0, 1), 2)
         const under = clamp(Nrm.y.negate().mul(0.5).add(0.6), 0, 1)
         const glow = u.glow.mul(u.glowStrength).mul(hot).mul(under)
-        return (vec4 as any)(albedo.mul(sun.add(sky).add(glow)), dens.mul(curve.w).mul(u.opacity).mul(mix(float(1), float(1.6), vCap)).mul(fade))
+        return (vec4 as any)(albedo.mul(sun.add(sky).add(glow)), dens.mul(curve.w).mul(u.opacity).mul(vOpacity).mul(mix(float(1), float(1.6), vCap)).mul(fade))
       })()
       color = out.xyz
       alpha = out.w
     } else {
       const disc = smoothstep(0.5, 0.2, length(c))
       color = tint.mul(u.intensity)
-      alpha = disc.mul(curve.w).mul(u.opacity).mul(soft)
+      alpha = disc.mul(curve.w).mul(u.opacity).mul(vOpacity).mul(soft)
     }
     m.colorNode = color
     m.opacityNode = r.blending === 'alpha' ? alpha.mul(vNear) : alpha

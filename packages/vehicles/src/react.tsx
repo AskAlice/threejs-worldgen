@@ -7,8 +7,10 @@
  * @module threejs-vehicles/react
  */
 import { useEffect, useImperativeHandle, useMemo, type Ref } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
+import type { Renderer } from 'three/webgpu'
 import { Fleet as FleetImpl, Vehicle as VehicleImpl, type VehicleSettings } from './fleet.ts'
+import { VehicleExhaust, type ExhaustInput } from './exhaust.ts'
 import type { RoadNetwork } from './paths.ts'
 import type { FleetEnvironment, FleetInput } from './sim.ts'
 import type { StateLook } from 'threejs-weathering'
@@ -72,4 +74,33 @@ export function Vehicle({ ref, env, ...settings }: VehicleProps): React.JSX.Elem
   useImperativeHandle(ref, () => vehicle, [vehicle])
   useFrame((_, delta) => vehicle.update(delta, env))
   return <primitive object={vehicle.object} />
+}
+
+/** Props of `<Exhaust>`: every {@link ExhaustInput} setting plus the fleet it smokes for. */
+export interface ExhaustProps extends ExhaustInput {
+  /** The fleet (from `<Fleet ref={...}>`). */
+  fleet: FleetImpl
+  /** Receives the underlying VehicleExhaust. */
+  ref?: Ref<VehicleExhaust | null>
+}
+
+/**
+ * Engine smoke, steam and exhaust for a fleet's vehicles (threejs-particles), updated every frame
+ * after the fleet. Settings are props (`reset` on every render).
+ *
+ * @example
+ * ```tsx
+ * const [fleet, setFleet] = useState<FleetImpl | null>(null)
+ * <Fleet ref={setFleet} groups={groups} />
+ * {fleet && <Exhaust fleet={fleet} temperature={-5} humidity={0.8} />}
+ * ```
+ */
+export function Exhaust({ fleet, ref, ...settings }: ExhaustProps): null {
+  const { gl, camera } = useThree()
+  const exhaust = useMemo(() => new VehicleExhaust(fleet, settings), [fleet])
+  useEffect(() => () => exhaust.dispose(), [exhaust])
+  useEffect(() => { exhaust.reset(settings) })
+  useImperativeHandle(ref, () => exhaust, [exhaust])
+  useFrame((_, delta) => exhaust.update(gl as unknown as Renderer, delta, camera)) // after the fleet (mounted after it); a positive priority would take over rendering
+  return null
 }
