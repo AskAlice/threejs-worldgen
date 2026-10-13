@@ -4,15 +4,17 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { World } from 'threejs-biomes'
 import { applyDamage } from 'threejs-weathering'
 import {
-  DEFAULT_DECORATE, PROP_KIND_IDS, PROP_KINDS, Props, RoadPath, decorateRoads, planPowerLine,
+  PROP_KIND_IDS, PROP_KINDS, Props, RoadPath, decorateRoads, planPowerLine,
   type DecorateOptions, type PropPlacement, type RoadNetworkLike,
 } from 'threejs-props'
-import { classOf, createPanel } from './panel'
+import { classOf, createPanel, specOptions } from './panel'
+import { panels } from './props.panel'
 import { worldGround } from './world-ground'
 
 // threejs-props sandbox: a gallery of every prop and variant with seed variation, a decorated town
 // junction, a rural gravel road with a power line, fences and hay, and a pylon line across the fields.
 // Everything sits on a threejs-biomes world and is one Props instance (one draw call per shape × material).
+// Every option is in the panel (props.panel.ts lists the few left out, and why), with share-by-URL.
 const renderer = new THREE.WebGPURenderer({ antialias: true, forceWebGL: new URLSearchParams(location.search).has('webgl') })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
 renderer.setSize(innerWidth, innerHeight)
@@ -89,7 +91,8 @@ const lots = [[200, 30], [300, -25], [380, 52], [470, 75], [520, 20]].map(([dx, 
 // 3. A high-voltage line between two (imagined) settlements north of the town.
 const pylons = planPowerLine([[C[0] - 500, C[1] + 330], [C[0] + 550, C[1] + 420]], world, { seed: 3, spacing: 260 })
 
-const decorate: DecorateOptions = { ...structuredClone(DEFAULT_DECORATE), seed: 7 }
+const spec = panels['threejs-props']
+const decorate = structuredClone(spec.decorateRoads.target) as DecorateOptions
 const placementsFor = () => [...gallery, ...decorateRoads(net, world, decorate, { lots }), ...pylons]
 
 const props = await Props.create({ scene, placements: placementsFor() })
@@ -128,24 +131,11 @@ const gui = createPanel([
   {
     name: 'threejs-props',
     classes: [
-      classOf('Props', props, { ...props.options, placements: undefined }, {
-        skip: ['placements'],
-        ranges: { wetness: [0, 1, 0.01], snow: [0, 1, 0.01], burn: [0, 1, 0.01], damage: [0, 1, 0.01], heat: [0, 1, 0.01], night: [0, 1, 0.01], lean: [0, 1.2, 0.01], sag: [0, 0.12, 0.001], iceSag: [0, 2, 0.01], segments: [1, 24, 1], thickness: [0.005, 0.1, 0.001] },
-      }),
-      classOf('RoadSurface (avenue)', { set: (i: object) => { for (const r of roads.slice(0, 5)) r.surface.set(i) } }, asphalt.options, {
-        skip: ['states', 'width'], choices: { surface: ['asphalt', 'cobblestone', 'gravel', 'dirt'], centreLine: ['none', 'dashed', 'solid', 'double'] },
-        ranges: { lanes: [1, 3, 1], wear: [0, 1, 0.01], cracks: [0, 1, 0.01], patches: [0, 1, 0.01], ruts: [0, 1, 0.01], potholes: [0, 1, 0.01] },
-      }),
-      classOf('RoadSurface (dirt lane)', dirt, dirt.options, {
-        skip: ['states', 'width'], choices: { surface: ['asphalt', 'cobblestone', 'gravel', 'dirt'], centreLine: ['none', 'dashed', 'solid', 'double'] },
-        ranges: { lanes: [1, 3, 1], wear: [0, 1, 0.01], cracks: [0, 1, 0.01], patches: [0, 1, 0.01], ruts: [0, 1, 0.01], potholes: [0, 1, 0.01] },
-      }),
-      {
-        // The panel edits this object in place; re-plan every placement from it.
-        name: 'decorateRoads', target: decorate as Record<string, any>,
-        onChange: () => props.set({ placements: placementsFor() }),
-        choices: { style: ['auto', 'picket', 'rail', 'adobe', 'stone'], kind: ['power-pole', 'pylon'], variant: ['auto', 'cobra', 'post'] },
-      },
+      classOf('Props', props, { ...props.options, placements: undefined }, specOptions(spec.Props)),
+      classOf('RoadSurface (avenue)', { set: (i: object) => { for (const r of roads.slice(0, 5)) r.surface.set(i) } }, asphalt.options, specOptions(spec['RoadSurface (avenue)'])),
+      classOf('RoadSurface (dirt lane)', dirt, dirt.options, specOptions(spec['RoadSurface (dirt lane)'])),
+      // The panel edits this object in place; re-plan every placement from it.
+      { name: 'decorateRoads', target: decorate as Record<string, any>, onChange: () => props.set({ placements: placementsFor() }), ...specOptions(spec.decorateRoads) },
     ],
   },
 ])
