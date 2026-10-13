@@ -1,5 +1,5 @@
 // Farm tractors: big lugged rear tyres and smaller front ones, a cab or an open roll-over frame, an
-// exhaust stack ahead of the cab, seeded colour families with matching rims (no liveries), and optional
+// exhaust stack ahead of the cab, seeded body colours with neutral rims and trim (no liveries), and optional
 // implements: a mounted plough or seeder, or a towed tipping trailer that articulates like a truck
 // trailer. Plus wheel footprints as plain data for grass and crop interaction, and field-row routes.
 import { Object3D } from 'three/webgpu'
@@ -10,12 +10,15 @@ import type { ExhaustVent, ModelPart, PartMount, VehicleModel, VehicleParams } f
 import type { FleetSim, RouteSpec } from './sim.ts'
 import type { Fleet } from './fleet.ts'
 
-/** Colour families: body paints and the rim colour that goes with them. */
+/**
+ * Colour families: body paints with neutral (grey or black) rims and trim. Deliberately no maker's
+ * signature scheme: no yellow anywhere, no contrasting rims, no white or contrasting roofs.
+ */
 export const TRACTOR_FAMILIES: Record<string, { body: string[]; rim: string }> = {
-  green: { body: ['#2f6b2a', '#367c2b', '#2a5f25'], rim: '#e8c21c' },
-  red: { body: ['#b3261e', '#a11d17', '#c0301f'], rim: '#9aa0a6' },
-  blue: { body: ['#1f4f9a', '#2a5db0', '#1c4688'], rim: '#c9ccd0' },
-  orange: { body: ['#e36c0a', '#d9601a', '#ef7d1a'], rim: '#2b2c30' },
+  green: { body: ['#2f5a2a', '#3a6431', '#28502a'], rim: '#3a3c3f' },
+  red: { body: ['#a32a1f', '#962419', '#ad3324'], rim: '#2b2c30' },
+  blue: { body: ['#244a86', '#2d5596', '#20406f'], rim: '#8d9196' },
+  orange: { body: ['#c8641a', '#bd5c1e', '#d06e22'], rim: '#2b2c30' },
 }
 
 /** Tractor implements. */
@@ -107,7 +110,7 @@ export function tractor(p: VehicleParams, rand: Rand): VehicleModel {
     for (const x of [-0.71, 0.71]) m.box([x, (deck + roof) / 2, (c0 + c1) / 2], [0.015, roof - deck - 0.2, c1 - c0 - 0.06], GLASS)
     m.box([0, (deck + 0.3 + roof) / 2, c1], [1.38, roof - deck - 0.4, 0.015], GLASS)
     m.box([0, (deck + 0.5 + roof) / 2, c0], [1.38, roof - deck - 0.6, 0.015], GLASS)
-    m.rounded([0, roof + 0.04, (c0 + c1) / 2], [1.62, 0.16, c1 - c0 + 0.3], rand() < 0.4 ? paint('#e9ecee') : BODY, 4, 18, 6)
+    m.rounded([0, roof + 0.04, (c0 + c1) / 2], [1.62, 0.16, c1 - c0 + 0.3], BODY, 4, 18, 6)
     for (const s of [-1, 1]) for (const z of [c0 - 0.12, c1 + 0.12]) m.rounded([s * 0.5, roof, z], [0.18, 0.08, 0.06], HEAD, 4)
     m.rounded([0, roof + 0.13, (c0 + c1) / 2], [0.12, 0.08, 0.12], paint('#ffb43a', 0, 0.8, FINISH.glass), 3)
     for (const s of [-1, 1]) {
@@ -314,13 +317,15 @@ export class WheelInteractors {
         n++
       }
     }
-    for (const it of this.interactors.splice(n)) it.object.removeFromParent()
+    for (let i = n; i < this.interactors.length; i++) this.interactors[i].object.removeFromParent()
+    this.interactors.length = n
     return this
   }
 
   /** Removes the interactor objects. */
   dispose(): void {
-    for (const it of this.interactors.splice(0)) it.object.removeFromParent()
+    for (const it of this.interactors) it.object.removeFromParent()
+    this.interactors.length = 0
   }
 }
 

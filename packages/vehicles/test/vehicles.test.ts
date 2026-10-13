@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { World } from 'threejs-biomes'
 import { isPlausible } from '../../worldgen/src/assets.ts'
-import { MeshBuilder, paint, type MeshData } from '../src/mesh.ts'
+import { MeshBuilder, paint, rgb, type MeshData } from '../src/mesh.ts'
 import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type VehicleType } from '../src/models.ts'
 import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/cars.ts'
 import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
 import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
 import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
-import { TRACTOR_IMPLEMENTS, fieldRoute, wheelFootprints } from '../src/tractor.ts'
+import { TRACTOR_FAMILIES, TRACTOR_IMPLEMENTS, WheelInteractors, fieldRoute, wheelFootprints } from '../src/tractor.ts'
 import { DEFAULT_EXHAUST, VehicleExhaust, condensation, createExhaustBuffers, createExhaustState, exhaustSources, type ExhaustSettings } from '../src/exhaust.ts'
 import { Fleet } from '../src/fleet.ts'
 import { MOTION_STRIDE, SOURCE_STRIDE, spawnRate } from 'threejs-particles'
@@ -677,4 +677,44 @@ test('exhaust: the GPU source table follows maxVents, selection buffers are reus
   const few = createExhaustBuffers(10)
   exhaustSources(pile, { x: 5, y: 0, z: 5 }, { ...DEFAULT_EXHAUST, maxVents: 10 }, createExhaustState(pile.count), 1 / 30, few)
   assert.deepEqual([...few.vehicle], Array.from({ length: 10 }, (_, i) => i))
+})
+
+test('tractors: colour families are a body colour with neutral trim, not a maker\'s signature scheme', () => {
+  // Saturation of a linear RGB colour (0 grey … 1 pure hue); near-black counts as neutral whatever its tinge.
+  const sat = (r: number, g: number, b: number) => { const hi = Math.max(r, g, b), lo = Math.min(r, g, b); return hi - lo < 0.02 ? 0 : (hi - lo) / hi }
+  for (const [family, fam] of Object.entries(TRACTOR_FAMILIES)) {
+    const [r, g, b] = rgb(fam.rim)
+    assert.ok(sat(r, g, b) < 0.15, `${family}: rims ${fam.rim} must be grey or black`)
+    for (const seed of [1, 2, 3, 4, 5]) for (const implement of TRACTOR_IMPLEMENTS) {
+      const m = buildVehicle('tractor', { family, implement }, seed)
+      // Nothing yellow anywhere (green-and-yellow is a defended trade dress), and no second livery colour:
+      // every own (unpainted) colour on the tractor is neutral, lamps and glass aside.
+      for (const part of m.parts) {
+        const c = part.mesh.color, st = part.mesh.style
+        for (let i = 0; i < c.length / 3; i++) {
+          if (st[i * 3] > 0.5 || st[i * 3 + 1] > 0 || st[i * 3 + 2] === 1) continue // body paint, lamps, glass
+          if (implement !== 'none' && part.name === 'body') continue // implements have their own colours
+          assert.ok(sat(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]) < 0.35, `${family} ${part.name}: coloured trim ${[...c.slice(i * 3, i * 3 + 3)].map((v) => v.toFixed(2))}`)
+        }
+      }
+    }
+  }
+})
+
+test('wheel interactors: follow the wheels without per-frame garbage', () => {
+  const fleet = new Fleet({ groups: [{ type: 'tractor', count: 2, speed: [4, 4], route: { kind: 'circle', center: [0, 0, 0], radius: 30 } }] })
+  const prints = new WheelInteractors(fleet)
+  assert.equal(prints.interactors.length, 8)
+  const list = prints.interactors, objects = list.map((i) => i.object)
+  fleet.update(0.1)
+  prints.update()
+  assert.equal(prints.interactors, list, 'same array')
+  assert.deepEqual(prints.interactors.map((i) => i.object), objects, 'same objects')
+  assert.ok(objects.every((o) => o.parent === fleet.object))
+  const capped = new WheelInteractors(fleet, { max: 5 })
+  assert.equal(capped.interactors.length, 5)
+  capped.dispose()
+  assert.equal(capped.interactors.length, 0)
+  assert.ok(objects.every((o) => o.parent === fleet.object), 'the other set is untouched')
+  fleet.dispose()
 })

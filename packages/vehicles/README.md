@@ -158,7 +158,7 @@ A rig is one fleet unit: the tractor drives the route and each trailer's kingpin
 
 ### Tractors
 
-A mid-size row-crop tractor: lugged 1.96 m rear and 1.55 m front tyres on a 1.95 m track, a narrow bonnet with front weights, a glass cab or an open roll-over frame, an exhaust stack at the front corner of the cab, and seeded colour families (green, red, blue, orange, each with its own rim colour; no liveries). Implements: a mounted plough or seed drill, or a towed tipping trailer that articulates like a truck trailer. `fieldRoute(center, rows, spacing, length, heading)` makes a closed route that works a field in rows and turns at the headlands.
+A mid-size row-crop tractor: lugged 1.96 m rear and 1.55 m front tyres on a 1.95 m track, a narrow bonnet with front weights, a glass cab or an open roll-over frame, an exhaust stack at the front corner of the cab, and seeded body colours (green, red, blue, orange) with neutral grey or black rims and trim, so no maker's signature scheme or livery. Implements: a mounted plough or seed drill, or a towed tipping trailer that articulates like a truck trailer. `fieldRoute(center, rows, spacing, length, heading)` makes a closed route that works a field in rows and turns at the headlands.
 
 For grass and crops, `wheelFootprints(fleet.sim, v)` gives each tyre's ground contact as plain data (`position`, `radius`, `strength`), and `WheelInteractors` keeps one `Object3D` per tyre on them, in the shape threejs-grass's `interactors` take:
 
