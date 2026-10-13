@@ -1,6 +1,7 @@
 {
   "name": "threejs-population",
   "version": "0.1.0",
+  "private": true,
   "description": "Population density on a hexagonal hierarchical grid (H3) for procedural worlds: rural cells, towns and urban centres",
   "type": "module",
   "license": "Apache-2.0",
