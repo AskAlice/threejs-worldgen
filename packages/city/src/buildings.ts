@@ -1,5 +1,6 @@
 import { pick, type Architecture, type RoofMaterial, type RoofShape, type WallMaterial } from './architecture.ts'
 import type { District } from './districts.ts'
+import type { Landmark } from './landmarks.ts'
 import type { Lot } from './lots.ts'
 import { boxCorners, insetPolygon, orientedBox, pointInPolygon, polygonArea, polygonCentroid, type OrientedBox, type Vec2 } from './polygon.ts'
 
@@ -66,6 +67,8 @@ export interface BuildingPart {
   roof: RoofShape
   /** Roof rise above the walls (ridge or peak), metres. */
   roofHeight: number
+  /** Walls without windows (steeples, tanks, silos, barns). */
+  blank?: boolean
 }
 
 /** Door position on the street side, for mailboxes, paths and people. */
@@ -124,6 +127,8 @@ export interface Building {
   shops: boolean
   /** Main door. */
   entrance: Entrance
+  /** A landmark (church, town hall, water tower), or `null` for homes, shops, offices and industry. */
+  use: Landmark | null
 }
 
 /** Building rules. */
@@ -190,7 +195,8 @@ export interface BuildingSite {
 
 const RESIDENTIAL_SHARE: Record<BuildingStyle, number> = { tower: 0.35, block: 0.75, house: 1, shed: 0 }
 
-const fits = (r: OrientedBox, p: Vec2[]) => boxCorners(r).every(([x, z]) => pointInPolygon(x, z, p))
+/** True if the rectangle lies inside the polygon. */
+export const fits = (r: OrientedBox, p: Vec2[]): boolean => boxCorners(r).every(([x, z]) => pointInPolygon(x, z, p))
 
 /** A rectangle-ish outline for a tower shaft: the inset footprint, its box, a chamfered box or a 12-gon. */
 function shaftShape(foot: Vec2[], inset: number, kind: number): Vec2[] | null {
@@ -221,8 +227,8 @@ function shaftShape(foot: Vec2[], inset: number, kind: number): Vec2[] | null {
   return out
 }
 
-/** Rectangle `w` wide (along the street) and `d` deep, set back from the street edge a→b of `lot`. */
-function streetRect(lot: Lot, along: number, w: number, d: number, setback: number): OrientedBox | null {
+/** Rectangle `w` wide (along the street) and `d` deep, set back from the street edge a→b of `lot` (shrunk until it fits). */
+export function streetRect(lot: Lot, along: number, w: number, d: number, setback: number): OrientedBox | null {
   const p = lot.polygon
   const a = p[lot.front], b = p[(lot.front + 1) % p.length]
   const fl = Math.hypot(b[0] - a[0], b[1] - a[1])
@@ -240,6 +246,22 @@ function streetRect(lot: Lot, along: number, w: number, d: number, setback: numb
   return null
 }
 
+/** The main door: the middle of the wall (of outline `wall`, counter-clockwise) closest to the lot's street edge. */
+export function entranceFacing(wall: Vec2[], lot: Lot): Entrance {
+  const p = lot.polygon, fa = p[Math.max(0, lot.front)], fb = p[(Math.max(0, lot.front) + 1) % p.length]
+  const fm: Vec2 = [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2]
+  let entrance: Entrance = { x: wall[0][0], z: wall[0][1], nx: 0, nz: 1 }
+  let bestD = Infinity
+  for (let i = 0; i < wall.length; i++) {
+    const a = wall[i], b = wall[(i + 1) % wall.length]
+    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2
+    const dist = Math.hypot(mx - fm[0], mz - fm[1])
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
+    if (dist < bestD) { bestD = dist; entrance = { x: mx, z: mz, nx: (b[1] - a[1]) / l, nz: -(b[0] - a[0]) / l } }
+  }
+  return entrance
+}
+
 /**
  * Decides what (if anything) stands on a lot: style, volumes, materials, roofs and details, matched
  * to the district and the regional architecture. Pure: same inputs and random sequence give the
@@ -252,7 +274,7 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
   if (d === 'park' || lot.front < 0 || rand() >= site.coverage) return null
 
   let floors = Math.round((site.floors[0] + (site.floors[1] - site.floors[0]) * Math.pow(site.density, 1.6)) * (1 + (rand() * 2 - 1) * o.variation))
-  floors = Math.max(1, Math.min(site.maxFloors, floors))
+  floors = Math.max(1, Math.min(site.maxFloors, Math.max(Math.round(site.floors[0]), floors)))
   let style: BuildingStyle
   if (d === 'industrial') style = 'shed'
   else if (d === 'farmland') style = rand() < 0.55 ? 'house' : 'shed'
@@ -411,18 +433,7 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
     details.push({ kind: 'ac', x: a[0] + ux * t + uz * 0.3, z: a[1] + uz * t - ux * 0.3, width: 0.9, depth: 0.6, bottom: f * fh + 0.4, top: f * fh + 1.0, angle: Math.atan2(uz, ux) })
   }
 
-  // Entrance: the middle of the wall closest to the street.
-  const fm: Vec2 = [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2]
-  let entrance: Entrance = { x: wall[0][0], z: wall[0][1], nx: 0, nz: 1 }
-  let bestD = Infinity
-  for (let i = 0; i < wall.length; i++) {
-    const a = wall[i], b = wall[(i + 1) % wall.length]
-    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2
-    const dist = Math.hypot(mx - fm[0], mz - fm[1])
-    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
-    if (dist < bestD) { bestD = dist; entrance = { x: mx, z: mz, nx: (b[1] - a[1]) / l, nz: -(b[0] - a[0]) / l } }
-  }
-
+  const entrance = entranceFacing(wall, lot)
   let height = 0, floorArea = 0
   for (const part of parts) {
     let below = 0
@@ -438,6 +449,6 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
     id, lot: lot.id, district: d, style, parts, material, roofMaterial, floors, floorHeight: fh, height,
     base: 0, bottom: 0, stilts, center: polygonCentroid(foot), area: polygonArea(foot), seed,
     population: (floorArea * RESIDENTIAL_SHARE[style] * (d === 'downtown' ? 0.6 : 1)) / o.areaPerPerson,
-    details, balconies, shops: d === 'downtown' && style !== 'house' ? rand() < 0.8 : style === 'block' && rand() < 0.3, entrance,
+    details, balconies, shops: d === 'downtown' && style !== 'house' ? rand() < 0.8 : style === 'block' && rand() < 0.3, entrance, use: null,
   }
 }

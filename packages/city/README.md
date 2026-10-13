@@ -71,8 +71,12 @@ by value. `react` and `@react-three/fiber` are optional peer dependencies; the c
 
 1. **Placement** (`generatePopulation`, then `planCities`): the [settlement planner](#settlement-planner) decides where
    people live and how many. Each settlement becomes a city whose size class comes from its population class
-   (`citySize`: metropolises and cities are cities, farmsteads get none) and whose radius follows its head count
-   through the class's `population` range (`cityRadius`).
+   (`citySize`: hamlet, village, town, city or metropolis; farmsteads get none) and whose radius follows its head
+   count through the class's `population` range (`cityRadius`). Each class builds differently: a **hamlet** is a
+   handful of houses at a junction; a **village** a few streets along the road through it, houses on big lots and a
+   church; a **town** a main street of 2–3 storey shops and flats (downtown is a strip along it, `mainStreet`), a short
+   grid of houses on big lots, a church, a town hall and a water tower, then fields; **cities** and **metropolises**
+   the full grid with towers downtown. Each size class carries its own `roads` and district `styles` presets.
 2. **Roads** (`growRoads`): arterials grow from the centre and branch into collectors and local streets
    (Parish & Müller 2001), following a tensor field (Chen et al. 2008) built from grid patches, a radial centre and the
    terrain gradient (streets along contours and coasts). Local constraints: avoid water and steep grades (steer, else
@@ -83,6 +87,8 @@ by value. `react` and `@react-three/fiber` are optional peer dependencies; the c
    recursive oriented-bounding-box cuts that keep street frontage. Roads through open ground get lots along both sides
    (villages, ribbon development, farmsteads).
 4. **Districts**: downtown, residential, industrial, park and farmland, by distance from the centre plus noise.
+   Landmarks (`planLandmarks`) take the lots nearest the centre that fit them: a church (nave and spired tower), a
+   town hall (hip roof, clock tower); a water tower stands further out.
 5. **Buildings**: towers (podium, shaft and crown, with box, chamfered, round or inset shafts), apartment blocks
    (penthouses, balconies), houses (gable, hip, skillion or flat roofs, L-shaped wings, chimneys, stilts) and sheds
    (saw-tooth roofs). Materials, roofs and details come from an architecture picked from the climate at the centre:
@@ -142,7 +148,7 @@ regenerate the settlement, palette changes rebuild its meshes, everything else i
 |---|---|---|
 | `seed` | `1` | Same seed, options and world give the same settlement. |
 | `center` | `[0, 0]` | Centre, frame-local [x, z] metres. |
-| `size` | `'town'` | `'hamlet'` · `'village'` · `'town'` · `'city'`: radius, height limit, layout, districts and surfaces. |
+| `size` | `'town'` | `'hamlet'` · `'village'` · `'town'` · `'city'` · `'metropolis'`: radius, height limit, layout, districts, surfaces and landmarks. |
 | `radius` | `0` | Metres; 0 = the middle of the size class's range. |
 | `style` | `'auto'` | `'grid'` · `'radial'` · `'organic'` presets for the tensor field and road lengths. |
 | `siteResolution` | `0` | Terrain sampling step, metres (0 = radius / 60, clamped 6–25). |
@@ -153,11 +159,12 @@ regenerate the settlement, palette changes rebuild its meshes, everything else i
 | `lotJitter` | `0.35` | How unevenly blocks are split. |
 | `roadside` | | Lots along open roads: `enabled`, `junctionClearance`, `margin`, `depth`. |
 | `buildings` | | `floorHeight` per style, `towerFloors` (12), `houseFloors` (2), `houseWidth`, `houseDepth`, `sideGap`, `sawtoothRoofs`, `chimneys`, `rooftop`, `penthouses`, `variation`, `areaPerPerson`. |
+| `landmarks` | | `church` (nave `width`, `length`, `wallHeight`, `pitch`; `towerWidth`, `towerHeight`, `spire`, `setback`), `townHall` (`width`, `depth`, `floors`, `pitch`, `clockTower`, `towerHeight`, `setback`), `waterTower` (`height`, `columnRadius`, `tankRadius`, `tankHeight`, `reach`). |
 | `architecture` | `'auto'` | `'temperate'` · `'cold'` · `'arid'` · `'mediterranean'` · `'tropical'` · `'wetland'`; auto reads the climate at the centre. |
 | `architectures` | | Per architecture: weighted `houseMaterials`, `blockMaterials`, `towerMaterials`, `houseRoofs`, `roofMaterials`; `pitch`, `overhang`, `stilts`, `wings`, `balconies`, `airConditioners`. |
 | `climate` | `null` | Override `{ temperature, moisture, biome }` for `'auto'`. |
 | `terrain` | | `flatten`, `flattenLots`, `maxGrade` (0.1), `step`, `roadFalloff`, `lotFalloff`, `bridgeClearance`, `foundation`, `roadOffset`. |
-| `sizes` | | Size classes: `population` range, `radius` range (a settlement's radius follows its population through them), `maxFloors`, `style`, `arms`, `districts` shares, `surfaces`, `oldTown`. |
+| `sizes` | | Size classes: `population` range, `radius` range (a settlement's radius follows its population through them), `maxFloors`, `style`, `arms`, `districts` shares, `surfaces`, `oldTown`, `mainStreet` (half-width of a main-street downtown, 0 = a disc), `landmarks` (how many churches, town halls, water towers), and `roads` / `styles` presets over the defaults (your own input still wins). |
 | `facade` | | `night`, `windowLight`, `lightIntensity`, `glass`, `frame`, `windows` per style (`bayWidth`, `windowWidth`, `windowHeight`, `sill`, `frame`, `lit`), `walls` / `roofs` palettes per material, `variation`, `patternScale`. |
 | `roadLook` | | `colors` per surface, `sidewalk`, `kerb`, `kerbHeight`, `marking`, `centerLine`, `concrete`, `markings`, `wear`. |
 | `weather` | zeros | `walls`, `roofs`, `roads`: `{ wetness, snow, burn, damage }`. |

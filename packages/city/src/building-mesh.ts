@@ -2,7 +2,7 @@ import { ShapeUtils, Vector2 } from 'three/webgpu'
 import { ROOF_MATERIALS, WALL_MATERIALS } from './architecture.ts'
 import { BUILDING_STYLES, type Building, type BuildingDetail, type BuildingPart } from './buildings.ts'
 import { MeshBuilder, type MeshData } from './mesh-builder.ts'
-import type { Vec2 } from './polygon.ts'
+import { polygonArea, polygonCentroid, type Vec2 } from './polygon.ts'
 
 /** Vertex attributes of building geometry (walls and roofs share them so both fit any BatchedMesh). */
 export const BUILDING_VERTEX = {
@@ -84,16 +84,16 @@ function face(m: MeshBuilder, p: P3[], uvs: number[], hint: P3) {
 
 const pool: Vector2[] = []
 
-/** Flat horizontal cap over a polygon at height y (facing up), uv = local xz. */
-function cap(m: MeshBuilder, poly: Vec2[], y: number, ox: number, oz: number) {
+/** Flat horizontal cap over a polygon at height y (facing up, or down for the underside of an overhang), uv = local xz. */
+function cap(m: MeshBuilder, poly: Vec2[], y: number, ox: number, oz: number, down = false) {
   // Reused Vector2s: no per-vertex allocations.
   while (pool.length < poly.length) pool.push(new Vector2())
   const tris = ShapeUtils.triangulateShape(poly.map(([x, z], i) => pool[i].set(x, z)), [])
-  m.set('normal', 0, 1, 0)
+  m.set('normal', 0, down ? -1 : 1, 0)
   for (const [i, j, k] of tris) {
     const a = poly[i], b = poly[j], c = poly[k]
     const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-    const order = cross < 0 ? [a, b, c] : [a, c, b]
+    const order = (cross < 0) !== down ? [a, b, c] : [a, c, b]
     const idx = order.map(([x, z]) => m.vertex(x - ox, y, z - oz, x - ox, z - oz))
     m.triangle(idx[0], idx[1], idx[2])
   }
@@ -132,6 +132,18 @@ function box(m: MeshBuilder, cx: number, cz: number, w: number, d: number, angle
   cap(m, ring, y1, ox, oz)
 }
 
+
+/** Cone roof: a fan from the outline at `top` to a point `rise` above its centroid. */
+function coneRoof(roof: MeshBuilder, poly: Vec2[], top: number, rise: number, ox: number, oz: number, seed: number, roofMaterial: number) {
+  const [cx, cz] = polygonCentroid(poly)
+  roof.set('facade', ROOF_PARTS.roof, seed, 0, roofMaterial)
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length]
+    const mx = (a[0] + b[0]) / 2 - cx, mz = (a[1] + b[1]) / 2 - cz
+    const slant = Math.hypot(mx, mz, rise)
+    face(roof, [[a[0] - ox, top, a[1] - oz], [b[0] - ox, top, b[1] - oz], [cx - ox, top + rise, cz - oz]], [0, slant, Math.hypot(b[0] - a[0], b[1] - a[1]), slant, 0, 0], [mx, Math.hypot(mx, mz) ** 2 / Math.max(rise, 1e-3), mz])
+  }
+}
 
 /** Pitched, skillion or saw-tooth roof on a part's rectangle (gable ends go into the wall mesh). */
 function pitchedRoof(roof: MeshBuilder, wall: MeshBuilder, part: BuildingPart, top: number, base: number, ox: number, oz: number, overhang: number, styleCode: number, seed: number, material: number, roofMaterial: number) {
@@ -204,26 +216,35 @@ export function buildingGeometry(b: Building, origin: Vec2, look: BuildingLook):
 
   for (const part of b.parts) {
     let below = b.bottom
+    let widest = part.tiers[0].polygon
+    const windows = !part.blank
     for (let t = 0; t < part.tiers.length; t++) {
       const tier = part.tiers[t]
       const top = base + tier.top
-      walls(w, tier.polygon, below, top, base, ox, oz, styleCode, b.seed, material, true)
+      walls(w, tier.polygon, below, top, base, ox, oz, styleCode, b.seed, material, windows)
       const last = t === part.tiers.length - 1
       if (!last || part.roof === 'flat') {
         r.set('facade', ROOF_PARTS.roof, b.seed, 0, flatMaterial)
         cap(r, tier.polygon, top, ox, oz)
         if (last && look.parapet > 0 && b.style !== 'house') walls(w, tier.polygon, top, top + look.parapet, base, ox, oz, styleCode, b.seed, material, false)
       }
+      // A tier wider than the one below (a water tower's tank) needs an underside.
+      if (t > 0 && polygonArea(tier.polygon) > polygonArea(part.tiers[t - 1].polygon)) {
+        r.set('facade', ROOF_PARTS.metal, b.seed, 0, 0)
+        cap(r, tier.polygon, below, ox, oz, true)
+      }
+      if (polygonArea(tier.polygon) > polygonArea(widest)) widest = tier.polygon
       below = top
     }
     const top = base + part.tiers[part.tiers.length - 1].top
-    if (part.roof !== 'flat' && part.rect) {
+    if (part.roof === 'cone') coneRoof(r, part.tiers[part.tiers.length - 1].polygon, top, part.roofHeight, ox, oz, b.seed, roofMaterial)
+    else if (part.roof !== 'flat' && part.rect) {
       pitchedRoof(r, w, part, top, base, ox, oz, look.overhang, styleCode, b.seed, material, roofMaterial)
     }
-    // Far LOD: one prism per part, capped halfway up the roof.
-    walls(sw, part.tiers[0].polygon, b.bottom, top + part.roofHeight * 0.5, base, ox, oz, styleCode, b.seed, material, true)
+    // Far LOD: one prism per part (its widest tier), capped halfway up the roof.
+    walls(sw, widest, b.bottom, top + part.roofHeight * 0.5, base, ox, oz, styleCode, b.seed, material, windows)
     sr.set('facade', ROOF_PARTS.roof, b.seed, 0, part.roof === 'flat' ? flatMaterial : roofMaterial)
-    cap(sr, part.tiers[0].polygon, top + part.roofHeight * 0.5, ox, oz)
+    cap(sr, widest, top + part.roofHeight * 0.5, ox, oz)
   }
 
   return { walls: w.build(), roofs: r.build(), simpleWalls: sw.build(), simpleRoofs: sr.build() }

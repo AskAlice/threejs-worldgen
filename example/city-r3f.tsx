@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { World } from 'threejs-biomes'
-import { City, generatePopulation, planCities, type CityImpl, type CityInput, type SettlementSize } from 'threejs-city/react'
-import { panels } from './city.panel'
+import { City, type CityImpl, type CityInput, type SettlementSize } from 'threejs-city/react'
+import { demoSites, panels } from './city.panel'
 import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 
 // threejs-city in React Three Fiber: one <City> on a threejs-biomes world, placed by the settlement planner
-// (generatePopulation, then planCities).
+// (generatePopulation, then planCities). The `size` control is the class picker: it moves to a settlement of that
+// class, hamlet to metropolis.
 // Every City option is a control (the same panel manifest as city.ts: city.panel.ts lists the few left out, and why),
 // and every control is a <City> prop: looks and weather update instantly, layout changes regenerate in place.
 const world = new World({ seed: 11 })
-const sites = planCities(generatePopulation(world, { radius: 10_000 })) // largest first
-const best = (size: SettlementSize) => sites.find((s) => s.size === size) ?? sites.at(-1)! // no hamlets: the smallest
+const best = demoSites(world)
 
 function Scene() {
   const options = useSpec('City', panels['threejs-city'].City) as CityInput

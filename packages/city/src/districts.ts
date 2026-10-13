@@ -75,14 +75,22 @@ export class DistrictMap {
   readonly cz: number
   /** Settlement radius, metres. */
   readonly radius: number
+  /** Half-width of the main-street downtown strip, metres (0 = downtown is a disc). */
+  readonly mainStreet: number
+  /** Direction of the main street, radians from +x. */
+  readonly axis: number
   private readonly seed: number
   private readonly cell: CellSample = { distance: 0, point: [0, 0, 0], random: 0 }
 
-  /** District layout around (`cx`, `cz`) for a settlement of `radius` metres. */
-  constructor(options: DistrictOptions, shares: DistrictShares, cx: number, cz: number, radius: number, seed: number) {
+  /**
+   * District layout around (`cx`, `cz`) for a settlement of `radius` metres. With `mainStreet` > 0, downtown is a
+   * strip that wide either side of a street through the centre along `axis` (a town's high street) instead of a disc.
+   */
+  constructor(options: DistrictOptions, shares: DistrictShares, cx: number, cz: number, radius: number, seed: number, mainStreet = 0, axis = 0) {
     this.options = options
     this.shares = shares
     this.cx = cx; this.cz = cz; this.radius = radius; this.seed = seed
+    this.mainStreet = mainStreet; this.axis = axis
   }
 
   /** Distance from the centre as a fraction of the radius, with boundary noise. */
@@ -95,7 +103,10 @@ export class DistrictMap {
   at(x: number, z: number): District {
     const s = this.shares
     const d = this.reach(x, z)
-    if (d < s.downtown) return 'downtown'
+    if (this.mainStreet > 0) {
+      const dx = x - this.cx, dz = z - this.cz, ux = Math.cos(this.axis), uz = Math.sin(this.axis)
+      if (Math.abs(dx * ux + dz * uz) < s.downtown * this.radius && Math.abs(dz * ux - dx * uz) < this.mainStreet) return 'downtown'
+    } else if (d < s.downtown) return 'downtown'
     if (d > s.farmland) return 'farmland'
     const o = this.options
     if (s.park > 0 && cellular(this.seed + 43, x / o.parkSize, 1.7, z / o.parkSize, 0.9, this.cell).random < s.park) return 'park'

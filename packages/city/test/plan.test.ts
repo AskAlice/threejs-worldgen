@@ -3,26 +3,74 @@ import assert from 'node:assert/strict'
 import { World } from 'threejs-biomes'
 import {
   architectureFor, buildingGeometry, cityData, citySize, DEFAULT_SIZE_CLASSES, generatePopulation, modifierPoint, planCities, planCity,
-  pointInPolygon, resolveCityOptions, roadAnchors, roadGeometry, routeCost, runToEnd, Site, type SettlementSize,
+  pointInPolygon, resolveCityOptions, roadAnchors, roadGeometry, routeCost, runToEnd, SETTLEMENT_SIZES, Site, type CityInput, type CityPlan,
+  type SettlementSize,
 } from '../src/index.ts'
 
 const ground = (x: number, z: number) => ({ height: Math.sin(x / 300) * 20 + Math.cos(z / 410) * 12, waterLevel: Math.abs(x - 250 + Math.sin(z / 100) * 30) < 20 ? -5 : NaN })
-const plan = (size: SettlementSize, seed = 3, extra = {}) => runToEnd(planCity(ground, resolveCityOptions({ size, seed, ...extra }), { temperature: 12, moisture: 0.5, biome: 'grassland' }))
+const plans = new Map<string, CityPlan>() // plans are pure: plan each settlement once per file
+const plan = (size: SettlementSize, seed = 3, extra: CityInput = {}) => {
+  const key = JSON.stringify([size, seed, extra])
+  if (!plans.has(key)) plans.set(key, runToEnd(planCity(ground, resolveCityOptions({ size, seed, ...extra }), { temperature: 12, moisture: 0.5, biome: 'grassland' })))
+  return plans.get(key)!
+}
 
-test('every size class gets buildings, bigger classes more of them', () => {
-  const counts = (['hamlet', 'village', 'town', 'city'] as const).map((s) => plan(s).buildings.length)
-  assert.ok(counts[0] > 0, 'hamlets have houses')
-  for (let i = 1; i < counts.length; i++) assert.ok(counts[i] > counts[i - 1], `${counts}`)
+test('bigger classes have more buildings, taller ones and more road', () => {
+  // Each class at the bottom of its radius range: the smallest metropolis still outgrows the largest-class below it.
+  const stats = SETTLEMENT_SIZES.map((size) => {
+    const p = plan(size, 3, { radius: DEFAULT_SIZE_CLASSES[size].radius[0] })
+    const h = p.buildings.filter((b) => !b.use).map((b) => b.height) // landmarks have their own heights
+    return { size, buildings: p.buildings.length, mean: h.reduce((s, x) => s + x, 0) / h.length, max: Math.max(...h), road: p.graph.totalLength() }
+  })
+  assert.ok(stats[0].buildings > 0, 'hamlets have houses')
+  for (let i = 1; i < stats.length; i++) {
+    const [a, b] = [stats[i - 1], stats[i]]
+    assert.ok(b.buildings > a.buildings && b.road > a.road && b.max >= a.max && b.mean >= a.mean, JSON.stringify([a, b]))
+  }
+  assert.ok(stats[4].max > stats[3].max && stats[3].max > 2 * stats[2].max, 'towers in cities, taller ones in metropolises')
+})
+
+test('a town: a main street of 2–3 storey shops, a church, town hall and water tower, no towers', () => {
+  const p = plan('town')
+  assert.deepEqual(p.buildings.filter((b) => b.use).map((b) => b.use).sort(), ['church', 'townHall', 'waterTower'])
+  const homes = p.buildings.filter((b) => !b.use)
+  assert.ok(homes.every((b) => b.style !== 'tower' && b.floors <= DEFAULT_SIZE_CLASSES.town.maxFloors))
+  const main = homes.filter((b) => b.district === 'downtown')
+  assert.ok(main.length > 10 && main.every((b) => b.style === 'block' && b.floors >= 2), `${main.length} on the main street`)
+  assert.ok(main.filter((b) => b.shops).length > main.length / 2, 'shops on the ground floor')
+  // Downtown is a strip along the street through the centre, not a disc.
+  const { axis } = p.districts
+  const along = main.map((b) => Math.abs((b.center[0] - p.center[0]) * Math.cos(axis) + (b.center[1] - p.center[1]) * Math.sin(axis)))
+  const across = main.map((b) => Math.abs((b.center[1] - p.center[1]) * Math.cos(axis) - (b.center[0] - p.center[0]) * Math.sin(axis)))
+  assert.ok(Math.max(...along) > 2 * Math.max(...across), 'longer than it is wide')
+  // The height limit is an option: lower it and nothing (but the landmarks) rises above it.
+  const low = plan('town', 3, { sizes: { town: { maxFloors: 2 } } })
+  assert.ok(low.buildings.every((b) => b.use || b.floors <= 2))
+})
+
+test('villages and hamlets: houses on big lots along the road, a church in the village, a junction in the hamlet', () => {
+  const village = plan('village')
+  const civic = village.buildings.filter((b) => b.use)
+  assert.ok(civic.length >= 1 && civic.length <= 2 && civic.some((b) => b.use === 'church'))
+  assert.ok(village.buildings.every((b) => b.use || (b.style === 'house' && b.floors <= 2)))
+  assert.ok(village.lots.every((l) => l.district !== 'downtown'))
+  const hamlet = plan('hamlet')
+  assert.ok(hamlet.buildings.length >= 4 && hamlet.buildings.every((b) => !b.use && b.style === 'house'))
+  assert.ok(hamlet.graph.nodes.some((n) => n.edges.length >= 3), 'a junction')
+  const homes = (p: CityPlan) => p.lots.filter((l) => l.district === 'residential')
+  const area = (p: CityPlan) => homes(p).reduce((s, l) => s + l.area, 0) / homes(p).length
+  assert.ok(area(village) > 2 * area(plan('city')), 'bigger lots than a city')
 })
 
 test('a town plans fast and deterministically', () => {
+  const fresh = () => runToEnd(planCity(ground, resolveCityOptions({ size: 'town', seed: 3 }), { temperature: 12, moisture: 0.5, biome: 'grassland' }))
   plan('town', 9) // warm up the JIT
   // CPU time, not wall time, so a busy machine doesn't fail the test.
   const t = process.cpuUsage()
-  const a = plan('town')
+  const a = fresh()
   const used = process.cpuUsage(t)
   assert.ok((used.user + used.system) / 1000 < 1000, `well under a second (${((used.user + used.system) / 1000).toFixed(0)} ms CPU)`)
-  assert.deepEqual(cityData(a, resolveCityOptions().roads), cityData(plan('town'), resolveCityOptions().roads))
+  assert.deepEqual(cityData(a, resolveCityOptions().roads), cityData(fresh(), resolveCityOptions().roads))
 })
 
 test('buildings stand inside their lots, on dry ground, with sane heights', () => {
@@ -53,7 +101,7 @@ test('climate picks the architecture: stilts in wetlands, flat roofs in deserts'
   assert.equal(architectureFor({ temperature: 26, moisture: 0.1, biome: 'desert' }), 'arid')
   assert.equal(architectureFor({ temperature: -4, moisture: 0.5, biome: 'taiga' }), 'cold')
   const wet = plan('village', 3, { architecture: 'wetland' })
-  assert.ok(wet.buildings.filter((b) => b.style === 'house').every((b) => b.stilts > 0))
+  assert.ok(wet.buildings.filter((b) => b.style === 'house' && !b.use).every((b) => b.stilts > 0))
   const arid = plan('village', 3, { architecture: 'arid' })
   const houses = arid.buildings.filter((b) => b.style === 'house')
   assert.ok(houses.filter((b) => b.parts[0].roof === 'flat').length > houses.length * 0.6)
@@ -61,12 +109,14 @@ test('climate picks the architecture: stilts in wetlands, flat roofs in deserts'
 
 test('geometry and data exports are consistent', () => {
   const p = plan('village')
-  const b = p.buildings[0]
-  const m = buildingGeometry(b, p.center, { wall: [1, 1, 1], roof: [1, 1, 1], overhang: 0.4, parapet: 0.9 })
-  for (const d of [m.walls, m.roofs, m.simpleWalls, m.simpleRoofs]) {
-    assert.equal(d.attributes.position.length, d.count * 3)
-    assert.ok(d.index.every((i) => i < d.count))
-    assert.ok(d.index instanceof Uint16Array)
+  // An ordinary building, and the church, town hall and water tower (cone roof, tank underside).
+  for (const b of [p.buildings[0], ...plan('town').buildings.filter((b) => b.use)]) {
+    const m = buildingGeometry(b, p.center, { wall: [1, 1, 1], roof: [1, 1, 1], overhang: 0.4, parapet: 0.9 })
+    for (const d of [m.walls, m.roofs, m.simpleWalls, m.simpleRoofs]) {
+      assert.ok(d.count > 0 && d.attributes.position.length === d.count * 3, `${b.use ?? b.style}`)
+      assert.ok(d.index.every((i) => i < d.count))
+      assert.ok(d.index instanceof Uint16Array)
+    }
   }
   const r = roadGeometry(p.graph, p.profiles, p.center, (x, z) => ground(x, z).height, { kerbHeight: 0.15, offset: 0.1, deckThickness: 1.2, pierSpacing: 24 })
   assert.ok(r.count > 0 && r.index.every((i) => i < r.count))

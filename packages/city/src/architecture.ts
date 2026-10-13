@@ -4,8 +4,8 @@ export type WallMaterial = 'plaster' | 'brick' | 'wood' | 'stone' | 'concrete' |
 /** Every wall material, in shader-index order. */
 export const WALL_MATERIALS: readonly WallMaterial[] = ['plaster', 'brick', 'wood', 'stone', 'concrete', 'glass', 'adobe', 'metal']
 
-/** Roof shapes. */
-export type RoofShape = 'flat' | 'gable' | 'hip' | 'skillion' | 'sawtooth'
+/** Roof shapes. `cone` rises from any outline to a point over its centre (tanks, silos). */
+export type RoofShape = 'flat' | 'gable' | 'hip' | 'skillion' | 'sawtooth' | 'cone'
 
 /** Roof materials. Each has its own procedural pattern in the roof shader. */
 export type RoofMaterial = 'tile' | 'slate' | 'shingle' | 'metal' | 'thatch' | 'concrete'

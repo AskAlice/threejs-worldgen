@@ -3,6 +3,7 @@ import { ARCHITECTURES, type ArchitectureName, type Architecture, type Climate, 
 import { DEFAULT_BLOCKS, type BlockOptions } from './blocks.ts'
 import { DEFAULT_BUILDINGS, type BuildingOptions } from './buildings.ts'
 import { DEFAULT_DISTRICTS, type DistrictOptions } from './districts.ts'
+import { DEFAULT_LANDMARKS, type LandmarkOptions } from './landmarks.ts'
 import { DEFAULT_ROADSIDE, type RoadsideOptions } from './lots.ts'
 import { DEFAULT_SIZE_CLASSES, type RoadStyle, type SettlementSize, type SizeClass } from './placement.ts'
 import { DEFAULT_ROADS, type RoadOptions } from './roads.ts'
@@ -137,6 +138,8 @@ export interface CityOptions {
   roadside: RoadsideOptions
   /** Building rules. */
   buildings: BuildingOptions
+  /** Churches, town halls and water towers (how many each size class gets is in `sizes`). */
+  landmarks: LandmarkOptions
   /** Regional building tradition; `'auto'` picks one from the climate at the centre. */
   architecture: ArchitectureName | 'auto'
   /** The architectures (materials, roofs, stilts, balconies, …). */
@@ -181,6 +184,7 @@ export const DEFAULT_CITY: CityOptions = {
   lotJitter: 0.35,
   roadside: DEFAULT_ROADSIDE,
   buildings: DEFAULT_BUILDINGS,
+  landmarks: DEFAULT_LANDMARKS,
   architecture: 'auto',
   architectures: ARCHITECTURES,
   climate: null,
@@ -263,10 +267,10 @@ function mergeInto<T>(target: T, input: unknown): T {
   return target
 }
 
-/** Resolves input into full settings: defaults ← the layout style's preset ← input. */
+/** Resolves input into full settings: defaults ← the layout style's preset ← the size class's `roads` and `styles` ← input. */
 export function resolveCityOptions(input: CityInput = {}): CityOptions {
   const size = (input.size ?? DEFAULT_CITY.size) as SettlementSize
   const sizes = mergeOptions(DEFAULT_CITY.sizes, input.sizes)
   const style = input.style && input.style !== 'auto' ? input.style : sizes[size].style
-  return mergeOptions(DEFAULT_CITY, ROAD_STYLES[style], input)
+  return mergeOptions(DEFAULT_CITY, ROAD_STYLES[style], { roads: sizes[size].roads, districts: { styles: sizes[size].styles } }, input)
 }

@@ -2,6 +2,7 @@ import type { ArchitectureName, RoofShape, WallMaterial } from './architecture.t
 import type { BuildingStyle, Entrance } from './buildings.ts'
 import type { District } from './districts.ts'
 import type { RoadEdge, RoadSurface, RoadType } from './graph.ts'
+import type { Landmark } from './landmarks.ts'
 import type { CityPlan } from './plan.ts'
 import type { RoadStyle } from './placement.ts'
 import type { Vec2 } from './polygon.ts'
@@ -121,6 +122,8 @@ export interface BuildingData {
   entrance: Entrance
   /** Estimated residents. */
   population: number
+  /** Landmark (church, town hall, water tower), or `null`. */
+  use: Landmark | null
 }
 
 /** The road network as plain data. */
@@ -180,7 +183,7 @@ export function cityData(plan: CityPlan, roads: RoadOptions): CityData {
     buildings: plan.buildings.map((b) => ({
       id: b.id, lot: b.lot, district: b.district, style: b.style, material: b.material, roof: b.parts[0].roof, floors: b.floors,
       height: b.height, base: b.base, footprint: b.parts[0].tiers[0].polygon.map((p) => [p[0], p[1]] as Vec2), center: b.center,
-      entrance: { ...b.entrance }, population: b.population,
+      entrance: { ...b.entrance }, population: b.population, use: b.use,
     })),
   }
 }

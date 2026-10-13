@@ -4,6 +4,7 @@ import { extractBlocks, type Block } from './blocks.ts'
 import { planBuilding, type Building } from './buildings.ts'
 import { DistrictMap, type District } from './districts.ts'
 import type { RoadGraph } from './graph.ts'
+import { planLandmarks } from './landmarks.ts'
 import { roadsideLots, subdivideBlock, type Lot } from './lots.ts'
 import type { CityOptions } from './options.ts'
 import type { RoadStyle } from './placement.ts'
@@ -78,8 +79,9 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   }
 
   // 2. Roads.
-  const districts = new DistrictMap(o.districts, sizeClass.districts, cx, cz, radius, seed)
   const field = new TensorField(o.field, cx, cz, radius, seed, site)
+  // The first arterials leave along the field's direction at the centre: that is the main street.
+  const districts = new DistrictMap(o.districts, sizeClass.districts, cx, cz, radius, seed, sizeClass.mainStreet, field.angle(cx, cz))
   const graph = yield* growRoads({ site, field, districts, cx, cz, radius, arms: o.roads.arms > 0 ? o.roads.arms : sizeClass.arms, seed }, o.roads)
   assignSurfaces(graph, districts, sizeClass.surfaces, sizeClass.oldTown, o.roads)
   const profiles = gradeRoads(graph, site, o.terrain)
@@ -130,17 +132,19 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   }
   yield
 
-  // 4. Buildings.
+  // 4. Buildings: landmarks first (on the lots nearest the centre that fit them), then everything else.
+  const landmarks = planLandmarks(lots, sizeClass.landmarks, o.landmarks, { architecture: arch, floorHeight: o.buildings.floorHeight }, [cx, cz], radius, seed)
   const buildings: Building[] = []
   const t = o.terrain
   for (const lot of lots) {
     const s = o.districts.styles[lot.district]
     const rand = mulberry32(hash4(seed, lot.id, 29, 5))
-    const b = planBuilding(lot, {
+    const b = landmarks.get(lot.id) ?? planBuilding(lot, {
       district: lot.district, density: districts.density(lot.center[0], lot.center[1]),
       floors: s.floors, maxFloors: sizeClass.maxFloors, setback: s.setback, coverage: s.coverage, architecture: arch,
     }, o.buildings, rand, buildings.length)
     if (!b) continue
+    b.id = buildings.length
     let lo = Infinity, hi = -Infinity
     for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) {
       const h = site.height(x, z)

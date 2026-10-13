@@ -1,16 +1,17 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { World } from 'threejs-biomes'
-import { City, generatePopulation, planCities, mergeOptions, type CityInput, type SettlementSize } from 'threejs-city'
+import { City, mergeOptions, SETTLEMENT_SIZES, type CityInput } from 'threejs-city'
 import { classOf, createPanel, specOptions } from './panel'
-import { panels } from './city.panel'
+import { demoSites, panels } from './city.panel'
 import { worldGround } from './world-ground'
 
 // threejs-city demo: a settlement placed by the settlement planner (generatePopulation, then planCities) on a
 // threejs-biomes world, on a simple terrain mesh sampled from world.frame (rebuilt whenever the city flattens the
 // ground). Every City option is in the shared panel (city.panel.ts lists the few it leaves out, and why), with
-// share-by-URL.
-// Keys (they drive the panel): 1–4 size · R new seed · N night · W wet · S snow · B burn · D damage · G layout
+// share-by-URL. The class picker (`size`, keys 1–5) moves to a settlement of that class: a hamlet at a junction, a
+// village along its road, a town with a main street, a city, a metropolis.
+// Keys (they drive the panel): 1–5 class · R new seed · N night · W wet · S snow · B burn · D damage · G layout
 
 const hud = document.getElementById('hud')!
 const renderer = new THREE.WebGPURenderer({ antialias: true })
@@ -36,8 +37,7 @@ const sky = new THREE.HemisphereLight('#cfe3ff', '#5a5040', 1.2)
 scene.add(sun, sun.target, sky)
 
 const world = new World({ seed: 11 })
-const sites = planCities(generatePopulation(world, { radius: 10_000 })) // largest first
-const best = (size: SettlementSize) => sites.find((s) => s.size === size) ?? sites.at(-1)! // no hamlets: the smallest
+const best = demoSites(world)
 let site = best('town')
 
 // Terrain: a grid around the city, coloured by the world's ground mix; water from waterLevel.
@@ -109,9 +109,9 @@ let fade: number | null = null // N: night fades towards this, then lands in the
 addEventListener('keydown', (e) => {
   if (e.target instanceof Element && e.target.closest('input, textarea, select')) return // typing in the panel
   const k = e.key.toLowerCase()
-  const sizes: Record<string, SettlementSize> = { '1': 'hamlet', '2': 'village', '3': 'town', '4': 'city' }
   const t = cityClass.target
-  if (sizes[k]) setOption(['size'], sizes[k])
+  const size = SETTLEMENT_SIZES[Number(k) - 1]
+  if (size) setOption(['size'], size)
   if (k === 'r') setOption(['seed'], (Number(t.seed) || 0) + 1)
   if (k === 'g') setOption(['style'], styles[(styles.indexOf(t.style) + 1) % styles.length])
   if (k === 'n') fade = (fade ?? city.options.facade.night) > 0.5 ? 0 : 1 // mid-fade: turn back
@@ -145,6 +145,6 @@ renderer.setAnimationLoop(() => {
   hud.textContent = `threejs-city — ${city.options.size} (${city.plan?.architecture ?? '…'}, ${city.plan?.style ?? '…'})
 ${s.buildings} buildings · ${s.roadKm.toFixed(1)} km roads · ${s.bridges} bridges · pop ≈ ${s.population.toLocaleString()}
 ${s.detailed} at full detail · generated in ${s.generationMs.toFixed(0)} ms
-1–4 size · R seed · G layout · N night · W wet · S snow · B burn · D damage`
+1–5 class · R seed · G layout · N night · W wet · S snow · B burn · D damage`
   renderer.render(scene, camera)
 })
