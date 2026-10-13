@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { RoadGraph } from 'threejs-city'
-import { DEFAULT_FLEET, DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, defaultParams, type FleetGroup, type FleetImpl, type VehicleImpl, type VehicleType } from 'threejs-vehicles/react'
+import { DEFAULT_FLEET, DEFAULT_VEHICLE, Fleet, VEHICLE_KINDS, VEHICLE_TYPES, Vehicle, defaultParams, fieldRoute, type FleetGroup, type FleetImpl, type VehicleImpl, type VehicleType } from 'threejs-vehicles/react'
 import type { Choices, Ranges } from './leva-options'
 import { Daylight, View, mount, useHud, useOptions, type V3 } from './r3f-shared'
-import { GALLERY_ROWS, JUNCTION, junctionLoop, junctionMesh, rowPosition, skyEnvironment } from './vehicles-rows'
+import { FIELD, GALLERY_ROWS, JUNCTION, fieldMesh, junctionLoop, junctionMesh, rowPosition, skyEnvironment } from './vehicles-rows'
 
 // threejs-vehicles in React Three Fiber. Gallery: a <Vehicle> per type, with shared settings and each
 // type's own parameters, plus the real-scale rows (car lookalikes, pickups, trucks, tractors) behind it. Traffic: one <Fleet> on a threejs-city RoadGraph street grid, with planes
@@ -46,9 +46,11 @@ function SkyEnvironment() {
 }
 
 function Gallery({ night }: { night: number }) {
-  const { turntable, frame } = useControls('Gallery', { turntable: true, frame: { value: 'all types', options: ['all types', ...GALLERY_ROWS.map((r) => r.name), 'junction'] } })
+  const { turntable, frame } = useControls('Gallery', { turntable: true, frame: { value: 'all types', options: ['all types', ...GALLERY_ROWS.map((r) => r.name), 'junction', 'field'] } })
+  const field = useMemo(() => ({ mesh: fieldMesh(), groups: [{ type: 'tractor', count: 1, params: { family: 'green', implement: 'seeder' }, speed: [3.5, 3.5], route: fieldRoute(FIELD.center, FIELD.rows, FIELD.spacing, FIELD.length) }] as FleetGroup[] }), [])
   const junction = useMemo(() => ({ mesh: junctionMesh(), groups: [{ type: 'truck', count: 1, params: { trailers: 3, trailer: 'mixed', cab: 'conventional', sleeper: true }, speed: [9, 9], route: { kind: 'path', points: junctionLoop().points, closed: true, smooth: 1 } }] as FleetGroup[] }), [])
   const view = useMemo(() => {
+    if (frame === 'field') return { position: [FIELD.center[0] + 40, 30, FIELD.center[2] - 55] as V3, target: [FIELD.center[0], 0, FIELD.center[2] - 10] as V3 }
     if (frame === 'junction') return { position: [JUNCTION.min[0] - 45, 38, JUNCTION.min[1] - 40] as V3, target: [JUNCTION.min[0] + 25, 0, JUNCTION.min[1] + 25] as V3 }
     const r = GALLERY_ROWS.findIndex((row) => row.name === frame)
     if (r < 0) return { position: [0, 26, 52] as V3, target: [0, 2, 0] as V3 }
@@ -69,6 +71,9 @@ function Gallery({ night }: { night: number }) {
       {/* A road train on a loop through a large-radius junction: trailers off-track inside the kerb, not over it. */}
       <primitive object={junction.mesh} />
       <Fleet seed={4} groups={junction.groups} lights={night} />
+      {/* A tractor working a field in rows (its WheelInteractors are what threejs-grass bends blades around). */}
+      <primitive object={field.mesh} />
+      <Fleet seed={2} groups={field.groups} lights={night} />
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 80]} receiveShadow>
         <planeGeometry args={[400, 400]} />
         <meshStandardNodeMaterial color="#8b8d8f" roughness={0.92} />

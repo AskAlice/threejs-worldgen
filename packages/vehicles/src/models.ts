@@ -3,11 +3,12 @@ import { MeshBuilder, paint, type MeshData, type Paint, type Vec3 } from './mesh
 import { LOOKALIKE_STYLES, lookalikeCar, type LookalikeStyle } from './cars.ts'
 import { PICKUP_STYLES, pickup } from './pickups.ts'
 import { TRAILER_KINDS, truck } from './trucks.ts'
+import { TRACTOR_FAMILIES, TRACTOR_IMPLEMENTS, tractor } from './tractor.ts'
 import { BODY, DARK, GLASS, GREY, HEAD, LIT, RIM, TAIL, TRIM, TYRE, WHITE, body, jitter, model, num, pick, roadWheel, str, type Rand } from './kit.ts'
 
 /** Every vehicle the package generates. */
 export type VehicleType =
-  | 'car' | 'pickup' | 'truck' | 'bicycle' | 'train'
+  | 'car' | 'pickup' | 'truck' | 'tractor' | 'bicycle' | 'train'
   | 'fishing-boat' | 'cruise-liner' | 'speedboat' | 'hovercraft' | 'aircraft-carrier'
   | 'airplane' | 'fighter-jet' | 'rocket'
 
@@ -696,6 +697,17 @@ export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
       load: { type: 'choice', default: 'mixed', options: ['mixed', 'empty', 'lumber', 'pipes', 'machinery'] },
     },
     build: truck,
+  },
+  tractor: {
+    name: 'Tractor', domain: 'land', tags: ['tractor', 'farm', 'agriculture', 'field', 'plough', 'plow', 'seeder', 'trailer', 'rural'],
+    params: {
+      cab: { type: 'choice', default: 'cab', options: ['cab', 'rops'] },
+      implement: { type: 'choice', default: 'none', options: [...TRACTOR_IMPLEMENTS] },
+      family: { type: 'choice', default: 'mixed', options: ['mixed', ...Object.keys(TRACTOR_FAMILIES)] },
+      load: { type: 'choice', default: 'hay', options: ['none', 'hay', 'gravel'] },
+      size: { type: 'number', default: 1, min: 0.75, max: 1.3, step: 0.01 },
+    },
+    build: tractor,
   },
   bicycle: {
     name: 'Bicycle', domain: 'land', tags: ['bike', 'bicycle', 'cyclist', 'road'],

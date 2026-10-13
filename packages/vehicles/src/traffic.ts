@@ -18,8 +18,8 @@ export interface TrafficEntry {
 
 /**
  * Weighted traffic by road kind: town streets (mixed cars, buses, a few pickups, box trucks and
- * bicycles), highways (semi-trailer rigs weigh in), rural roads (pickups and utes weigh in) and dirt
- * roads (mostly pickups and utes).
+ * bicycles), highways (semi-trailer rigs weigh in), rural roads (pickups, utes and tractors weigh in) and
+ * dirt roads (mostly pickups, utes and tractors).
  */
 export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
   urban: [
@@ -43,6 +43,7 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
     { type: 'pickup', params: { style: 'ute', ute: 'tray' }, weight: 5 },
     { type: 'pickup', params: { style: 'angular' }, weight: 2 },
     { type: 'truck', params: { trailers: 1 }, weight: 4 },
+    { type: 'tractor', params: {}, weight: 3 },
   ],
   dirtRoad: [
     { type: 'pickup', params: { style: 'fullSize', lift: 0.12 }, weight: 30 },
@@ -51,6 +52,8 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
     { type: 'car', params: { style: 'suv' }, weight: 14 },
     { type: 'car', params: { style: 'mixed' }, weight: 12 },
     { type: 'car', params: { style: 'vintage' }, weight: 2 },
+    { type: 'tractor', params: {}, weight: 6 },
+    { type: 'tractor', params: { implement: 'trailer' }, weight: 3 },
   ],
 }
 

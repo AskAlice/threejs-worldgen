@@ -154,7 +154,7 @@ export const DEFAULT_FLEET: FleetSettings = {
 
 /** Default cruise speeds (m/s) by type. */
 export const DEFAULT_SPEEDS: Record<VehicleType, [number, number]> = {
-  car: [9, 15], pickup: [9, 15], truck: [14, 24], bicycle: [4, 7], train: [18, 26],
+  car: [9, 15], pickup: [9, 15], truck: [14, 24], tractor: [4, 8], bicycle: [4, 7], train: [18, 26],
   'fishing-boat': [3, 5], 'cruise-liner': [6, 9], speedboat: [12, 20], hovercraft: [10, 15], 'aircraft-carrier': [5, 8],
   airplane: [70, 85], 'fighter-jet': [140, 190], rocket: [0, 0],
 }
@@ -242,7 +242,7 @@ function trailerCount(params: VehicleParams | undefined): number {
 /** Number of vehicles a group expands to (trains: locomotive + wagons per unit; trucks: tractor + trailers). */
 export function groupVehicleCount(g: FleetGroup): number {
   const per = g.type === 'train' ? 1 + Math.max(0, Math.round(Number(g.params?.wagons ?? VEHICLE_KINDS.train.params.wagons.default)))
-    : g.type === 'truck' ? 1 + trailerCount(g.params) : 1
+    : g.type === 'truck' ? 1 + trailerCount(g.params) : g.type === 'tractor' && g.params?.implement === 'trailer' ? 2 : 1
   return Math.max(0, Math.floor(g.count)) * per
 }
 
@@ -356,6 +356,8 @@ export class FleetSim {
           members.push({ type: 'truck', params: { ...params, piece: 'tractor' }, salt: 0 })
           const n = trailerCount(params)
           for (let w = 0; w < n; w++) members.push({ type: 'truck', params: { ...params, piece: 'trailer', slot: w, trailers: n }, salt: w + 1 })
+        } else if (spec.type === 'tractor' && params.implement === 'trailer') {
+          members.push({ type: 'tractor', params, salt: 0 }, { type: 'tractor', params: { ...params, piece: 'trailer' }, salt: 1 })
         } else members.push({ type: spec.type, params, salt: 0 })
         let behind = 0
         members.forEach((mem, k) => {

@@ -5,7 +5,7 @@
 <p><b><a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html?scene">Live demo</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles.html">Vehicle gallery</a> · <a href="https://askalice.github.io/threejs-worldgen/demo/vehicles-r3f.html">React Three Fiber demo</a> · <a href="https://askalice.github.io/threejs-worldgen/vehicles/">Landing page</a> · <a href="https://askalice.github.io/threejs-worldgen/docs/modules/threejs-vehicles.html">API docs</a></b></p>
 <!-- demo-cards:end -->
 
-Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), pickups (full-size, ute, angular stainless), trucks (conventional and cab-over tractors with box, container, flatbed and tanker trailers, multi-trailer rigs, rigid box trucks), bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
+Procedural, animated vehicles for three.js. The package covers cars (sedan, hatchback, SUV, pickup, van, bus, and six lookalikes of well-known cars), pickups (full-size, ute, angular stainless), trucks (conventional and cab-over tractors with box, container, flatbed and tanker trailers, multi-trailer rigs, rigid box trucks), farm tractors with implements, bicycles, trains (a locomotive plus passenger and freight wagons), fishing boats, cruise liners, speedboats, hovercraft, aircraft carriers, airliners and light aircraft, fighter jets and multi-stage rockets.
 
 Every vehicle is a seeded, low-poly generator, so the variety looks random but never is.
 
@@ -110,6 +110,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | `car` | `style` (`mixed`, sedan, hatchback, suv, truck, van, bus, compact, retroWagon, vintage, electricSaloon, roadster, muscle), `size 1` |
 | `pickup` | `style` (`mixed`, fullSize, ute, angular), `cab` (regular, extended, `crew`), `bed` (`short`, long), `lift 0`, `hitch false`, `load` (`none`, crates, hay, gravel), `ute` (`coupe`, tray), `painted false`, `size 1` |
 | `truck` | `cab` (`conventional`, cabOver), `sleeper true`, `axles 3`, `stacks true`, `cabColor ''`, `body` (`tractor`, rigid), `trailers 1` (1…3), `trailer` (`mixed`, box, container, flatbed, tanker), `load` (`mixed`, empty, lumber, pipes, machinery) |
+| `tractor` | `cab` (`cab`, rops), `implement` (`none`, plough, seeder, trailer), `family` (`mixed`, green, red, blue, orange), `load` (none, `hay`, gravel; on the trailer), `size 1` |
 | `bicycle` | `style` (`mixed`, road, city, mountain), `rider true` |
 | `train` | `car` (`locomotive`, passenger, freight), `freight` (`mixed`, boxcar, tank, hopper, container), `wagons 5`, `cargo` (`passenger`, freight, mixed), `size 1` |
 | `fishing-boat` | `length 13`, `outriggers true` |
@@ -155,9 +156,21 @@ One generator covers heavy goods vehicles: a long-bonnet conventional or a cab-o
 
 A rig is one fleet unit: the tractor drives the route and each trailer's kingpin sits on the coupling in front (the tractor's fifth wheel, or the one over the lead trailer's axles in a B-train), its axles dragged after it. Trailers therefore off-track inside on turns as real ones do. Sizes keep to road-legal limits (`TRUCK_LIMITS`: 2.6 m wide, 4.3 m high, 16.2 m trailers, 53.5 m road trains).
 
+### Tractors
+
+A mid-size row-crop tractor: lugged 1.96 m rear and 1.55 m front tyres on a 1.95 m track, a narrow bonnet with front weights, a glass cab or an open roll-over frame, an exhaust stack at the front corner of the cab, and seeded colour families (green, red, blue, orange, each with its own rim colour; no liveries). Implements: a mounted plough or seed drill, or a towed tipping trailer that articulates like a truck trailer. `fieldRoute(center, rows, spacing, length, heading)` makes a closed route that works a field in rows and turns at the headlands.
+
+For grass and crops, `wheelFootprints(fleet.sim, v)` gives each tyre's ground contact as plain data (`position`, `radius`, `strength`), and `WheelInteractors` keeps one `Object3D` per tyre on them, in the shape threejs-grass's `interactors` take:
+
+```ts
+const prints = new WheelInteractors(fleet, { types: ['tractor'] })
+grass.set({ interactors: prints.interactors })
+renderer.setAnimationLoop(() => { fleet.update(); prints.update(); renderer.render(scene, camera) })
+```
+
 ### Traffic pools
 
-`TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`): semi-trailer rigs weigh into highways, box trucks into towns, pickups and utes into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
+`TRAFFIC_POOLS` weights what drives where (`urban`, `highway`, `rural`, `dirtRoad`): semi-trailer rigs weigh into highways, box trucks into towns, pickups, utes and tractors into rural and dirt roads. `trafficGroups(pool, count, route)` splits a count into fleet groups:
 
 ```ts
 new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: city.graph })

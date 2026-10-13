@@ -8,6 +8,7 @@ import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/car
 import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
 import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
 import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
+import { TRACTOR_IMPLEMENTS, fieldRoute, wheelFootprints } from '../src/tractor.ts'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
 import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
@@ -31,6 +32,7 @@ const SIZES: Record<VehicleType, [number, number][]> = {
   train: [[2.8, 3.4], [3.8, 5], [16, 22]],
   pickup: [[1.7, 2.6], [1.4, 2.4], [4.8, 6.6]],
   truck: [[2.4, 3.4], [3, TRUCK_LIMITS.height], [5.5, 10]],
+  tractor: [[2.3, 3.6], [2.6, 3.6], [4.2, 7.5]],
   'fishing-boat': [[3, 14], [5, 14], [10, 16]],
   'cruise-liner': [[20, 32], [35, 60], [180, 220]],
   speedboat: [[2, 3], [1.5, 3], [6.5, 8.5]],
@@ -496,4 +498,52 @@ test('truck articulation: trailers stay coupled, follow the tractor and off-trac
   // On a straight they line up again; same seed, same motion.
   const run = () => { const s = new FleetSim(settings([{ ...g, route: { kind: 'path', points: [[0, 0, 0], [0, 0, 300], [200, 0, 300]], closed: false } }])); for (let i = 0; i < 300; i++) s.step(1 / 20); return [...s.pose] }
   assert.deepEqual(run(), run())
+})
+
+test('tractors: plausible wheels and track, implements, footprints that match the wheels, deterministic', () => {
+  for (const cab of ['cab', 'rops']) for (const implement of TRACTOR_IMPLEMENTS) for (const family of ['green', 'red', 'blue', 'orange']) {
+    const m = buildVehicle('tractor', { cab, implement, family }, 2)
+    for (const part of m.parts) checkMesh(part.mesh, `tractor ${cab} ${implement}`)
+    const rear = m.parts.find((p) => p.name === 'wheel')!, front = m.parts.find((p) => p.name === 'frontWheel')!
+    const rR = rear.mesh.bounds[4], rF = front.mesh.bounds[4]
+    // A mid-size row-crop tractor: 1.8–2.1 m rear tyres, front ones 70–85 % of that, a 1.5–2.3 m track.
+    assert.ok(rR > 0.85 && rR < 1.06 && rF / rR > 0.65 && rF / rR < 0.9, `wheel radii ${rR.toFixed(2)} / ${rF.toFixed(2)}`)
+    const track = 2 * Math.abs(rear.mounts[0].position[0])
+    assert.ok(track > 1.5 && track < 2.3, `track ${track}`)
+    assert.ok(m.wheelBase > 2.2 && m.wheelBase < 3.2)
+    assert.ok(front.mounts.every((t) => t.steer) && rear.mounts.every((t) => !t.steer), 'front wheels steer')
+    assert.equal(m.vents.length, 1)
+    assert.equal(m.vents[0].kind, 'stack')
+    assert.ok(m.vents[0].position[1] > 2.8, 'stack above the cab line')
+    assert.ok(m.palette.every((c) => /^#[0-9a-f]{6}$/i.test(c)))
+    assert.equal(m.hitch?.coupling !== undefined, implement === 'trailer')
+    assert.deepEqual(m.parts[0].mesh.position, buildVehicle('tractor', { cab, implement, family }, 2).parts[0].mesh.position)
+  }
+  const plain = buildVehicle('tractor', { family: 'green' }).parts[0].mesh.position.length
+  assert.ok(buildVehicle('tractor', { family: 'green', implement: 'plough' }).parts[0].mesh.position.length > plain)
+  assert.ok(buildVehicle('tractor', { family: 'green', implement: 'seeder' }).parts[0].mesh.position.length > plain)
+  // The trailer implement is a towed, articulated vehicle.
+  const towing: FleetGroup = { type: 'tractor', count: 1, params: { implement: 'trailer' }, route: fieldRoute([0, 0, 0], 4, 8, 50) }
+  assert.equal(groupVehicleCount(towing), 2)
+  const sim = new FleetSim(settings([towing, { type: 'tractor', count: 1, params: { family: 'red' }, route: { kind: 'circle', center: [100, 0, 0], radius: 20 } }]))
+  for (let i = 0; i < 300; i++) sim.step(1 / 20)
+  assert.equal(sim.models[sim.model[1]].style, 'trailer')
+  // Footprints: one per wheel, at the wheels' ground contact, radius matching the tyre width.
+  const v = 2, prints = wheelFootprints(sim, v), m = sim.models[sim.model[v]]
+  assert.equal(prints.length, 4)
+  const yaw = sim.pose[v * 8 + 3]
+  const wheels = m.parts.filter((p) => p.name === 'wheel' || p.name === 'frontWheel').flatMap((p) => p.mounts.map((mt) => ({ mt, width: p.mesh.bounds[3] - p.mesh.bounds[0] })))
+  wheels.forEach(({ mt, width }, i) => {
+    const x = sim.pose[v * 8] + Math.cos(yaw) * mt.position[0] + Math.sin(yaw) * mt.position[2]
+    const z = sim.pose[v * 8 + 2] - Math.sin(yaw) * mt.position[0] + Math.cos(yaw) * mt.position[2]
+    assert.ok(Math.hypot(prints[i].position[0] - x, prints[i].position[2] - z) < 1e-4, 'footprint under its wheel')
+    assert.ok(Math.abs(prints[i].position[1] - sim.pose[v * 8 + 1]) < 1e-6, 'on the ground')
+    assert.ok(prints[i].radius > width * 0.45 && prints[i].radius < width * 0.75, `radius ${prints[i].radius} for a ${width} m tyre`)
+    assert.ok(prints[i].strength > 0 && prints[i].strength <= 1)
+  })
+  // The big rear tyres press hardest.
+  assert.ok(prints[0].strength > prints[3].strength)
+  // Field routes: closed, rows the given spacing apart.
+  const route = fieldRoute([10, 0, 20], 6, 5, 40)
+  assert.ok(route.kind === 'path' && route.closed && route.points.length > 12)
 })

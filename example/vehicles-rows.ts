@@ -63,6 +63,18 @@ export const GALLERY_ROWS: GalleryRow[] = [
       { type: 'truck', params: { cab: 'conventional', sleeper: true, trailers: 3, trailer: 'mixed' }, label: 'road train, three trailers' },
     ],
   },
+  {
+    name: 'tractors',
+    spacing: 6,
+    depth: 10,
+    items: [
+      { type: 'tractor', params: { family: 'green' }, label: 'cab' },
+      { type: 'tractor', params: { family: 'orange', cab: 'rops' }, label: 'open frame' },
+      { type: 'tractor', params: { family: 'red', implement: 'plough' }, label: 'plough' },
+      { type: 'tractor', params: { family: 'blue', implement: 'seeder' }, label: 'seeder' },
+      { type: 'tractor', params: { family: 'green', implement: 'trailer', load: 'hay' }, label: 'trailer with hay' },
+    ],
+  },
 ]
 
 /** Where row `r` stands (its z) and where its item `i` stands (x), metres. */
@@ -154,5 +166,25 @@ export function junctionMesh(): THREE.Group {
   const kerbMesh = new THREE.Mesh(kg, new THREE.MeshStandardNodeMaterial({ color: '#c9c6bf', roughness: 0.85, side: THREE.DoubleSide }))
   kerbMesh.castShadow = kerbMesh.receiveShadow = true
   group.add(kerbMesh)
+  return group
+}
+
+/** A field beside the gallery that a tractor works in rows (`fieldRoute`), metres. */
+export const FIELD = { center: [-120, 0.02, 90] as [number, number, number], rows: 8, spacing: 6, length: 60 }
+
+/** Tilled ground for the field: furrow stripes along its rows. */
+export function fieldMesh(): THREE.Group {
+  const { center: [cx, cy, cz], rows, spacing, length } = FIELD
+  const group = new THREE.Group()
+  const w = rows * spacing + 24, l = length + 30
+  const soil = new THREE.Mesh(new THREE.PlaneGeometry(w, l).rotateX(-Math.PI / 2), new THREE.MeshStandardNodeMaterial({ color: '#5b4632', roughness: 0.97 }))
+  soil.position.set(cx, cy, cz)
+  soil.receiveShadow = true
+  group.add(soil)
+  const furrow = new THREE.InstancedMesh(new THREE.BoxGeometry(0.35, 0.08, length + 10), new THREE.MeshStandardNodeMaterial({ color: '#4a3826', roughness: 1 }), Math.floor(w / 0.75))
+  const m = new THREE.Matrix4()
+  for (let i = 0; i < furrow.count; i++) furrow.setMatrixAt(i, m.makeTranslation(cx - w / 2 + 0.4 + i * 0.75, cy + 0.03, cz))
+  furrow.receiveShadow = true
+  group.add(furrow)
   return group
 }
