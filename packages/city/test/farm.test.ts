@@ -21,7 +21,7 @@ test('a farmstead: farmhouse, barn, silos and shed in a yard, fields around it, 
   const uses = p.buildings.map((b) => b.use)
   assert.ok(uses.includes('farmhouse') && uses.includes('barn') && uses.includes('machineShed'), `${uses}`)
   assert.ok(p.farm && p.farm.fields.length >= 4, 'fields')
-  for (const b of p.buildings) for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) assert.ok(pointInPolygon(x, z, p.farm.yard) || toRoad(p, x, z) > 0)
+  for (const b of p.buildings) for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) assert.ok(pointInPolygon(x, z, p.farm.yard), `${b.use} outside the yard`)
   const barn = p.buildings.find((b) => b.use === 'barn')!
   assert.ok(barn.tint && ['gable', 'gambrel'].includes(barn.parts[0].roof) && barn.parts[0].blank)
   assert.ok(p.graph.edges.some((e) => e.type === 'minor' && e.surface === 'dirt'), 'a dirt driveway')
@@ -49,6 +49,36 @@ test('farm buildings build valid geometry: gambrel barn, cone-roofed silos', () 
     const m = buildingGeometry(b, p.center, { wall: [1, 1, 1], roof: [1, 1, 1], overhang: 0.4, parapet: 0 })
     for (const d of [m.walls, m.roofs]) assert.ok(d.count > 0 && d.index.every((i) => i < d.count), `${b.use}`)
   }
+})
+
+/** The road node where the driveway starts must carry a road edge, and no road edge may run over water unbridged. */
+function assertJoined(p: CityPlan) {
+  const [ax, az] = p.farm!.access
+  const access = p.graph.nearestNode(ax, az, 0.5)
+  assert.ok(access >= 0 && p.graph.nodes[access].edges.some((e) => p.graph.edges[e].type !== 'minor'), 'access node on a road edge')
+  assert.ok(!p.site.wet(ax, az), 'access on dry ground')
+  for (const e of p.graph.edges) {
+    if (e.bridge) continue
+    const a = p.graph.nodes[e.a], b = p.graph.nodes[e.b]
+    for (let t = 0; t <= 1; t += 0.05) assert.ok(!p.site.wet(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t), `edge ${e.id} (${e.type}) runs over water`)
+  }
+}
+
+test('a pond on the road: the driveway still joins the road on dry ground, the road bridges the pond', () => {
+  const pond: SiteFn = (x, z) => ({ height: 0, waterLevel: Math.abs(x) < 12 && Math.abs(z - 200) < 15 ? 1 : NaN })
+  for (let seed = 1; seed <= 5; seed++) {
+    const p = farm(pond, { seed, farm: { road: [[-600, 200], [600, 200]] } })
+    assert.ok(p.farm, `seed ${seed}: a farm`)
+    assertJoined(p)
+  }
+})
+
+test('degenerate sizes finish: zero fence length, zero field size', () => {
+  // All pasture, so every field is fenced.
+  const fenced = farm(rolling, { farm: { fences: { length: 0 }, crops: { corn: { weight: 0 }, wheat: { weight: 0 }, fallow: { weight: 0 } } } })
+  const fences = fenced.farm!.props.filter((q) => q.kind === 'fence')
+  assert.ok(fences.length > 0 && fences.every((q) => (q.length ?? 0) > 0 && Number.isFinite(q.x)))
+  assert.ok(farm(rolling, { farm: { fieldSize: [0, 0] } }).farm)
 })
 
 test('farms are deterministic', () => {
@@ -89,6 +119,7 @@ test('every farm of a seeded world has a driveway joined to the road network', (
     if (!p.farm) continue
     built++
     // The driveway's far end lies on a network road, and the yard is reachable from it.
+    assertJoined(p)
     const [ax, az] = p.farm.access
     assert.ok(network.edges.some((e) => e.type !== 'rail' && e.type !== 'powerline' && nearestOnPolyline(e.points, ax, az).distance < 0.5), 'access on the network')
     const access = p.graph.nearestNode(ax, az, 0.5)

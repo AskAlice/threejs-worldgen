@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { levaSchema, nest, schemaValues, specSchema } from './leva-options.ts'
+import { changed, levaSchema, nest, schemaValues, specSchema } from './leva-options.ts'
 
 // Stand-in for leva's `folder()`, which only wraps its arguments.
 const folder = (schema: Record<string, unknown>, settings: object) => ({ folder: schema, settings })
@@ -72,4 +72,11 @@ test('specSchema takes a panel manifest class; schemaValues + nest round-trip th
   assert.deepEqual(specSchema(spec), { skip: ['center'], ranges: spec.ranges, choices: undefined, arrays: true })
   const levaFolder = (schema: unknown, settings: object) => ({ schema, settings }) // leva's own shape
   assert.deepEqual(nest(schemaValues(levaSchema(spec.defaults, levaFolder, specSchema(spec)))), { seed: 1, deep: { on: true } })
+})
+
+test('changed keeps only the edited options, so presets under them (e.g. a size class) still apply', () => {
+  const defaults = { size: 'town', roads: { arms: 0, primary: { width: 12 } }, styles: { floors: [1, 7] }, center: [0, 0] }
+  assert.deepEqual(changed(structuredClone(defaults), defaults), {})
+  const edited = { size: 'village', roads: { arms: 0, primary: { width: 9 } }, styles: { floors: [1, 4] }, center: [0, 0] }
+  assert.deepEqual(changed(edited, defaults), { size: 'village', roads: { primary: { width: 9 } }, styles: { floors: [1, 4] } })
 })

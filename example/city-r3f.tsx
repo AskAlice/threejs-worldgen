@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal, useFrame } from '@react-three/fiber'
 import { World } from 'threejs-biomes'
-import { City, mergeOptions, type CityImpl, type CityInput, type SettlementSize } from 'threejs-city/react'
+import { City, DEFAULT_CITY, mergeOptions, type CityImpl, type CityInput, type SettlementSize } from 'threejs-city/react'
 import { Props } from 'threejs-props/react'
 import { demoSites, panels, siteInput } from './city.panel'
+import { changed } from './leva-options'
 import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 
 // threejs-city in React Three Fiber: one <City> on a threejs-biomes world, placed by the settlement planner
@@ -23,8 +24,9 @@ function FarmProps({ city }: { city: CityImpl }) {
 }
 
 function Scene() {
-  const options = useSpec('City', panels['threejs-city'].City) as CityInput
-  const site = useMemo(() => best(options.size as SettlementSize), [options.size])
+  // Only the edited controls: the rest stays unset, so each size class's own road and district rules apply (as in city.ts).
+  const options = changed(useSpec('City', panels['threejs-city'].City), DEFAULT_CITY) as CityInput
+  const site = useMemo(() => best((options.size ?? DEFAULT_CITY.size) as SettlementSize), [options.size])
   const [impl, setImpl] = useState<CityImpl | null>(null)
   useEffect(() => void Object.assign(window, { city: impl, world }), [impl]) // for the console
   const r = site.radius

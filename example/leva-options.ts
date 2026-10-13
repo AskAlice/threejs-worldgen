@@ -72,6 +72,22 @@ export function nest(values: Record<string, unknown>): Record<string, any> {
   return out
 }
 
+/**
+ * Only the options in `values` that differ from `defaults` (arrays compare whole), nested. leva always reports every
+ * control; passing just the edits lets presets the panel doesn't show (a size class's road and district rules) apply.
+ */
+export function changed(values: Record<string, any>, defaults: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {}
+  for (const [k, v] of Object.entries(values)) {
+    const d = defaults?.[k]
+    if (v && typeof v === 'object' && !Array.isArray(v) && d && typeof d === 'object' && !Array.isArray(d)) {
+      const inner = changed(v, d)
+      if (Object.keys(inner).length) out[k] = inner
+    } else if (JSON.stringify(v) !== JSON.stringify(d)) out[k] = v
+  }
+  return out
+}
+
 /** The values a schema starts with, flat by key (what leva's `useControls` returns before any edit). */
 export function schemaValues(schema: Record<string, any>): Record<string, unknown> {
   const out: Record<string, unknown> = {}

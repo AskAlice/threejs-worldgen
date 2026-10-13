@@ -227,17 +227,21 @@ export function nearestOnPolyline(pts: readonly Vec2[], x: number, z: number): {
   return best
 }
 
-/** The stretch of a polyline within `span` metres (along it) of its point on segment `segment` at `t`, that point included. */
-function stretch(pts: readonly Vec2[], segment: number, t: number, span: number): { points: Vec2[]; at: number } {
+/**
+ * The stretch of a polyline within `span` metres (along it) of its point on segment `segment` at `t`, that point
+ * included (index `at`), with points at most `step` metres apart.
+ */
+function stretch(pts: readonly Vec2[], segment: number, t: number, span: number, step = 30): { points: Vec2[]; at: number } {
   const [ax, az] = pts[segment], [bx, bz] = pts[segment + 1]
   const p: Vec2 = [ax + (bx - ax) * t, az + (bz - az) * t]
   const walk = (dir: 1 | -1) => {
     const out: Vec2[] = []
     let prev = p, left = span
     for (let i = dir > 0 ? segment + 1 : segment; i >= 0 && i < pts.length && left > 0; i += dir) {
-      const q = pts[i], l = Math.hypot(q[0] - prev[0], q[1] - prev[1])
-      if (l > left) { out.push([prev[0] + ((q[0] - prev[0]) * left) / l, prev[1] + ((q[1] - prev[1]) * left) / l]); break }
-      if (l > 2) out.push(q)
+      let q = pts[i], l = Math.hypot(q[0] - prev[0], q[1] - prev[1])
+      if (l > left) { q = [prev[0] + ((q[0] - prev[0]) * left) / l, prev[1] + ((q[1] - prev[1]) * left) / l]; l = left }
+      const n = Math.ceil(l / step)
+      if (l > 2) for (let k = 1; k <= n; k++) out.push([prev[0] + ((q[0] - prev[0]) * k) / n, prev[1] + ((q[1] - prev[1]) * k) / n])
       left -= l; prev = q
     }
     return out
@@ -313,7 +317,8 @@ export function* planFarm(ground: SiteFn, o: CityOptions, climate: Climate | nul
       const probes = [[0, 0], [-L / 2, -W / 2], [L / 2, -W / 2], [L / 2, W / 2], [-L / 2, W / 2], [0, -W / 2], [0, W / 2], [-L / 2, 0], [L / 2, 0]].map(([u, v]) => at(u, v))
       if (probes.some(([qx, qz]) => !site.contains(qx, qz) || site.wet(qx, qz) || site.slope(qx, qz) > f.maxSlope)) continue
       const [fx, fz] = at(L / 2, 0)
-      const bridges = site.contains(px, pz) ? wetRuns(px, pz, fx, fz) : null
+      // The driveway must meet the road on dry ground.
+      const bridges = site.contains(px, pz) && !site.wet(px, pz) ? wetRuns(px, pz, fx, fz) : null
       if (!bridges) continue
       yard = { x, z, ux, uz, px, pz, bridges }
     }
@@ -335,15 +340,21 @@ export function* planFarm(ground: SiteFn, o: CityOptions, climate: Climate | nul
   const piece = stretch(road, near.segment, near.t, f.roadSpan)
   const graph = new RoadGraph(30)
   const rc = o.roads[f.roadType]
-  let prev = -1, access = -1
+  // Nodes on dry ground only; the road bridges whatever water lies between two of them. It stops at the site edge.
+  let prev = -1, access = -1, over = false
   piece.points.forEach(([x, z], i) => {
-    if (!site.contains(x, z) || site.wet(x, z)) { prev = -1; return } // the drawn stretch stops at water and the site edge
+    if (!site.contains(x, z)) { prev = -1; over = false; return }
+    if (site.wet(x, z)) { over = true; return }
     const node = graph.addNode(x, z)
-    if (prev >= 0) graph.addEdge(prev, node, f.roadType, rc.width, rc.sidewalk)
+    if (prev >= 0) {
+      const a = graph.nodes[prev]
+      graph.addEdge(prev, node, f.roadType, rc.width, rc.sidewalk, over || !(wetRuns(a.x, a.z, x, z)?.length === 0))
+    }
     if (i === piece.at) access = node
     prev = node
+    over = false
   })
-  if (access < 0) access = graph.addNode(yard.px, yard.pz)
+  if (access < 0 || !graph.nodes[access].edges.length) return empty // no road to join (the access point is dry, so only a road off the site)
   // Driveway from the road to the yard: ~30 m steps over dry ground, one bridge per stream it crosses.
   const [fx, fz] = at(L / 2, 0)
   const dl = Math.hypot(fx - yard.px, fz - yard.pz), dx = (fx - yard.px) / (dl || 1), dz = (fz - yard.pz) / (dl || 1)
@@ -418,7 +429,8 @@ export function* planFarm(ground: SiteFn, o: CityOptions, climate: Climate | nul
   // 5. Fields: a patchwork of rectangles aligned with the driveway, anchored at the yard front and the driveway.
   const lines = (from: number, dir: 1 | -1, salt: number) => {
     const out = [from]
-    for (let k = 0, x = from; Math.abs(x) < radius + f.fieldSize[1]; k++) out.push((x += dir * span(f.fieldSize, mulberry32(hash4(seed, salt, k, 91)))))
+    // At least a metre a step, so a zero field size can't stall.
+    for (let k = 0, x = from; Math.abs(x) < radius + f.fieldSize[1]; k++) out.push((x += dir * Math.max(1, span(f.fieldSize, mulberry32(hash4(seed, salt, k, 91))))))
     return out
   }
   const us = [...lines(L / 2 + f.fieldGap, -1, 1).reverse(), ...lines(L / 2 + f.fieldGap, 1, 2).slice(1)]
@@ -435,7 +447,7 @@ export function* planFarm(ground: SiteFn, o: CityOptions, climate: Climate | nul
   for (let i = 0; i + 1 < us.length; i++) for (let j = 0; j + 1 < vs.length; j++) {
     const fr = mulberry32(hash4(seed, i, j, 97))
     let [u0, u1, v0, v1] = [us[i] + f.fieldGap / 2, us[i + 1] - f.fieldGap / 2, vs[j] + f.fieldGap / 2, vs[j + 1] - f.fieldGap / 2]
-    if (Math.hypot((u0 + u1) / 2, (v0 + v1) / 2) > radius) continue
+    if (u1 <= u0 || v1 <= v0 || (u1 - u0) * (v1 - v0) < f.fieldMinArea || Math.hypot((u0 + u1) / 2, (v0 + v1) / 2) > radius) continue
     // Keep clear of the yard (largest remnant of the cell outside it) and of the driveway along v = 0.
     const yu = L / 2 + clear(0), yv = W / 2 + clear(0)
     if (u0 < yu && u1 > -yu && v0 < yv && v1 > -yv) {
@@ -479,7 +491,7 @@ export function* planFarm(ground: SiteFn, o: CityOptions, climate: Climate | nul
     if (fl.crop !== 'pasture') continue
     fl.polygon.forEach((a, k) => {
       const b = fl.polygon[(k + 1) % fl.polygon.length]
-      const l = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.floor(l / f.fences.length)
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.floor(l / Math.max(0.5, f.fences.length))
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t
         props.push({ kind: 'fence', x, y: site.height(x, z), z, yaw: Math.atan2(-(b[1] - a[1]), b[0] - a[0]), seed: hash4(seed, fl.id, k, i), variant: f.fences.variant, length: l / n })
