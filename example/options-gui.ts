@@ -8,27 +8,31 @@ export type Choices = Record<string, readonly string[]>
 /**
  * Builds a lil-gui panel for a plain-JSON options object: numbers → sliders, booleans → checkboxes,
  * strings → text or dropdowns, `#rrggbb` → colour pickers, nested objects → folders. Every change calls
- * `onChange(path, value)`; the shared sandboxes use it to call `set({...})` on the package.
+ * `onChange(path, value)`; the shared sandboxes use it to call `set({...})` on the package. `skip` takes option
+ * names (skipped at any depth) or dotted paths. With `arrays`, non-empty arrays become folders too (their elements
+ * use the array's name for ranges and choices), and a change inside one reports the array's path and a copy of it.
  */
-export function addOptions(gui: GUI, target: Record<string, any>, onChange: (path: string[], value: unknown) => void, opts: { ranges?: Ranges; choices?: Choices; skip?: string[]; path?: string[]; closed?: boolean } = {}) {
+export function addOptions(gui: GUI, target: Record<string, any>, onChange: (path: string[], value: unknown) => void, opts: { ranges?: Ranges; choices?: Choices; skip?: string[]; path?: string[]; closed?: boolean; arrays?: boolean; name?: string } = {}) {
   const { ranges = {}, choices = {}, skip = [], path = [] } = opts
   for (const [key, value] of Object.entries(target)) {
-    if (skip.includes(key)) continue
     const p = [...path, key]
+    if (skip.includes(key) || skip.includes(p.join('.'))) continue
     const notify = (v: unknown) => onChange(p, v)
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const name = Array.isArray(target) ? opts.name ?? key : key
+    if (value && typeof value === 'object' && (!Array.isArray(value) || (opts.arrays && value.length > 0))) {
       const folder = gui.addFolder(key)
-      addOptions(folder, value, onChange, { ...opts, path: p })
+      const sub = Array.isArray(value) ? () => onChange(p, structuredClone(value)) : onChange
+      addOptions(folder, value, sub, { ...opts, path: p, name: Array.isArray(value) ? key : name })
       if (opts.closed !== false) folder.close()
     } else if (typeof value === 'number') {
-      const r = ranges[key] ?? guessRange(value)
+      const r = ranges[name] ?? guessRange(value)
       gui.add(target, key, r[0], r[1], r[2] ?? niceStep(r[0], r[1])).onChange(notify)
     } else if (typeof value === 'boolean') {
       gui.add(target, key).onChange(notify)
     } else if (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) {
       gui.addColor(target, key).onChange(notify)
     } else if (typeof value === 'string') {
-      ;(choices[key] ? gui.add(target, key, choices[key] as string[]) : gui.add(target, key)).onChange(notify)
+      ;(choices[name] ? gui.add(target, key, choices[name] as string[]) : gui.add(target, key)).onChange(notify)
     }
   }
 }

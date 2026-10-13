@@ -8,6 +8,7 @@ import {
   type DecorateOptions, type PropPlacement, type RoadNetworkLike,
 } from 'threejs-props'
 import { classOf, createPanel } from './panel'
+import { worldGround } from './world-ground'
 
 // threejs-props sandbox: a gallery of every prop and variant with seed variation, a decorated town
 // junction, a rural gravel road with a power line, fences and hay, and a pylon line across the fields.
@@ -43,34 +44,11 @@ const C: [number, number] = [-3000, 2000]
 const H = (x: number, z: number) => world.height(x, z)
 
 // Terrain and water around everything, coloured by the world's ground mix.
-const terrain = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 }))
-const water = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardNodeMaterial({ color: '#3a6f8f', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.85 }))
+const ground = worldGround(world, [C[0], C[1] + 150], 1400, 200)
+const terrain = new THREE.Mesh(ground.terrain, new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 }))
+const water = new THREE.Mesh(ground.water, new THREE.MeshStandardNodeMaterial({ color: '#3a6f8f', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.85 }))
 terrain.receiveShadow = true
 scene.add(terrain, water)
-{
-  const size = 1400, n = 200
-  const geo = new THREE.PlaneGeometry(size, size, n, n).rotateX(-Math.PI / 2).translate(C[0], 0, C[1] + 150)
-  const wgeo = geo.clone()
-  const pos = geo.attributes.position, wpos = wgeo.attributes.position
-  const colors = new Float32Array(pos.count * 3)
-  const s = world.sample(0, 0)
-  for (let i = 0; i < pos.count; i++) {
-    world.sample(pos.getX(i), pos.getZ(i), s)
-    pos.setY(i, s.elevation)
-    wpos.setY(i, s.waterLevel === s.waterLevel ? s.waterLevel : s.elevation - 2)
-  }
-  geo.computeVertexNormals()
-  const nrm = geo.attributes.normal, c = new THREE.Color()
-  for (let i = 0; i < pos.count; i++) {
-    world.sample(pos.getX(i), pos.getZ(i), s)
-    const ny = Math.max(0.05, nrm.getY(i))
-    const { color } = world.ground(s, Math.sqrt(1 - ny * ny) / ny)
-    c.setRGB(color[0], color[1], color[2], THREE.SRGBColorSpace).toArray(colors, i * 3)
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  terrain.geometry = geo
-  water.geometry = wgeo
-}
 
 // 1. Gallery: every kind (rows) × variants × three seeds (columns), north of the town.
 const gallery: PropPlacement[] = []

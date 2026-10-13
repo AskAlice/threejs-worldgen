@@ -1,12 +1,15 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { World, WorldTerrain, renderWorldMap } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
-import { Population, PopulationOverlay, renderPopulationMap, type PopulationInput, type PopulationMode } from 'threejs-population'
-import { addOptions, patch } from './options-gui'
+import { Population, PopulationOverlay, renderPopulationMap, resolvePopulationOptions, type PopulationInput, type PopulationMapOptions, type PopulationOptions } from 'threejs-population'
+import { classOf, createPanel, specOptions, type PanelClass } from './panel'
+import { panels } from './population.panel'
+import { patch } from './options-gui'
 
-// threejs-population sandbox: a flat world with its people, settlements and networks; every option live.
+// threejs-population sandbox: a flat world with its people, settlements and networks. Every option of Population,
+// PopulationOverlay and the 2D map is in the shared panel (population.panel.ts lists the few left out, and why),
+// with share-by-URL. Population changes regenerate (batched while you drag).
 const renderer = new THREE.WebGPURenderer({ antialias: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
 renderer.setSize(innerWidth, innerHeight)
@@ -31,11 +34,13 @@ controls.enableDamping = true
 
 const hud = document.getElementById('hud')!
 const map = (document.getElementById('map') as HTMLCanvasElement).getContext('2d')!
-const ui = { map: 'density' as PopulationMode }
+const spec = panels['threejs-population']
+const mapOptions = structuredClone(spec.renderPopulationMap.target!)
 function drawMap() {
   const n = 256, size = population.options.radius * 2
   const base = renderWorldMap(world, { center: population.options.center, size, resolution: n })
-  const top = renderPopulationMap(population.data, { mode: ui.map, resolution: n }, population.network)
+  const { hexResolution, ...rest } = mapOptions as Partial<PopulationMapOptions>
+  const top = renderPopulationMap(population.data, { ...rest, hexResolution: (hexResolution ?? -1) < 0 ? null : hexResolution, resolution: n }, population.network, overlay.options.style)
   for (let i = 0; i < base.length; i += 4) {
     const a = top[i + 3] ? 0.75 : 0
     for (let k = 0; k < 3; k++) base[i + k] = base[i + k] * (1 - a) + top[i + k] * a
@@ -49,19 +54,36 @@ function drawMap() {
 population.onChange(drawMap)
 drawMap()
 
-const gui = new GUI({ title: 'threejs-population' })
-gui.add(ui, 'map', ['density', 'landUse', 'lights', 'habitability']).onChange(drawMap)
-let pending: ReturnType<typeof setTimeout> | undefined
-addOptions(gui.addFolder('Population'), structuredClone(population.options) as Record<string, any>, (path, value) => {
-  clearTimeout(pending)
-  pending = setTimeout(() => population.set(patch(path, value) as PopulationInput), 200)
-}, { skip: ['location', 'center', 'fertility', 'avoid'], ranges: { ruralShare: [0, 1, 0.01], zipf: [0.5, 2, 0.01], levels: [1, 4, 1], jitter: [0, 1, 0.01], hamletChance: [0, 1, 0.01], farmsteadChance: [0, 1, 0.01], water: [0, 1, 0.01] } })
-const overlayOptions = structuredClone(overlay.options) as Record<string, any>
-overlayOptions.resolution = -1 // −1 = auto in this panel
-addOptions(gui.addFolder('Overlay'), overlayOptions, (path, value) => {
-  if (path[0] === 'resolution') overlay.set({ resolution: (value as number) < 0 ? 'auto' : (value as number) })
-  else overlay.set(patch(path, value))
-}, { skip: ['origin', 'densityRamp', 'lightRamp', 'habitabilityRamp'], choices: { mode: ['density', 'landUse', 'lights', 'habitability'] }, ranges: { resolution: [-1, 10, 1], opacity: [0, 1, 0.01], gap: [0, 0.5, 0.01] } })
+// Population regenerates on change: batch the changes made while dragging.
+let pending: PopulationInput = {}
+let timer: ReturnType<typeof setTimeout> | undefined
+const populationInput = {
+  set(change: PopulationInput) {
+    pending = resolvePopulationOptions(change, pending as PopulationOptions) // deep merge
+    clearTimeout(timer)
+    timer = setTimeout(() => { const p = pending; pending = {}; population.set(p) }, 200)
+  },
+}
+const { origin: _origin, ...overlayView } = overlay.options
+const overlayTarget = { ...structuredClone(overlayView), resolution: overlay.options.resolution === 'auto' ? -1 : overlay.options.resolution }
+const overlayClass: PanelClass = {
+  name: 'PopulationOverlay',
+  target: overlayTarget,
+  ...specOptions(spec.PopulationOverlay),
+  onChange: (path, value) => {
+    if (path[0] === 'resolution') overlay.set({ resolution: (value as number) < 0 ? 'auto' : (value as number) })
+    else if (path[0] === 'style') { overlay.set({ style: { [path[1]]: structuredClone(overlayTarget.style[path[1] as keyof typeof overlayTarget.style]) } }); drawMap() } // style merges one level deep
+    else overlay.set(patch(path, value))
+  },
+}
+createPanel([{
+  name: 'threejs-population',
+  classes: [
+    classOf('Population', populationInput, population.options, specOptions(spec.Population)),
+    overlayClass,
+    { name: 'renderPopulationMap', target: mapOptions, onChange: drawMap, ...specOptions(spec.renderPopulationMap) },
+  ],
+}], { title: 'threejs-population' })
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight

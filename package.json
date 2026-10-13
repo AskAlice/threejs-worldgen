@@ -24,10 +24,12 @@
     "build": "npm run build --workspaces",
     "dev": "vite example",
     "typecheck": "tsc --noEmit",
-    "test": "node --conditions=worldgen-source --test packages/*/test/*.test.ts",
+    "test": "node --conditions=worldgen-source --test packages/*/test/*.test.ts example/*.test.ts landing/*.test.mjs scripts/*.test.mjs .claude/hooks/*.test.mjs",
     "docs": "typedoc",
     "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && node landing/build.mjs && node landing/check.mjs",
-    "publish:all": "scripts/publish-all.sh"
+    "publish:all": "scripts/publish-all.sh",
+    "readme:cards": "node landing/readme-cards.mjs",
+    "check:options": "node --conditions=worldgen-source scripts/options-coverage.mjs"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.9",

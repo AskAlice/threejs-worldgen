@@ -13,8 +13,42 @@ export interface PanelClass {
   ranges?: Ranges
   /** Dropdown choices by option name. */
   choices?: Choices
-  /** Option names to leave out. */
+  /** Option names (any depth) or dotted paths (`facade.walls`) to leave out. */
   skip?: string[]
+  /** Also edit arrays (tuples, palettes, lists of objects); a change sends the whole array. */
+  arrays?: boolean
+}
+
+/**
+ * One class in a sandbox's panel manifest (`example/<demo>.panel.ts`): the package defaults it must cover and why
+ * any option is left out. `scripts/options-coverage.mjs` checks it; the sandbox passes it to its class with
+ * {@link specOptions}.
+ */
+export interface PanelClassSpec {
+  /**
+   * The package's default options. A function is called only by the check (for defaults that are costly or need
+   * Node), with `paramDefaults(fn)`: a function's literal parameter defaults, for packages whose options are
+   * function parameters.
+   */
+  defaults: object | ((paramDefaults: (fn: Function) => Record<string, unknown>) => object)
+  /** Options left out, each with the reason (option name at any depth, or a dotted path). */
+  skip?: Record<string, string>
+  /** Slider ranges by option name. */
+  ranges?: Ranges
+  /** Dropdown choices by option name. */
+  choices?: Choices
+  /** Also edit arrays. */
+  arrays?: boolean
+  /** The object the panel edits, when the sandbox doesn't take it from an instance's options. */
+  target?: Record<string, any>
+}
+
+/** A sandbox's panel manifest: package name → class name → {@link PanelClassSpec}. */
+export type PanelSpec = Record<string, Record<string, PanelClassSpec>>
+
+/** The panel settings (`skip`, `ranges`, `choices`, `arrays`) of a manifest class, for `classOf`'s `extra`. */
+export function specOptions({ skip = {}, ranges, choices, arrays }: PanelClassSpec): Partial<PanelClass> {
+  return { skip: Object.keys(skip), ranges, choices, arrays }
 }
 
 /** One package's section of the panel. */
@@ -54,7 +88,7 @@ export function createPanel(packages: PanelPackage[], { title = 'threejs-worldge
         entry[path.join('.')] = value
         writeHash(shared)
       }
-      addOptions(cf, cls.target, apply, { ranges: cls.ranges, choices: cls.choices, skip: cls.skip })
+      addOptions(cf, cls.target, apply, { ranges: cls.ranges, choices: cls.choices, skip: cls.skip, arrays: cls.arrays })
       cf.add({ reset: () => {
         for (const [p, v] of Object.entries(shared[key] ?? {})) {
           const path = p.split('.')
@@ -106,21 +140,36 @@ function folderPath(f: GUI | undefined): string {
 
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
 
-// Sets an existing option only (own keys all the way down, no prototype keys, same value type).
-// Returns false and changes nothing otherwise.
+// Sets an existing option only (own keys all the way down, no prototype keys, same value type; arrays only with the
+// same shape, copied in place so the controls stay bound). Returns false and changes nothing otherwise.
 function setPath(target: Record<string, any>, path: string[], value: unknown): boolean {
   let o: any = target
   for (let i = 0; i < path.length; i++) {
     const k = path[i]
     if (FORBIDDEN.has(k) || o === null || typeof o !== 'object' || !Object.hasOwn(o, k)) return false
     if (i === path.length - 1) {
-      if (typeof o[k] !== typeof value || (typeof value === 'object' && value !== null)) return false
-      o[k] = value
+      if (!sameShape(o[k], value)) return false
+      if (value && typeof value === 'object') assignDeep(o[k], value)
+      else o[k] = value
       return true
     }
     o = o[k]
   }
   return false
+}
+
+function sameShape(a: any, b: any): boolean {
+  if (typeof a !== typeof b || (a === null) !== (b === null) || Array.isArray(a) !== Array.isArray(b)) return false
+  if (!a || typeof a !== 'object') return true
+  const keys = Object.keys(a)
+  return keys.length === Object.keys(b).length && keys.every((k) => Object.hasOwn(b, k) && sameShape(a[k], b[k]))
+}
+
+function assignDeep(target: any, value: any) {
+  for (const k of Object.keys(value)) {
+    if (value[k] && typeof value[k] === 'object') assignDeep(target[k], value[k])
+    else target[k] = value[k]
+  }
 }
 
 function readHash(): Record<string, Record<string, unknown>> {

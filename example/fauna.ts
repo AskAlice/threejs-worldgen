@@ -1,12 +1,13 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { World, createSample } from 'threejs-biomes'
-import { DEFAULT_FISH_SCHOOLS, FISH_SPECIES, Fauna, Fish } from 'threejs-fauna'
-import { addOptions, patch } from './options-gui'
+import { FISH_SPECIES, Fauna, Fish } from 'threejs-fauna'
+import { classOf, createPanel, specOptions } from './panel'
+import { panels } from './fauna.panel'
 
-// Sandbox for threejs-fauna. Default: every fish species swimming in place, with a GUI for one of
-// them. `?world`: fish schools and bird flocks streaming around the camera at a river mouth.
+// Sandbox for threejs-fauna. Default: every fish species swimming in place, each with its own folder in the
+// shared panel. `?world`: fish schools and bird flocks streaming around the camera at a river mouth, with every
+// FishSchools and BirdFlocks option. fauna.panel.ts lists the few options left out, and why; share-by-URL.
 const params = new URLSearchParams(location.search)
 const hud = document.getElementById('hud')!
 
@@ -29,7 +30,7 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix()
   renderer.setSize(innerWidth, innerHeight)
 })
-const gui = new GUI({ title: 'threejs-fauna' })
+const spec = panels['threejs-fauna']
 
 if (params.has('world')) await worldMode()
 else await gallery()
@@ -47,24 +48,14 @@ async function gallery() {
   })
   camera.position.set(0, 0.7, 3.4)
   controls.target.set(0, 0.7, 0)
-  const state = { species: 'clownfish', speed: 1, turn: 0 }
-  let folder = gui.addFolder('species')
-  const bind = () => {
-    folder.destroy()
-    folder = gui.addFolder(`species: ${state.species}`)
-    const fish = fishes[ids.indexOf(state.species)]
-    const opts = structuredClone(fish.settings.species) as Record<string, any>
-    delete opts.habitat
-    delete opts.school
-    addOptions(folder, opts, (path, value) => fish.set({ species: patch(path, value) }), {
-      ranges: { depth: [0.05, 0.8], width: [0.02, 0.4], bodyLength: [0.5, 0.95], nose: [0.3, 1.5], back: [0.3, 0.7], peduncle: [0.05, 0.6], squareness: [1.5, 4], count: [0, 20, 1], density: [0, 30], amplitude: [0, 0.3], hueVariation: [0, 1] },
-      choices: { shape: ['forked', 'lunate', 'rounded', 'truncate'] },
-    })
-  }
-  gui.add(state, 'species', ids).onChange(bind)
-  gui.add(state, 'speed', 0, 4).onChange((v: number) => fishes.forEach((f) => f.set({ speed: v })))
-  gui.add(state, 'turn', -1, 1).onChange((v: number) => fishes.forEach((f) => f.set({ turn: v })))
-  bind()
+  const all = { set: (input: object) => fishes.forEach((f) => f.set(input)) }
+  createPanel([{
+    name: 'threejs-fauna',
+    classes: [
+      classOf('all fish', all, { speed: 1, turn: 0 }, { ranges: { speed: [0, 4], turn: [-1, 1] } }),
+      ...fishes.map((f, i) => classOf(`Fish: ${ids[i]}`, f, f.settings, specOptions(spec.Fish))),
+    ],
+  }], { title: 'threejs-fauna' })
   renderer.setAnimationLoop(() => {
     controls.update()
     renderer.render(scene, camera)
@@ -87,9 +78,15 @@ async function worldMode() {
   controls.target.set(0, -1, 0)
   const fauna = await Fauna.create({ camera, scene, renderer, world, origin, predators: [{ object: camera, radius: 3 }] })
   Object.assign(globalThis, { fauna, THREE }) // for poking at it from the console
-  const fishOptions = structuredClone({ ...DEFAULT_FISH_SCHOOLS, predators: [], species: undefined }) as Record<string, any>
-  for (const k of ['predators', 'origin', 'species', 'seed']) delete fishOptions[k]
-  addOptions(gui.addFolder('fish'), fishOptions, (path, value) => fauna.set({ fish: patch(path, value) }), { ranges: { density: [0, 2000], gridResolution: [3, 9, 1], tileSize: [16, 256, 1] } })
+  // A layer per kind; its settings minus the predators (the camera: not JSON, and skipped in the panel).
+  const kind = (name: 'fish' | 'birds') => ({ set: (input: object) => fauna.set({ [name]: input }) })
+  createPanel([{
+    name: 'threejs-fauna',
+    classes: [
+      classOf('FishSchools', kind('fish'), { ...fauna.layers.fish!.settings, predators: [] }, specOptions(spec.FishSchools)),
+      classOf('BirdFlocks', kind('birds'), { ...fauna.layers.birds!.settings, predators: [] }, specOptions(spec.BirdFlocks)),
+    ],
+  }], { title: 'threejs-fauna' })
   const s = createSample(8)
   renderer.setAnimationLoop(() => {
     controls.update()
