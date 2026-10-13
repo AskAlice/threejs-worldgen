@@ -15,6 +15,7 @@ export default {
   lede: 'Bake any mesh or group into a heightfield once, then look up the height, measure the slope and ray-march the ground anywhere, with no per-object raycasts. A height function works the same way, so a modelled island and an endless procedural world look alike to everything built on top.',
   hero: { img: 'terrain.jpg', alt: 'Grass covering a rolling hill mesh, every blade placed on its baked heightfield in the threejs-grass demo' },
   thumb: 'heightfield/thumb.jpg',
+  thumbAlt: 'Grass growing over a smooth rolling hill, each blade set on the baked heightfield, hills fading into haze behind',
   demos: [{ label: 'Sandbox', href: 'heightfield.html' }],
   stats: [['4', 'functions, one peer dependency'], ['1024', 'samples per side by default'], ['12', 'bisection steps per ray hit'], ['NaN', 'off the terrain, never a guess']],
   install: 'npm i threejs-heightfield three',

@@ -55,6 +55,11 @@
   ],
   "treatWarningsAsErrors": true,
   "hostedBaseUrl": "https://askalice.github.io/threejs-worldgen/docs/",
+  "navigationLinks": {
+    "Website": "https://askalice.github.io/threejs-worldgen/",
+    "Demos": "https://askalice.github.io/threejs-worldgen/demo/demos.html",
+    "GitHub": "https://github.com/AskAlice/threejs-worldgen"
+  },
   "plugin": [
     "./scripts/typedoc-seo.mjs"
   ],

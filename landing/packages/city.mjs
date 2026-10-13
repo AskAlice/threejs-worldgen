@@ -13,6 +13,7 @@ export default {
   lede: 'Settlements where people would live, placed and sized by a population model on an H3 hex grid, with roads that follow the terrain, blocks, lots and buildings that match the climate. One call to <code>City.create()</code> or one <code>&lt;City /&gt;</code>, and the ground is flattened under all of it.',
   hero: { img: 'city/hero.jpg', alt: 'Aerial view of a procedural city beside a river' },
   thumb: 'city/thumb.jpg',
+  thumbAlt: 'Downtown towers rising from a street grid of houses beside a river',
   demos: [{ label: 'three.js demo', href: 'city.html' }, { label: 'React Three Fiber demo', href: 'city-r3f.html' }, { label: 'Settlement planner demo', href: 'population.html' }, { label: 'Settlement planner R3F demo', href: 'population-r3f.html' }],
   stats: [['~3,600', 'buildings in a 1.5 km city'], ['4', 'size classes'], ['6', 'architectures'], ['0', 'texture assets']],
   install: 'npm i threejs-city threejs-biomes three',

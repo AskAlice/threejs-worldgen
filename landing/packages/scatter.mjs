@@ -13,6 +13,7 @@ export default {
   lede: 'Give it a mesh per level of detail and a few placement rules; it streams instances over your terrain in camera-centred tiles. Placement is a pure function of <code>seed</code> and position, and draw calls stay flat however far the world goes.',
   hero: { img: 'scatter/hero.jpg', alt: 'A mixed forest of oak, beech, birch and spruce running over rolling hills to the horizon' },
   thumb: 'scatter/thumb.jpg',
+  thumbAlt: 'A mixed forest of conifers and broadleaf trees running to a hazy ridge',
   demos: [{ label: 'three.js demo', href: 'scatter.html' }],
   stats: [['~25k', 'instances in the demo'], ['82', 'draw calls for all of them'], ['8×8', 'impostor views per object'], ['4 ms', 'build budget per frame']],
   install: 'npm i threejs-scatter three',

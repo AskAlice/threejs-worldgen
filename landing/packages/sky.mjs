@@ -13,6 +13,7 @@ export default {
   lede: 'A layered atmosphere, Gaussian clouds, a sun and moon on real orbits, stars and the Milky Way turning with sidereal time. The lighting, fog and exposure that go with them come from the same <code>Sky.create()</code> or one <code>&lt;Sky /&gt;</code>.',
   hero: { img: 'sky/hero.jpg', alt: 'Sunset over rolling hills, with golden cumulus on the horizon and cirrus streaks above' },
   thumb: 'sky/thumb.jpg',
+  thumbAlt: 'Golden cumulus clouds over rolling hills at sunset',
   demos: [{ label: 'three.js demo', href: 'sky.html' }],
   stats: [['5', 'atmosphere layers'], ['16k', 'cloud splats nearby'], ['5', 'seeded planets'], ['1', 'draw call per layer']],
   install: 'npm i threejs-sky three',

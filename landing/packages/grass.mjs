@@ -1,5 +1,6 @@
 // Lander data for threejs-grass. Schema: see landing/build.mjs. HTML is allowed in headline, lede, sub, body, intro and
 // final text; media paths are relative to site/media/ (sources: media/ and landing/media/); demo hrefs are relative to demo/.
+// A `thumb` other than the hero image needs its own alt text in `thumbAlt`.
 export default {
   short: 'grass',
   name: 'threejs-grass',

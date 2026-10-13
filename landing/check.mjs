@@ -3,11 +3,13 @@
 //   node landing/check.mjs [siteDir=site]
 //
 // Every HTML page needs a title, description, canonical, og:title, og:image and twitter:card; titles and descriptions
-// must be unique; JSON-LD must parse; every sitemap URL, og:image and internal href/src must map to a built file.
+// must be unique; JSON-LD must parse; every sitemap URL, og:image and internal href/src must map to a built file; the
+// docs map on the docs home must link every public package's API modules and every demo page in example/.
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, resolve, relative, dirname } from 'node:path'
 import { SITE } from './seo.mjs'
+import { missingFromMap, workspacePackages, demoPages } from './readme-cards.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const site = resolve(root, process.argv[2] ?? 'site')
@@ -64,6 +66,11 @@ for (const sm of ['sitemap.xml', 'docs/sitemap.xml']) {
     if (!loc.startsWith(SITE) || !target(loc, site)) errors.push(`${sm}: ${loc} has no built file`)
   }
 }
+// The docs home (README.md) must map every public package's API modules and every demo page (landing/readme-cards.mjs).
+const docsHome = join(site, 'docs/index.html')
+if (!existsSync(docsHome)) errors.push('missing docs/index.html')
+else for (const url of missingFromMap(readFileSync(docsHome, 'utf8'), workspacePackages(root), demoPages(root))) errors.push(`docs/index.html: the docs map has no link to ${url} (run npm run readme:cards)`)
+
 const robots = existsSync(join(site, 'robots.txt')) ? readFileSync(join(site, 'robots.txt'), 'utf8') : ''
 if (!robots.includes(`Sitemap: ${SITE}sitemap.xml`)) errors.push('robots.txt does not point to sitemap.xml')
 for (const f of files.filter((f) => f.includes(`${join('media', 'og')}/`))) {

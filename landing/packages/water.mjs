@@ -13,6 +13,7 @@ export default {
   lede: 'An ocean that is one draw call at every altitude, rivers that flow downhill, and lakes that fill to their spill level. Drop it on a <code>threejs-biomes</code> world, flat or planet, or use it on its own for a plain sea.',
   hero: { img: 'water/hero.jpg', alt: 'Waves rolling onto a sandy coast at a river mouth' },
   thumb: 'water/thumb.jpg',
+  thumbAlt: 'Waves breaking on a sandy beach beside a river mouth',
   demos: [
     { label: 'three.js demo', href: 'water.html' },
     { label: 'Planet demo', href: 'water.html?planet' },

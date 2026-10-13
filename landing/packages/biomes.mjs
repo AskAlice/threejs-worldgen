@@ -13,6 +13,7 @@ export default {
   lede: 'Climate, continents, mountain ranges, rivers and volcanoes, sorted into 20 blended biomes on an infinite plane or a whole planet. Streaming terrain takes you from orbit down to the ground an ant walks on.',
   hero: { img: 'biomes/hero.jpg', alt: 'Rivers meandering through a valley between mountain ranges on a generated world' },
   thumb: 'biomes/thumb.jpg',
+  thumbAlt: 'A braided river winding across a broad valley below a snow-streaked mountain',
   demos: [
     { label: 'Planet demo', href: 'terrain.html' },
     { label: 'Flat world demo', href: 'terrain.html?surface=plane' },

@@ -1,7 +1,8 @@
 // TypeDoc plugin: search titles, per-page descriptions, canonical links and social cards for the API reference.
 // Registered in typedoc.json ("plugin"). TypeDoc itself writes docs/sitemap.xml and the index canonical from
 // "hostedBaseUrl"; this adds the rest through the renderer's head.end hook, and on endPage swaps TypeDoc's generic
-// <title> and "Documentation for …" description for the ones below (a second description tag would be a duplicate).
+// <title> and "Documentation for …" description for the ones below (a second description tag would be a duplicate),
+// and keeps the docs home to one <h1>.
 import { existsSync, readFileSync } from 'node:fs'
 import { JSX, PageEvent, ReflectionKind } from 'typedoc'
 import { SITE, seoTags, esc } from '../landing/seo.mjs'
@@ -57,5 +58,7 @@ export function load(app) {
     page.contents = page.contents
       .replace(/<title>[^<]*<\/title>/, `<title>${esc(info(page).title)}</title>`)
       .replace(/<meta name="description" content="Documentation for [^"]*"\/>/, '')
+    // The README's "# threejs-worldgen" would be a second <h1> under TypeDoc's page title: make it an <h2>.
+    if (page.url === 'index.html') page.contents = page.contents.replace(/<h1( id="[^"]*" class="tsd-anchor-link">[\s\S]*?)<\/h1>/, '<h2$1</h2>')
   })
 }

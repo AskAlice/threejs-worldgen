@@ -13,6 +13,7 @@ export default {
   lede: 'Fish schools in rivers and seas, matched to water type, temperature and depth, and bird flocks over the biomes they like. Bodies, patterns, swimming and wing beats are all generated, and every group is a seeded flock that never leaves its habitat.',
   hero: { img: 'fauna/hero.jpg', alt: 'Twelve procedural fish species swimming side by side' },
   thumb: 'fauna/thumb.jpg',
+  thumbAlt: 'Twelve procedural fish species in rows on deep blue water',
   demos: [{ label: 'Fish gallery', href: 'fauna.html' },
     { label: 'Fish and birds in a world', href: 'fauna.html?world' }, { label: 'React Three Fiber demo', href: 'fauna-r3f.html' }],
   stats: [['12', 'fish species'], ['4', 'bird species'], ['0', 'textures or models'], ['1', 'InstancedMesh per species']],

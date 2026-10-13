@@ -13,6 +13,7 @@ export default {
   lede: 'Fronts, rain, snow, gusts and thunderstorms over your world, wildfires that spread with fuel, wind and slope, and one material-state layer that makes everything wet, snowy, burnt or damaged. Scrub time backwards or forwards and the same seed always gives the same sky.',
   hero: { img: 'weathering/hero.jpg', alt: 'A wildfire front burning through a conifer forest, smoke drifting downwind' },
   thumb: 'weathering/thumb.jpg',
+  thumbAlt: 'A wildfire spreading across a forested hillside, scorched ground in front',
   demos: [{ label: 'three.js demo', href: 'weathering.html' }],
   stats: [['4', 'material states'], ['24k', 'raindrops, one draw call'], ['22', 'burnable fuel models'], ['3', 'draw calls per wildfire']],
   install: 'npm i threejs-weathering threejs-biomes three',
