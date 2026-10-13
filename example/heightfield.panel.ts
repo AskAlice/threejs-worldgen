@@ -1,9 +1,9 @@
 import { bakeHeightfield, createHeightSampler, raycastHeight, slopeAt } from 'threejs-heightfield'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the heightfield sandbox (heightfield.ts); checked by scripts/options-coverage.mjs.
-// threejs-heightfield has no options object: its options are its functions' parameter defaults, so the check reads
-// those from the functions and the sandbox edits `target` (starting at the same values).
+// Panel manifest of the heightfield sandboxes (heightfield.ts and heightfield-r3f.tsx); checked by
+// scripts/options-coverage.mjs. threejs-heightfield has no options object: its options are its functions' parameter
+// defaults, so the check reads those from the functions and the sandboxes edit `target` (starting at the same values).
 export const panels: PanelSpec = {
   'threejs-heightfield': {
     createHeightSampler: {
@@ -15,3 +15,6 @@ export const panels: PanelSpec = {
     raycastHeight: { defaults: (params) => params(raycastHeight), target: { maxDistance: 2000, step: 0.5 }, ranges: { maxDistance: [10, 5000, 1], step: [0.05, 10, 0.05] } },
   },
 }
+
+/** The classes heightfield-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'heightfield-r3f.tsx': ['createHeightSampler', 'slopeAt', 'raycastHeight'] }

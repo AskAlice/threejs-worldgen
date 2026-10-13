@@ -2,6 +2,7 @@
 // daylight, a terrain patch from a threejs-biomes world, orbit controls, a HUD, and leva controls
 // generated from a package's JSON options.
 import * as THREE from 'three/webgpu'
+import { pass } from 'three/tsl'
 import { createRoot } from 'react-dom/client'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, extend, useFrame, useThree, type CameraProps, type ThreeToJSXElements } from '@react-three/fiber'
@@ -19,14 +20,18 @@ extend(THREE as any)
 
 export type V3 = [number, number, number]
 
-/** Renders `scene` into `#root` on a WebGPURenderer (`?webgl` forces the WebGL backend), as the grass R3F demo does. */
-export function mount(scene: ReactNode, camera: CameraProps) {
+/**
+ * Renders `scene` into `#root` on a WebGPURenderer (`?webgl` forces the WebGL backend), as the grass R3F demo does.
+ * `renderer` settings (e.g. the three.js sandbox's tone mapping) are applied once it is created.
+ */
+export function mount(scene: ReactNode, camera: CameraProps, renderer: Partial<Pick<THREE.WebGPURenderer, 'toneMapping' | 'toneMappingExposure'>> = {}) {
   Object.assign(window, { levaStore }) // for the console: levaStore.setValueAtPath('City.facade.facade/night', 1, true)
   createRoot(document.getElementById('root')!).render(
     <Canvas
       dpr={[1, 1.5]}
       shadows="percentage"
       camera={camera}
+      onCreated={({ gl }) => void Object.assign(gl, renderer)}
       gl={async (props) => {
         const renderer = new THREE.WebGPURenderer({ ...(props as any), antialias: true, forceWebGL: location.search.includes('webgl') })
         await renderer.init()
@@ -47,10 +52,38 @@ export function useOptions(name: string, defaults: object, opts: SchemaOptions =
 /**
  * leva controls for one class of a panel manifest (`example/<demo>.panel.ts`): its `target` (or `defaults`) with the
  * manifest's skips, ranges, choices and arrays, so the R3F sandbox shows what the three.js sandbox shows. The folder
- * is named after the class; scripts/options-coverage.mjs checks every class a manifest's `r3f` lists this way.
+ * is named after the class (or `folder`, for one folder per instance); scripts/options-coverage.mjs checks every class
+ * a manifest's `r3f` lists this way.
  */
-export function useSpec(name: string, spec: PanelClassSpec, collapsed = false): Record<string, any> {
-  return useOptions(name, (spec.target ?? spec.defaults) as object, specSchema(spec), collapsed)
+export function useSpec(name: string, spec: PanelClassSpec, { collapsed = false, folder = name }: { collapsed?: boolean; folder?: string } = {}): Record<string, any> {
+  return useOptions(folder, (spec.target ?? spec.defaults) as object, specSchema(spec), collapsed)
+}
+
+/**
+ * Renders the frame through a RenderPipeline whose output is `output(scene colour)` (bloom and the like) instead of
+ * R3F's plain render. Runs after every other `useFrame`.
+ */
+export function Post({ output }: { output: (color: any) => any }) {
+  const { gl, scene, camera } = useThree()
+  const pipeline = useMemo(() => {
+    const p = new THREE.RenderPipeline(gl as unknown as THREE.WebGPURenderer)
+    p.outputNode = output(pass(scene, camera).getTextureNode('output'))
+    return p
+  }, [gl, scene, camera])
+  useEffect(() => () => pipeline.dispose(), [pipeline])
+  useFrame(() => pipeline.render(), 1)
+  return null
+}
+
+/** Sets the scene's background colour and fog (`[near, far]` linear, or an exp² density) while mounted. */
+export function Backdrop({ color, fog }: { color: string; fog?: [near: number, far: number] | number }) {
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    scene.background = new THREE.Color(color)
+    scene.fog = fog === undefined ? null : typeof fog === 'number' ? new THREE.FogExp2(color, fog) : new THREE.Fog(color, fog[0], fog[1])
+    return () => void ((scene.background = null), (scene.fog = null))
+  }, [scene, color, JSON.stringify(fog)])
+  return null
 }
 
 /** Writes `text()` into `#hud` twice a second. */

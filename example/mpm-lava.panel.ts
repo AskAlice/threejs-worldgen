@@ -1,7 +1,7 @@
 import { DEFAULT_LAVA, DEFAULT_MPM, LAVA_DEFAULTS } from 'threejs-particles'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the MPM lava sandbox (mpm-lava.ts); checked by scripts/options-coverage.mjs.
+// Panel manifest of the MPM lava sandboxes (mpm-lava.ts and mpm-lava-r3f.tsx); checked by scripts/options-coverage.mjs.
 export const panels: PanelSpec = {
   'threejs-particles': {
     MPMSolver: {
@@ -32,3 +32,6 @@ export const panels: PanelSpec = {
     },
   },
 }
+
+/** The classes mpm-lava-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'mpm-lava-r3f.tsx': ['MPMSolver', 'MPMLava'] }

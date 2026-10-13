@@ -1,8 +1,8 @@
 import { DEFAULT_MPM, DEFAULT_SNOW_SURFACE, SNOW } from 'threejs-particles'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the MPM snow sandbox (mpm-snow.ts); checked by scripts/options-coverage.mjs. The solver runs the
-// `snow` material only, so its defaults are the core's with the snow parameters in place of the jelly.
+// Panel manifest of the MPM snow sandboxes (mpm-snow.ts and mpm-snow-r3f.tsx); checked by scripts/options-coverage.mjs.
+// The solver runs the `snow` material only, so its defaults are the core's with the snow parameters in place of the jelly.
 export const panels: PanelSpec = {
   'threejs-particles': {
     MPMSolver: {
@@ -33,3 +33,6 @@ export const panels: PanelSpec = {
     },
   },
 }
+
+/** The classes mpm-snow-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'mpm-snow-r3f.tsx': ['MPMSolver', 'MPMSnowSurface'] }

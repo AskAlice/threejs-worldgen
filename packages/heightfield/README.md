@@ -36,6 +36,19 @@ const hills = createHeightSampler((x, z) => Math.sin(x * 0.03) * 4) // functions
 
 Imports from `three/webgpu`, like `threejs-grass`. Full API docs: <https://askalice.github.io/threejs-worldgen/docs/>.
 
+## React
+
+`threejs-heightfield/react` adds `useHeightSampler(terrain, maxResolution)`: `createHeightSampler` that bakes a mesh
+once, and again only when the mesh or `maxResolution` changes. `react` is an optional peer dependency.
+
+```tsx
+import { useHeightSampler } from 'threejs-heightfield/react'
+
+const [ground, setGround] = useState<Object3D | null>(null)
+const height = useHeightSampler(ground, 512)
+return <mesh ref={setGround} geometry={terrain} />
+```
+
 ## License
 
 Apache-2.0

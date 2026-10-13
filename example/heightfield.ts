@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createHeightSampler, raycastHeight, slopeAt, type HeightFn } from 'threejs-heightfield'
 import { createPanel, specOptions } from './panel'
 import { panels } from './heightfield.panel'
+import { SIZE, hills, slopeColor, surface } from './heightfield-scene'
 
 // threejs-heightfield sandbox: the two sources it supports, a height function (used as-is) and meshes baked into a
 // heightfield, sampled on a grid of instanced markers coloured by slopeAt, with raycastHeight under the pointer.
@@ -25,17 +26,6 @@ const sun = new THREE.DirectionalLight('#fff1dc', 2.6)
 sun.position.set(80, 140, 40)
 scene.add(sun, new THREE.HemisphereLight('#cfe3ff', '#5a5040', 1.1))
 
-const SIZE = 200 // the sampled square, metres
-// Rolling hills with a steep ridge along z at x = 30.
-const hills: HeightFn = (x, z) => 8 * Math.sin(x * 0.045) * Math.cos(z * 0.038) + 3 * Math.sin((x + 2 * z) * 0.09) + 14 * Math.exp(-(((x - 30) / 12) ** 2))
-
-function surface(size: number, segments: number) {
-  const geo = new THREE.PlaneGeometry(size, size, segments, segments).rotateX(-Math.PI / 2)
-  const pos = geo.attributes.position
-  for (let i = 0; i < pos.count; i++) pos.setY(i, hills(pos.getX(i), pos.getZ(i)))
-  geo.computeVertexNormals()
-  return geo
-}
 const ground = new THREE.MeshStandardNodeMaterial({ color: '#7d8659', roughness: 0.95 })
 const stone = new THREE.MeshStandardNodeMaterial({ color: '#a59d90', roughness: 0.85 })
 
@@ -102,7 +92,7 @@ function placeMarkers() {
       hits++
       markers.setMatrixAt(k, m.makeTranslation(x, y + 0.3, z))
       const s = slope(x, z) // rise / run: 1 = 45°
-      markers.setColorAt(k, s === null ? c.set('#8a8a8a') : c.setHSL(0.33 * (1 - Math.min(1, s)), 0.75, 0.45)) // grey: no slope
+      markers.setColorAt(k, slopeColor(s, c))
     }
   }
   markers.instanceMatrix.needsUpdate = true

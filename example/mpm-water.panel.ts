@@ -1,7 +1,7 @@
 import { DEFAULT_FLUID_SURFACE, DEFAULT_MPM, DEFAULT_PUDDLES, DEFAULT_SPLASHES } from 'threejs-particles'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the MPM water sandbox (mpm-water.ts); checked by scripts/options-coverage.mjs.
+// Panel manifest of the MPM water sandboxes (mpm-water.ts and mpm-water-r3f.tsx); checked by scripts/options-coverage.mjs.
 export const panels: PanelSpec = {
   'threejs-particles': {
     MPMSolver: {
@@ -49,3 +49,6 @@ export const panels: PanelSpec = {
     },
   },
 }
+
+/** The classes mpm-water-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'mpm-water-r3f.tsx': ['MPMSolver', 'FluidSurface', 'SplashEmitter', 'PuddleField'] }

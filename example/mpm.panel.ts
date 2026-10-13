@@ -1,7 +1,7 @@
 import { DEFAULT_MPM } from 'threejs-particles'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the MPM sandbox (mpm.ts); checked by scripts/options-coverage.mjs.
+// Panel manifest of the MPM sandboxes (mpm.ts and mpm-r3f.tsx); checked by scripts/options-coverage.mjs.
 export const panels: PanelSpec = {
   'threejs-particles': {
     MPMSolver: {
@@ -20,3 +20,6 @@ export const panels: PanelSpec = {
     },
   },
 }
+
+/** The classes mpm-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'mpm-r3f.tsx': ['MPMSolver'] }

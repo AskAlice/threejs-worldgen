@@ -151,6 +151,9 @@ mpm.center(camera.position.x, camera.position.y, camera.position.z)    // follow
 <MPM resolution={[64, 48, 64]} cellSize={0.25} height={world.height} emit={[{ center: [0, 5, 0], size: [1, 1, 1] }]} />
 ```
 
+`timeStep={1 / 60}` steps it by a fixed step. The surfaces take the solver from its ref: `<MPMSnowSurface solver={mpm} />`,
+`<FluidSurface source={mpm} />` and `<MPMLava solver={mpm} />` (which steps the solver itself: give that `timeStep={0}`).
+
 Each substep is three compute passes: **P2G** (each particle scatters mass and momentum, with its stress and APIC
 terms, into its 27 nodes), the **grid update** (momentum / mass, gravity, domain walls and terrain; it also clears
 the accumulators, so the grid is cleared every substep) and **G2P** (velocity, `C`, `F ← (I + dt·C)·F`, the

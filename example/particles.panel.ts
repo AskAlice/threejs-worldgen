@@ -1,9 +1,10 @@
 import { DEFAULT_GRID, DEFAULT_PARTICLES, merge, resolveParticleOptions, type GridOptions, type ParticleInput } from 'threejs-particles'
 import type { PanelClassSpec, PanelSpec } from './panel'
 
-// Panel manifest of the particles sandbox (particles.ts); checked by scripts/options-coverage.mjs.
-// A bonfire from three systems (blackbody flames, lit smoke with a plume grid, spark streaks); each system's settings
-// are here so both sandboxes build the same fire, and each starts the panel at its own values (`target`).
+// Panel manifest of the particles sandboxes (particles.ts and particles-r3f.tsx); checked by
+// scripts/options-coverage.mjs. A bonfire from three systems (blackbody flames, lit smoke with a plume grid, spark
+// streaks); each system's settings are here so both sandboxes build the same fire, and each starts the panel at its own
+// values (`target`).
 
 /** Flames: blackbody tongues, additive. */
 export const FLAMES: ParticleInput = {
@@ -60,3 +61,5 @@ export const panels: PanelSpec = {
   },
 }
 
+/** The classes particles-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'particles-r3f.tsx': ['flames', 'smoke', 'sparks', 'grid'] }

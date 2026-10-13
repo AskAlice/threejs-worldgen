@@ -13,14 +13,25 @@
       "worldgen-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./react": {
+      "worldgen-source": "./src/react.tsx",
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external three",
+    "build": "tsup src/index.ts src/react.tsx --format esm --dts --clean --external three --external react",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
+    "react": ">=19",
     "three": ">=0.186.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "repository": {
     "type": "git",
