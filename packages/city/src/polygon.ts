@@ -73,7 +73,8 @@ export function polygonPerimeter(p: readonly Vec2[]): number {
 export function segmentIntersection(ax: number, az: number, bx: number, bz: number, cx: number, cz: number, dx: number, dz: number): SegmentHit | null {
   const rx = bx - ax, rz = bz - az, sx = dx - cx, sz = dz - cz
   const den = rx * sz - rz * sx
-  if (Math.abs(den) < 1e-12) return null
+  // Parallel (relative to the lengths, so round-off on long parallel edges doesn't fake a crossing).
+  if (Math.abs(den) <= 1e-10 * Math.hypot(rx, rz) * Math.hypot(sx, sz)) return null
   const qx = cx - ax, qz = cz - az
   const t = (qx * sz - qz * sx) / den
   const u = (qx * rz - qz * rx) / den

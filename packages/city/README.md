@@ -71,9 +71,9 @@ by value. `react` and `@react-three/fiber` are optional peer dependencies; the c
 
 1. **Placement** (`generatePopulation`, then `planCities`): the [settlement planner](#settlement-planner) decides where
    people live and how many. Each settlement becomes a city whose size class comes from its population class
-   (`citySize`: hamlet, village, town, city or metropolis; farmsteads get none) and whose radius follows its head
-   count through the class's `population` range (`cityRadius`). Each class builds differently: a **hamlet** is a
-   handful of houses at a junction; a **village** a few streets along the road through it, houses on big lots and a
+   (`citySize`: farmstead, hamlet, village, town, city or metropolis) and whose radius follows its head count through
+   the class's `population` range (`cityRadius`). Each class builds differently: a **farmstead** is a farm (below); a
+   **hamlet** a handful of houses at a junction; a **village** a few streets along the road through it, houses on big lots and a
    church; a **town** a main street of 2–3 storey shops and flats (downtown is a strip along it, `mainStreet`), a short
    grid of houses on big lots, a church, a town hall and a water tower, then fields; **cities** and **metropolises**
    the full grid with towers downtown. Each size class carries its own `roads` and district `styles` presets.
@@ -95,6 +95,17 @@ by value. `react` and `@react-three/fiber` are optional peer dependencies; the c
    `temperate`, `cold` (steep roofs, timber), `arid` (adobe, flat roofs), `mediterranean`, `tropical`, `wetland` (stilts).
 6. **Terrain**: each road gets a graded profile (max grade, smoothed); `FlattenPath` modifiers along the roads (bridges
    excluded) and pads under buildings are registered on the world in one batch and removed on `dispose()`.
+
+**Farms** (`size: 'farmstead'`, `planFarm`): the farmyard takes the first dry spot within `farm.search` of the
+settlement whose ground is no steeper than `farm.maxSlope` (none: no farm). In it stand a farmhouse (the region's
+architecture), a gambrel or gable barn in red or weathered timber, 0–2 grain silos and a machine shed. A dirt driveway,
+bridged over streams, runs to the nearest point of `farm.road`: `planCities` sets it from the population's road
+network (`generateNetworks`), and without one a country road is laid past the farm. Fields are a patchwork aligned with
+the driveway, kept off the yard, roads, water and steep ground. Each grows corn, wheat, fallow or pasture, picked by the
+climate (`farm.crops`), with rows along its long side or along the contours on slopes. Fields are ground-hugging
+geometry with a TSL shader: crop colour, rows and tramlines that fade by their screen footprint, streaks along the rows,
+headlands, and a gentle soil drift. Corn is drawn as a flat placeholder colour until threejs-grass grows it (see the
+data below).
 
 ### Rendering
 
@@ -125,8 +136,17 @@ can drive them every frame.
 
 `city.data()` returns a JSON-safe `CityData` in frame-local metres: road nodes and edges (class, surface, width,
 sidewalk, lanes, speed, access, graded centreline), lots (district, polygon, street frontage and its road edge) and
-buildings (style, material, roof, height, footprint, entrance). Add props to `city.local`, which uses the same
-coordinates.
+buildings (style, material, roof, height, footprint, entrance, `use`: landmark or farm building). Add props to
+`city.local`, which uses the same coordinates.
+
+A farm's `data().farm` holds its `yard`, gravel `apron`, driveway `access` point and:
+
+- `fields`: `polygon`, `crop`, `rows` (unit direction), `rowSpacing` and `contour`. Corn fields are the input for a 3D
+  crop such as threejs-grass corn.
+- `vehicleSpots`: `{ kind: 'tractor', asset: 'vehicles/tractor', position, heading, working, field }`, parked in the
+  yard or working a field along its rows.
+- `props`: hay bales and pasture fences in threejs-props' `PropPlacement` shape, so `new Props({ placements: farm.props })`
+  added to `city.local` places them.
 
 ```ts
 import { laneOffset, pointOnEdge, roadAnchors, routeCost } from 'threejs-city'
@@ -148,7 +168,7 @@ regenerate the settlement, palette changes rebuild its meshes, everything else i
 |---|---|---|
 | `seed` | `1` | Same seed, options and world give the same settlement. |
 | `center` | `[0, 0]` | Centre, frame-local [x, z] metres. |
-| `size` | `'town'` | `'hamlet'` · `'village'` · `'town'` · `'city'` · `'metropolis'`: radius, height limit, layout, districts, surfaces and landmarks. |
+| `size` | `'town'` | `'farmstead'` · `'hamlet'` · `'village'` · `'town'` · `'city'` · `'metropolis'`: radius, height limit, layout, districts, surfaces and landmarks (a farmstead builds a farm). |
 | `radius` | `0` | Metres; 0 = the middle of the size class's range. |
 | `style` | `'auto'` | `'grid'` · `'radial'` · `'organic'` presets for the tensor field and road lengths. |
 | `siteResolution` | `0` | Terrain sampling step, metres (0 = radius / 60, clamped 6–25). |
@@ -159,6 +179,7 @@ regenerate the settlement, palette changes rebuild its meshes, everything else i
 | `lotJitter` | `0.35` | How unevenly blocks are split. |
 | `roadside` | | Lots along open roads: `enabled`, `junctionClearance`, `margin`, `depth`. |
 | `buildings` | | `floorHeight` per style, `towerFloors` (12), `houseFloors` (2), `houseWidth`, `houseDepth`, `sideGap`, `sawtoothRoofs`, `chimneys`, `rooftop`, `penthouses`, `variation`, `areaPerPerson`. |
+| `farm` | | Farmsteads: `road` (polyline the driveway joins), `roadType`, `roadDistance`, `roadSpan`, `maxDriveway`, `yard` size, `maxSlope`, `search`; fields `fieldSize`, `fieldMinArea`, `fieldGap`, `contourSlope`, `fieldMaxSlope`; `crops` (weight, temperature and moisture ranges) and `cropMargin`; look `rowSpacing`, `rowContrast`, `tramlines`, `colors` per crop, `yardColor`, `variation`, `streaks`, `headland`, `fieldOffset`, `fieldStep`; `farmhouse`, `barn` (sizes, `gambrel` chance, `colors`), `silos`, `shed`, `fences`, `hayBales`, `tractorWorking`. |
 | `landmarks` | | `church` (nave `width`, `length`, `wallHeight`, `pitch`; `towerWidth`, `towerHeight`, `spire`, `setback`), `townHall` (`width`, `depth`, `floors`, `pitch`, `clockTower`, `towerHeight`, `setback`), `waterTower` (`height`, `columnRadius`, `tankRadius`, `tankHeight`, `reach`). |
 | `architecture` | `'auto'` | `'temperate'` · `'cold'` · `'arid'` · `'mediterranean'` · `'tropical'` · `'wetland'`; auto reads the climate at the centre. |
 | `architectures` | | Per architecture: weighted `houseMaterials`, `blockMaterials`, `towerMaterials`, `houseRoofs`, `roofMaterials`; `pitch`, `overhang`, `stilts`, `wings`, `balconies`, `airConditioners`. |

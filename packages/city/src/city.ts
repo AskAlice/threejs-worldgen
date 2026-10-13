@@ -9,6 +9,8 @@ import { buildingGeometry, detailGeometry, detailInstances, DETAIL_SHAPES } from
 import type { Building } from './buildings.ts'
 import { cityData, type CityData } from './data.ts'
 import { applyFacadeUniforms, BuildingWeather, createCityUniforms, createFacadeMaterial, createRoofMaterial } from './facade-material.ts'
+import { createFieldMaterial } from './field-material.ts'
+import { fieldGeometry } from './field-mesh.ts'
 import type { RoadGraph } from './graph.ts'
 import type { MeshData } from './mesh-builder.ts'
 import { mergeOptions, resolveCityOptions, type CityInput, type CityOptions, type Weather } from './options.ts'
@@ -113,6 +115,7 @@ export class City {
   private details: BatchedMesh | null = null
   private detailIds: number[][] = []
   private roads: Mesh | null = null
+  private fields: Mesh | null = null
   private materials: Material[] = []
   private weather: BuildingWeather | null = null
   private lodState: Uint8Array = new Uint8Array(0)
@@ -336,6 +339,8 @@ export class City {
     this.details = null
     this.detailIds = []
     if (this.roads) { this.roads.removeFromParent(); this.roads.geometry.dispose() }
+    if (this.fields) { this.fields.removeFromParent(); this.fields.geometry.dispose() }
+    this.fields = null
     for (const m of this.materials) m.dispose()
     this.weather?.dispose()
     this.walls = this.roofs = null
@@ -360,7 +365,7 @@ export class City {
       const flat = b.parts[0].roof === 'flat'
       const roofList = b.parts[0].roof === 'sawtooth' ? f.roofs.metal : flat ? f.roofs.concrete : f.roofs[b.roofMaterial]
       return buildingGeometry(b, origin, {
-        wall: rgb(pickHex(f.walls[b.material], b.seed), k),
+        wall: rgb(b.tint ?? pickHex(f.walls[b.material], b.seed), k),
         roof: rgb(pickHex(roofList, hash01(b.id, 9, 1, 2)), 1 + (k - 1) * 0.5),
         overhang: o.architectures[plan.architecture].overhang,
         parapet: b.style === 'house' ? 0 : 0.9,
@@ -410,6 +415,22 @@ export class City {
       this.roads.receiveShadow = true
       this.roads.name = 'Roads'
       this.object.add(this.roads)
+    }
+
+    // A farm's fields and yard, hugging the ground: the yard follows the flattened pads, fields lie clear of them.
+    const farm = plan.farm
+    if (farm) {
+      const ground = (x: number, z: number) => (pointInPolygon(x, z, farm.apron) ? this.frame.height(x, z) : site.height(x, z))
+      const fm = o.farm
+      const data = fieldGeometry(farm, origin, ground, { rowContrast: fm.rowContrast, tramlines: fm.tramlines, yardColor: fm.yardColor, offset: fm.fieldOffset, step: fm.fieldStep })
+      if (data.count) {
+        const material = createFieldMaterial(this.uniforms, fm)
+        this.materials.push(material)
+        this.fields = new Mesh(toGeometry(data), material)
+        this.fields.receiveShadow = true
+        this.fields.name = 'Fields'
+        this.object.add(this.fields)
+      }
     }
     this.lodState = new Uint8Array(plan.buildings.length)
     this.lastCam.set(Infinity, 0, 0)

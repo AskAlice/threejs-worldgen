@@ -1,5 +1,6 @@
 import { pick, type Architecture, type RoofMaterial, type RoofShape, type WallMaterial } from './architecture.ts'
 import type { District } from './districts.ts'
+import type { FarmBuilding } from './farm.ts'
 import type { Landmark } from './landmarks.ts'
 import type { Lot } from './lots.ts'
 import { boxCorners, insetPolygon, orientedBox, pointInPolygon, polygonArea, polygonCentroid, type OrientedBox, type Vec2 } from './polygon.ts'
@@ -127,8 +128,10 @@ export interface Building {
   shops: boolean
   /** Main door. */
   entrance: Entrance
-  /** A landmark (church, town hall, water tower), or `null` for homes, shops, offices and industry. */
-  use: Landmark | null
+  /** A landmark or farm building, or `null` for homes, shops, offices and industry. */
+  use: Landmark | FarmBuilding | null
+  /** Wall colour (`#rrggbb`) instead of one from the material's palette (a red barn). */
+  tint?: string
 }
 
 /** Building rules. */
@@ -260,6 +263,17 @@ export function entranceFacing(wall: Vec2[], lot: Lot): Entrance {
     if (dist < bestD) { bestD = dist; entrance = { x: mx, z: mz, nx: (b[1] - a[1]) / l, nz: -(b[0] - a[0]) / l } }
   }
   return entrance
+}
+
+/** A building from hand-made parts (landmarks, farm buildings): footprint, height and entrance worked out; `id` −1, base set later. */
+export function assembleBuilding(lot: Lot & { district: District }, use: Building['use'], style: BuildingStyle, parts: BuildingPart[], a: Pick<Building, 'material' | 'roofMaterial' | 'floors' | 'floorHeight'> & Partial<Pick<Building, 'tint' | 'population'>>, seed: number): Building {
+  const foot = parts[0].tiers[0].polygon
+  let height = 0
+  for (const p of parts) height = Math.max(height, p.tiers[p.tiers.length - 1].top)
+  return {
+    id: -1, lot: lot.id, district: lot.district, style, parts, population: 0, ...a, height, base: 0, bottom: 0, stilts: 0, center: polygonCentroid(foot), area: polygonArea(foot),
+    seed, details: [], balconies: [], shops: false, entrance: entranceFacing(foot, lot), use,
+  }
 }
 
 /**

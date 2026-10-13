@@ -17,7 +17,8 @@ const plan = (size: SettlementSize, seed = 3, extra: CityInput = {}) => {
 
 test('bigger classes have more buildings, taller ones and more road', () => {
   // Each class at the bottom of its radius range: the smallest metropolis still outgrows the largest-class below it.
-  const stats = SETTLEMENT_SIZES.map((size) => {
+  // (Farmsteads are farms, not smaller hamlets: see farm.test.ts.)
+  const stats = SETTLEMENT_SIZES.filter((s) => s !== 'farmstead').map((size) => {
     const p = plan(size, 3, { radius: DEFAULT_SIZE_CLASSES[size].radius[0] })
     const h = p.buildings.filter((b) => !b.use).map((b) => b.height) // landmarks have their own heights
     return { size, buildings: p.buildings.length, mean: h.reduce((s, x) => s + x, 0) / h.length, max: Math.max(...h), road: p.graph.totalLength() }
@@ -135,14 +136,17 @@ test('cities come from the population model, largest first, sized by their peopl
   const data = generatePopulation(world, input)
   const sites = planCities(data)
   assert.deepEqual(sites, planCities(generatePopulation(world, input)))
-  assert.equal(sites.length, data.settlements.filter((s) => s.class !== 'farmstead').length)
+  assert.equal(sites.length, data.settlements.length)
+  assert.ok(sites.every((s) => s.road === null), 'no network given, no farm roads')
   assert.ok(new Set(sites.map((s) => s.size)).size >= 2)
   sites.forEach((s, i) => {
     assert.equal(s.size, citySize(s.settlement.class))
     assert.deepEqual([s.x, s.z], s.settlement.position)
     const { radius } = DEFAULT_SIZE_CLASSES[s.size]
     assert.ok(s.radius >= radius[0] && s.radius <= radius[1], `${s.size} radius ${s.radius}`)
-    if (i) assert.ok(s.settlement.population <= sites[i - 1].settlement.population)
+    // Ranked settlements largest first, then the farmsteads.
+    if (i && s.size !== 'farmstead') assert.ok(s.settlement.population <= sites[i - 1].settlement.population)
+    if (i) assert.ok(s.size === 'farmstead' || sites[i - 1].size !== 'farmstead')
   })
 })
 

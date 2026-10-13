@@ -2,15 +2,17 @@ import { hash01, seedOf, type DeepPartial } from 'threejs-biomes'
 import type { District, DistrictShares, DistrictStyle } from './districts.ts'
 import type { RoadSurface, RoadType } from './graph.ts'
 import { cellKey } from './hex.ts'
+import { nearestOnPolyline } from './farm.ts'
 import type { Landmark } from './landmarks.ts'
 import type { PopulationData, Settlement, SettlementClass } from './population-model.ts'
+import type { Network } from './population-network.ts'
 import type { RoadOptions } from './roads.ts'
 
 /** What a `City` builds, smallest first (see {@link citySize} for the population classes each one takes). */
-export type SettlementSize = 'hamlet' | 'village' | 'town' | 'city' | 'metropolis'
+export type SettlementSize = 'farmstead' | 'hamlet' | 'village' | 'town' | 'city' | 'metropolis'
 
 /** Every size class, smallest first. */
-export const SETTLEMENT_SIZES: readonly SettlementSize[] = ['hamlet', 'village', 'town', 'city', 'metropolis']
+export const SETTLEMENT_SIZES: readonly SettlementSize[] = ['farmstead', 'hamlet', 'village', 'town', 'city', 'metropolis']
 
 /** Street layout styles. */
 export type RoadStyle = 'grid' | 'organic' | 'radial'
@@ -47,12 +49,18 @@ const NONE: Record<Landmark, number> = { church: 0, townHall: 0, waterTower: 0 }
 const PAVED: Record<RoadType, RoadSurface> = { primary: 'asphalt', secondary: 'asphalt', minor: 'asphalt' }
 
 /**
- * Default size classes. Population ranges match the population model's default class thresholds. A hamlet is a
- * cluster of houses at a junction; a village a few streets along the road through it, houses on big lots and a
- * church; a town a main street of 2–3 storey shops and flats, a short grid of houses on big lots, a church, a town
- * hall and a water tower, then fields; cities and metropolises the full grid, with towers downtown.
+ * Default size classes. Population ranges match the population model's default class thresholds. A farmstead is a
+ * farm (see `farm` options; its radius is the farmland around it); a hamlet a cluster of houses at a junction; a
+ * village a few streets along the road through it, houses on big lots and a church; a town a main street of 2–3
+ * storey shops and flats, a short grid of houses on big lots, a church, a town hall and a water tower, then fields;
+ * cities and metropolises the full grid, with towers downtown.
  */
 export const DEFAULT_SIZE_CLASSES: Record<SettlementSize, SizeClass> = {
+  farmstead: {
+    population: [1, 50], radius: [260, 420], maxFloors: 2, style: 'organic', arms: 0, districts: { downtown: 0, farmland: 0, industrial: 0, park: 0 },
+    surfaces: { primary: 'asphalt', secondary: 'gravel', minor: 'dirt' }, oldTown: null, mainStreet: 0, landmarks: NONE,
+    roads: { primary: { width: 7.5 } }, styles: {},
+  },
   hamlet: {
     population: [50, 1000], radius: [70, 130], maxFloors: 2, style: 'organic', arms: 2, districts: { downtown: 0, farmland: 0.75, industrial: 0, park: 0 },
     surfaces: { primary: 'gravel', secondary: 'dirt', minor: 'dirt' }, oldTown: null, mainStreet: 0, landmarks: NONE,
@@ -101,27 +109,28 @@ export interface CitySite {
   seed: number
   /** The population model's settlement. */
   settlement: Settlement
+  /** Farmsteads, when planned with a road network: the nearest road (frame-local polyline) and its class, for `farm.road` and `farm.roadType`. */
+  road: { points: [number, number][]; type: RoadType } | null
 }
 
-const CITY_SIZE: Record<SettlementClass, SettlementSize | null> = { metropolis: 'metropolis', city: 'city', town: 'town', village: 'village', hamlet: 'hamlet', farmstead: null }
-
-/** What gets built for a population settlement class: the size class of the same name; farmsteads get no `City` (`null`). */
-export function citySize(settlementClass: SettlementClass): SettlementSize | null {
-  return CITY_SIZE[settlementClass]
+/** What gets built for a population settlement class: the size class of the same name. */
+export function citySize(settlementClass: SettlementClass): SettlementSize {
+  return settlementClass
 }
 
 /** City radius for a settlement: where its population sits (log scale) in its size class's `population` range, mapped onto the class's `radius` range. */
 export function cityRadius(settlement: Settlement, sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES): number {
-  const c = sizes[citySize(settlement.class) ?? 'hamlet']
+  const c = sizes[citySize(settlement.class)]
   const p0 = Math.max(1, c.population[0]), p1 = c.population[1]
   const t = p1 > p0 ? Math.log(Math.max(1, settlement.population) / p0) / Math.log(p1 / p0) : 1
   return c.radius[0] + (c.radius[1] - c.radius[0]) * Math.min(1, Math.max(0, t))
 }
 
 /**
- * The cities to build for a population: one {@link CitySite} per settlement that gets one (see {@link citySize}),
- * largest first. Where settlements go and how many people they hold comes from the population model
- * ({@link generatePopulation}); this maps them onto size classes. Deterministic from the population.
+ * The settlements to build for a population: one {@link CitySite} per settlement, largest first (farmsteads last).
+ * Where settlements go and how many people they hold comes from the population model ({@link generatePopulation});
+ * this maps them onto size classes. With the population's road network ({@link generateNetworks}), each farmstead
+ * also gets the nearest road for its driveway. Deterministic from the population.
  *
  * @example
  * ```ts
@@ -129,14 +138,22 @@ export function cityRadius(settlement: Settlement, sizes: Record<SettlementSize,
  * const city = await City.create({ world, camera, scene, center: [site.x, site.z], size: site.size, radius: site.radius, seed: site.seed })
  * ```
  */
-export function planCities(data: PopulationData, sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES): CitySite[] {
+export function planCities(data: PopulationData, sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES, network: Network | null = null): CitySite[] {
   const seed = seedOf(data.options.seed)
+  const roads = network?.edges.filter((e) => e.type === 'highway' || e.type === 'road' || e.type === 'track') ?? []
   const out: CitySite[] = []
   for (const s of data.settlements) {
     const size = citySize(s.class)
-    if (!size) continue
     const [lo, hi] = cellKey(s.cell)
-    out.push({ x: s.position[0], z: s.position[1], size, radius: cityRadius(s, sizes), seed: Math.floor(hash01(lo, hi, seed, 3) * 2 ** 31), settlement: s })
+    let road: CitySite['road'] = null
+    if (size === 'farmstead' && roads.length) {
+      let best = Infinity
+      for (const e of roads) {
+        const d = nearestOnPolyline(e.points, s.position[0], s.position[1]).distance
+        if (d < best) { best = d; road = { points: e.points.map(([x, z]) => [x, z]), type: e.type === 'track' ? 'secondary' : 'primary' } }
+      }
+    }
+    out.push({ x: s.position[0], z: s.position[1], size, radius: cityRadius(s, sizes), seed: Math.floor(hash01(lo, hi, seed, 3) * 2 ** 31), settlement: s, road })
   }
   return out
 }

@@ -4,6 +4,7 @@ import { City, type CityStats } from './city.ts'
 import { DEFAULT_CITY, mergeOptions, type CityInput } from './options.ts'
 import { planCities, type CitySite } from './placement.ts'
 import { generatePopulation, type PopulationData, type PopulationInput } from './population-model.ts'
+import { generateNetworks } from './population-network.ts'
 
 /** Settings of a {@link Settlements} group. All plain data. */
 export interface SettlementsOptions {
@@ -82,7 +83,10 @@ export class Settlements {
       this.siteKey = key
       for (const c of this.cities) c.dispose()
       this.data = generatePopulation(this.world, o.population, this.frame)
-      this.sites = planCities(this.data, mergeOptions(DEFAULT_CITY.sizes, o.city.sizes)).slice(0, o.maxSettlements)
+      const sizes = mergeOptions(DEFAULT_CITY.sizes, o.city.sizes)
+      this.sites = planCities(this.data, sizes).slice(0, o.maxSettlements)
+      // Farmsteads join the road network with a driveway: route it only when there are farms to build.
+      if (this.sites.some((s) => s.size === 'farmstead')) this.sites = planCities(this.data, sizes, generateNetworks(this.data)).slice(0, o.maxSettlements)
       this.cities = this.sites.map((s) => {
         const c = new City({ world: this.world, frame: this.frame, camera: this.camera ?? undefined, ...this.cityInput(s) })
         this.object.add(c.object)
@@ -132,6 +136,6 @@ export class Settlements {
   }
 
   private cityInput(s: CitySite): CityInput {
-    return mergeOptions(this.options.city, { center: [s.x, s.z], size: s.size, radius: s.radius, seed: s.seed })
+    return mergeOptions(this.options.city, { center: [s.x, s.z], size: s.size, radius: s.radius, seed: s.seed, farm: s.road ? { road: s.road.points, roadType: s.road.type } : undefined })
   }
 }

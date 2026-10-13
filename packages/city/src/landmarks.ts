@@ -1,9 +1,9 @@
 import { hash4, mulberry32 } from 'threejs-biomes'
 import { pick, type Architecture } from './architecture.ts'
-import { entranceFacing, streetRect, type Building, type BuildingPart, type BuildingStyle } from './buildings.ts'
+import { assembleBuilding, streetRect, type Building, type BuildingPart, type BuildingStyle } from './buildings.ts'
 import type { Lot } from './lots.ts'
 import type { PlannedLot } from './plan.ts'
-import { boxCorners, pointInPolygon, polygonArea, polygonCentroid, type OrientedBox, type Vec2 } from './polygon.ts'
+import { boxCorners, pointInPolygon, type OrientedBox, type Vec2 } from './polygon.ts'
 
 /** Civic buildings that make a place recognisable from above. */
 export type Landmark = 'church' | 'townHall' | 'waterTower'
@@ -128,16 +128,6 @@ function frontLength(lot: Lot): number {
   return Math.hypot(b[0] - a[0], b[1] - a[1])
 }
 
-function building(lot: PlannedLot, use: Landmark, style: BuildingStyle, parts: BuildingPart[], a: Pick<Building, 'material' | 'roofMaterial' | 'floors' | 'floorHeight'>, seed: number): Building {
-  const foot = parts[0].tiers[0].polygon
-  let height = 0
-  for (const p of parts) height = Math.max(height, p.tiers[p.tiers.length - 1].top)
-  return {
-    id: -1, lot: lot.id, district: lot.district, style, parts, ...a, height, base: 0, bottom: 0, stilts: 0, center: polygonCentroid(foot), area: polygonArea(foot),
-    seed, population: 0, details: [], balconies: [], shops: false, entrance: entranceFacing(foot, lot), use,
-  }
-}
-
 function church(lot: PlannedLot, c: ChurchOptions, ctx: LandmarkContext, rand: () => number): Building | null {
   const front = frontLength(lot)
   const w = Math.min(span(c.width, rand), front - 2)
@@ -151,7 +141,7 @@ function church(lot: PlannedLot, c: ChurchOptions, ctx: LandmarkContext, rand: (
   if (!nave || !tower || nave.halfLength * 2 < c.length[0] * 0.7 || Math.min(tower.halfLength, tower.halfWidth) * 2 < tw * 0.8) return null
   const flat = pick(ctx.architecture.houseRoofs, rand()) === 'flat'
   const wall = span(c.wallHeight, rand), top = Math.max(wall + nave.halfWidth * c.pitch + 3, span(c.towerHeight, rand))
-  return building(lot, 'church', 'house', [
+  return assembleBuilding(lot, 'church', 'house', [
     { tiers: [{ polygon: boxCorners(nave), top: wall }], rect: nave, roof: flat ? 'flat' : 'gable', roofHeight: flat ? 0 : nave.halfWidth * c.pitch, blank: true },
     { tiers: [{ polygon: boxCorners(tower), top }], rect: tower, roof: flat || c.spire <= 0 ? 'flat' : 'hip', roofHeight: flat ? 0 : tw * c.spire, blank: true },
   ], { material: pick(ctx.architecture.houseMaterials, rand()), roofMaterial: pick(ctx.architecture.roofMaterials, rand()), floors: 1, floorHeight: wall }, rand())
@@ -174,7 +164,7 @@ function townHall(lot: PlannedLot, t: TownHallOptions, ctx: LandmarkContext, ran
     const tower: OrientedBox = { center: r.center, axis: r.axis, halfLength: s, halfWidth: s }
     parts.push({ tiers: [{ polygon: boxCorners(tower), top: top + rise + t.towerHeight }], rect: tower, roof: flat ? 'flat' : 'hip', roofHeight: flat ? 0 : s * 1.6, blank: true })
   }
-  return building(lot, 'townHall', 'block', parts, { material: pick(ctx.architecture.blockMaterials, rand()), roofMaterial: pick(ctx.architecture.roofMaterials, rand()), floors, floorHeight: fh }, rand())
+  return assembleBuilding(lot, 'townHall', 'block', parts, { material: pick(ctx.architecture.blockMaterials, rand()), roofMaterial: pick(ctx.architecture.roofMaterials, rand()), floors, floorHeight: fh }, rand())
 }
 
 function waterTower(lot: PlannedLot, o: WaterTowerOptions, rand: () => number): Building | null {
@@ -182,7 +172,7 @@ function waterTower(lot: PlannedLot, o: WaterTowerOptions, rand: () => number): 
   const [cx, cz] = lot.center
   const ring = (r: number, n: number): Vec2[] => Array.from({ length: n }, (_, i) => [cx + Math.cos((i / n) * Math.PI * 2) * r, cz + Math.sin((i / n) * Math.PI * 2) * r])
   if (!ring(R + 1.5, 16).every(([x, z]) => pointInPolygon(x, z, lot.polygon))) return null
-  return building(lot, 'waterTower', 'shed', [
-    { tiers: [{ polygon: ring(o.columnRadius, 12), top: h }, { polygon: ring(R, 16), top: h + th }], rect: null, roof: 'cone', roofHeight: R * 0.3, blank: true },
+  return assembleBuilding(lot, 'waterTower', 'shed', [
+    { tiers: [{ polygon: ring(o.columnRadius, 16), top: h }, { polygon: ring(R, 24), top: h + th }], rect: null, roof: 'cone', roofHeight: R * 0.3, blank: true },
   ], { material: 'metal', roofMaterial: 'metal', floors: 1, floorHeight: h }, rand())
 }

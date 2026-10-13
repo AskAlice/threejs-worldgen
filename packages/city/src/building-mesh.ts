@@ -169,6 +169,18 @@ function pitchedRoof(roof: MeshBuilder, wall: MeshBuilder, part: BuildingPart, t
       face(roof, [at(-Lo, s * Wo, eave), at(Lo, s * Wo, eave), at(Lo, 0, top + R), at(-Lo, 0, top + R)], [0, slopeLen, 2 * Lo, slopeLen, 2 * Lo, 0, 0, 0], nrm(0, s, 1))
       gableWall(s, [at(s * L, -W, top), at(s * L, W, top), at(s * L, 0, top + R)], [0, top - base, 2 * W, top - base, W, top + R - base])
     }
+  } else if (part.roof === 'gambrel') {
+    // Steep lower slopes to a knee at 60 % of the rise, half-way in; shallow upper slopes to the ridge.
+    const kw = W * 0.5, kh = top + R * 0.6
+    const lower = (kh - top) / (W - kw)
+    const low = top - o * lower
+    for (const s of [-1, 1]) {
+      const lowLen = Math.hypot(W + o - kw, kh - low), upLen = Math.hypot(kw, R * 0.4)
+      face(roof, [at(-Lo, s * Wo, low), at(Lo, s * Wo, low), at(Lo, s * kw, kh), at(-Lo, s * kw, kh)], [0, lowLen + upLen, 2 * Lo, lowLen + upLen, 2 * Lo, upLen, 0, upLen], nrm(0, s, 1))
+      face(roof, [at(-Lo, s * kw, kh), at(Lo, s * kw, kh), at(Lo, 0, top + R), at(-Lo, 0, top + R)], [0, upLen, 2 * Lo, upLen, 2 * Lo, 0, 0, 0], nrm(0, s, 1))
+      gableWall(s, [at(s * L, -W, top), at(s * L, W, top), at(s * L, kw, kh), at(s * L, -kw, kh)], [0, top - base, 2 * W, top - base, W + kw, kh - base, W - kw, kh - base])
+      gableWall(s, [at(s * L, -kw, kh), at(s * L, kw, kh), at(s * L, 0, top + R)], [W - kw, kh - base, W + kw, kh - base, W, top + R - base])
+    }
   } else if (part.roof === 'hip') {
     const rl = Math.max(0, L - W)
     for (const s of [-1, 1]) {

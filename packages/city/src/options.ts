@@ -3,6 +3,7 @@ import { ARCHITECTURES, type ArchitectureName, type Architecture, type Climate, 
 import { DEFAULT_BLOCKS, type BlockOptions } from './blocks.ts'
 import { DEFAULT_BUILDINGS, type BuildingOptions } from './buildings.ts'
 import { DEFAULT_DISTRICTS, type DistrictOptions } from './districts.ts'
+import { DEFAULT_FARM, type FarmOptions } from './farm.ts'
 import { DEFAULT_LANDMARKS, type LandmarkOptions } from './landmarks.ts'
 import { DEFAULT_ROADSIDE, type RoadsideOptions } from './lots.ts'
 import { DEFAULT_SIZE_CLASSES, type RoadStyle, type SettlementSize, type SizeClass } from './placement.ts'
@@ -140,6 +141,8 @@ export interface CityOptions {
   buildings: BuildingOptions
   /** Churches, town halls and water towers (how many each size class gets is in `sizes`). */
   landmarks: LandmarkOptions
+  /** Farmsteads (`size: 'farmstead'`): yard, buildings, driveway, fields and crops. */
+  farm: FarmOptions
   /** Regional building tradition; `'auto'` picks one from the climate at the centre. */
   architecture: ArchitectureName | 'auto'
   /** The architectures (materials, roofs, stilts, balconies, …). */
@@ -185,6 +188,7 @@ export const DEFAULT_CITY: CityOptions = {
   roadside: DEFAULT_ROADSIDE,
   buildings: DEFAULT_BUILDINGS,
   landmarks: DEFAULT_LANDMARKS,
+  farm: DEFAULT_FARM,
   architecture: 'auto',
   architectures: ARCHITECTURES,
   climate: null,

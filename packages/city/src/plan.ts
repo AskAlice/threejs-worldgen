@@ -3,6 +3,7 @@ import { architectureFor, type ArchitectureName, type Climate } from './architec
 import { extractBlocks, type Block } from './blocks.ts'
 import { planBuilding, type Building } from './buildings.ts'
 import { DistrictMap, type District } from './districts.ts'
+import { planFarm, type Farm } from './farm.ts'
 import type { RoadGraph } from './graph.ts'
 import { planLandmarks } from './landmarks.ts'
 import { roadsideLots, subdivideBlock, type Lot } from './lots.ts'
@@ -12,7 +13,7 @@ import { pointInPolygon, pointSegment, segmentIntersection } from './polygon.ts'
 import { assignSurfaces, growRoads } from './roads.ts'
 import { Site, type SiteFn } from './site.ts'
 import { TensorField } from './tensor-field.ts'
-import { gradeRoads, type RoadProfile } from './terrain.ts'
+import { gradeRoads, settleBuilding, type RoadProfile } from './terrain.ts'
 
 /** A lot with its district. */
 export interface PlannedLot extends Lot {
@@ -46,6 +47,8 @@ export interface CityPlan {
   buildings: Building[]
   /** Estimated residents. */
   population: number
+  /** A farmstead's yard, fields, tractor spots and props (`null` for other settlements, and for a farm with no dry, gentle ground). */
+  farm: Farm | null
 }
 
 /** Automatic terrain sampling resolution for a radius, metres. */
@@ -57,11 +60,12 @@ export function siteResolution(radius: number): number {
  * Plans a whole settlement: samples the ground, grows roads, grades them, extracts blocks, splits
  * lots and plans buildings. A generator that yields every few milliseconds of work, so it can run
  * to completion at once (`runToEnd`) or spread over frames. Pure: the same ground and options give
- * the same plan.
+ * the same plan. Farmsteads (`size: 'farmstead'`) are planned by {@link planFarm}.
  * @param ground Height and water lookup in frame-local coordinates (e.g. `Site.frameFn(frame)`).
  * @param climate Climate at the centre, for `architecture: 'auto'` (`options.climate` wins; temperate if neither).
  */
 export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | null = null): Generator<void, CityPlan> {
+  if (o.size === 'farmstead') return yield* planFarm(ground, o, climate)
   const seed = seedOf(o.seed)
   const sizeClass = o.sizes[o.size]
   const radius = o.radius > 0 ? o.radius : (sizeClass.radius[0] + sizeClass.radius[1]) / 2
@@ -135,7 +139,6 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   // 4. Buildings: landmarks first (on the lots nearest the centre that fit them), then everything else.
   const landmarks = planLandmarks(lots, sizeClass.landmarks, o.landmarks, { architecture: arch, floorHeight: o.buildings.floorHeight }, [cx, cz], radius, seed)
   const buildings: Building[] = []
-  const t = o.terrain
   for (const lot of lots) {
     const s = o.districts.styles[lot.district]
     const rand = mulberry32(hash4(seed, lot.id, 29, 5))
@@ -145,30 +148,14 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
     }, o.buildings, rand, buildings.length)
     if (!b) continue
     b.id = buildings.length
-    let lo = Infinity, hi = -Infinity
-    for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) {
-      const h = site.height(x, z)
-      lo = Math.min(lo, h); hi = Math.max(hi, h)
-    }
-    if (b.stilts > 0) {
-      // Stilt houses leave the ground alone and stand clear of the highest point (or water).
-      const w = site.waterLevel(b.center[0], b.center[1])
-      b.base = Math.max(hi, w === w ? w : -Infinity) + b.stilts
-      b.bottom = b.base - 0.3
-    } else if (t.flatten && t.flattenLots) {
-      b.base = site.height(b.center[0], b.center[1])
-      b.bottom = Math.min(lo, b.base) - t.foundation
-    } else {
-      b.base = hi
-      b.bottom = lo - t.foundation
-    }
+    settleBuilding(b, site, o.terrain)
     buildings.push(b)
     if ((buildings.length & 255) === 255) yield
   }
 
   let population = 0
   for (const b of buildings) population += b.population
-  return { center: [cx, cz], radius, style, architecture, site, districts, graph, profiles, blocks, lots, buildings, population: Math.round(population) }
+  return { center: [cx, cz], radius, style, architecture, site, districts, graph, profiles, blocks, lots, buildings, population: Math.round(population), farm: null }
 }
 
 /** True if a road (e.g. a dead-end street the block outline ignored) runs through or too close to the lot. */

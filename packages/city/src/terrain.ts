@@ -128,6 +128,30 @@ export function roadModifiers(graph: RoadGraph, profiles: RoadProfile[], toModif
   return out
 }
 
+/**
+ * Stands a planned building on the ground: sets `base` (ground-floor level) and `bottom` (foundation or stilt foot).
+ * Stilt houses stand clear of the highest ground (or water) and leave it alone; with `flattenLots` the floor is the
+ * ground at the centre (a pad is flattened there); otherwise the highest ground under the footprint.
+ */
+export function settleBuilding(b: Building, site: Site, t: TerrainOptions): void {
+  let lo = Infinity, hi = -Infinity
+  for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) {
+    const h = site.height(x, z)
+    lo = Math.min(lo, h); hi = Math.max(hi, h)
+  }
+  if (b.stilts > 0) {
+    const w = site.waterLevel(b.center[0], b.center[1])
+    b.base = Math.max(hi, w === w ? w : -Infinity) + b.stilts
+    b.bottom = b.base - 0.3
+  } else if (t.flatten && t.flattenLots) {
+    b.base = site.height(b.center[0], b.center[1])
+    b.bottom = Math.min(lo, b.base) - t.foundation
+  } else {
+    b.base = hi
+    b.bottom = lo - t.foundation
+  }
+}
+
 /** A flat pad under a building: a path along its long axis whose flat strip covers the whole footprint. */
 export function padModifier(b: Building, toModifier: (x: number, z: number, y: number) => [number, number, number, number], o: TerrainOptions): FlattenPath {
   // Fit the footprint's long axis.

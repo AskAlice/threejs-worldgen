@@ -2,6 +2,7 @@ import type { ArchitectureName, RoofShape, WallMaterial } from './architecture.t
 import type { BuildingStyle, Entrance } from './buildings.ts'
 import type { District } from './districts.ts'
 import type { RoadEdge, RoadSurface, RoadType } from './graph.ts'
+import type { Farm, FarmBuilding } from './farm.ts'
 import type { Landmark } from './landmarks.ts'
 import type { CityPlan } from './plan.ts'
 import type { RoadStyle } from './placement.ts'
@@ -122,8 +123,8 @@ export interface BuildingData {
   entrance: Entrance
   /** Estimated residents. */
   population: number
-  /** Landmark (church, town hall, water tower), or `null`. */
-  use: Landmark | null
+  /** Landmark (church, town hall, water tower) or farm building (farmhouse, barn, silo, machine shed), or `null`. */
+  use: Landmark | FarmBuilding | null
 }
 
 /** The road network as plain data. */
@@ -152,6 +153,8 @@ export interface CityData {
   lots: LotData[]
   /** Buildings. */
   buildings: BuildingData[]
+  /** A farmstead's yard, fields (corn ones for a crop renderer), tractor spots and props; `null` for other settlements. */
+  farm: Farm | null
 }
 
 /** Plain-data snapshot of a plan (frame-local coordinates; y = local height). */
@@ -185,6 +188,7 @@ export function cityData(plan: CityPlan, roads: RoadOptions): CityData {
       height: b.height, base: b.base, footprint: b.parts[0].tiers[0].polygon.map((p) => [p[0], p[1]] as Vec2), center: b.center,
       entrance: { ...b.entrance }, population: b.population, use: b.use,
     })),
+    farm: plan.farm ? structuredClone(plan.farm) : null,
   }
 }
 
