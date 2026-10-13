@@ -1,15 +1,8 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "name": "threejs-worldgen",
-  "hostedBaseUrl": "https://askalice.github.io/threejs-worldgen/docs/",
-  "plugin": [
-    "./scripts/typedoc-seo.mjs"
-  ],
-  "favicon": "landing/favicon.svg",
   "entryPoints": [
     "packages/heightfield/src/index.ts",
-    "packages/photoreal/src/index.ts",
-    "packages/photoreal/src/react.tsx",
     "packages/biomes/src/index.ts",
     "packages/biomes/src/react.tsx",
     "packages/scatter/src/index.ts",
@@ -60,5 +53,10 @@
     "TypeAlias",
     "Constructor"
   ],
-  "treatWarningsAsErrors": true
+  "treatWarningsAsErrors": true,
+  "hostedBaseUrl": "https://askalice.github.io/threejs-worldgen/docs/",
+  "plugin": [
+    "./scripts/typedoc-seo.mjs"
+  ],
+  "favicon": "landing/favicon.svg"
 }
