@@ -425,7 +425,10 @@ export class FleetSim {
     let span = 0
     for (let v = lead; v < n && this.unit[v] === u; v++) span += this.models[this.model[v]].size[2]
     const p = this.pose, lane = rt.spec.lane ?? 0
-    for (let d = span + 10; d >= 0; d -= 0.5) {
+    // On an open path, walking back past its start would reflect the walk (the tractor would reverse
+    // mid-priming): start no earlier than the path's start; the rest of the rig is seeded straight behind.
+    const back = rt.path.closed ? span + 10 : Math.min(span + 10, Math.max(0, this.unitS[u]))
+    for (let d = back; d >= 0; d -= 0.5) {
       const ps = rt.path.sample(this.unitS[u] - d, tmpSample)
       const hl = Math.hypot(ps.tx, ps.tz) || 1
       p[lead * 8] = ps.x - (ps.tz / hl) * lane; p[lead * 8 + 1] = ps.y; p[lead * 8 + 2] = ps.z + (ps.tx / hl) * lane
@@ -446,7 +449,11 @@ export class FleetSim {
     const hx = p[po] + Math.sin(yawP) * c, hz = p[po + 2] + Math.cos(yawP) * c
     const kp = m.hitch?.kingpin ?? 0, len = Math.max(0.5, kp - (m.hitch?.axle ?? 0))
     const t = this.trail
-    if (!(t[v * 2] === t[v * 2])) { t[v * 2] = hx - Math.sin(yawP) * len; t[v * 2 + 1] = hz - Math.cos(yawP) * len }
+    // The tractrix is only stable when pulled: when the axle is not behind the hitch along the heading
+    // in front (first placement, or the rig turned round at the end of an open path), seed it straight behind.
+    if (!(t[v * 2] === t[v * 2]) || (hx - t[v * 2]) * Math.sin(yawP) + (hz - t[v * 2 + 1]) * Math.cos(yawP) <= 0) {
+      t[v * 2] = hx - Math.sin(yawP) * len; t[v * 2 + 1] = hz - Math.cos(yawP) * len
+    }
     const dx = hx - t[v * 2], dz = hz - t[v * 2 + 1], d = Math.hypot(dx, dz) || 1
     t[v * 2] = hx - (dx / d) * len; t[v * 2 + 1] = hz - (dz / d) * len
     const yaw = Math.atan2(dx, dz)

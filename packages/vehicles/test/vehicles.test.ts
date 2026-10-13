@@ -623,3 +623,26 @@ test('exhaust: steam chuffs with the wheels, engines smoke harder pulling away',
   for (let i = 0; i < 30; i++) { truck.step(1 / 30); exhaustSources(truck, { x: 0, y: 0, z: 0 }, s, st, 1 / 30, b) }
   assert.ok(b.sources[3] > 2 * idle && b.motion[3] > idleAlpha, `pulling away: ${b.sources[3].toFixed(1)} vs ${idle.toFixed(1)}`)
 })
+
+test('truck articulation on open (back and forth) paths: trailers stay behind their hitch on every leg', () => {
+  for (const trailers of [1, 2]) {
+    const sim = new FleetSim(settings([{ type: 'truck', count: 1, params: { trailers }, route: { kind: 'path', points: [[0, 0, 0], [0, 0, 200]], closed: false } }]))
+    let legs = 0, lastDir = 0
+    for (let i = 0; i < 1200; i++) {
+      sim.step(0.1)
+      const dir = Math.sign(Math.cos(sim.pose[3]))
+      if (dir !== lastDir) { legs++; lastDir = dir }
+      for (let v = 1; v < sim.count; v++) {
+        const prev = sim.models[sim.model[v - 1]], m = sim.models[sim.model[v]]
+        const py = sim.pose[(v - 1) * 8 + 3], ty = sim.pose[v * 8 + 3]
+        const hx = sim.pose[(v - 1) * 8] + Math.sin(py) * prev.hitch!.coupling!, hz = sim.pose[(v - 1) * 8 + 2] + Math.cos(py) * prev.hitch!.coupling!
+        const ax = sim.pose[v * 8] + Math.sin(ty) * m.hitch!.axle!, az = sim.pose[v * 8 + 2] + Math.cos(ty) * m.hitch!.axle!
+        const lead = sim.pose[3]
+        // Along the tractor's heading, every trailer's axle trails its hitch, and it points the same way.
+        assert.ok((hx - ax) * Math.sin(lead) + (hz - az) * Math.cos(lead) > 0, `step ${i}: trailer ${v} axle ahead of its hitch`)
+        assert.ok(Math.cos(ty - lead) > 0.5, `step ${i}: trailer ${v} yaw ${ty.toFixed(2)} vs tractor ${lead.toFixed(2)}`)
+      }
+    }
+    assert.ok(legs >= 4, `drove ${legs} legs`)
+  }
+})
