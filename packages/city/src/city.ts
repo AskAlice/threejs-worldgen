@@ -210,10 +210,10 @@ export class City {
   update(budget: number = this.options.buildBudget): void {
     if (this.job) {
       const start = performance.now()
-      while (this.job && performance.now() - start < budget) {
+      do { // at least one step per call, so any budget (even 0) makes progress
         const r = this.job.next()
         if (r.done) this.finish(r.value)
-      }
+      } while (this.job && performance.now() - start < budget)
       this.jobTime += performance.now() - start
     }
     this.updateLod()

@@ -453,15 +453,17 @@ export class FireSim {
 
   /**
    * Runs (or replays) to `time`, seconds. Quiet stretches with nothing burning are skipped in one jump.
-   * With a `budget` (milliseconds) it stops early once that much time is spent and catches up on later
+   * With a `budget` (milliseconds) it stops early, after at least one tick, once that much time is spent and catches up on later
    * calls; the result is the same either way, since the state depends only on the tick.
    */
   runTo(time: number, budget = Infinity): this {
     const target = Math.floor((time - this.options.startTime) / this.options.tick + 1e-9)
     if (target < this.tickIndex) this.restart()
     const start = budget < Infinity ? performance.now() : 0
+    const first = this.tickIndex
     while (this.tickIndex < target) {
-      if (budget < Infinity && performance.now() - start > budget) break
+      // The budget is checked only after a tick: on a microsecond clock it is already spent before the first one.
+      if (budget < Infinity && this.tickIndex > first && performance.now() - start > budget) break
       if (this.stats.burning === 0) {
         const next = this.nextEvent(target)
         if (next > this.tickIndex) this.jump(next - this.tickIndex)

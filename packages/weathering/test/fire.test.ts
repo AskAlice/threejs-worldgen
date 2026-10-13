@@ -77,6 +77,16 @@ test('fuel is conserved: what is left = what was there − consumed + regrown', 
   }
 })
 
+test('a time budget always advances at least one tick, even on a fine-grained clock', (t) => {
+  // Linux's performance.now() resolves microseconds, so "elapsed > 0" holds before any work is done.
+  let clock = 0
+  t.mock.method(performance, 'now', () => (clock += 0.01))
+  const sim = new FireSim({ ...calm, seed: 'budget' }, { landscape: grass() })
+  sim.ignite(0, 0, 6, 0)
+  sim.runTo(100, 0)
+  assert.ok(sim.time > 0, 'a zero budget still steps once')
+})
+
 test('deterministic: same seed same fire, however time is chunked or scrubbed', () => {
   const make = () => new FireSim({ ...calm, seed: 'det', fallback: { wind: [5, 2], moisture: 0.07 } }, { landscape: grass() })
   const a = make(), b = make(), c = make(), d = make()

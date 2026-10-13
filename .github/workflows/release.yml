@@ -12,6 +12,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # the suite takes about a minute; a hang should fail fast, not run for hours
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
