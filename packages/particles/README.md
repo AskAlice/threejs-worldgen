@@ -262,6 +262,54 @@ renderer.setAnimationLoop(() => {
 - `example/mpm-snow.html` shows footprints or wheel tracks in powder; `?scene=avalanche` releases a slab onto a
   runout. `?check` records the GPU side of `test/mpm-snow.test.ts`.
 
+### Lava
+
+`LAVA` is a temperature-dependent material, and `MPMLava` adds its thermal step and draws it. Lava needs a fine grid
+(Δx ≈ 0.125 m): the bottom cell of a flow is ground contact, so flows thinner than ~6 cells barely move.
+
+```ts
+import { LAVA_PRESETS, MPMLava, MPMSolver } from 'threejs-particles'
+
+const mpm = new MPMSolver(renderer, {
+  resolution: [128, 64, 128], cellSize: 0.125, maxSpeed: 5, maxSubsteps: 12, friction: 0.6, height,
+  materials: { lava: { viscosityMax: 2000, ...LAVA_PRESETS.pahoehoe.material } },   // or LAVA_PRESETS.aa
+})
+mpm.object.visible = false
+const lava = new MPMLava(mpm, { ...LAVA_PRESETS.pahoehoe.lava, envMap: scene.environment })
+scene.add(lava.object)
+lava.emit({ positions: ventLayer, velocity: [0.4, -0.1, 0] })   // a vent: fills only free space
+renderer.setAnimationLoop(() => {
+  renderer.compute(lava.prepare(1 / 60))                         // solver substeps, then the thermal step
+  lava.lighting.fromScene(scene)
+  lava.render(renderer, camera)                                  // screen-space surface passes
+  renderer.render(scene, camera)
+})
+```
+
+- **Rheology**:
+  - Viscosity is Arrhenius in temperature, `η = viscosity · e^(activation·(1/T − 1/eruption))`. It is capped at
+    `viscosityMax`, which sets the time step.
+  - Below `solidus + crustRange` the yield stress rises from `meltYield` (Bingham melt) to the crust's `yieldStress`.
+  - The plastic return works on b = F·Fᵀ (deviatoric scaling, then F rebuilt by Cholesky), so no SVD is needed.
+  - Melt is cohesive up to 20 % stretch. Crust cracks open past `crackStrain`.
+- **Heat**:
+  - Once per frame, the lava scatters mass and heat into its own grid (fixed point, so it is deterministic).
+  - Each particle exposed by the fill φ loses heat to the air: εσ(T⁴ − Ta⁴) plus convection. Particles on the ground
+    lose heat by contact conductance. The loss is spread over a thermal `skin`, a few mm, so surfaces crust within
+    seconds.
+  - Particles conduct heat to each other through the grid, at an exact exponential rate of 4κ/Δx².
+- **Drawing**:
+  - It is a screen-space surface. The particles near the surface are splatted as spheres into depth, the depth is
+    bilaterally smoothed, and a full-screen pass reconstructs the normals.
+  - The surface is shaded as basalt: albedo ~0.05, GGX sun, environment light.
+  - The glow is blackbody colour at the skin temperature. That temperature follows a fit to the pāhoehoe skin cooling
+    measured by Keszthelyi & Denlinger (1996), `lavaSkin`, and its brightness is Wien-scaled.
+  - Opening crust cracks glow at the melt's bulk temperature.
+  - Ropy folds run across the surface flow on dark skin. They fade out by `fwidth`.
+- **Effects**: `lavaHeatSources(read, origin, { ages })` gives source tables for heat haze and spark `ParticleSystem`s.
+- **Demo**: `example/mpm-lava.html` is a vent on a volcano flank in a biomes world, with `?preset=aa` and `?night`.
+  `?check` records the GPU side of `test/mpm-lava.test.ts`.
+
 ### Water (MPM): rain splashes, puddles, spray and waterfalls
 
 `mpm-water.ts` registers `water`, a weakly compressible fluid: Kirchhoff stress `τ = −J·p(J)·I + μ·J·(C + Cᵀ)` with
