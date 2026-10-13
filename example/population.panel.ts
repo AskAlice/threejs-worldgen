@@ -1,13 +1,13 @@
-import { DEFAULT_OVERLAY, DEFAULT_POPULATION, DEFAULT_POPULATION_MAP } from 'threejs-population'
+import { DEFAULT_OVERLAY, DEFAULT_POPULATION, DEFAULT_POPULATION_MAP } from 'threejs-city'
 import type { PanelSpec } from './panel'
 
-// Panel manifest of the population sandboxes (population.ts, and population-r3f.tsx for the classes in `r3f`);
-// checked by scripts/options-coverage.mjs.
+// Panel manifest of threejs-city's settlement planner sandboxes (population.ts, and population-r3f.tsx for the classes
+// in `r3f`); checked by scripts/options-coverage.mjs.
 const unit: [number, number, number] = [0, 1, 0.01]
 const modes = ['density', 'landUse', 'lights', 'habitability']
 
 export const panels: PanelSpec = {
-  'threejs-population': {
+  'threejs-city': {
     Population: {
       defaults: DEFAULT_POPULATION,
       arrays: true,

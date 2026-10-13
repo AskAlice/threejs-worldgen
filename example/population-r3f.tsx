@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useControls } from 'leva'
 import { World } from 'threejs-biomes'
-import { DEFAULT_POPULATION, PopulationOverlay, usePopulation, type PopulationInput, type PopulationOverlayImpl } from 'threejs-population/react'
+import { DEFAULT_POPULATION, PopulationOverlay, usePopulation, type PopulationInput, type PopulationOverlayImpl } from 'threejs-city/react'
 import { panels } from './population.panel'
 import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 
-// threejs-population in React Three Fiber: usePopulation(world, input) and a <PopulationOverlay> hex
+// threejs-city settlement planner in React Three Fiber: usePopulation(world, input) and a <PopulationOverlay> hex
 // choropleth over the world's terrain. Every control is the hook's input or an overlay prop: every option, from the
 // same panel manifest as population.ts (population.panel.ts lists the few left out, and why).
 const world = new World({ seed: 1 })
-const spec = panels['threejs-population']
+const spec = panels['threejs-city']
 
 /** `value`, once it has stopped changing for `ms` (re-running the population on every slider tick is slow). */
 function useSettled<T>(value: T, ms = 200): T {
@@ -36,7 +36,7 @@ function Scene() {
   useHud(() => {
     const d = population.data, count: Record<string, number> = {}
     for (const s of d.settlements) count[s.class] = (count[s.class] ?? 0) + 1
-    return `threejs-population · usePopulation + <PopulationOverlay>\n${d.total.toLocaleString()} people · H3 res ${d.resolution} (${d.cellEdge.toFixed(0)} m)\n` +
+    return `threejs-city · usePopulation + <PopulationOverlay>\n${d.total.toLocaleString()} people · H3 res ${d.resolution} (${d.cellEdge.toFixed(0)} m)\n` +
       `${Object.entries(count).map(([k, v]) => `${v} ${k}`).join(' · ')}\n${population.network.edges.length} network links`
   })
 

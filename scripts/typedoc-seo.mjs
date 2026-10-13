@@ -10,7 +10,7 @@ const DOCS = SITE + 'docs/'
 const API = 'threejs-worldgen API reference'
 const PAGES = {
   'index.html': [`${API} · procedural worlds for three.js and React Three Fiber`, 'API reference for threejs-worldgen: WebGPU procedural terrain, biomes, water, trees, grass, cities, weather and sky packages for three.js and React Three Fiber.'],
-  'modules.html': [`All packages · ${API}`, 'Every threejs-worldgen package and React Three Fiber entry point: heightfield, biomes, water, scatter, trees, grass, city, population, props, vehicles, fauna, weathering and sky.'],
+  'modules.html': [`All packages · ${API}`, 'Every threejs-worldgen package and React Three Fiber entry point: heightfield, biomes, water, scatter, trees, grass, city, props, vehicles, fauna, weathering and sky.'],
   'hierarchy.html': [`Class hierarchy · ${API}`, 'The class hierarchy of the threejs-worldgen packages for three.js: terrain, water, scatter, grass, city, vehicles, fauna, weather and sky classes.'],
 }
 

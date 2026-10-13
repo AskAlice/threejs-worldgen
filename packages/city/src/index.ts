@@ -1,8 +1,12 @@
 /**
- * Procedural settlements for three.js: hamlets to cities placed where the land suits them, roads
- * grown along a tensor field, blocks, lots and buildings matched to the local climate, procedural
- * TSL facades and road surfaces with weather hooks, and terrain flattened under it all. Works on
- * flat worlds and planets from `threejs-biomes`. Everything derives from `seed` and the world.
+ * Procedural settlements for three.js: hamlets to cities where people live, roads grown along a tensor
+ * field, blocks, lots and buildings matched to the local climate, procedural TSL facades and road surfaces
+ * with weather hooks, and terrain flattened under it all. Works on flat worlds and planets from
+ * `threejs-biomes`. Everything derives from `seed` and the world.
+ *
+ * The settlement planner is a population model on H3's hexagonal hierarchical grid: habitability from the
+ * world, central places sized by rank (Zipf), dispersed rural people, land use, night lights and
+ * terrain-following road / rail / power networks. `planCities` turns its settlements into cities.
  *
  * @module threejs-city
  */
@@ -16,6 +20,12 @@ export * from './blocks.ts'
 export * from './lots.ts'
 export * from './architecture.ts'
 export * from './buildings.ts'
+export * from './hex.ts'
+export * from './population-model.ts'
+export * from './population-network.ts'
+export * from './population.ts'
+export * from './population-map.ts'
+export * from './population-overlay.ts'
 export * from './placement.ts'
 export * from './terrain.ts'
 export * from './options.ts'

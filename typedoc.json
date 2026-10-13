@@ -5,8 +5,6 @@
     "packages/heightfield/src/index.ts",
     "packages/biomes/src/index.ts",
     "packages/biomes/src/react.tsx",
-    "packages/population/src/index.ts",
-    "packages/population/src/react.tsx",
     "packages/scatter/src/index.ts",
     "packages/scatter/src/react.tsx",
     "packages/trees/src/index.ts",

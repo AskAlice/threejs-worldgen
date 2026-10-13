@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { World } from 'threejs-biomes'
 import {
-  architectureFor, buildingGeometry, cityData, findSettlements, modifierPoint, planCity, pointInPolygon, resolveCityOptions,
-  roadAnchors, roadGeometry, routeCost, runToEnd, Site, type SettlementSize,
+  architectureFor, buildingGeometry, cityData, citySize, DEFAULT_SIZE_CLASSES, generatePopulation, modifierPoint, planCities, planCity,
+  pointInPolygon, resolveCityOptions, roadAnchors, roadGeometry, routeCost, runToEnd, Site, type SettlementSize,
 } from '../src/index.ts'
 
 const ground = (x: number, z: number) => ({ height: Math.sin(x / 300) * 20 + Math.cos(z / 410) * 12, waterLevel: Math.abs(x - 250 + Math.sin(z / 100) * 30) < 20 ? -5 : NaN })
@@ -79,18 +79,21 @@ test('geometry and data exports are consistent', () => {
   assert.ok(path.length >= 2)
 })
 
-test('settlement placement is deterministic and sized by score', () => {
+test('cities come from the population model, largest first, sized by their people', () => {
   const world = new World({ seed: 11 })
-  const region = { minX: -6000, minZ: -6000, maxX: 6000, maxZ: 6000 }
-  const a = findSettlements(world, world.frame, region, { sampleSpacing: 400 })
-  assert.deepEqual(a, findSettlements(world, world.frame, region, { sampleSpacing: 400 }))
-  for (const s of a) {
-    assert.ok(s.score >= 0.35 && s.score <= 1)
-    assert.ok(Number.isNaN(world.sample(s.x, s.z).waterLevel), 'on dry land')
-  }
-  // Asking for a sub-region gives the same settlements inside it.
-  const sub = findSettlements(world, world.frame, { minX: 0, minZ: 0, maxX: 6000, maxZ: 6000 }, { sampleSpacing: 400 })
-  assert.deepEqual(sub, a.filter((s) => s.x >= 0 && s.z >= 0))
+  const input = { radius: 8000, totalPopulation: 300_000 }
+  const data = generatePopulation(world, input)
+  const sites = planCities(data)
+  assert.deepEqual(sites, planCities(generatePopulation(world, input)))
+  assert.equal(sites.length, data.settlements.filter((s) => s.class !== 'farmstead').length)
+  assert.ok(new Set(sites.map((s) => s.size)).size >= 2)
+  sites.forEach((s, i) => {
+    assert.equal(s.size, citySize(s.settlement.class))
+    assert.deepEqual([s.x, s.z], s.settlement.position)
+    const { radius } = DEFAULT_SIZE_CLASSES[s.size]
+    assert.ok(s.radius >= radius[0] && s.radius <= radius[1], `${s.size} radius ${s.radius}`)
+    if (i) assert.ok(s.settlement.population <= sites[i - 1].settlement.population)
+  })
 })
 
 test('flatten modifiers land on the planned height, on flat worlds and planets', () => {

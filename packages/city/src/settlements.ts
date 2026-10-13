@@ -1,18 +1,17 @@
 import { Group, type Camera, type Object3D } from 'three/webgpu'
 import type { LocalFrame, World } from 'threejs-biomes'
 import { City, type CityStats } from './city.ts'
-import { mergeOptions, type CityInput } from './options.ts'
-import { findSettlements, type PlacementInput, type Region, type Settlement } from './placement.ts'
+import { DEFAULT_CITY, mergeOptions, type CityInput } from './options.ts'
+import { planCities, type CitySite } from './placement.ts'
+import { generatePopulation, type PopulationData, type PopulationInput } from './population-model.ts'
 
 /** Settings of a {@link Settlements} group. All plain data. */
 export interface SettlementsOptions {
-  /** Area to populate (frame-local metres). */
-  region: Region
-  /** Placement rules. */
-  placement: PlacementInput
-  /** Settings shared by every settlement (centre, size, radius and seed come from placement). */
+  /** Where people live: the population model's settings (its `center` and `radius` are the area to populate). */
+  population: PopulationInput
+  /** Settings shared by every settlement (centre, size, radius and seed come from the population; `sizes` maps it onto cities). */
   city: CityInput
-  /** Most settlements to build, best sites first. */
+  /** Most settlements to build, largest first. */
   maxSettlements: number
 }
 
@@ -28,19 +27,22 @@ export interface SettlementsCreateOptions extends Partial<SettlementsOptions> {
   scene?: Object3D
 }
 
-const DEFAULTS: SettlementsOptions = { region: { minX: -10000, minZ: -10000, maxX: 10000, maxZ: 10000 }, placement: {}, city: {}, maxSettlements: 24 }
+const DEFAULTS: SettlementsOptions = { population: {}, city: {}, maxSettlements: 24 }
 
 /**
- * Every settlement in a region: sites from {@link findSettlements}, one {@link City} each, sized by
- * how good the site is (hamlets to cities).
+ * Every settlement of a population: the population model ({@link generatePopulation}) decides where people
+ * live and how many, {@link planCities} maps its settlements onto size classes (hamlets to cities), and each
+ * gets one {@link City}.
  */
 export class Settlements {
   /** Root of all settlements. */
   readonly object = new Group()
-  /** The cities, best site first. */
+  /** The cities, largest first. */
   cities: City[] = []
-  /** The chosen sites, matching `cities`. */
-  sites: Settlement[] = []
+  /** Their sites, matching `cities`. */
+  sites: CitySite[] = []
+  /** The population they were planned from. */
+  data!: PopulationData
   /** Resolved settings. */
   options: SettlementsOptions = DEFAULTS
   private readonly world: World
@@ -49,7 +51,7 @@ export class Settlements {
   private siteKey = ''
   private unhook = () => {}
 
-  /** Finds sites and creates their cities. */
+  /** Plans the population and creates its cities. */
   static async create(options: SettlementsCreateOptions): Promise<Settlements> {
     return new Settlements(options)
   }
@@ -72,14 +74,15 @@ export class Settlements {
     }
   }
 
-  /** Replaces all settings. New region or placement rules re-site everything; city settings apply to each city. */
+  /** Replaces all settings. New population settings or size classes re-plan everything; other city settings apply to each city. */
   reset(input: Partial<SettlementsOptions> = {}): this {
     const o = (this.options = { ...DEFAULTS, ...input })
-    const key = JSON.stringify([o.region, o.placement, o.maxSettlements])
+    const key = JSON.stringify([o.population, o.city.sizes, o.maxSettlements])
     if (key !== this.siteKey) {
       this.siteKey = key
       for (const c of this.cities) c.dispose()
-      this.sites = findSettlements(this.world, this.frame, o.region, o.placement).sort((a, b) => b.score - a.score).slice(0, o.maxSettlements)
+      this.data = generatePopulation(this.world, o.population, this.frame)
+      this.sites = planCities(this.data, mergeOptions(DEFAULT_CITY.sizes, o.city.sizes)).slice(0, o.maxSettlements)
       this.cities = this.sites.map((s) => {
         const c = new City({ world: this.world, frame: this.frame, camera: this.camera ?? undefined, ...this.cityInput(s) })
         this.object.add(c.object)
@@ -93,7 +96,7 @@ export class Settlements {
 
   /** Merges settings into the current ones. */
   set(input: Partial<SettlementsOptions>): this {
-    return this.reset({ ...this.options, ...input, city: mergeOptions(this.options.city, input.city) })
+    return this.reset({ ...this.options, ...input, population: mergeOptions(this.options.population, input.population), city: mergeOptions(this.options.city, input.city) })
   }
 
   /** Updates every city (progressive generation and LOD). */
@@ -128,7 +131,7 @@ export class Settlements {
     this.object.removeFromParent()
   }
 
-  private cityInput(s: Settlement): CityInput {
+  private cityInput(s: CitySite): CityInput {
     return mergeOptions(this.options.city, { center: [s.x, s.z], size: s.size, radius: s.radius, seed: s.seed })
   }
 }

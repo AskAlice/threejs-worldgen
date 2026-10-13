@@ -1,4 +1,4 @@
-import type { NetworkOptions, PopulationData, Settlement } from './model.ts'
+import type { NetworkOptions, PopulationData, Settlement } from './population-model.ts'
 
 /** Kind of link between settlements. */
 export type NetworkType = 'highway' | 'road' | 'track' | 'rail' | 'powerline'

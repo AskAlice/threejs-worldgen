@@ -11,7 +11,7 @@ export const panels: PanelSpec = {
       defaults: DEFAULT_CITY,
       arrays: true,
       skip: {
-        center: 'set from the settlement site findSettlements picks for the size (keys 1–4 or `size`)',
+        center: 'set from the largest site of that size planCities finds (keys 1–4 or `size`)',
         climate: 'null = read from the world at the centre; pick an `architecture` instead',
         'sizes.hamlet.oldTown': 'null = no old-town core; the panel cannot edit null',
         'sizes.city.oldTown': 'null = no old-town core; the panel cannot edit null',

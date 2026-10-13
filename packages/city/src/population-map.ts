@@ -1,5 +1,5 @@
-import { aggregatePopulation, type AggregateCell, type LandUse, type PopulationData } from './model.ts'
-import type { Network, NetworkType } from './network.ts'
+import { aggregatePopulation, type AggregateCell, type LandUse, type PopulationData } from './population-model.ts'
+import type { Network, NetworkType } from './population-network.ts'
 
 /** What a population view colours cells by. */
 export type PopulationMode = 'density' | 'landUse' | 'lights' | 'habitability'

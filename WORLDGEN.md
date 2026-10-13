@@ -91,8 +91,9 @@ triplanar mapping so cliffs don't stretch, and `mx_worley_noise` / `mx_fractal_n
 
 ### 7. Cities and settlements
 
-- **Placement:** score land by flatness, nearness to water or a river, and temperate climate. The best score in each
-  ~5 km region gets a settlement, sized by score (village → town → city).
+- **Placement:** the settlement planner, a population model on an H3 hex grid, scores land by habitability (fertile
+  biome, gentle slope, comfortable climate, fresh water or a coast), places central places at the local maxima of
+  each tier, and sizes them by rank (Zipf). Each settlement's class picks the city's size (village → town → city).
 - **Roads:** grow major roads from the centre by an L-system-like rule set (Parish & Müller 2001), steered by a
   tensor field (Chen et al. 2008) so streets follow the coast and contours. Avoid water and steep ground; bridge
   rivers. Minor roads fill in a grid or organic pattern depending on the district.
@@ -141,7 +142,7 @@ greener ground along the banks (moisture bonus near water).
 | `threejs-water` | sea and lakes on `WaterMesh`, river carving, flow-accumulation rivers for bounded maps | `threejs-biomes` |
 | `threejs-scatter` | tiled blue-noise placement, instancing, impostors; generalises the grass tile streamer | `threejs-heightfield` |
 | `threejs-trees` | space-colonisation trees, species presets, rocks | `threejs-scatter` |
-| `threejs-city` | settlement placement, road graph, lots, buildings, facade shader, terrain flattening | `threejs-biomes` |
+| `threejs-city` | settlement planner (population on an H3 grid), road graph, lots, buildings, facade shader, terrain flattening | `threejs-biomes` |
 
 Generation runs in Web Workers (tiles are pure functions of seed and coordinates, so they move to workers with no
 shared state), and the main thread only uploads finished buffers.

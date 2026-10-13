@@ -2,14 +2,14 @@ import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { World, WorldTerrain, renderWorldMap } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
-import { Population, PopulationOverlay, renderPopulationMap, resolvePopulationOptions, type PopulationInput, type PopulationMapOptions, type PopulationOptions } from 'threejs-population'
+import { Population, PopulationOverlay, renderPopulationMap, resolvePopulationOptions, type PopulationInput, type PopulationMapOptions, type PopulationOptions } from 'threejs-city'
 import { classOf, createPanel, specOptions, type PanelClass } from './panel'
 import { panels } from './population.panel'
 import { patch } from './options-gui'
 
-// threejs-population sandbox: a flat world with its people, settlements and networks. Every option of Population,
-// PopulationOverlay and the 2D map is in the shared panel (population.panel.ts lists the few left out, and why),
-// with share-by-URL. Population changes regenerate (batched while you drag).
+// threejs-city's settlement planner: a flat world with its people, settlements and networks. Every option of
+// Population, PopulationOverlay and the 2D map is in the shared panel (population.panel.ts lists the few left out,
+// and why), with share-by-URL. Population changes regenerate (batched while you drag).
 const renderer = new THREE.WebGPURenderer({ antialias: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
 renderer.setSize(innerWidth, innerHeight)
@@ -34,7 +34,7 @@ controls.enableDamping = true
 
 const hud = document.getElementById('hud')!
 const map = (document.getElementById('map') as HTMLCanvasElement).getContext('2d')!
-const spec = panels['threejs-population']
+const spec = panels['threejs-city']
 const mapOptions = structuredClone(spec.renderPopulationMap.target!)
 function drawMap() {
   const n = 256, size = population.options.radius * 2
@@ -77,13 +77,13 @@ const overlayClass: PanelClass = {
   },
 }
 createPanel([{
-  name: 'threejs-population',
+  name: 'threejs-city',
   classes: [
     classOf('Population', populationInput, population.options, specOptions(spec.Population)),
     overlayClass,
     { name: 'renderPopulationMap', target: mapOptions, onChange: drawMap, ...specOptions(spec.renderPopulationMap) },
   ],
-}], { title: 'threejs-population' })
+}], { title: 'threejs-city · settlement planner' })
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight

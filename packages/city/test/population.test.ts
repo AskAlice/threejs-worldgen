@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 // The world module directly (not the threejs-biomes index), so these tests load no three.js.
 import { World } from '../../biomes/src/world.ts'
 import { HexGrid } from '../src/hex.ts'
-import { aggregatePopulation, generatePopulation, nightLights, type PopulationData } from '../src/model.ts'
-import { generateNetworks, reachable } from '../src/network.ts'
-import { renderPopulationMap } from '../src/map.ts'
+import { aggregatePopulation, generatePopulation, nightLights, type PopulationData } from '../src/population-model.ts'
+import { generateNetworks, reachable } from '../src/population-network.ts'
+import { renderPopulationMap } from '../src/population-map.ts'
 
 const small = { radius: 7000, totalPopulation: 250_000 }
 const flat = new World({ seed: 1 })

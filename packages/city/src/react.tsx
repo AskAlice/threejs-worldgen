@@ -1,16 +1,19 @@
 /**
- * React Three Fiber entry point: `<City>` (one settlement) and `<Settlements>` (every settlement in
- * a region), plus everything from `threejs-city` (the classes are re-exported as `CityImpl` and
- * `SettlementsImpl`).
+ * React Three Fiber entry point: `<City>` (one settlement), `<Settlements>` (every settlement of a
+ * population), `usePopulation` and `<PopulationOverlay>`, plus everything from `threejs-city` (the classes
+ * are re-exported as `CityImpl`, `SettlementsImpl` and `PopulationOverlayImpl`).
  *
  * @module threejs-city/react
  */
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera } from 'three/webgpu'
 import type { LocalFrame, World } from 'threejs-biomes'
 import { City as CityImpl } from './city.ts'
 import type { CityInput } from './options.ts'
+import { Population } from './population.ts'
+import type { PopulationInput } from './population-model.ts'
+import { PopulationOverlay as PopulationOverlayImpl, type OverlayInput } from './population-overlay.ts'
 import { Settlements as SettlementsImpl, type SettlementsOptions } from './settlements.ts'
 
 export * from './index.ts'
@@ -18,6 +21,8 @@ export * from './index.ts'
 export { City as CityImpl } from './city.ts'
 /** The imperative {@link SettlementsImpl | Settlements} class, renamed because `Settlements` is the component here. */
 export { Settlements as SettlementsImpl } from './settlements.ts'
+/** The imperative {@link PopulationOverlayImpl | PopulationOverlay} class, renamed because `PopulationOverlay` is the component here. */
+export { PopulationOverlay as PopulationOverlayImpl } from './population-overlay.ts'
 
 /** Props of `<City>`: every {@link CityInput} setting plus the objects below. */
 export interface CityProps extends CityInput {
@@ -78,11 +83,11 @@ export interface SettlementsProps extends Partial<SettlementsOptions> {
 }
 
 /**
- * Every settlement in a region, placed where the land suits them and sized by how well it does.
+ * Every settlement of a population: placed and sized by the population model, one city each.
  *
  * @example
  * ```tsx
- * <Settlements world={world} region={{ minX: -8000, minZ: -8000, maxX: 8000, maxZ: 8000 }} city={{ facade: { night } }} />
+ * <Settlements world={world} population={{ radius: 8000, totalPopulation: 300_000 }} city={{ facade: { night } }} />
  * ```
  */
 export function Settlements({ world, frame, camera, ref, ...options }: SettlementsProps): React.JSX.Element | null {
@@ -108,4 +113,71 @@ export function Settlements({ world, frame, camera, ref, ...options }: Settlemen
     group.update()
   })
   return group ? <primitive object={group.object} /> : null
+}
+
+/**
+ * A {@link Population} on `world` that follows `input` declaratively: created once per world, then
+ * `reset(input)` whenever the settings change (compared by value, so inline objects are fine).
+ */
+export function usePopulation(world: World, input: PopulationInput = {}): Population {
+  const population = useMemo(() => new Population(world, input), [world])
+  const key = JSON.stringify(input)
+  useEffect(() => {
+    population.reset(input)
+  }, [population, key])
+  useEffect(() => population.follow(), [population])
+  return population
+}
+
+/** Props of `<PopulationOverlay>`: every overlay setting plus the ones below. */
+export interface PopulationOverlayProps extends OverlayInput {
+  /** The population to draw (see {@link usePopulation}). */
+  population: Population
+  /** Receives the underlying overlay instance. */
+  ref?: Ref<PopulationOverlayImpl | null>
+  /** Camera for `resolution: 'auto'`. Defaults to the R3F default camera. */
+  camera?: Camera
+}
+
+/**
+ * Hex choropleth of population (and its networks) over the terrain. Props are the full truth: removing a
+ * prop reverts it.
+ *
+ * @example
+ * ```tsx
+ * function Scene() {
+ *   const world = useWorld({ seed: 'meadow' })
+ *   const population = usePopulation(world, { totalPopulation: 900_000 })
+ *   return <PopulationOverlay population={population} mode="lights" extrude={0} />
+ * }
+ * ```
+ */
+export function PopulationOverlay({ population, ref, camera, ...options }: PopulationOverlayProps): React.JSX.Element | null {
+  const { camera: defaultCamera } = useThree()
+  const activeCamera = camera ?? defaultCamera
+  const [overlay, setOverlay] = useState<PopulationOverlayImpl | null>(null)
+  const latest = useRef(options)
+  latest.current = options
+
+  useEffect(() => {
+    const o = new PopulationOverlayImpl({ population, camera: activeCamera, ...latest.current })
+    setOverlay(o)
+    return () => {
+      o.dispose()
+      setOverlay(null)
+    }
+  }, [population])
+
+  useEffect(() => {
+    if (overlay) overlay.camera = activeCamera
+  }, [overlay, activeCamera])
+
+  const key = JSON.stringify(options)
+  useEffect(() => {
+    overlay?.reset(options)
+  }, [overlay, key])
+
+  useImperativeHandle(ref, () => overlay!, [overlay])
+  useFrame(() => overlay?.update())
+  return overlay ? <primitive object={overlay.object} /> : null
 }

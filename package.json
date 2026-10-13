@@ -7,7 +7,6 @@
   "workspaces": [
     "packages/heightfield",
     "packages/biomes",
-    "packages/population",
     "packages/scatter",
     "packages/trees",
     "packages/water",

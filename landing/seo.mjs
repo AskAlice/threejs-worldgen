@@ -7,7 +7,7 @@ export const OG = { width: 1200, height: 630 } // every card in landing/media/og
 
 // Package order on the homepage (landing/build.mjs) and in the README cards (landing/readme-cards.mjs) follows the
 // pipeline: ground, then what grows on it, then people, then the sky. threejs-heightfield sits under all of them.
-export const ORDER = ['heightfield', 'biomes', 'water', 'scatter', 'trees', 'grass', 'city', 'population', 'props', 'vehicles', 'fauna', 'weathering', 'sky']
+export const ORDER = ['heightfield', 'biomes', 'water', 'scatter', 'trees', 'grass', 'city', 'props', 'vehicles', 'fauna', 'weathering', 'sky']
 
 export const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 export const plain = (html) => String(html).replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')

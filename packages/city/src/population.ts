@@ -1,6 +1,6 @@
 import type { LocalFrame, World } from 'threejs-biomes'
-import { DEFAULT_POPULATION, generatePopulation, resolvePopulationOptions, type PopulationData, type PopulationInput, type PopulationOptions } from './model.ts'
-import { generateNetworks, type Network } from './network.ts'
+import { DEFAULT_POPULATION, generatePopulation, resolvePopulationOptions, type PopulationData, type PopulationInput, type PopulationOptions } from './population-model.ts'
+import { generateNetworks, type Network } from './population-network.ts'
 
 /**
  * A live population over a world: settings in, {@link PopulationData} and a {@link Network} out,

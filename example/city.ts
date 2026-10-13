@@ -1,14 +1,15 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { World } from 'threejs-biomes'
-import { City, findSettlements, mergeOptions, type CityInput, type SettlementSize } from 'threejs-city'
+import { City, generatePopulation, planCities, mergeOptions, type CityInput, type SettlementSize } from 'threejs-city'
 import { classOf, createPanel, specOptions } from './panel'
 import { panels } from './city.panel'
 import { worldGround } from './world-ground'
 
-// threejs-city demo: a settlement placed by findSettlements on a threejs-biomes world, on a simple
-// terrain mesh sampled from world.frame (rebuilt whenever the city flattens the ground). Every City option is in
-// the shared panel (city.panel.ts lists the few it leaves out, and why), with share-by-URL.
+// threejs-city demo: a settlement placed by the settlement planner (generatePopulation, then planCities) on a
+// threejs-biomes world, on a simple terrain mesh sampled from world.frame (rebuilt whenever the city flattens the
+// ground). Every City option is in the shared panel (city.panel.ts lists the few it leaves out, and why), with
+// share-by-URL.
 // Keys (they drive the panel): 1–4 size · R new seed · N night · W wet · S snow · B burn · D damage · G layout
 
 const hud = document.getElementById('hud')!
@@ -35,8 +36,8 @@ const sky = new THREE.HemisphereLight('#cfe3ff', '#5a5040', 1.2)
 scene.add(sun, sun.target, sky)
 
 const world = new World({ seed: 11 })
-const sites = findSettlements(world, world.frame, { minX: -10000, minZ: -10000, maxX: 10000, maxZ: 10000 })
-const best = (size: SettlementSize) => sites.filter((s) => s.size === size).sort((a, b) => b.score - a.score)[0] ?? sites.sort((a, b) => b.importance - a.importance)[0]
+const sites = planCities(generatePopulation(world, { radius: 10_000 })) // largest first
+const best = (size: SettlementSize) => sites.find((s) => s.size === size) ?? sites.at(-1)! // no hamlets: the smallest
 let site = best('town')
 
 // Terrain: a grid around the city, coloured by the world's ground mix; water from waterLevel.

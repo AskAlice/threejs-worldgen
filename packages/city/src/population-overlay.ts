@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Group, LineBasicNodeMaterial, LineSegments, Mesh, MeshBasicNodeMaterial, Sphere, SRGBColorSpace, Vector3, type Camera } from 'three/webgpu'
 import type { Vec3 } from 'threejs-biomes'
-import { aggregatePopulation } from './model.ts'
-import { cellColor, DEFAULT_STYLE, densityT, type PopulationMode, type PopulationStyle } from './map.ts'
+import { aggregatePopulation } from './population-model.ts'
+import { cellColor, DEFAULT_STYLE, densityT, type PopulationMode, type PopulationStyle } from './population-map.ts'
 import type { Population } from './population.ts'
 
 /** Every overlay setting (plain data). Change at runtime with {@link PopulationOverlay.set}. */

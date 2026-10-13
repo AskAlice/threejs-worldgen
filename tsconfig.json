@@ -69,12 +69,6 @@
       "threejs-weathering/react": [
         "./packages/weathering/src/react.tsx"
       ],
-      "threejs-population": [
-        "./packages/population/src/index.ts"
-      ],
-      "threejs-population/react": [
-        "./packages/population/src/react.tsx"
-      ],
       "threejs-props": [
         "./packages/props/src/index.ts"
       ],

@@ -26,8 +26,8 @@ parametric, plain three.js first, great but optional React Three Fiber support.
       hovercraft, aircraft carriers, fighter jets on generated road, rail, sea and air networks
 - [ ] `threejs-weathering`: rain, snow, wind, lightning; wildfires that spread with fuel, wind and slope and regrow; every
       asset can get wet, snowy, burnt and damaged through a shared material-state layer
-- [ ] `threejs-population`: population density on a hierarchical hexagonal grid (H3): rural cells, towns and urban
-      centres with central-place structure, driving settlements, networks and traffic
+- [ ] `threejs-city` settlement planner: population density on a hierarchical hexagonal grid (H3): rural cells, towns
+      and urban centres with central-place structure, driving settlements, networks and traffic
 - [ ] `threejs-fauna`: fish schools, then birds and wildlife
 - [ ] Fuzzy-searchable asset gallery for spawning and placing assets
 - [ ] Options menu grouped by package, then by class

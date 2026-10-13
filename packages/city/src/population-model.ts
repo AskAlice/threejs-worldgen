@@ -595,16 +595,16 @@ function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x
 }
 
-/** Turns a string or number seed into a 32-bit integer (FNV-1a for strings). */
-export function seedOf(seed: number | string): number {
+// threejs-biomes' seedOf, copied so this module (and its tests) load no three.js.
+function seedOf(seed: number | string): number {
   if (typeof seed === 'number') return seed | 0
   let h = 2166136261
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
   return h | 0
 }
 
-/** Deterministic hash of a seed, an H3 cell and a salt to [0, 1). */
-export function hash01(seed: number, cell: string, salt: number): number {
+// Deterministic hash of a seed, an H3 cell and a salt to [0, 1).
+function hash01(seed: number, cell: string, salt: number): number {
   const [lo, hi] = cellKey(cell)
   let x = Math.imul(seed | 0, 0x27d4eb2d) ^ Math.imul(lo | 0, 0x165667b1) ^ Math.imul(hi | 0, 0x9e3779b1) ^ Math.imul(salt | 0, 0x85ebca77)
   x = Math.imul(x ^ (x >>> 15), 0x85ebca6b)

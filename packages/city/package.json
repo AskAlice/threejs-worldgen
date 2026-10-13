@@ -1,7 +1,7 @@
 {
   "name": "threejs-city",
   "version": "0.1.0",
-  "description": "Procedural settlements for three.js: road networks, blocks, lots, buildings and terrain flattening",
+  "description": "Procedural settlements for three.js: a population model on an H3 hex grid that plans them, road networks, blocks, lots, buildings and terrain flattening",
   "type": "module",
   "license": "Apache-2.0",
   "sideEffects": false,
@@ -25,6 +25,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "h3-js": "^4.5.0",
     "threejs-heightfield": "^0.1.0",
     "threejs-biomes": "^0.1.0"
   },
@@ -56,6 +57,8 @@
     "procedural",
     "react-three-fiber",
     "r3f",
-    "city"
+    "city",
+    "population",
+    "h3"
   ]
 }

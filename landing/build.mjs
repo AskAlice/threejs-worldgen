@@ -29,10 +29,9 @@ const RELATED = {
   scatter: ['trees', 'biomes', 'grass', 'props'],
   trees: ['scatter', 'biomes', 'weathering', 'grass'],
   grass: ['biomes', 'scatter', 'trees', 'weathering'],
-  city: ['population', 'props', 'vehicles', 'biomes'],
-  population: ['city', 'biomes', 'vehicles', 'props'],
-  props: ['city', 'vehicles', 'weathering', 'population'],
-  vehicles: ['city', 'props', 'water', 'population'],
+  city: ['biomes', 'props', 'vehicles', 'weathering'],
+  props: ['city', 'vehicles', 'weathering'],
+  vehicles: ['city', 'props', 'water'],
   fauna: ['biomes', 'water', 'trees', 'sky'],
   weathering: ['sky', 'trees', 'city', 'grass'],
   sky: ['weathering', 'biomes', 'water', 'fauna'],
@@ -48,7 +47,7 @@ const DEMOS = {
   'scatter.html': ['scatter', 'Procedural forest demo · threejs-scatter and threejs-trees for three.js', 'Stream a procedural forest over terrain in three.js: blue-noise placement of trees, rocks and plants with LODs and impostors, and 29 tree species.'],
   'water.html': ['water', 'threejs-water demo · Oceans, lakes and rivers in three.js WebGPU', 'Live WebGPU sandbox for threejs-water: ocean waves, foam and shallows, lakes and carved rivers with drainage-basin hydrology on procedural terrain.'],
   'city.html': ['city', 'threejs-city demo · Procedural cities and road networks in three.js', 'Live sandbox for threejs-city: procedural settlements with road networks, blocks, lots and buildings that flatten the terrain beneath them.'],
-  'population.html': ['population', 'threejs-population demo · Population density on an H3 hex grid', 'Live sandbox for threejs-population: population density, land use, settlement hierarchy and road networks on a hexagonal H3 grid over procedural terrain.'],
+  'population.html': ['city', 'threejs-city settlement planner demo · Population density on an H3 hex grid', 'Live sandbox for the settlement planner of threejs-city: population density, land use, settlement hierarchy and road networks on a hexagonal H3 grid over procedural terrain.'],
   'props.html': ['props', 'threejs-props demo · Procedural street and countryside props for three.js', 'Live sandbox for threejs-props: procedural street lights, traffic lights, power lines, fences, signs and mailboxes placed along generated roads.'],
   'vehicles.html': ['vehicles', 'threejs-vehicles demo · Procedural traffic, trains and boats in three.js', 'Live sandbox for threejs-vehicles: procedural animated cars, bicycles, trains, boats and aircraft on generated road, rail and water networks.'],
   'fauna.html': ['fauna', 'threejs-fauna demo · Procedural fish schools and bird flocks in three.js', 'Live sandbox for threejs-fauna: procedural fish schools, bird flocks and wildlife that live in the biomes and waters that suit them.'],
@@ -61,7 +60,7 @@ const DEMOS = {
   'city-r3f.html': ['city', 'threejs-city React Three Fiber demo · Procedural cities in R3F', 'The threejs-city <City> component in React Three Fiber: a procedural settlement on a threejs-biomes world, with every option as a live leva control.'],
   'props-r3f.html': ['props', 'threejs-props React Three Fiber demo · Street and road props in R3F', 'The threejs-props <Props> and <RoadPath> components in React Three Fiber: instanced street lights, fences, signs and power lines along roads, with live controls.'],
   'vehicles-r3f.html': ['vehicles', 'threejs-vehicles React Three Fiber demo · Procedural traffic in R3F', 'The threejs-vehicles <Vehicle> and <Fleet> components in React Three Fiber: a gallery of every vehicle type and live traffic on a street grid, with planes overhead.'],
-  'population-r3f.html': ['population', 'threejs-population React Three Fiber demo · H3 population maps in R3F', 'usePopulation and the <PopulationOverlay> hex map of threejs-population in React Three Fiber: density, land use and night lights, with every option live.'],
+  'population-r3f.html': ['city', 'threejs-city settlement planner in React Three Fiber · H3 population maps', 'usePopulation and the <PopulationOverlay> hex map of the threejs-city settlement planner in React Three Fiber: density, land use and night lights, with every option live.'],
   'fauna-r3f.html': ['fauna', 'threejs-fauna React Three Fiber demo · Fish schools and bird flocks in R3F', 'The threejs-fauna <Fish> and <Fauna> components in React Three Fiber: all 12 fish species side by side, then fish schools and bird flocks at a river mouth.'],
   'sky.html': ['sky','threejs-sky demo · Day/night cycle, clouds and stars in three.js', 'Live sandbox for threejs-sky: a day/night cycle with sun and moon phases, clouds, the Milky Way, shooting stars and a Keplerian solar system.'],
 }
@@ -229,6 +228,7 @@ function lander(p) {
     : heroImg ? `<span class="live">${main ? `screenshot · ${esc(main.href.split(/[?#]/)[0])}` : 'screenshot'}</span>`
     : '<span class="live dev">in development</span>'
   const stage = heroImg ? `<img src="${P}media/${heroImg}"${dims(heroImg)} fetchpriority="high" alt="${esc(p.hero.alt)}" />` : sketch(p)
+  // Feature rows: `features`, then any `sections` (each { id, label, heading, intro, rows }, e.g. a sub-system).
   let side = 0 // alternate text left/right, counting only non-wide rows (as on the original grass lander)
   const row = (f, i) => {
     const n = String(i + 1).padStart(2, '0')
@@ -339,18 +339,19 @@ function lander(p) {
       </div>
     </section>
 
-    <section id="features">
+${[{ id: 'features', label: "What's in the box", ...p.features }, ...(p.sections ?? [])].map((s) => `
+    <section id="${s.id}">
       <div class="wrap">
         <div class="features-head">
           <div>
-            <span class="label reveal">What's in the box</span>
-            <h2 class="reveal">${p.features.heading}</h2>
+            <span class="label reveal">${s.label}</span>
+            <h2 class="reveal">${s.heading}</h2>
           </div>
-          <p class="intro reveal">${p.features.intro}</p>
+          <p class="intro reveal">${s.intro}</p>
         </div>
-${p.features.rows.map(row).join('\n')}
+${s.rows.map(row).join('\n')}
       </div>
-    </section>
+    </section>`).join('')}
 ${related.length ? `
     <section class="related" aria-labelledby="works-with">
       <div class="wrap">
@@ -380,7 +381,7 @@ ${script(p.hero?.embed && main ? p.hero.embed : null, P)}`
 const FLOW = [
   ['Ground', ['biomes'], 'Seeded climate, height and 20 blended biomes on a flat world or a whole planet, with streaming LOD terrain.'],
   ['Water and growth', ['water', 'scatter', 'trees', 'grass'], 'Oceans, lakes and rivers carved into that ground, then forests, rocks and grass placed where the biome wants them.'],
-  ['People', ['city', 'population'], 'Population density decides where towns grow; settlements lay roads, lots and buildings and flatten the terrain under them.'],
+  ['People', ['city'], 'Population density decides where settlements grow and how big; they lay roads, lots and buildings and flatten the terrain under them.'],
   ['Life and things', ['props', 'vehicles', 'fauna'], 'Street furniture beside the roads, vehicles on the networks and animals in the biomes and waters that suit them.'],
   ['Weather and sky', ['weathering', 'sky'], 'Rain, snow, lightning and wildfire wear everything down; the sky turns day into night over a Keplerian solar system.'],
 ]
