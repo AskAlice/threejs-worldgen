@@ -18,6 +18,7 @@ export default {
   demos: [
     { label: 'three.js demo', href: 'index.html' },
     { label: 'React Three Fiber demo', href: 'r3f.html' },
+    { label: 'Corn demo', href: 'corn.html' },
   ],
   stats: [['~700k', 'blades on screen'], ['12', 'grass presets'], ['4', 'levels of detail'], ['1', 'function call']],
   install: 'npm i threejs-grass three',
