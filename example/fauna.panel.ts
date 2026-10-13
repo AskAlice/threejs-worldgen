@@ -1,9 +1,9 @@
 import { DEFAULT_BIRD_FLOCKS, DEFAULT_FISH_SCHOOLS, Fish } from 'threejs-fauna'
 import type { PanelClassSpec, PanelSpec } from './panel'
 
-// Panel manifest of the fauna sandbox (fauna.ts); checked by scripts/options-coverage.mjs. The gallery shows one
-// `Fish` class per species; `?world` shows `FishSchools` and `BirdFlocks` (the layers `Fauna` manages; its shared
-// seed and states are each layer's `seed` and `states`).
+// Panel manifest of the fauna sandboxes (fauna.ts and fauna-r3f.tsx); checked by scripts/options-coverage.mjs. The
+// gallery shows one `Fish` class per species; `?world` shows `FishSchools` and `BirdFlocks` (the layers `Fauna` manages;
+// its shared seed and states are each layer's `seed` and `states`).
 const choices = { shape: ['forked', 'lunate', 'rounded', 'truncate'], water: ['fresh', 'sea', 'any'] }
 const ranges = { rings: [4, 48, 1], sides: [4, 32, 1], finColumns: [2, 16, 1], count: [0, 20, 1], size: [1, 200, 1], hueVariation: [0, 1, 0.01] } satisfies PanelClassSpec['ranges']
 const layer = {
@@ -28,3 +28,6 @@ export const panels: PanelSpec = {
     BirdFlocks: { defaults: DEFAULT_BIRD_FLOCKS, arrays: true, skip: layer, choices, ranges: { ...ranges, density: [0, 50], gridResolution: [3, 9, 1], tileSize: [64, 1024, 1], stepRate: [5, 120, 1] } },
   },
 }
+
+/** The classes fauna-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'fauna-r3f.tsx': ['Fish', 'FishSchools', 'BirdFlocks'] }

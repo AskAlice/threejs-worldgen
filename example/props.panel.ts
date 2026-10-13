@@ -1,7 +1,7 @@
 import { DEFAULT_DECORATE, DEFAULT_PROPS, DEFAULT_ROAD_SURFACE, type RoadSurfaceOptions } from 'threejs-props'
 import type { PanelClassSpec, PanelSpec } from './panel'
 
-// Panel manifest of the props sandbox (props.ts); checked by scripts/options-coverage.mjs.
+// Panel manifest of the props sandboxes (props.ts and props-r3f.tsx); checked by scripts/options-coverage.mjs.
 const weather = 'the weather folder sets it for every prop and road at once (and dims the light for night)'
 const unit: [number, number, number] = [0, 1, 0.01]
 const surface = (target: RoadSurfaceOptions): PanelClassSpec => ({
@@ -35,3 +35,5 @@ export const panels: PanelSpec = {
   },
 }
 
+/** The classes props-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */
+export const r3f = { 'props-r3f.tsx': ['Props', 'RoadSurface (avenue)', 'RoadSurface (dirt lane)', 'decorateRoads'] }
