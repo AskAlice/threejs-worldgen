@@ -94,13 +94,13 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | `Fleet` | Instanced vehicles: one `InstancedMesh` per model part (bodies, wheels, fans, propellers, rocket stages), one shared single-material TSL shader, plume, flame and wake effects. `set`/`reset`, `update(dt, env)`, `ignite`, `setStates`, `vehicle(i)`, `setRoads` |
 | `Vehicle` | One vehicle (a fleet of one) standing in place with its parts animating; for heroes, galleries and spawned assets |
 | `FleetSim` | The GPU-free core: groups → units (trains = locomotive + wagons) → vehicles. Poses, speeds, steering, banking, wave bobbing, damage tilt and weather exposure live in typed arrays |
-| `buildVehicle`, `VEHICLE_KINDS`, `VEHICLE_TYPES` | Seeded generators for all 11 types, with JSON parameters, defaults and ranges |
+| `buildVehicle`, `VEHICLE_KINDS`, `VEHICLE_TYPES` | Seeded generators for all 14 types, with JSON parameters, defaults and ranges |
 | `Path`, `catmullRom`, `circlePoints` | Arc-length spline paths: closed loops, and open ones driven back and forth |
 | `RoadNavigator`, `RoadNetwork` | Lane-keeping random walk over a road graph, seeded junction choices and rounded corners. `RoadGraph` from threejs-city fits as it is |
 | `rocketAt` | Analytic gravity-turn ascent (scrubbable) |
 | `planRoute`, `fitsRule`, `VEHICLE_PLACEMENT` | Plausible routes per type (water depth, ground slope, air clearance, flat pads near water). Rules match threejs-worldgen's `PlacementRule` |
 | `vehicleAssets` | Every type as an `AssetDef` for threejs-worldgen's `AssetRegistry` |
-| `MeshBuilder` | The typed-array, flat-shaded low-poly builder behind the models (box, cylinder, tube, ellipsoid, loft, fin, beam) |
+| `MeshBuilder` | The typed-array builder behind the models: flat-shaded primitives (box, cylinder, tube, ellipsoid, loft, fin, beam) and smooth-shaded surfaces, lathes and rounded boxes for bodywork |
 | `createVehicleMaterial`, `createFxMaterial`, `createWakeMaterial` | The TSL materials |
 
 ## Vehicle types
