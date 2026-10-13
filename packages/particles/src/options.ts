@@ -24,7 +24,7 @@ export interface ParticleOptions {
   life: [number, number]
   /** Spawn shape and initial state. */
   emitter: {
-    /** `point`, `box` (half extents `size`), `disc` (radius `size[0]`, on XZ), `sphere` (radius `size[0]`) or `sources` (see {@link ParticleSystem.setSources}). */
+    /** `point`, `box` (half extents `size`), `disc` (radius `size[0]`, on XZ), `sphere` (radius `size[0]`) or `sources` (see {@link threejs-particles!ParticleSystem.setSources}). */
     shape: EmitterShape
     /** Centre, local space, metres. */
     position: [number, number, number]
