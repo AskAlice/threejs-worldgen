@@ -330,8 +330,10 @@ export class Walker {
   private readonly x0: number
   private readonly length: number
   private readonly z0: number
+  private readonly spec: SceneSpec
 
-  constructor(private readonly spec: SceneSpec) {
+  constructor(spec: SceneSpec) {
+    this.spec = spec
     const o = spec.origin, dx = spec.cellSize
     // From 1.5 m outside the domain to 1.5 m past it: the first steps land outside the simulated snow.
     this.x0 = o[0] - 1.5
