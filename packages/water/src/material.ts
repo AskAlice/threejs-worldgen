@@ -13,7 +13,7 @@ export interface WaterAppearance {
   shallowColor: string
   /** Colour of deep water: what you see where the bottom is out of sight. */
   deepColor: string
-  /** Metres of water after which ~63% of the view through it is replaced by `deepColor`. */
+  /** Metres of water after which ~63% of the green channel is replaced by `deepColor`. Absorption is per channel (red first), so shallows read turquoise. */
   visibility: number
   /** Screen-space refraction strength (0 = none). */
   refraction: number
@@ -387,13 +387,17 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const path = max(dist.mul(sceneZ.div(viewZ).sub(1)), 0) // metres of water the view ray crosses
     const depth = path.mul(max(dot(V, U), 0.02)) // ≈ vertical water depth
     const behind = viewportSharedTexture(uv).rgb
-    const tint = mix(vec3(1), u.shallowColor, float(1).sub(exp(path.mul(-4).div(u.visibility))))
-    const body = mix(behind.mul(tint), u.deepColor.mul(day), float(1).sub(exp(path.negate().div(u.visibility))))
+    // Beer–Lambert absorption per channel: red dies first, so shallows read turquoise and depth reads blue.
+    const absorb = float(1).sub(exp(path.negate().mul(vec3(2.2, 1, 0.6).div(u.visibility))))
+    const tint = mix(vec3(1), u.shallowColor, absorb)
+    const body = mix(behind.mul(tint), u.deepColor.mul(day), absorb)
 
-    // Shoreline: soft edge, then foam that laps in bands.
+    // Shoreline: soft edge, then foam that laps in bands. The band's wobble fades out at the waterline,
+    // where the depth buffer is noise and would otherwise speckle the foam.
     const edge = smoothstep(0, u.foamWidth.mul(0.2), depth)
     const foamNoise = mx_noise_float(vec3(p.div(u.detailScale.mul(0.8)), u.time.mul(0.3))).mul(keep(u.detailScale.mul(0.8)).mul(0.5)).add(0.5)
-    const cut = depth.div(u.foamWidth).add(sin(u.time.mul(1.3).sub(depth.div(u.foamWidth).mul(5))).mul(0.12))
+    const band = depth.div(u.foamWidth)
+    const cut = band.add(sin(u.time.mul(1.3).sub(band.mul(5))).mul(0.12).mul(smoothstep(0, 0.5, band)))
     const shore = smoothstep(cut.sub(0.15), cut.add(0.15), foamNoise)
     const foam = max(shore, surfaceFoam).mul(u.foam).clamp(0, 1)
 

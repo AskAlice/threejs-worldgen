@@ -295,31 +295,39 @@ function buildLakeGeometry(h: HydrologyResult, expand: number): BufferGeometry |
 
 /** One mesh for all rivers: a ribbon per polyline at its water surface, wide enough to reach under the carved banks. */
 function buildRiverGeometry(h: HydrologyResult, o: LakesSettings): BufferGeometry | null {
-  const { x0, z0, cellSize: cs } = h.grid
+  const { x0, z0, cellSize: cs, cols, rows } = h.grid
   const pos: number[] = [], flow: number[] = [], local: number[] = [], index: number[] = []
+  const inLake = (x: number, z: number) => {
+    const c = Math.round((x - x0) / cs), r = Math.round((z - z0) / cs)
+    return c >= 0 && r >= 0 && c < cols && r < rows && h.lakeIndex[r * cols + c] >= 0
+  }
   for (const river of h.rivers) {
     const p = river.points
-    const base = pos.length / 3
-    for (let i = 0; i < p.length; i++) {
-      const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)]
-      let tx = b[0] - a[0], tz = b[1] - a[1]
-      const len = Math.hypot(tx, tz) || 1
-      tx /= len; tz /= len
-      const halfChannel = river.width[i] / 2
-      const half = halfChannel + Math.max(cs, halfChannel * h.options.bankFalloff) * 0.8
-      // Speed from the surface slope along the river.
-      const drop = river.surface[Math.max(0, i - 1)] - river.surface[Math.min(p.length - 1, i + 1)]
-      const slope = Math.max(0, drop) / len
-      const speed = Math.min(o.maxFlowSpeed, Math.max(o.minFlowSpeed, o.flowSpeed * Math.sqrt(slope / 0.01)))
-      for (const side of [-1, 1]) {
-        const x = p[i][0] - tz * half * side, z = p[i][1] + tx * half * side
-        pos.push(x - x0, river.surface[i], z - z0)
-        flow.push(tx * speed, tz * speed)
-        local.push(x, z)
-      }
-      if (i > 0) {
-        const k = base + (i - 1) * 2 // left, right of the previous point
-        index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2)
+    // Skip the stretches inside a lake: the lake surface is drawn there, and two water surfaces at the
+    // same level z-fight.
+    for (const [from, to] of runs(p, inLake)) {
+      const base = pos.length / 3
+      for (let i = from; i < to; i++) {
+        const a = p[Math.max(from, i - 1)], b = p[Math.min(to - 1, i + 1)]
+        let tx = b[0] - a[0], tz = b[1] - a[1]
+        const len = Math.hypot(tx, tz) || 1
+        tx /= len; tz /= len
+        const halfChannel = river.width[i] / 2
+        const half = halfChannel + Math.max(cs, halfChannel * h.options.bankFalloff) * 0.8
+        // Speed from the surface slope along the river.
+        const drop = river.surface[Math.max(from, i - 1)] - river.surface[Math.min(to - 1, i + 1)]
+        const slope = Math.max(0, drop) / len
+        const speed = Math.min(o.maxFlowSpeed, Math.max(o.minFlowSpeed, o.flowSpeed * Math.sqrt(slope / 0.01)))
+        for (const side of [-1, 1]) {
+          const x = p[i][0] - tz * half * side, z = p[i][1] + tx * half * side
+          pos.push(x - x0, river.surface[i], z - z0)
+          flow.push(tx * speed, tz * speed)
+          local.push(x, z)
+        }
+        if (i > from) {
+          const k = base + (i - from - 1) * 2 // left, right of the previous point
+          index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2)
+        }
       }
     }
   }
@@ -330,4 +338,17 @@ function buildRiverGeometry(h: HydrologyResult, o: LakesSettings): BufferGeometr
   g.setAttribute('aLocal', new Float32BufferAttribute(local, 2))
   g.setIndex(index)
   return g
+}
+
+/** Index ranges `[from, to)` of a polyline that are not in a lake, at least two points long. */
+function runs(points: [number, number][], inLake: (x: number, z: number) => boolean): [number, number][] {
+  const out: [number, number][] = []
+  let from = -1
+  for (let i = 0; i <= points.length; i++) {
+    const wet = i < points.length && !inLake(points[i][0], points[i][1])
+    if (wet) { if (from < 0) from = i; continue }
+    if (from >= 0 && i - from >= 2) out.push([from, i])
+    from = -1
+  }
+  return out
 }

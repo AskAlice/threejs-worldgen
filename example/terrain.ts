@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { World, WorldTerrain, SurfaceControls, renderWorldMap, createSample, type MapMode, type WorldInput } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
+import { Ocean } from 'threejs-water'
 import { patch } from './options-gui'
 import { classOf, createPanel } from './panel'
 
@@ -25,8 +26,6 @@ const world = new World(worldInput)
 const controls = new SurfaceControls(camera, renderer.domElement, world, { distance: planet ? 9000 : 2500 })
 const terrain = await WorldTerrain.create({ world, camera, scene, createWorker: () => new TerrainWorker(), origin: controls.origin })
 
-Object.assign(window, { world, terrain, controls, renderer, camera, scene })
-
 // Light: a fixed sun in world space (so moving around a planet goes through day and night).
 const sunDir = new THREE.Vector3(0.6, 0.55, 0.35).normalize()
 const sun = new THREE.DirectionalLight('#fff3e0', 3)
@@ -35,6 +34,12 @@ scene.add(sun, new THREE.HemisphereLight('#bcd4ff', '#4a4030', 0.9))
 const skyDay = new THREE.Color('#9ec3e6'), space = new THREE.Color('#02030a')
 scene.background = new THREE.Color()
 scene.fog = new THREE.FogExp2(skyDay.getHex(), 0)
+
+// The sea, from the water package: it reads sea level and radius from the world every frame and follows
+// the camera, so it works on the flat world and on the 60 km planet alike.
+const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#7fa8d4', horizonColor: '#cfe0ee' })
+
+Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean })
 
 // UI.
 const hud = document.getElementById('hud')!
@@ -91,6 +96,7 @@ let lastMapFocus = [Infinity, Infinity, Infinity]
 renderer.setAnimationLoop(() => {
   controls.update()
   terrain.setOrigin(controls.origin)
+  ocean.setOrigin(controls.origin)
 
   // Sky fades to space with altitude; fog thins out with it.
   const alt = controls.altitude
