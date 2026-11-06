@@ -1,0 +1,25 @@
+# common
+
+Tickets that do not belong to one published package. Flat, no milestone grouping.
+
+- [01: Screen-space reflections with sky fallback](issues/01-screen-space-reflections-with-sky-fallback.md)
+- [02: Volumetric atmosphere and clouds](issues/02-volumetric-atmosphere-and-clouds.md)
+- [03: Seamless LOD swaps](issues/03-seamless-lod-swaps.md)
+- [04: Seabed depth shading](issues/04-seabed-depth-shading.md)
+- [05: Aerial-range ground detail](issues/05-aerial-range-ground-detail.md)
+- [06: Inland water via Rivers and Lakes](issues/06-inland-water-via-rivers-and-lakes.md)
+- [07: Particles exported API is documented and honest](issues/07-particles-exported-api-documented-and-honest.md)
+- [08: One R3F wrapper lifecycle hook](issues/08-one-r3f-wrapper-lifecycle-hook.md)
+- [09: Typed vehicle parameters](issues/09-typed-vehicle-parameters.md)
+- [10: One MPM option sanitiser](issues/10-one-mpm-option-sanitiser.md)
+- [11: Restore per-class road markings](issues/11-city-road-markings-per-class.md)
+- [12: Rule: every feature is parametric with great but optional React Three Fiber support](issues/12-rule-every-feature-is-parametric-with-great-but-optional-rea.md)
+- [13: Rule: generation is never random — seeded and procedural, but looks random](issues/13-rule-generation-is-never-random-seeded-and-procedural-but-lo.md)
+- [14: Rule: optimized instancing and buffer geometry wherever possible](issues/14-rule-optimized-instancing-and-buffer-geometry-wherever-possi.md)
+- [15: Epic: Houdini-style ragdoll + MoGraph/Mixamo animation hybrid for crowd agents](issues/15-epic-houdini-style-ragdoll-mograph-mixamo-animation-hybrid-f.md)
+- [16: Ragdoll joint limits and motors (threejs-ragdoll)](issues/16-ragdoll-joint-limits-and-motors-threejs-ragdoll.md)
+- [17: States, triggers and blending (threejs-character)](issues/17-states-triggers-and-blending-threejs-character.md)
+- [18: Crowds of agents (threejs-crowd)](issues/18-crowds-of-agents-threejs-crowd.md)
+- [19: Rule: no jaggies or sparkle — procedural AA (fwidth), smooth state fields, anisotropic filtering, Earth-like palettes](issues/19-rule-no-jaggies-or-sparkle-procedural-aa-fwidth-smooth-state.md)
+- [20: threejs-photoreal: shared render pipeline with the three.js equivalents of Blender's realism settings](issues/20-threejs-photoreal-shared-render-pipeline-with-the-three-js-e.md)
+- [21: React component nits found while building the R3F sandboxes (#65)](issues/21-react-component-nits-found-while-building-the-r3f-sandboxes.md)

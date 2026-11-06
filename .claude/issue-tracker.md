@@ -24,12 +24,18 @@ and the body is revised to match. Search `.scratch/` first and update rather tha
 
 ## Layout
 
+Two locations, chosen by what the ticket is about:
+
 ```
-.scratch/<feature-slug>/
-├── spec.md                 (optional, when the feature has a written spec)
-└── issues/
-    └── NN-<slug>.md        one ticket per file, numbered from 01
+.scratch/<package>/<milestone>/issues/NN-<slug>.md   published package only
+.scratch/common/issues/NN-<slug>.md                  everything else, flat
 ```
+
+- `<package>` is one of the packages this repo publishes: heightfield, biomes, scatter, trees, water, particles,
+  weathering, fauna, city, props, vehicles, sky, grass, worldgen.
+- `common/` has no milestone or feature subdirectories. Cross-package work, tooling, docs and review follow-ups go
+  there. Never invent a feature directory.
+- One ticket per file, numbered from `01` within its directory.
 
 Each ticket carries:
 
@@ -39,7 +45,7 @@ Each ticket carries:
 
 A ticket's number is its filename prefix. Dependency order is the numbering order: blockers first.
 
-## Working a feature
+## Working the backlog
 
 When several tickets are independent (no open blockers, disjoint files), hand them to parallel subagents, one ticket
 each. Keep coupled tickets, and anything touching the same files, sequential. Shared monorepo files (root
