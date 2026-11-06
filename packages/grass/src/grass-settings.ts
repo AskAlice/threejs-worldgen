@@ -150,7 +150,7 @@ export function layoutKey(s: GrassSettings): string {
   return JSON.stringify([s.type, s.tileSize, s.density, s.heightVariation, s.widthVariation, s.clumping, s.clumpSize, s.maxSlope, s.lods])
 }
 
-/** Settings embedded in the material. LOD distances/densities are uniform-driven, so they are excluded. */
+/** Settings that require a new material instance. LOD distances/densities are uniform-driven, so they are excluded. */
 export function materialKey(s: GrassSettings): string {
   return JSON.stringify([s.type, s.tileSize, s.density, s.heightVariation, s.widthVariation, s.clumping, s.clumpSize, s.maxSlope])
 }

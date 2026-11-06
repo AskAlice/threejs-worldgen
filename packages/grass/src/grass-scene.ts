@@ -3,7 +3,7 @@ import type { Terrain } from 'threejs-heightfield'
 import { MAX_INTERACTORS, type GrassUniforms } from './material.ts'
 import type { Interactor, ObjectRef } from './grass-settings.ts'
 
-/** Frames to wait before freeing a replaced tile geometry (see `Grass.retire`). */
+/** Frames to wait before freeing a replaced tile geometry (see `Retirement.retire`). */
 const RETIRE_AFTER_FRAMES = 60
 /** Wall-clock equivalent used when a disposed field no longer gets update() calls. */
 const RETIRE_AFTER_MS = RETIRE_AFTER_FRAMES * 16

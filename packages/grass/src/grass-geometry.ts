@@ -93,8 +93,6 @@ export class TileGeometryStore {
   write(tile: Tile, take: Int32Array, segments: number, billboard: boolean): void {
     const written = take.reduce((a, b) => a + b, 0)
 
-    // Reuse the tile's GPU buffers when the new data fits; only grow (with slack) when it doesn't.
-    // Allocating fresh buffers on every LOD change is what makes camera moves stutter.
     let geometry = tile.mesh.geometry
     const base = this.baseGeometry(segments, billboard)
     const current = geometry.getAttribute('aOffset') as InstancedBufferAttribute | undefined
