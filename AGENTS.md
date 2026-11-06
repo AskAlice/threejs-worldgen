@@ -7,7 +7,7 @@ buffer geometry, tests) are in [README.md](README.md).
 
 ### Issue tracker
 
-Issues live in GitHub Issues on AskAlice/threejs-worldgen (`gh` CLI). The repo is public. See `docs/agents/issue-tracker.md`.
+Issues live as markdown files under `.scratch/<feature>/`; there is no remote tracker. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
