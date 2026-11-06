@@ -4,7 +4,7 @@ import {
   materialRoughness, mix, mx_noise_float, mx_worley_noise_vec2, normalView, normalWorld, positionView, positionWorld, smoothstep,
   step, time, uniform, vec2, vec3, vertexColor,
 } from 'three/tsl'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /**
  * The four material states every weathered asset understands, each 0…1:

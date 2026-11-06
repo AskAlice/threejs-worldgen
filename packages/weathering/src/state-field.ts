@@ -3,7 +3,7 @@ import { positionWorld, step, uniform } from 'three/tsl'
 import { STATE_CHANNELS, type MaterialStates, type StateChannel } from './states.ts'
 import type { ClimatePoint, SurfaceSample, Weather } from './weather.ts'
 import { smoothSample } from './sampling.ts'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** Where a {@link StateField} lies and how fine it is. Plain JSON. */
 export interface StateFieldOptions {

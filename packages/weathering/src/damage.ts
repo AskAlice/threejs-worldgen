@@ -3,7 +3,7 @@ import type { InstanceStates } from './instance-states.ts'
 import type { StateField } from './state-field.ts'
 import type { StateChannel } from './states.ts'
 import { createWeatherSample, type ClimatePoint, type Weather } from './weather.ts'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** What damage is written into: a state field, per-instance states (with their positions), or both. */
 export interface DamageTarget {

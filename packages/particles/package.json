@@ -24,6 +24,9 @@
     "build": "tsup src/index.ts src/react.tsx --format esm --dts --clean --external three --external react --external @react-three/fiber",
     "prepublishOnly": "npm run build"
   },
+  "dependencies": {
+    "threejs-heightfield": "^0.1.0"
+  },
   "peerDependencies": {
     "@react-three/fiber": ">=9",
     "react": ">=19",

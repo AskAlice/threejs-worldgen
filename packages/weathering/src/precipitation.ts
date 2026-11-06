@@ -3,7 +3,8 @@ import { abs, cos, float, floor, instancedBufferAttribute, length, normalize, po
 import { hash01, seedOf } from 'threejs-biomes'
 import { createWeatherSample, type Weather, type WeatherSample } from './weather.ts'
 import { axisBillboard, createQuadInstances, sphereBillboard } from './particles.ts'
-import { merge, mod, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
+import { mod } from './util.ts'
 
 /** Rain streaks. */
 export interface RainLook {

@@ -1,5 +1,5 @@
 import { clamp, fbm, hash01, hash4, noise3, seedOf, smoothstep, createSample, type DeepPartial, type FractalOptions, type LocalFrame, type World } from 'threejs-biomes'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** What falls from the sky. `sleet` is the mixed band between {@link RainSettings.snowTemperature} and `rainTemperature`. */
 export type PrecipitationType = 'none' | 'rain' | 'sleet' | 'snow'
