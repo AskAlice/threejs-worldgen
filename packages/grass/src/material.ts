@@ -8,9 +8,9 @@ import {
 /** Maximum number of simultaneous {@link Interactor}s. Extra ones are ignored. */
 export const MAX_INTERACTORS = 16
 
-/** Neutral grass map: full coverage (R=1), default height (G=0.5 → 1x). */
-const neutralMap = new DataTexture(new Uint8Array([255, 128, 0, 255]), 1, 1)
-neutralMap.needsUpdate = true
+/** Neutral grass map: full coverage (R=1), default height (G=0.5 → 1x). Bound when a field has no map. */
+export const neutralGrassMap = new DataTexture(new Uint8Array([255, 128, 0, 255]), 1, 1)
+neutralGrassMap.needsUpdate = true
 
 /**
  * Creates the uniform set shared by a Grass field's materials. Grass calls this for you and drives the
@@ -62,7 +62,7 @@ export function createGrassUniforms() {
     /** minX, minZ, sizeX, sizeZ of the grass map in world space. */
     mapBounds: uniform(new Vector4(-1e6, -1e6, 2e6, 2e6)),
     /** Grass map texture (R = coverage, G = height); a neutral 1×1 texture when there is none. */
-    map: texture(neutralMap),
+    map: texture(neutralGrassMap),
     /** Global multiplier on interactor push. */
     interactionStrength: uniform(1),
     /** xyz = world position, w = radius (0 = unused slot). */

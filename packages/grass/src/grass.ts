@@ -2,7 +2,7 @@ import {
   BufferGeometry, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3,
   type Camera, type DirectionalLight, type MeshPhysicalNodeMaterial, type Node, type Object3D,
 } from 'three/webgpu'
-import { createGrassMaterial, createGrassUniforms, MAX_INTERACTORS, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material.ts'
+import { createGrassMaterial, createGrassUniforms, MAX_INTERACTORS, neutralGrassMap, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material.ts'
 import { presets, type GrassStyle, type PresetName } from './presets.ts'
 import { createHeightSampler, slopeAt, type HeightFn, type Terrain } from 'threejs-heightfield'
 import type { GrassMap } from './grass-map.ts'
@@ -160,6 +160,8 @@ interface CellCache {
 interface Tile {
   ix: number
   iz: number
+  /** Edge length of the grid this tile was built on (kept when a tileSize change retires it). */
+  size: number
   /** Blade candidates currently built per cell. */
   built: Int32Array
   segments: number
@@ -202,10 +204,15 @@ export class Grass {
   private material: MeshPhysicalNodeMaterial | null = null
   private baseGeometries = new Map<string, BufferGeometry>()
   private tiles = new Map<string, Tile>()
+  /** Tiles from the previous grid, kept on screen until the new grid covers their area. */
+  private staleTiles: Tile[] = []
   private layoutKey = ''
   private layoutTileSize = 0
+  private layoutType = ''
+  private materialKey = ''
   private frame = 0
   private unhook = () => {}
+  private disposalTimer: ReturnType<typeof setTimeout> | null = null
 
   /**
    * Creates a grass field and builds every visible tile so the first frame is complete.
@@ -230,12 +237,7 @@ export class Grass {
     this.set(input)
     if (scene) {
       scene.add(this.object)
-      const previous = scene.onBeforeRender
-      scene.onBeforeRender = (...args) => {
-        previous.apply(scene, args)
-        this.update()
-      }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = subscribeScene(scene, () => this.update())
     }
   }
 
@@ -293,26 +295,43 @@ export class Grass {
       u.map.value = s.grassMap.texture
       u.mapBounds.value.set(s.grassMap.minX, s.grassMap.minZ, s.grassMap.size, s.grassMap.size)
     } else {
-      u.mapBounds.value.set(-1e6, -1e6, 2e6, 2e6) // neutral map stays bound; this just disables it
+      u.map.value = neutralGrassMap // drop the previous map's texture, not just its bounds
+      u.mapBounds.value.set(-1e6, -1e6, 2e6, 2e6)
     }
 
     const layoutKey = JSON.stringify([s.type, s.tileSize, s.density, s.heightVariation, s.widthVariation, s.clumping, s.clumpSize, s.maxSlope, s.lods])
     if (layoutKey !== this.layoutKey) {
-      const tileSizeChanged = this.settings && this.layoutTileSize !== s.tileSize
+      const tileSizeChanged = this.layoutTileSize !== s.tileSize
+      const typeChanged = this.layoutType !== s.type
       this.layoutKey = layoutKey
       this.layoutTileSize = s.tileSize
-      if (tileSizeChanged) this.clearTiles()
-      else {
+      this.layoutType = s.type
+      if (tileSizeChanged) {
+        // The new grid does not line up with the old one: keep the old tiles on screen until the
+        // new grid covers their area, then retire them through the delayed-free path.
+        if (typeChanged) this.clearTiles()
+        else this.retireTilesForResize()
+      } else {
         // Keep showing the old blades until each tile is rebuilt, instead of the field blinking out.
         for (const tile of this.tiles.values()) {
           tile.cells = []
           tile.built = new Int32Array(0)
         }
       }
-      this.material?.dispose()
+    }
+
+    // LOD distances/densities are uniform-driven, so they must not rebuild the material.
+    const materialKey = JSON.stringify([s.type, s.tileSize, s.density, s.heightVariation, s.widthVariation, s.clumping, s.clumpSize, s.maxSlope])
+    if (materialKey !== this.materialKey) {
+      this.materialKey = materialKey
+      if (this.material) {
+        const material = this.material
+        this.retire(() => material.dispose())
+      }
       this.material = createGrassMaterial(this.uniforms, s.type === 'billboards')
     }
     for (const tile of this.tiles.values()) this.applyTileSettings(tile)
+    for (const tile of this.staleTiles) tile.mesh.material = this.material!
     return this
   }
 
@@ -363,6 +382,7 @@ export class Grass {
         this.tiles.delete(key)
       }
     }
+    this.retireStaleTiles()
     this.flushRetired()
 
     pending.sort((a, b) => a.dist - b.dist)
@@ -388,11 +408,17 @@ export class Grass {
   dispose(): void {
     this.unhook()
     this.clearTiles()
-    this.flushRetired(true)
-    this.material?.dispose()
-    for (const g of this.baseGeometries.values()) g.dispose()
+    if (this.material) {
+      const material = this.material
+      this.retire(() => material.dispose())
+      this.material = null
+    }
+    for (const g of this.baseGeometries.values()) this.retire(() => g.dispose())
     this.baseGeometries.clear()
     this.object.removeFromParent()
+    // No more update() calls will flush the retire list, so free it on a timer instead of at once:
+    // in-flight pipelines may still reference these buffers.
+    this.scheduleFlush()
   }
 
   /** Fraction (0..1) of full blade density at a distance from the camera — the CPU mirror of the shader's LOD curve. */
@@ -452,7 +478,7 @@ export class Grass {
     mesh.matrixAutoUpdate = false
     mesh.visible = false
     this.object.add(mesh)
-    return { ix, iz, built: new Int32Array(0), segments: 0, cells: [], mesh, minY: 0, maxY: 0, seen: 0, dist: 0 }
+    return { ix, iz, size: this.settings.tileSize, built: new Int32Array(0), segments: 0, cells: [], mesh, minY: 0, maxY: 0, seen: 0, dist: 0 }
   }
 
   private buildTile(tile: Tile, needs: Int32Array, segments: number) {
@@ -491,7 +517,7 @@ export class Grass {
       geometry.setAttribute('aParams', new InstancedBufferAttribute(new Float32Array(capacity * 4), 4))
       geometry.setAttribute('aPatch', new InstancedBufferAttribute(new Float32Array(capacity * 3), 3))
       tile.mesh.geometry = geometry
-      this.retire(old)
+      this.retire(() => disposeInstanced(old))
     }
     const aOffset = geometry.getAttribute('aOffset') as InstancedBufferAttribute
     const aParams = geometry.getAttribute('aParams') as InstancedBufferAttribute
@@ -688,11 +714,51 @@ export class Grass {
   private clearTiles() {
     for (const tile of this.tiles.values()) this.removeTile(tile)
     this.tiles.clear()
+    for (const tile of this.staleTiles) this.removeTile(tile)
+    this.staleTiles.length = 0
+  }
+
+  /** Moves the current grid aside so it keeps rendering until the new grid covers its area. */
+  private retireTilesForResize() {
+    for (const tile of this.tiles.values()) this.staleTiles.push(tile)
+    this.tiles.clear()
+  }
+
+  /** Drops a stale tile once every new tile overlapping its area has been built (or it left the view). */
+  private retireStaleTiles() {
+    if (!this.staleTiles.length) return
+    const ts = this.settings.tileSize
+    const keep: Tile[] = []
+    for (const stale of this.staleTiles) {
+      const x0 = stale.ix * stale.size
+      const x1 = x0 + stale.size
+      const z0 = stale.iz * stale.size
+      const z1 = z0 + stale.size
+      let overlaps = false
+      let covered = true
+      for (const tile of this.tiles.values()) {
+        const nx0 = tile.ix * ts
+        const nx1 = nx0 + ts
+        const nz0 = tile.iz * ts
+        const nz1 = nz0 + ts
+        if (x0 < nx1 && nx0 < x1 && z0 < nz1 && nz0 < z1) {
+          overlaps = true
+          if (tile.built.length === 0) {
+            covered = false
+            break
+          }
+        }
+      }
+      if (overlaps && !covered) keep.push(stale)
+      else this.removeTile(stale)
+    }
+    this.staleTiles = keep
   }
 
   private removeTile(tile: Tile) {
     tile.mesh.removeFromParent()
-    this.retire(tile.mesh.geometry)
+    const geometry = tile.mesh.geometry
+    this.retire(() => disposeInstanced(geometry))
   }
 
   /**
@@ -700,19 +766,56 @@ export class Grass {
    * pipelines asynchronously, and one still in flight may read the old geometry. Freeing it at once
    * (which detaches the shared blade attributes) made that pipeline fail and the tile blink out.
    */
-  private retired: { geometry: InstancedBufferGeometry; frame: number }[] = []
-  private retire(geometry: InstancedBufferGeometry) {
-    this.retired.push({ geometry, frame: this.frame })
+  private retired: { dispose: () => void; frame: number }[] = []
+  private retire(dispose: () => void) {
+    this.retired.push({ dispose, frame: this.frame })
   }
   private flushRetired(all = false) {
     while (this.retired.length && (all || this.frame - this.retired[0].frame > RETIRE_AFTER_FRAMES)) {
-      disposeInstanced(this.retired.shift()!.geometry)
+      this.retired.shift()!.dispose()
     }
+  }
+  private scheduleFlush() {
+    if (this.disposalTimer) return
+    this.disposalTimer = setTimeout(() => {
+      this.disposalTimer = null
+      this.flushRetired(true)
+    }, RETIRE_AFTER_MS)
   }
 }
 
 const _v = new Vector3()
 const _t = new Vector3()
+
+/**
+ * Per-scene update subscriptions. Each field adds its own listener, so disposing one never restores
+ * a sibling's captured callback chain (which used to stop or resurrect the other field's updates).
+ */
+const sceneHooks = new WeakMap<Object3D, { listeners: Set<() => void>; previous: Object3D['onBeforeRender'] }>()
+
+function subscribeScene(scene: Object3D, listener: () => void): () => void {
+  let hook = sceneHooks.get(scene)
+  if (!hook) {
+    const previous = scene.onBeforeRender
+    const listeners = new Set<() => void>()
+    hook = { listeners, previous }
+    sceneHooks.set(scene, hook)
+    scene.onBeforeRender = (...args) => {
+      previous.apply(scene, args)
+      for (const l of listeners) l()
+    }
+  }
+  hook.listeners.add(listener)
+  return () => {
+    const current = sceneHooks.get(scene)
+    if (!current) return
+    current.listeners.delete(listener)
+    if (current.listeners.size === 0) {
+      scene.onBeforeRender = current.previous
+      sceneHooks.delete(scene)
+    }
+  }
+}
 
 /** The interactor's object, or `null` while a React ref is unmounted. */
 export function interactorObject(it: Interactor | undefined): Object3D | null {
@@ -756,6 +859,8 @@ export function writeSun(u: Pick<GrassUniforms, 'sunDirection' | 'sunColor'>, su
 }
 /** Frames to wait before freeing a replaced tile geometry (see `Grass.retire`). */
 const RETIRE_AFTER_FRAMES = 60
+/** Wall-clock equivalent used when a disposed field no longer gets update() calls. */
+const RETIRE_AFTER_MS = RETIRE_AFTER_FRAMES * 16
 /** Cells are built with this many times the blades they currently need. */
 const HEADROOM = 1.3
 
