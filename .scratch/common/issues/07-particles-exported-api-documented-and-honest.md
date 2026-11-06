@@ -14,3 +14,7 @@
 - [ ] No `as unknown as` cast remains on the vent path
 - [ ] Exhaust and vent tests pass unchanged
 - [ ] Typecheck and the particles package build pass
+
+## Comments
+
+- 2026-11-06 — Implemented in commit 62f6015: the remaining exported particles API is documented; typedoc reports 0 warnings and the export list is unchanged.

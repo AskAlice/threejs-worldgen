@@ -12,3 +12,5 @@ site
 
 .prove-it/runs/
 .prove-it/audits/
+.prove-it/server.log
+.prove-it/server.pid
