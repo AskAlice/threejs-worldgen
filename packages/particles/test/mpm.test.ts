@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { DEFAULT_MPM, MPMReference, MPM_FIXED, bakeMPMHeights, mpmEmitPositions, mpmStableStep, mpmTimeStep, projectFriction, resolveMPMOptions, toFixed } from '../src/mpm-reference.ts'
+import { MPMSolver } from '../src/mpm.ts'
 import { JELLY, det3, identity3, lame, mpmMaterial, mul3, transpose3 } from '../src/mpm-materials.ts'
 
 const small = { capacity: 4096, resolution: [24, 24, 24] as [number, number, number], cellSize: 0.25, origin: [0, 0, 0] as [number, number, number] }
@@ -60,6 +61,18 @@ test('emission: a seeded lattice of Δx/2 spacing (8 per cell), deterministic', 
   assert.notDeepEqual(a, mpmEmitPositions({ center: [1, 2, 3], size: [0.5, 0.5, 0.5] }, 0.25, 8))
   const ball = mpmEmitPositions({ shape: 'sphere', center: [0, 0, 0], size: [0.5, 0, 0], jitter: 0 }, 0.25, 1)
   assert.ok(ball.length / 3 > 200 && ball.length / 3 < 300) // ≈ π/6 of 512
+})
+
+test('writeHead: ring slot the next emit writes, wrapping at capacity', () => {
+  const s = new MPMSolver({} as any, { ...small, capacity: 8 })
+  assert.equal(s.writeHead, 0)
+  s.emit({ positions: [0, 0, 0] })
+  assert.equal(s.writeHead, 1)
+  s.emit({ positions: new Array(15).fill(0) }) // 5 particles: slots 1…5
+  assert.equal(s.writeHead, 6)
+  s.emit({ positions: new Array(15).fill(0) }) // 5 more: slots 6, 7, 0, 1, 2
+  assert.equal(s.writeHead, 3)
+  assert.equal(s.count, 8)
 })
 
 test('one substep of a lone particle: v += g·dt, C stays 0, x += dt·v (APIC reproduces translation)', () => {

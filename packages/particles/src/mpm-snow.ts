@@ -53,14 +53,18 @@ export const SNOW_PRESETS: Record<'powder' | 'packed' | 'wet', SnowParams> = {
 /** Jp stays in this range (finite and positive; stretched snow at 10 is loose powder). The lower end is also at least density / maxDensity. */
 export const SNOW_JP_RANGE: [number, number] = [0.1, 10]
 
-/** Hardening factor exp(ξ(1 − Jp)), capped at `maxHardening` (at least 1). */
+/**
+ * Hardening factor exp(ξ(1 − Jp)), capped at `maxHardening` (at least 1). ξ (`hardening`) is dimensionless; Jp is the
+ * plastic volume ratio, 1 fresh and 0.1…10 ({@link SNOW_JP_RANGE}), so compaction stiffens and stretch softens.
+ */
 export function snowHardeningGeneric<T>(o: MPMOps<T>, Jp: T, p: Record<keyof SnowParams, T>): T {
   return o.min(o.exp(o.mul(p.hardening, o.sub(o.num(1), Jp))), o.max(p.maxHardening, o.num(1)))
 }
 
 /**
- * Fixed-corotated Kirchhoff stress τ = 2μ(F − R)Fᵀ + λ(J − 1)J·I with R the rotation of F (polar decomposition
- * through the SVD) and μ, λ hardened by Jp. Column-major scalars, on any {@link MPMOps}.
+ * Fixed-corotated Kirchhoff stress τ = 2μ(F − R)Fᵀ + λ(J − 1)J·I, in pascals (units of `youngs`), with R the rotation
+ * of F (polar decomposition through the SVD) and μ, λ hardened by Jp (1 fresh, 0.1…10; ξ dimensionless). Column-major
+ * scalars, on any {@link MPMOps}.
  */
 export function snowStressGeneric<T>(o: MPMOps<T>, F: T[], J: T, Jp: T, p: Record<keyof SnowParams, T>): T[] {
   const { U, V } = svd3Generic(o, F)
@@ -86,10 +90,15 @@ export function snowStressGeneric<T>(o: MPMOps<T>, F: T[], J: T, Jp: T, p: Recor
  * The plastic return mapping: F = U·Σ·Vᵀ, Σ clamped to [1 − θc, 1 + θs], and the plastic volume ratio Jp takes
  * what the clamp removed (Jp ← Jp·det Σ / det Σclamped). Compaction stops at `maxDensity` (Jp ≥ ρ / maxDensity):
  * past it the clamped values are scaled back so Jp lands on that floor and the rest stays elastic (and pushes back),
- * since the hardening cap alone would let impacts crush snow to nothing. Jp also stays at most
- * {@link SNOW_JP_RANGE}`[1]`. On any {@link MPMOps}.
+ * since the hardening cap alone would let impacts crush snow to nothing. Jp also stays within
+ * {@link SNOW_JP_RANGE} (0.1…10). On any {@link MPMOps}.
  */
-export function snowPlasticityGeneric<T>(o: MPMOps<T>, F: T[], Jp: T, p: Record<keyof SnowParams, T>): { F: T[]; Jp: T } {
+export function snowPlasticityGeneric<T>(o: MPMOps<T>, F: T[], Jp: T, p: Record<keyof SnowParams, T>): {
+  /** Clamped deformation gradient F = U·Σclamped·Vᵀ (column-major). */
+  F: T[]
+  /** New plastic volume ratio Jp, 0.1…10 ({@link SNOW_JP_RANGE}). */
+  Jp: T
+} {
   const { U, S, V } = svd3Generic(o, F)
   const lo = o.sub(o.num(1), p.compression), hi = o.add(o.num(1), p.stretch)
   const Sc = S.map((s) => o.v(o.min(o.max(s, lo), hi)))
@@ -200,14 +209,23 @@ export const DEFAULT_SNOW_SURFACE: SnowSurfaceOptions = {
 
 /** The snow shading uniforms {@link snowMaterial} builds on. */
 export interface SnowShading {
+  /** Height of the wind-ripple normal detail, metres (default 0.001; 0 is flat). */
   relief: any
+  /** Share of ~6 mm ice grains that glint, 0…1 (default 0.035; 0 off). */
   glints: any
+  /** Albedo of fresh snow (sRGB colour). */
   color: any
+  /** Albedo of fully compacted snow (sRGB colour). */
   packedColor: any
+  /** Plastic volume ratio Jp at which snow looks fully compacted, 0.1…10 (1 is fresh; default 0.7). */
   packedJp: any
+  /** Roughness of fresh snow, 0…1 (default 0.85). */
   roughness: any
+  /** Roughness of fully compacted snow, 0…1 (default 0.6; smoother, a soft sheen). */
   packedRoughness: any
+  /** Light scattered through the snow, 0…1 (default 0.35; 0 off). */
   translucency: any
+  /** Colour of light that has travelled through snow (sRGB colour; ice absorbs red, so blue-cyan). */
   translucencyColor: any
 }
 

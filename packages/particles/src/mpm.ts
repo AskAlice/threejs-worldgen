@@ -74,6 +74,8 @@ export class MPMSolver {
   readonly buffers: MPMBuffers
   /** Live particles (at most `capacity`; the oldest are overwritten when full). */
   count = 0
+  /** Ring slot the next {@link MPMSolver.emit} writes, 0…`capacity` − 1: the first particle of that emit. */
+  get writeHead(): number { return this.head }
   /** Simulated seconds. */
   time = 0
   /** Substeps of the last {@link MPMSolver.step}. */

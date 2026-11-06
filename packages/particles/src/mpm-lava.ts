@@ -168,7 +168,7 @@ const SKIN_AGE = 312, SKIN_EXPONENT = 0.35
  */
 export const LAVA_GLOW_1400 = 1.1
 /**
- * Skin temperature of a surface exposed for `age` seconds, as a fraction of (T − T_air): 1/(1 + (age/312 s)^0.35), a fit to
+ * Skin temperature of a surface exposed for `age` seconds (≥ 0), as a fraction 0…1 of (T − T_air): 1/(1 + (age/312 s)^0.35), a fit to
  * pāhoehoe surfaces measured by Keszthelyi & Denlinger (1996): ~900 °C after 10 s, ~750 °C after a minute, ~600 °C
  * after five, from 1150 °C. A particle is far thicker than that skin, so its own temperature drives the flow while the
  * drawing glows at the skin's.
@@ -179,7 +179,7 @@ export function lavaSkin(age: number): number {
 
 // ---- CPU curves (the tests check these; the TSL below is the same maths) ----
 
-/** Melt viscosity at `T` kelvin, Pa·s: Arrhenius from `viscosity` at `eruption`, capped at `viscosityMax`. */
+/** Melt viscosity at `T` kelvin, Pa·s (0 < η ≤ `viscosityMax`): Arrhenius from `viscosity` at `eruption`, capped at `viscosityMax`. */
 export function lavaViscosity(T: number, p: LavaParams): number {
   return Math.min(p.viscosityMax, p.viscosity * Math.exp(p.activation * (1 / Math.max(T, MIN_T) - 1 / p.eruption)))
 }
@@ -558,7 +558,7 @@ export class MPMLava {
   emit(spec: MPMEmit, maxFill = 0.7): number {
     const s = this.solver, u = this.uniforms
     this.closeGate()
-    const head = (s as unknown as { head: number }).head // ring slot of the first new particle (MPMSolver's own field)
+    const head = s.writeHead // ring slot of the first new particle
     const p = s.options.materials[this.options.material]
     const k = s.emit({ material: this.options.material, temperature: p.eruption, ...spec })
     if (!k) return 0
