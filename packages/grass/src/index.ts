@@ -4,8 +4,10 @@
  *
  * @module threejs-grass
  */
-export { Grass, createBladeGeometry, createBillboardGeometry } from './grass.ts'
-export type { GrassOptions, GrassInput, GrassSettings, GrassLOD, GrassRenderer, GrassStats, WindOptions, Interactor } from './grass.ts'
+export { Grass } from './grass.ts'
+export type { GrassOptions, GrassRenderer, GrassStats } from './grass.ts'
+export { createBladeGeometry, createBillboardGeometry } from './grass-geometry.ts'
+export type { GrassInput, GrassSettings, GrassLOD, WindOptions, Interactor } from './grass-settings.ts'
 export { MAX_INTERACTORS, createGrassUniforms } from './material.ts'
 export type { GrassUniforms, GrassMapSample } from './material.ts'
 export { GrassMap, TerrainPainter } from './grass-map.ts'

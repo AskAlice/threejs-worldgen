@@ -166,6 +166,11 @@ export default () => (
 
 **Terrain.** A mesh is baked once into a heightfield by CPU rasterisation, which works for any geometry including transformed groups. A height function `(x, z) => y` is called directly, which suits infinite procedural worlds. Grass is skipped where the height is `NaN` (off the mesh) or where the slope exceeds `maxSlope`.
 
+**Terrain refs.** A terrain may be an object, a `{ current }` ref, or a height function. A ref that is empty at
+construction grows on flat ground and is adopted on the first `update()` after its object mounts (tiles rebuild
+there), then dropped again if it unmounts. Vanilla `Grass` and `<Grass>` share this rule: the React component
+passes the ref through instead of re-resolving it, so a late-mounting terrain never recreates the field.
+
 **Grass map.** An optional world-space texture: R controls coverage (thinning), G controls height. Edits are live because the map is sampled on the GPU.
 
 ---
@@ -289,7 +294,9 @@ grass.reset({ preset: 'frostbite' })  // frostbite exactly as designed
 
 #### `grass.setTerrain(terrain?)`
 
-Swaps the terrain (mesh, group or height function) and regenerates all tiles.
+Swaps the terrain (mesh, group, ref to one, or height function) and regenerates all tiles. A ref is resolved
+when it is set and re-resolved on every [`update`](#grassupdatebudgetms), so a terrain that mounts later is
+adopted without another call.
 
 **three.js**
 ```ts
@@ -451,7 +458,7 @@ useEffect(() => { if (grass.current) grass.current.object.visible = false }, [])
 | `camera` | `Camera` | (required; R3F: default camera) | Camera the field follows |
 | `scene` | `Object3D` | | Grass is added to it and auto-updates |
 | `renderer` | `GrassRenderer` | | `WebGPURenderer`; initialised if needed |
-| `terrain` | `Terrain` | flat at y = 0 | Mesh/group or `(x, z) => y` |
+| `terrain` | `Terrain \| ObjectRef<Object3D>` | flat at y = 0 | Mesh/group, ref to one, or `(x, z) => y`; a late ref is adopted on the next update |
 | `preset` | `PresetName` | `'kentuckyBluegrass'` | Starting look |
 | `type` | `'blades' \| 'billboards'` | `'blades'` | Geometric blades or billboard tufts |
 | `tileSize` | `number` | `25` | Tile edge (m) |
@@ -1069,7 +1076,7 @@ interface GrassProps extends GrassInput {
 export { Grass as GrassImpl }  // the imperative class
 ```
 
-- Creates the field on mount (and when `camera`, the renderer or the terrain object changes) and disposes it on unmount.
+- Creates the field on mount (and when `camera`, the renderer or the terrain object changes) and disposes it on unmount. A terrain ref filling in later is adopted by the field's own update, so it does not recreate the field.
 - Every other prop is applied with `grass.reset()` on render, so props are declarative (a removed prop reverts to the preset). This is cheap for visual props, and tiles rebuild only when layout props actually change.
 - Updates every frame through `useFrame`.
 - `ref` receives the `GrassImpl` instance.

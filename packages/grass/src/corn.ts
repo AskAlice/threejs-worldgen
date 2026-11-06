@@ -6,7 +6,8 @@ import { createHeightSampler, type HeightFn, type Terrain } from 'threejs-height
 import { FlattenMap, PLANT_STRIDE, bounds, plantRows, pointInPolygon, type CornField } from './corn-layout.ts'
 import { CORN_MODEL_HEIGHT, createCanopyMaterial, createCornMaterial, createCornUniforms, type CornUniforms } from './corn-material.ts'
 import { findSun, resolveObject, resolveTerrain, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
-import type { GrassRenderer, Interactor, ObjectRef, WindOptions } from './grass.ts'
+import type { Interactor, ObjectRef, WindOptions } from './grass-settings.ts'
+import type { GrassRenderer } from './grass.ts'
 import { hash2 } from './random.ts'
 
 /** One of the four levels of detail of a {@link Corn} field. Density is interpolated between consecutive levels. */

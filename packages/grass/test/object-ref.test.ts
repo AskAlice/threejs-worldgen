@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Object3D } from 'three/webgpu'
-import { resolveObject } from '../src/grass.ts'
+import { resolveObject } from '../src/grass-scene.ts'
 
 // The one resolver both entry points use for terrain and interactors.
 

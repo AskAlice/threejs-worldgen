@@ -29,7 +29,10 @@ export interface WindOptions {
 }
 
 /** An object, or a React-style ref to one (`current` is `null` until mounted). */
-export type ObjectRef<T extends Object3D = Object3D> = T | { current: T | null }
+export type ObjectRef<T extends Object3D = Object3D> = T | {
+  /** The object, or `null` while it is not mounted. */
+  current: T | null
+}
 
 /** Something that pushes grass aside: characters, vehicles, balls… */
 export interface Interactor {

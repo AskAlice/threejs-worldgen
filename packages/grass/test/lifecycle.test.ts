@@ -1,7 +1,8 @@
 import { test, mock, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { Mesh, Object3D, PerspectiveCamera, type MeshPhysicalNodeMaterial, type InstancedBufferGeometry } from 'three/webgpu'
-import type { Grass as GrassType, GrassLOD } from '../src/grass.ts'
+import type { Grass as GrassType } from '../src/grass.ts'
+import type { GrassLOD } from '../src/grass-settings.ts'
 import type { GrassMap as GrassMapType } from '../src/grass-map.ts'
 
 const { Grass } = (await import('../src/grass.ts')) as { Grass: typeof GrassType }

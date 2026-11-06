@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Object3D, PerspectiveCamera } from 'three/webgpu'
+import { Mesh, Object3D, PerspectiveCamera, Scene } from 'three/webgpu'
 import { Corn, FlattenMap, PLANT_STRIDE, createCanopyGeometry, createCornGeometry, plantRows, pointInPolygon, type CornField } from '../src/index.ts'
 
 // An L-shaped (concave) field with rows at 30°.
@@ -141,4 +141,64 @@ test('geometry: plant model levels of detail and the canopy surface', () => {
     topArea += Math.abs(ux * vz - uz * vx) / 2
   }
   assert.ok(Math.abs(topArea - (40 * 15 + 15 * 25)) < 1, `canopy area ${topArea}`)
+})
+
+test('corn: two fields on one scene update independently, disposing one leaves the other running', () => {
+  const scene = new Scene()
+  const camera = new PerspectiveCamera()
+  const a = new Corn({ camera, scene, fields: [L] })
+  const b = new Corn({ camera, scene, fields: [L] })
+  let ca = 0
+  let cb = 0
+  a.update = () => { ca++ }
+  b.update = () => { cb++ }
+  const render = () => scene.onBeforeRender(null as never, scene, camera, null as never, null as never, null as never)
+
+  render()
+  assert.deepEqual([ca, cb], [1, 1])
+  a.dispose()
+  render()
+  assert.deepEqual([ca, cb], [1, 2], 'B keeps updating and A never runs again')
+  b.dispose()
+  render()
+  assert.deepEqual([ca, cb], [1, 2])
+})
+
+test('corn: chunk planting is deterministic from the seed', () => {
+  const camera = new PerspectiveCamera()
+  camera.position.set(10, 2, 10)
+  const plant = (seed: number) => {
+    const corn = new Corn({ camera, fields: [L], seed })
+    corn.update(Infinity)
+    const offsets: number[] = []
+    for (const child of corn.object.children) {
+      const attribute = (child as Mesh).geometry.getAttribute?.('aOffset')
+      if (attribute) offsets.push(...Array.from((attribute.array as Float32Array).subarray(0, attribute.count * 4)))
+    }
+    const plants = corn.stats.plants
+    corn.dispose()
+    return { offsets, plants }
+  }
+  const a = plant(3)
+  const b = plant(3)
+  assert.ok(a.plants > 0)
+  assert.equal(b.plants, a.plants)
+  assert.deepEqual(b.offsets, a.offsets, 'the same seed plants the same chunk contents')
+  assert.notDeepEqual(plant(4).offsets, a.offsets, 'a different seed plants a different layout')
+})
+
+test('corn: an interactor given as a ref (a React ref to the tractor) flattens once it mounts', () => {
+  const tractor = new Object3D()
+  tractor.position.set(10, 0.5, 10)
+  const ref: { current: Object3D | null } = { current: null }
+  const camera = new PerspectiveCamera()
+  camera.position.set(10, 2, 0)
+  const corn = new Corn({ camera, fields: [L], interactors: [{ object: ref, radius: 1.2 }] })
+  corn.update(Infinity)
+  assert.equal(corn.flattened(10, 10), 0, 'an unmounted ref flattens nothing')
+  ref.current = tractor
+  corn.update(0)
+  assert.equal(corn.flattened(10, 10), 1, 'the mounted tractor flattens its radius')
+  assert.equal(corn.flattened(10 + 1.2 + corn.flattenMap.texel, 10), 0)
+  corn.dispose()
 })

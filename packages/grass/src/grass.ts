@@ -14,10 +14,6 @@ import { TileStream } from './grass-tiles.ts'
 import { Retirement } from './retirement.ts'
 import { findSun, resolveTerrain, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
 
-export { createBillboardGeometry, createBladeGeometry } from './grass-geometry.ts'
-export { findSun, resolveObject, writeInteractors, writeSun } from './grass-scene.ts'
-export type { GrassInput, GrassLOD, GrassSettings, Interactor, ObjectRef, WindOptions } from './grass-settings.ts'
-
 /** Minimal renderer shape Grass needs. Pass a `WebGPURenderer` from `three/webgpu`. */
 export interface GrassRenderer {
   /** `true` on `WebGPURenderer`; anything else is rejected. */
