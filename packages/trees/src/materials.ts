@@ -101,10 +101,14 @@ function weatherOf(o: MaterialOptions): Weather {
   return { wetness: w.wetness ?? u.wetness, snow: w.snow ?? u.snow, burn: w.burn ?? u.burn, damage: w.damage ?? u.damage }
 }
 
-/** TSL: albedo and roughness after wetness and snow (snow settles where `normal`, world space, faces up). */
-function weathered(albedo: any, roughness: number, w: Weather, normal: any = normalWorld) {
+/**
+ * TSL: albedo and roughness after wetness and snow (snow settles where `normal`, world space, faces up). `grain` breaks
+ * up the snow line; it defaults to world-position noise, and an impostor passes a per-instance value instead, because
+ * its camera-facing quad has no surface of its own to sample.
+ */
+function weathered(albedo: any, roughness: number, w: Weather, normal: any = normalWorld, grain: any = mx_noise_float(positionWorld.mul(1.7)).mul(0.25)) {
   const wet = albedo.mul(mix(float(1), float(0.55), w.wetness))
-  const up = normal.y.add(mx_noise_float(positionWorld.mul(1.7)).mul(0.25))
+  const up = normal.y.add(grain)
   const cover = smoothstep(0.15, 0.7, up).mul(w.snow).add(w.snow.mul(w.snow).mul(0.3)).clamp(0, 1)
   return {
     color: mix(wet, vec3(0.9, 0.93, 0.97), cover),
@@ -128,9 +132,9 @@ function instanceRandoms() {
 }
 
 /** TSL: per-instance hue / saturation shift (`hueVariation`, `saturationVariation`), scaled by `amount`. */
-function varied(color: any, p: TreeParams, amount = 1): any {
+function varied(color: any, p: TreeParams, amount: any = 1): any {
   const r = instanceRandoms()
-  return saturation(hue(color, r.a.sub(0.5).mul(2 * p.hueVariation * amount)), r.b.sub(0.5).mul(2 * p.saturationVariation * amount).add(1))
+  return saturation(hue(color, r.a.sub(0.5).mul(2 * p.hueVariation).mul(amount)), r.b.sub(0.5).mul(2 * p.saturationVariation).mul(amount).add(1))
 }
 
 /**
@@ -312,32 +316,65 @@ export function createRockMaterial(options: MaterialOptions = {}): MeshStandardN
   return m
 }
 
-/** `bakeImpostor` mask for {@link applyImpostorWeather}: a leaf card's `cardRandom` (≥ 0.01) on foliage, 0 elsewhere. */
+/**
+ * `bakeImpostor` mask for {@link applyImpostorWeather}. One 8-bit channel carries two things: foliage pixels get
+ * `0.52 + cardRandom · 0.47` (0.52..0.99), and bark gets `cardRandom · 0.49 + 0.005` (0.005..0.495), so `damage` can
+ * break branches per pixel the way the bark material drops them on the mesh. A trunk's `cardRandom` is negative
+ * (never removed) and bakes as 0. Rocks (no cards) bake as 0 too.
+ */
 export function impostorFoliageMask(foliage: boolean): Node<'float'> | number {
-  return foliage ? (attribute('cardRandom', 'float').clamp(0, 1).mul(0.99).add(0.01) as any) : 0
+  const card = attribute('cardRandom', 'float')
+  if (foliage) return card.clamp(0, 1).mul(0.47).add(0.52) as any
+  return select(card.lessThan(0), float(0), card.mul(0.49).add(0.005)) as any
+}
+
+/** Options of {@link applyImpostorWeather}: the material's weather inputs and the tree it was baked from. */
+export interface ImpostorWeatherOptions extends MaterialOptions {
+  /** The impostor is a rock (no foliage, no branches, no per-instance tree colour). */
+  rock?: boolean
+  /** The tree params of the baked variant: per-instance hue / saturation and crown thinning. */
+  params?: Partial<TreeParams>
+  /** Leaf back-light strength, as on `createLeafMaterial`. */
+  translucency?: number
 }
 
 /**
  * Applies the same weather as the mesh materials to a baked impostor's material (threejs-scatter `bakeImpostor`),
- * in the same order: instance tint, then burn, then wetness and snow, from the same `treeUniforms` (or `weather`
- * inputs), so nothing pops at the mesh-to-impostor switch. Snow settles by the baked normal; with a foliage mask
- * ({@link impostorFoliageMask}) burn scorches leaves and chars bark separately, and burn and damage drop leaf cards.
- * Bake with clear weather. Bark branches broken by `damage` stay on the impostor.
+ * in the same order: per-instance hue / saturation and brightness tint, then burn, then wetness and snow, from the
+ * same `treeUniforms` (or `weather` inputs), so nothing pops at the mesh-to-impostor switch. Everything per instance
+ * (the colour shift, the crown thinning, the snow noise) is read from `scatterParams`, because the bake has no
+ * instances to vary. Snow settles by the baked normal; with a foliage mask ({@link impostorFoliageMask}) burn scorches
+ * leaves and chars bark separately, burn and damage drop leaf cards, and damage breaks branches. Bake with clear
+ * weather. The back-lit glow uses the tinted colour, which the mesh keeps untinted.
  */
-export function applyImpostorWeather(material: MeshStandardNodeMaterial, surface: ImpostorSurface, options: MaterialOptions & { rock?: boolean } = {}): void {
+export function applyImpostorWeather(material: MeshStandardNodeMaterial, surface: ImpostorSurface, options: ImpostorWeatherOptions = {}): void {
+  const p = { ...DEFAULT_TREE_PARAMS, ...options.params }
   const w = weatherOf(options)
   const s = surface as Record<keyof ImpostorSurface, any>
+  const r = instanceRandoms()
   let color: any
+  let glow: any = float(0)
+  let foliage: any = float(0)
   let alpha: any = s.alpha
   if (options.rock) color = s.color.mul(float(1).sub(w.burn.mul(0.75)))
   else {
-    const foliage = step(0.005, s.mask)
+    const card = fract(s.mask.add(r.c.mul(7.13)))
+    foliage = step(0.5, s.mask)
+    const branch = step(0.002, s.mask).mul(step(s.mask, 0.497))
+    const shade = varied(s.color, p, mix(float(GREEN.includes(p.kind) ? 1 : 0.3), float(1), foliage))
     // Bark chars along its furrows (~0.5 on average, see the bark material).
-    color = mix(mix(s.color, CHAR, smoothstep(0.2, 0.6, w.burn.mul(1.4))), scorched(s.color, w), foliage)
-    const gone = foliage.mul(step(fract(s.mask.add(instanceRandoms().c.mul(7.13))), leafLoss(w)))
+    color = mix(mix(shade, CHAR, smoothstep(0.2, 0.6, w.burn.mul(1.4))), scorched(shade, w), foliage)
+    const thin = min(r.b.mul(p.densityVariation).add(leafLoss(w)), 1.01)
+    const gone = max(foliage.mul(step(card, thin)), branch.mul(step(card, w.damage.mul(0.45))))
     alpha = select(gone.greaterThan(0.5), float(0), alpha)
+    glow = scorched(shade, w)
   }
-  const look = weathered(color, 0.85, w, s.normal)
+  // The quad is camera-facing, so world-position noise would paint the snow line onto the quad instead of the tree.
+  const look = weathered(color, 0.85, w, s.normal, r.b.sub(0.5).mul(0.5))
   material.colorNode = vec4(look.color, alpha)
   material.roughnessNode = look.roughness
+  if (!options.rock) {
+    const back = pow(max(dot(normalize(cameraPosition.sub(positionWorld)), treeUniforms.sunDirection.negate()), 0), 3)
+    material.emissiveNode = glow.mul(treeUniforms.sunColor).mul(back.mul(options.translucency ?? 0.5).mul(0.5)).mul(float(1).sub(w.burn)).mul(foliage)
+  }
 }

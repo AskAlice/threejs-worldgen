@@ -152,6 +152,10 @@ instance.
 | `burn` | Bark chars along the furrows first; leaves scorch brown then black and drop out; fruit darkens; rock gets soot. |
 | `damage` | Side branches break off and leaf mass and fruit thin out (whole cards / branches collapse in the vertex shader, no alpha cost). No effect on rock. |
 
+Far LODs match: the baked impostor is re-shaded with the same inputs (per-instance hue, saturation and brightness, burn,
+wetness, snow by the baked normal, leaf loss, broken branches per pixel, leaf back-light), so nothing pops at the
+mesh-to-impostor switch.
+
 Imports from `three/webgpu` (WebGPURenderer; falls back to WebGL2 by itself). Full API docs:
 <https://askalice.github.io/threejs-worldgen/docs/>.
 

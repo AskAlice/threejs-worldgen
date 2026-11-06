@@ -119,7 +119,7 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
         treeUniforms.windStrength.value = 0
         try {
           const baked = await bakeImpostor(options.renderer, group, { size: 512, ...options.impostor }, (m) => impostorFoliageMask(foliage.has(m)))
-          applyImpostorWeather(baked.material, baked.surface, { ...mo, rock: isRock })
+          applyImpostorWeather(baked.material, baked.surface, { ...mo, rock: isRock, params: tree })
           impostor = { distance: farD * k, geometry: baked.geometry, material: baked.material, castShadow: false }
         } finally {
           treeUniforms.windStrength.value = wind

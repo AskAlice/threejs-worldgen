@@ -16,7 +16,7 @@ export type { RockName, RockParams } from './rock.ts'
 export {
   applyImpostorWeather, createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, getLeafTexture, impostorFoliageMask, setTreeEnvironment, treeUniforms,
 } from './materials.ts'
-export type { LeafMaterialOptions, MaterialOptions, TreeEnvironment, WeatherInputs } from './materials.ts'
+export type { ImpostorWeatherOptions, LeafMaterialOptions, MaterialOptions, TreeEnvironment, WeatherInputs } from './materials.ts'
 export { drawLeafImage } from './leaf-texture.ts'
 export type { LeafImage } from './leaf-texture.ts'
 export { createVegetationLayers, mergeTreeGeometry } from './layers.ts'

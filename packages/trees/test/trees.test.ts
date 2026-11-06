@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { MeshStandardNodeMaterial, type BufferGeometry, type Node } from 'three/webgpu'
-import { float, vec3 } from 'three/tsl'
+import { float, positionWorld, vec3 } from 'three/tsl'
 import { mulberry32 } from 'threejs-scatter'
 import { BIOMES } from 'threejs-biomes'
 import {
-  applyImpostorWeather, createVegetationLayers, drawLeafImage, generateRock, generateTree, generateTreeLevels, growSkeleton, rocks, species, treeUniforms, type SpeciesName,
+  applyImpostorWeather, createVegetationLayers, drawLeafImage, generateRock, generateTree, generateTreeLevels, growSkeleton, impostorFoliageMask, rocks, species, treeUniforms, type SpeciesName,
 } from '../src/index.ts'
 
 const NAMES: SpeciesName[] = [
@@ -156,18 +156,24 @@ test('every biome scatter table entry (threejs-biomes BIOMES) is a species or ro
   for (const name of names) assert.ok(name in species || name in rocks, `${name} has a preset`)
 })
 
-/** Whether `target` is anywhere in the TSL graph under `node`. */
-function dependsOn(node: unknown, target: unknown): boolean {
+/** Every node in the TSL graph under `root`. */
+function nodes(root: unknown): Node[] {
   const seen = new Set<unknown>()
-  const stack = [node as Node]
+  const out: Node[] = []
+  const stack = [root as Node]
   while (stack.length) {
     const n = stack.pop()!
-    if (n === target) return true
     if (!n || seen.has(n)) continue
     seen.add(n)
+    out.push(n)
     for (const c of n.getChildren()) stack.push(c as Node)
   }
-  return false
+  return out
+}
+
+/** Whether `target` is anywhere in the TSL graph under `node`. */
+function dependsOn(node: unknown, target: unknown): boolean {
+  return nodes(node).includes(target as Node)
 }
 
 test('impostors get the same weather as the mesh LODs: snow by the baked normal, wet, burn, damage leaf loss', () => {
@@ -186,4 +192,27 @@ test('impostors get the same weather as the mesh LODs: snow by the baked normal,
   applyImpostorWeather(own, surface, { weather: { snow }, rock: true })
   assert.ok(dependsOn(own.colorNode, snow) && !dependsOn(own.colorNode, u.snow), 'per-material weather inputs win, like on the meshes')
   assert.ok(!dependsOn(own.colorNode, surface.mask), 'rocks have no foliage')
+})
+
+test('impostor parity: per-instance colour and thinning, leaf back-light, per-instance snow, damage', () => {
+  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5), roughness: float(0.6) }
+  const m = new MeshStandardNodeMaterial()
+  const params = { hueVariation: 0.123, saturationVariation: 0.321, densityVariation: 0.456 }
+  applyImpostorWeather(m, surface, { params })
+  // The bake has no instances, so the variant's own variation is folded in at shade time, from the same per-instance
+  // random the meshes read.
+  const constants = nodes(m.colorNode).filter((n) => (n as any).constructor.name === 'ConstNode').map((n) => (n as any).value)
+  assert.ok(constants.includes(2 * params.hueVariation) && constants.includes(2 * params.saturationVariation), 'per-instance hue / saturation')
+  assert.ok(constants.includes(params.densityVariation), 'densityVariation joins the leaf loss, as on the meshes')
+  assert.ok(!dependsOn(m.colorNode, positionWorld), 'the snow noise is per instance, not painted onto the camera-facing quad')
+  // The leaf material's emissive translucency: glow towards the sun, from the leaf colour, killed by burn.
+  assert.ok(dependsOn(m.emissiveNode, treeUniforms.sunDirection) && dependsOn(m.emissiveNode, treeUniforms.sunColor), 'back-light towards the sun')
+  assert.ok(dependsOn(m.emissiveNode, surface.color) && dependsOn(m.emissiveNode, treeUniforms.burn), 'glow from the leaf colour, no glow when burnt')
+  // Damage breaks branches per pixel as well as dropping leaves, so a damaged tree reads damaged at distance.
+  assert.ok(dependsOn(m.colorNode, treeUniforms.damage) && dependsOn(m.colorNode, surface.mask), 'damage drops leaves and branches')
+  assert.ok(typeof impostorFoliageMask(false) !== 'number', 'bark bakes its card random, so damage can break branches')
+
+  const rock = new MeshStandardNodeMaterial()
+  applyImpostorWeather(rock, surface, { rock: true })
+  assert.ok(!rock.emissiveNode, 'rocks do not glow')
 })
