@@ -44,6 +44,12 @@ export interface ChunkData {
   center: Vec3
   /** Vertex positions relative to `center` (xyz). Skirt vertices follow the grid. */
   positions: Float32Array
+  /**
+   * Per-vertex offset (xyz, metres) from `positions` to where the same vertex sits on the parent
+   * (one level coarser) surface. The terrain material blends towards it at distance, so a level swap
+   * morphs instead of snapping. Zero at level 0 and on every vertex the parent grid also samples.
+   */
+  morph: Float32Array
   /** Vertex normals (xyz). */
   normals: Float32Array
   /** Ground colour (rgb, sRGB 0…1). */
@@ -266,8 +272,27 @@ export function buildChunk(world: World, key: ChunkKey, settings: ChunkSettings)
     biomeColors[vi * 3] = srgbToLinear(br); biomeColors[vi * 3 + 1] = srgbToLinear(bg); biomeColors[vi * 3 + 2] = srgbToLinear(bb)
   }
 
-  // Skirt vertices: copies of the border pushed down (towards the planet centre on spheres).
-  const depth = size * settings.skirt + 1
+  // Geomorph target: the parent level's triangulated surface. Both levels sample the same world function,
+  // so every even grid vertex already sits on the parent grid; an odd vertex sits on a parent edge (or on
+  // the shared diagonal of a parent quad) and morphs to that midpoint. A root has no parent, so it keeps
+  // its own surface.
+  const morph = new Float32Array(total * 3)
+  const gp = (i: number, j: number) => ((j + 1) * g + (i + 1)) * 3
+  if (key.level > 0) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    if ((i & 1) === 0 && (j & 1) === 0) continue
+    let a: number, b: number
+    if (i & 1) { a = gp(i - 1, j & 1 ? j + 1 : j); b = gp(i + 1, j & 1 ? j - 1 : j) }
+    else { a = gp(i, j - 1); b = gp(i, j + 1) }
+    const vi = j * n + i, gi = gp(i, j)
+    for (let k = 0; k < 3; k++) morph[vi * 3 + k] = (pos[a + k] + pos[b + k]) * 0.5 - pos[gi + k]
+  }
+
+  // Skirt vertices: copies of the border pushed down (towards the planet centre on spheres). The depth is
+  // the requested fraction, but never less than this chunk's own deviation from its parent level: a finer
+  // neighbour's crack against this edge is at most a quarter of that, so level seams stay hidden.
+  let seam = 0
+  for (const vi of border) seam = Math.max(seam, Math.hypot(morph[vi * 3], morph[vi * 3 + 1], morph[vi * 3 + 2]))
+  const depth = settings.skirt > 0 ? Math.max(size * settings.skirt, seam) + 1 : 0
   border.forEach((vi, k) => {
     const si = n * n + k
     const gi = ((Math.floor(vi / n) + 1) * g + ((vi % n) + 1)) * 3
@@ -276,13 +301,14 @@ export function buildChunk(world: World, key: ChunkKey, settings: ChunkSettings)
     positions[si * 3 + 1] = positions[vi * 3 + 1] - uy * depth
     positions[si * 3 + 2] = positions[vi * 3 + 2] - uz * depth
     normals.copyWithin(si * 3, vi * 3, vi * 3 + 3)
+    morph.copyWithin(si * 3, vi * 3, vi * 3 + 3)
     colors.copyWithin(si * 3, vi * 3, vi * 3 + 3)
     climate.copyWithin(si * 4, vi * 4, vi * 4 + 4)
     biomeColors.copyWithin(si * 3, vi * 3, vi * 3 + 3)
   })
 
   return {
-    key, version: world.version, center, positions, normals, colors, climate, biomeColors,
+    key, version: world.version, center, positions, morph, normals, colors, climate, biomeColors,
     index: chunkIndex(n, sphere ? FLIP[key.face] : false),
     minElevation: minE, maxElevation: maxE, radius: radius + depth, size,
   }

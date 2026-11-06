@@ -1,6 +1,6 @@
-import { BufferAttribute, BufferGeometry, Group, Mesh, Sphere, Vector3, type Camera, type MeshStandardNodeMaterial, type Object3D } from 'three/webgpu'
+import { BufferAttribute, BufferGeometry, Group, Mesh, Sphere, Vector2, Vector3, type Camera, type MeshStandardNodeMaterial, type Object3D } from 'three/webgpu'
 import { buildChunk, chunkId, chunkIndex, type ChunkData, type ChunkKey, type ChunkSettings } from './chunk.ts'
-import { selectChunks, type ChunkBounds, type LodSettings } from './lod.ts'
+import { selectChunks, type ChunkBounds, type LodHistory, type LodSettings } from './lod.ts'
 import { createTerrainMaterial, DEFAULT_TERRAIN_MATERIAL, type TerrainMaterialOptions, type TerrainUniforms } from './terrain-material.ts'
 import type { Vec3 } from './noise.ts'
 import type { World, WorldRegion } from './world.ts'
@@ -35,6 +35,7 @@ export const DEFAULT_TERRAIN: TerrainOptions = {
   rootSize: 4096,
   skirt: 0.03,
   lodFactor: 2,
+  lodMargin: 0.1,
   minChunkSize: 1,
   viewDistance: 24_000,
   buildBudget: 6,
@@ -94,8 +95,9 @@ const DETAIL_PERIOD = 4096
  * Streaming level-of-detail terrain for a {@link World}: a grid of quadtrees on flat worlds, a cube-sphere
  * of quadtrees on planets. Chunks split as the camera approaches (down to `minChunkSize`), build in Web
  * Workers or within a main-thread budget, never leave holes while they swap, and rebuild only the
- * region a world change touched. Geometry is stored relative to each chunk's centre and placed relative
- * to a floating `origin`, so it stays precise from orbit to ant scale.
+ * region a world change touched. Levels morph into each other over a distance band (no geometric pop) and
+ * skirts hide the cracks between neighbouring levels. Geometry is stored relative to each chunk's centre
+ * and placed relative to a floating `origin`, so it stays precise from orbit to ant scale.
  *
  * @example
  * ```ts
@@ -122,6 +124,7 @@ export class WorldTerrain {
 
   private entries = new Map<string, Entry>()
   private frame = 0
+  private lodHistory: LodHistory = { split: new Set() }
   private workers: Worker[] = []
   private jobs = new Map<number, Entry>()
   private nextJob = 1
@@ -203,7 +206,11 @@ export class WorldTerrain {
     if (this.material.wireframe !== m.wireframe) { this.material.wireframe = m.wireframe; this.material.needsUpdate = true }
     if (before.resolution !== o.resolution || before.rootSize !== o.rootSize || before.skirt !== o.skirt) this.clear()
     if (before.origin.join() !== o.origin.join()) this.placeMeshes()
-    for (const e of this.entries.values()) if (e.mesh) { e.mesh.castShadow = o.castShadow; e.mesh.receiveShadow = o.receiveShadow }
+    for (const e of this.entries.values()) if (e.mesh) {
+      e.mesh.castShadow = o.castShadow
+      e.mesh.receiveShadow = o.receiveShadow
+      if (e.data) (e.mesh.userData.morphRange as Vector2).set(...morphBand(o.lodFactor, o.lodMargin ?? 0.1, e.data.size))
+    }
     return this
   }
 
@@ -226,7 +233,7 @@ export class WorldTerrain {
       const d = this.entries.get(chunkId(k))?.data
       return d ? { center: d.center, radius: d.radius, maxElevation: d.maxElevation } : undefined
     }
-    const { show, need } = selectChunks(this.world, cam, o, bounds, maxElevation)
+    const { show, need } = selectChunks(this.world, cam, o, bounds, maxElevation, this.lodHistory)
 
     // Stale chunks keep drawing until their rebuild lands; queue them behind missing ones.
     const queue = need.map((k) => this.entry(k))
@@ -359,6 +366,7 @@ export class WorldTerrain {
     if (clearStale) e.stale = false
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', new BufferAttribute(data.positions, 3))
+    geometry.setAttribute('morphPosition', new BufferAttribute(data.morph, 3))
     geometry.setAttribute('normal', new BufferAttribute(data.normals, 3))
     geometry.setAttribute('color', new BufferAttribute(data.colors, 3))
     geometry.setAttribute('climate', new BufferAttribute(data.climate, 4))
@@ -373,6 +381,7 @@ export class WorldTerrain {
     mesh.matrixAutoUpdate = true
     mesh.userData.level = e.key.level
     mesh.userData.detailOffset = new Vector3(mod(data.center[0], DETAIL_PERIOD), mod(data.center[1], DETAIL_PERIOD), mod(data.center[2], DETAIL_PERIOD))
+    mesh.userData.morphRange = new Vector2(...morphBand(this.options.lodFactor, this.options.lodMargin ?? 0.1, data.size))
     mesh.visible = old?.visible ?? false
     this.place(mesh, data)
     e.mesh = mesh
@@ -433,6 +442,20 @@ export class WorldTerrain {
 
 function mod(x: number, p: number): number {
   return ((x % p) + p) % p
+}
+
+/**
+ * Geomorph band `[near, far]` for a chunk, metres, per vertex. Fully fine by the moment this chunk splits
+ * (its split distance plus its own reach, so even its far border is refined) and fully on its parent level by
+ * the moment the parent split (the parent's split distance less the parent's reach, i.e. the nearest child
+ * vertex), so neither a split nor a merge snaps.
+ */
+function morphBand(lodFactor: number, margin: number, size: number): [number, number] {
+  const split = size * (lodFactor * (1 - margin) + 0.5)
+  const near = split + size * 0.71
+  // Clamped so a small lodFactor still gets a band instead of an inverted one.
+  const far = Math.max(near * 1.05, split * 2 - size * 1.42)
+  return [near, far]
 }
 
 function resolve(input: TerrainInput): TerrainOptions {

@@ -26,7 +26,7 @@ function handle(msg: { type: string; options?: World['options']; version?: numbe
     // The index buffer is cached per resolution on both sides; send only whether it is flipped.
     const out = { ...data, index: isFlipped(data.index) }
     ;(self as unknown as Worker).postMessage({ type: 'built', id: msg.id, worker: msg.worker, data: out }, [
-      data.positions.buffer, data.normals.buffer, data.colors.buffer, data.climate.buffer, data.biomeColors.buffer,
+      data.positions.buffer, data.morph.buffer, data.normals.buffer, data.colors.buffer, data.climate.buffer, data.biomeColors.buffer,
     ])
   }
 }

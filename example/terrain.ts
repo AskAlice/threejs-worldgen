@@ -10,12 +10,13 @@ const params = new URLSearchParams(location.search)
 const planet = params.get('surface') !== 'plane'
 
 const renderer = new THREE.WebGPURenderer({ antialias: true, reversedDepthBuffer: true, forceWebGL: params.has('webgl') })
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
-renderer.setSize(innerWidth, innerHeight)
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 0.9
 document.body.appendChild(renderer.domElement)
 await renderer.init()
+// Size after init, so the first presented frame is already at the final resolution.
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
+renderer.setSize(innerWidth, innerHeight)
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1e7)
@@ -40,7 +41,7 @@ scene.fog = new THREE.FogExp2(skyDay.getHex(), 0)
 // Scene readback for the water (depth, view-space normals, colour). Half resolution: the pass draws
 // the visible terrain once more at a quarter of the pixels.
 const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 })
-const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#7fa8d4', horizonColor: '#cfe0ee', prepass })
+const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#9ec3e6', horizonColor: '#dfeaf2', scatterColor: '#0b3247', prepass })
 
 Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean, prepass })
 
@@ -69,7 +70,7 @@ const gui = createPanel([
       },
       {
         name: 'WorldTerrain', target: terrainOptions, onChange: (path, value) => terrain.set(patch(path, value)),
-        ranges: { resolution: [9, 65, 8], lodFactor: [0.5, 6, 0.1], minChunkSize: [0.25, 64, 0.25], viewDistance: [1000, 100_000, 500], buildBudget: [1, 30, 1], skirt: [0, 0.2, 0.005] },
+        ranges: { resolution: [9, 65, 8], lodFactor: [0.5, 6, 0.1], lodMargin: [0, 0.4, 0.01], minChunkSize: [0.25, 64, 0.25], viewDistance: [1000, 100_000, 500], buildBudget: [1, 30, 1], skirt: [0, 0.2, 0.005] },
         choices: { debug: ['none', 'biomes', 'lod', 'splat'] },
         skip: ['jobsPerWorker', 'keepAlive'],
       },
@@ -120,10 +121,12 @@ renderer.setAnimationLoop(() => {
   world.sampleAt(f[0], f[1], f[2], sample)
   const biome = world.options.biomes[sample.biomes[0]].name
   const s = terrain.stats
+  const sea = ocean.waterAt(0, 0, 0) // render-space zero is the focus, so this is the sea under it
   const fmt = (m: number) => (m < 1 ? `${(m * 100).toFixed(1)} cm` : m < 1000 ? `${m.toFixed(1)} m` : `${(m / 1000).toFixed(2)} km`)
   hud.textContent = `${fps.toFixed(0)} fps · camera ${fmt(controls.distance)} from focus, ${fmt(alt)} above ground
 ${biome} · ${sample.temperature.toFixed(1)} °C · moisture ${sample.moisture.toFixed(2)} · elevation ${sample.elevation.toFixed(1)} m
-chunks ${s.visible} drawn / ${s.cached} cached · ${s.building} building · ${s.queued} queued · depth ${s.deepest} · ${(s.triangles / 1e6).toFixed(2)} M tris`
+chunks ${s.visible} drawn / ${s.cached} cached · ${s.building} building · ${s.queued} queued · depth ${s.deepest} · ${(s.triangles / 1e6).toFixed(2)} M tris
+sea ${sea.depth >= 0 ? `${fmt(sea.depth)} deep` : `${fmt(-sea.depth)} above the waterline`} at the focus · camera ${fmt(ocean.stats.altitude)} above sea level`
 
   // Map overlay around the focus (redrawn when the focus moves far or settings change).
   const moved = Math.hypot(f[0] - lastMapFocus[0], f[1] - lastMapFocus[1], f[2] - lastMapFocus[2]) > ui.mapSize * 0.05

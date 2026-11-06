@@ -98,9 +98,19 @@ biome can shape the ground: dunes, mesa terraces, tundra hummocks, flattened wet
 
 ## Terrain options
 
-`resolution 33` (vertices per chunk side) · `rootSize 4096` · `lodFactor 2` · `minChunkSize 1` (use `0.25` for ants) ·
-`viewDistance 24000` · `skirt 0.03` · `buildBudget 6` ms · `castShadow` · `receiveShadow` · `origin` ·
+`resolution 33` (vertices per chunk side) · `rootSize 4096` · `lodFactor 2` · `lodMargin 0.1` (hysteresis) ·
+`minChunkSize 1` (use `0.25` for ants) · `viewDistance 24000` · `skirt 0.03` · `buildBudget 6` ms ·
+`castShadow` · `receiveShadow` · `origin` ·
 `material: { debug: 'none' | 'biomes' | 'lod' | 'splat', detail, detailScale, detailDistance, bump, brightness, saturation, wireframe }`.
+
+Levels swap without a pop: a chunk morphs from its parent level's surface to its own over the last stretch of
+its range (`ChunkData.morph` drives it in the shader), the split distance carries `lodMargin` hysteresis so a
+boundary does not oscillate, and each chunk's skirt hangs at least as deep as the largest crack a finer
+neighbouring level can open.
+
+Every level samples the same unfiltered world, so a level change only alters tessellation: elevation, biome
+weights, rivers and vertex colours stay identical at shared world positions. A 33² level-0 chunk at full
+detail takes about 20 ms to build on a 60 km planet, so build chunks in workers.
 
 ## License
 

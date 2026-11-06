@@ -1,4 +1,4 @@
-import { chunkSize, cubeToSphere, type ChunkKey } from './chunk.ts'
+import { chunkId, chunkSize, cubeToSphere, type ChunkKey } from './chunk.ts'
 import type { Vec3 } from './noise.ts'
 import type { World } from './world.ts'
 
@@ -12,6 +12,12 @@ export interface LodSettings {
   minChunkSize: number
   /** Flat worlds: terrain is drawn out to this distance from the camera, metres. Planets cull by the horizon. */
   viewDistance: number
+  /**
+   * Hysteresis as a fraction of the split distance: a chunk splits only once the camera is `lodFactor ×
+   * (1 − lodMargin)` away, and merges only past `lodFactor × (1 + lodMargin)`, so a boundary crossed does not
+   * oscillate. Needs {@link LodHistory}. Default 0.1.
+   */
+  lodMargin?: number
 }
 
 /** What the renderer knows about a built chunk, for culling and distance tests. */
@@ -30,6 +36,15 @@ export interface ChunkSelection {
   show: ChunkKey[]
   /** Chunks to build, most urgent first. */
   need: ChunkKey[]
+}
+
+/**
+ * Previous frame's decisions, for {@link selectChunks}'s hysteresis. Pass the same object every frame;
+ * the function replaces `split` with its new set.
+ */
+export interface LodHistory {
+  /** Ids of the chunks that were split (their children chosen) last frame. */
+  split: Set<string>
 }
 
 /** Deepest quadtree level for these settings. */
@@ -55,13 +70,17 @@ export function children(k: ChunkKey): ChunkKey[] {
  *
  * @param bounds Returns bounds for built chunks, `undefined` for chunks not built yet.
  * @param maxElevation Conservative highest terrain height, for chunks not built yet.
+ * @param history Optional previous frame's decisions; gives the split test hysteresis so a chunk at a
+ *   distance boundary does not flip level every frame.
  */
-export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds: (k: ChunkKey) => ChunkBounds | undefined, maxElevation: number): ChunkSelection {
+export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds: (k: ChunkKey) => ChunkBounds | undefined, maxElevation: number, history?: LodHistory): ChunkSelection {
   const sphere = world.options.surface === 'sphere'
   const R = world.options.radius
   const deepest = maxLevel(world, s)
   const show: ChunkKey[] = []
   const need: { key: ChunkKey; priority: number }[] = []
+  const margin = Math.max(0, s.lodMargin ?? 0.1)
+  const split: Set<string> = new Set()
   const tmp: Vec3 = [0, 0, 0]
   const camDist = Math.hypot(camera[0], camera[1], camera[2])
   const horizon = sphere ? Math.sqrt(Math.max(0, camDist * camDist - R * R)) : Infinity
@@ -80,7 +99,13 @@ export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds:
 
   const distance = (b: ChunkBounds) => Math.hypot(camera[0] - b.center[0], camera[1] - b.center[1], camera[2] - b.center[2])
   const size = (k: ChunkKey) => chunkSize(world, k, s.rootSize)
-  const shouldSplit = (k: ChunkKey, b: ChunkBounds) => k.level < deepest && distance(b) - size(k) * 0.5 < size(k) * s.lodFactor
+  const shouldSplit = (k: ChunkKey, b: ChunkBounds) => {
+    if (k.level >= deepest) return false
+    // Split on approach at (1 − margin), merge on retreat only past (1 + margin): in between, keep the
+    // previous decision so a camera drifting across the boundary does not flip level.
+    const scale = history?.split.has(chunkId(k)) ? 1 + margin : 1 - margin
+    return distance(b) - size(k) * 0.5 < size(k) * s.lodFactor * scale
+  }
   const visible = (b: ChunkBounds) => {
     const d = distance(b)
     if (!sphere) return d - b.radius < s.viewDistance
@@ -94,6 +119,7 @@ export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds:
     const b = estimate(k)
     if (!visible(b)) return
     if (shouldSplit(k, b)) {
+      split.add(chunkId(k))
       const kids = children(k)
       // Recurse only once every child can be drawn (built, or covered by its own built children).
       const ready = kids.every((c) => built(c) || children(c).every(built))
@@ -127,5 +153,6 @@ export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds:
     for (let y = z0; y <= z1; y++) for (let x = x0; x <= x1; x++) visit({ face: -1, level: 0, x, y })
   }
   need.sort((a, b) => a.priority - b.priority)
+  if (history) history.split = split
   return { show, need: need.map((n) => n.key) }
 }

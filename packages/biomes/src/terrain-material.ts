@@ -1,7 +1,7 @@
-import { Color, MeshStandardNodeMaterial, Vector3, type Node } from 'three/webgpu'
+import { Color, MeshStandardNodeMaterial, Vector2, Vector3, type Node } from 'three/webgpu'
 import {
-  Fn, If, attribute, cameraPosition, clamp, dFdx, dFdy, distance, float, mix, mx_noise_float, normalView, positionLocal,
-  positionView, positionWorld, smoothstep, uniform, vec2, vec3, vec4,
+  Fn, If, attribute, cameraPosition, clamp, dFdx, dFdy, distance, float, mix, modelWorldMatrix, mx_noise_float, normalView,
+  positionGeometry, positionLocal, positionView, positionWorld, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl'
 
 /** How the terrain is coloured. */
@@ -88,7 +88,8 @@ function perturbNormal(height: Node<'float'>, scale: Node<'float'>) {
  * slope, temperature, height and rivers, then procedural detail that depends on the ground (rock
  * grain, snow sparkle, sand ripples, wet darkening) and micro bumps, all
  * fading out with distance so far LODs don't shimmer. Each chunk mesh must set
- * `userData.detailOffset` (its centre modulo the detail period, a `Vector3`) and `userData.level`.
+ * `userData.detailOffset` (its centre modulo the detail period, a `Vector3`), `userData.level` and
+ * `userData.morphRange` (`Vector2(splitDistance, parentSplitDistance)`, the geomorph band).
  */
 export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {}): { material: MeshStandardNodeMaterial; uniforms: TerrainUniforms; setDebug: (debug: TerrainDebug) => void } {
   const o = { ...DEFAULT_TERRAIN_MATERIAL, ...input }
@@ -104,6 +105,15 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   const base = attribute<'vec3'>('color', 'vec3')
   const climate = attribute<'vec4'>('climate', 'vec4')
   const biome = attribute<'vec3'>('biomeColor', 'vec3')
+
+  // Geomorph: a chunk starts on its parent level's surface and refines to its own as the camera closes in,
+  // so a level swap morphs instead of snapping. `morphPosition` is the per-vertex offset to the parent
+  // surface (see `ChunkData`). The blend uses the vertex's own distance, so neighbouring chunks of the same
+  // level compute the same factor at a shared vertex and still meet.
+  const morph = attribute<'vec3'>('morphPosition', 'vec3')
+  const morphRange = uniform(new Vector2(0, -1)).onObjectUpdate(({ object }) => object?.userData.morphRange)
+  const refine = smoothstep(morphRange.y, morphRange.x, distance(modelWorldMatrix.mul(positionGeometry), cameraPosition))
+  material.positionNode = positionLocal.add(morph.mul(refine.oneMinus()))
 
   const fade = smoothstep(u.detailDistance, u.detailDistance.mul(0.25), distance(positionWorld, cameraPosition)).mul(u.detail)
 

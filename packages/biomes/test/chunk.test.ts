@@ -1,9 +1,78 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { World } from '../src/world.ts'
-import { buildChunk, chunkSize, cubeToSphere, sphereToFace } from '../src/chunk.ts'
+import { buildChunk, chunkSize, cubeToSphere, sphereToFace, type ChunkData, type ChunkKey } from '../src/chunk.ts'
 
 const settings = { resolution: 9, rootSize: 2048, skirt: 0.02 }
+
+// Same walk as chunk.ts's border ring: the k-th skirt vertex copies the k-th border vertex.
+function borderLoop(n: number): number[] {
+  const loop: number[] = []
+  for (let i = 0; i < n - 1; i++) loop.push(i)
+  for (let j = 0; j < n - 1; j++) loop.push(j * n + n - 1)
+  for (let i = n - 1; i > 0; i--) loop.push((n - 1) * n + i)
+  for (let j = n - 1; j > 0; j--) loop.push(j * n)
+  return loop
+}
+
+const worldPos = (d: ChunkData, v: number): [number, number, number] =>
+  [d.center[0] + d.positions[v * 3], d.center[1] + d.positions[v * 3 + 1], d.center[2] + d.positions[v * 3 + 2]]
+
+// The morph offset must land every vertex on the parent level's *rendered* surface (not just near it):
+// that is what makes a split or merge morph instead of snapping. Both levels sample the same world
+// function, so even vertices already sit on the parent grid; odd ones sit on a parent edge, or on the
+// diagonal shared by the parent quad's two triangles.
+test('geomorph offset lands every vertex on the parent level surface', () => {
+  const n = settings.resolution
+  for (const planet of [false, true]) {
+    const world = planet ? new World({ seed: 11, surface: 'sphere', radius: 50_000 }) : new World({ seed: 11 })
+    const parentKey: ChunkKey = { face: planet ? 0 : -1, level: 4, x: 3, y: 2 }
+    const parent = buildChunk(world, parentKey, settings)
+    const at = (x: number, y: number) => worldPos(parent, y * n + x)
+    const mid = (a: [number, number, number], b: [number, number, number]): [number, number, number] =>
+      [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]
+    let max = 0, maxOffset = 0
+    for (let oy = 0; oy < 2; oy++) for (let ox = 0; ox < 2; ox++) {
+      const child = buildChunk(world, { face: parentKey.face, level: parentKey.level + 1, x: parentKey.x * 2 + ox, y: parentKey.y * 2 + oy }, settings)
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const p = (ox * (n - 1) + i) / 2, q = (oy * (n - 1) + j) / 2
+        const surface = p % 1 === 0 && q % 1 === 0 ? at(p, q)
+          : p % 1 === 0 ? mid(at(p, q - 0.5), at(p, q + 0.5))
+          : q % 1 === 0 ? mid(at(p - 0.5, q), at(p + 0.5, q))
+          : mid(at(p - 0.5, q + 0.5), at(p + 0.5, q - 0.5))
+        const v = j * n + i
+        const coarse = worldPos(child, v)
+        for (let k = 0; k < 3; k++) coarse[k] += child.morph[v * 3 + k]
+        for (let k = 0; k < 3; k++) max = Math.max(max, Math.abs(coarse[k] - surface[k]))
+        maxOffset = Math.max(maxOffset, Math.hypot(child.morph[v * 3], child.morph[v * 3 + 1], child.morph[v * 3 + 2]))
+      }
+    }
+    assert.ok(maxOffset > 0.01, `${planet ? 'planet' : 'plane'} morph is not a no-op (${maxOffset} m)`)
+    assert.ok(max < 0.01, `${planet ? 'planet' : 'plane'} parent-surface error ${max} m`)
+  }
+})
+
+// A finer neighbour cracks against this chunk by its own deviation from this surface. The skirt must hang
+// deeper than that, at every neighbouring level, so a level seam never opens a hole.
+test('skirt hangs deeper than the crack a finer neighbouring level opens', () => {
+  const n = settings.resolution
+  for (const planet of [false, true]) {
+    const world = planet ? new World({ seed: 5, surface: 'sphere', radius: 50_000 }) : new World({ seed: 5 })
+    const parentKey: ChunkKey = { face: planet ? 0 : -1, level: 3, x: 2, y: 3 }
+    const parent = buildChunk(world, parentKey, settings)
+    const border = borderLoop(n)
+    const depth = Math.hypot(...[0, 1, 2].map((k) => parent.positions[(n * n) * 3 + k] - parent.positions[border[0] * 3 + k]))
+    assert.ok(depth >= chunkSize(world, parentKey, settings.rootSize) * settings.skirt, `${planet ? 'planet' : 'plane'} skirt fraction`)
+    let crack = 0
+    for (let oy = 0; oy < 2; oy++) for (let ox = 0; ox < 2; ox++) {
+      const child = buildChunk(world, { face: parentKey.face, level: parentKey.level + 1, x: parentKey.x * 2 + ox, y: parentKey.y * 2 + oy }, settings)
+      for (let v = 0; v < n * n; v++) crack = Math.max(crack, Math.hypot(child.morph[v * 3], child.morph[v * 3 + 1], child.morph[v * 3 + 2]))
+    }
+    assert.ok(depth > crack, `${planet ? 'planet' : 'plane'} skirt ${depth} m vs crack ${crack} m`)
+    // The skirt keeps the border's morph offset, so the wall stays attached while the chunk morphs.
+    for (let k = 0; k < border.length; k++) for (let c = 0; c < 3; c++) assert.equal(parent.morph[(n * n + k) * 3 + c], parent.morph[border[k] * 3 + c])
+  }
+})
 
 // Every main-grid triangle faces up/out; every skirt triangle faces away from the chunk centre.
 function checkWinding(world: World, face: number) {
