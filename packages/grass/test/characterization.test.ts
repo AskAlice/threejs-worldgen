@@ -2,6 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { PerspectiveCamera } from 'three/webgpu'
 import { Grass, GrassMap, createBladeGeometry } from '../src/index.ts'
+import { TileStream } from '../src/grass-tiles.ts'
+import { TileGeometryStore } from '../src/grass-geometry.ts'
+import { Retirement } from '../src/retirement.ts'
 
 test('blade geometry: three vertices per row plus a tip, for any segment count', () => {
   for (const segments of [1, 2, 3, 5, 8]) {
@@ -46,31 +49,38 @@ test('blade geometry: three vertices per row plus a tip, for any segment count',
   assert.deepEqual(Array.from(a.index!.array), Array.from(b.index!.array))
 })
 
-type Cell = { candidates: number; count: number; offsets: Float32Array; params: Float32Array; patches: Float32Array }
 type TileRef = { ix: number; iz: number }
-interface CellInternals {
-  cellsPerSide: number
-  cellFull: number
-  createCell(tile: TileRef, c: number, cs: number): Cell
-  generate(tile: TileRef, cell: Cell, c: number, cs: number, full: number, upTo: number): void
+
+/** The extracted generator, wired to a real field's settings/terrain but no material or tiles. */
+function streamFor(grass: Grass) {
+  const retirement = new Retirement()
+  const material = () => null
+  return new TileStream({
+    object: grass.object,
+    settings: () => grass.settings,
+    billboard: () => grass.settings.type === 'billboards',
+    height: () => grass.sampleHeight,
+    densityAt: (dist) => grass.densityAt(dist),
+    material,
+    geometry: new TileGeometryStore({ settings: () => grass.settings, material }, retirement),
+    retirement,
+  })
 }
 
-function grow(grass: Grass, ix: number, iz: number, c: number, upTo: number) {
-  const internals = grass as unknown as CellInternals
-  const n = internals.cellsPerSide
+function grow(stream: TileStream, grass: Grass, tile: TileRef, c: number, upTo: number) {
+  const n = stream.cellsPerSide
   const cs = grass.settings.tileSize / n
-  const tile = { ix, iz }
-  const cell = internals.createCell(tile, c, cs)
-  internals.generate(tile, cell, c, cs, internals.cellFull, upTo)
+  const cell = stream.createCell(tile, c, cs)
+  stream.generate(tile, cell, c, cs, stream.cellFull, upTo)
   return { cell, cs, n }
 }
 
 test('cells: generation is deterministic per cell coordinate and stays inside its cell', () => {
   // Clumping 0 keeps the raw draw inside the cell; tufts deliberately spill by up to clumpSize / 2.
   const grass = new Grass({ camera: new PerspectiveCamera(), clumping: 0 })
-  const internals = grass as unknown as CellInternals
+  const stream = streamFor(grass)
   const c = 7
-  const { cell, cs, n } = grow(grass, 2, -3, c, 40)
+  const { cell, cs, n } = grow(stream, grass, { ix: 2, iz: -3 }, c, 40)
   assert.equal(cell.count, 40)
   assert.equal(cell.candidates, 40)
   const cx = (c % n) * cs, cz = Math.floor(c / n) * cs
@@ -80,24 +90,24 @@ test('cells: generation is deterministic per cell coordinate and stays inside it
     assert.equal(y, 0) // flat terrain
     assert.ok(yaw >= 0 && yaw < Math.PI * 2)
     // LOD ranks are the candidate order, so fewer blades are always an exact prefix of more.
-    assert.ok(Math.abs(cell.params[i * 4 + 2] - (i + 0.5) / internals.cellFull) < 1e-9, `blade ${i} rank`)
+    assert.ok(Math.abs(cell.params[i * 4 + 2] - (i + 0.5) / stream.cellFull) < 1e-9, `blade ${i} rank`)
   }
 
   // Same cell coordinates, same blades.
-  const again = grow(grass, 2, -3, c, 40)
+  const again = grow(stream, grass, { ix: 2, iz: -3 }, c, 40)
   assert.deepEqual(Array.from(cell.offsets), Array.from(again.cell.offsets))
   assert.deepEqual(Array.from(cell.params), Array.from(again.cell.params))
   assert.deepEqual(Array.from(cell.patches), Array.from(again.cell.patches))
   // A different cell draws a different stream.
-  const other = grow(grass, 2, -3, c + 1, 40)
+  const other = grow(stream, grass, { ix: 2, iz: -3 }, c + 1, 40)
   assert.notDeepEqual(Array.from(cell.offsets), Array.from(other.cell.offsets))
 
   // Growing a cell further only appends: the first 12 blades are untouched.
   const tile = { ix: 2, iz: -3 }
-  const prefix = internals.createCell(tile, c, cs)
-  internals.generate(tile, prefix, c, cs, internals.cellFull, 12)
+  const prefix = stream.createCell(tile, c, cs)
+  stream.generate(tile, prefix, c, cs, stream.cellFull, 12)
   const first = Array.from(prefix.offsets.subarray(0, 12 * 4))
-  internals.generate(tile, prefix, c, cs, internals.cellFull, 40)
+  stream.generate(tile, prefix, c, cs, stream.cellFull, 40)
   assert.equal(prefix.count, 40)
   assert.deepEqual(Array.from(prefix.offsets.subarray(0, 12 * 4)), first)
   grass.dispose()
@@ -105,7 +115,7 @@ test('cells: generation is deterministic per cell coordinate and stays inside it
 
 test('cells: default clumping spreads tufts no further than half a clump past the cell', () => {
   const grass = new Grass({ camera: new PerspectiveCamera() })
-  const { cell, cs, n } = grow(grass, 0, 0, 0, 30)
+  const { cell, cs, n } = grow(streamFor(grass), grass, { ix: 0, iz: 0 }, 0, 30)
   const pad = grass.settings.clumpSize / 2
   for (let i = 0; i < cell.count; i++) {
     const [x, , z] = cell.offsets.subarray(i * 4, (i + 1) * 4)

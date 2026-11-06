@@ -7,11 +7,12 @@ import { createHeightSampler, type HeightFn, type Terrain } from 'threejs-height
 import type { GrassMap } from './grass-map.ts'
 import {
   layoutKey as computeLayoutKey, materialKey as computeMaterialKey, resolveSettings, writeSettings,
-  type GrassInput, type GrassSettings, type WindOptions,
+  type GrassInput, type GrassSettings, type ObjectRef, type WindOptions,
 } from './grass-settings.ts'
 import { TileGeometryStore } from './grass-geometry.ts'
-import { TileStream, type CellCache } from './grass-tiles.ts'
-import { findSun, resolveTerrain, Retirement, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
+import { TileStream } from './grass-tiles.ts'
+import { Retirement } from './retirement.ts'
+import { findSun, resolveTerrain, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
 
 export { createBillboardGeometry, createBladeGeometry } from './grass-geometry.ts'
 export { findSun, interactorObject, resolveObject, writeInteractors, writeSun } from './grass-scene.ts'
@@ -44,7 +45,7 @@ export interface GrassOptions extends GrassInput {
   /** Must be a WebGPURenderer (`three/webgpu`); it falls back to WebGL2 by itself. Initialised if needed. */
   renderer?: GrassRenderer
   /** Mesh/group (or a ref to one) to grow on, a `(x, z) => y` function, or omit for flat ground. */
-  terrain?: Terrain | { current: Object3D | null }
+  terrain?: Terrain | ObjectRef<Object3D>
 }
 
 /**
@@ -78,7 +79,7 @@ export class Grass {
   private readonly retirement = new Retirement()
   private readonly geometry = new TileGeometryStore({
     settings: () => this.settings,
-    material: () => this.material!,
+    material: () => this.material,
   }, this.retirement)
   private readonly stream = new TileStream({
     object: this.object,
@@ -86,7 +87,7 @@ export class Grass {
     billboard: () => this.billboard,
     height: () => this.sampleHeight,
     densityAt: (dist) => this.densityAt(dist),
-    material: () => this.material!,
+    material: () => this.material,
     geometry: this.geometry,
     retirement: this.retirement,
   })
@@ -189,7 +190,7 @@ export class Grass {
   }
 
   /** Swaps the terrain (mesh/group, ref to one, or height function) and regenerates all tiles. */
-  setTerrain(terrain?: Terrain | { current: Object3D | null }): void {
+  setTerrain(terrain?: Terrain | ObjectRef<Object3D>): void {
     this.sampleHeight = createHeightSampler(resolveTerrain(terrain))
     this.stream.clear()
   }
@@ -206,8 +207,13 @@ export class Grass {
     const { tiles, instances } = this.stream.update(cam, budget, s.castShadow, s.shadowDistance)
 
     this.uniforms.viewPosition.value.copy(cam)
-    this.updateSun()
-    this.updateInteractors()
+    let sun = s.sun
+    if (!sun && !this.sunSearched && this.object.parent) {
+      this.sunSearched = true
+      this.autoSun = findSun(this.object)
+    }
+    writeSun(this.uniforms, sun ?? this.autoSun)
+    writeInteractors(this.uniforms, s.interactors)
     this.stats.tiles = tiles
     this.stats.instances = instances
   }
@@ -246,34 +252,6 @@ export class Grass {
     return this.settings.maxDistance
   }
 
-  /** Live tile map; read-only view used for diagnostics and lifecycle checks. */
-  private get tiles() {
-    return this.stream.tiles
-  }
-
-  /** Tiles from the previous grid awaiting retirement; read-only view for lifecycle checks. */
-  private get staleTiles() {
-    return this.stream.staleTiles
-  }
-
-  // Cell generation is streamed by `TileStream`; these handles stay on the field because the cell
-  // characterization tests drive the generator directly.
-  private get cellsPerSide() {
-    return this.stream.cellsPerSide
-  }
-
-  private get cellFull() {
-    return this.stream.cellFull
-  }
-
-  private createCell(tile: { ix: number; iz: number }, c: number, cs: number) {
-    return this.stream.createCell(tile, c, cs)
-  }
-
-  private generate(tile: { ix: number; iz: number }, cell: CellCache, c: number, cs: number, full: number, upTo: number) {
-    this.stream.generate(tile, cell, c, cs, full, upTo)
-  }
-
   /**
    * TSL nodes reading the grass map at a world XZ position. Use them in your terrain material to show
    * dirt where grass was erased; they follow map edits and `grassMap` swaps live.
@@ -290,18 +268,6 @@ export class Grass {
 
   private sunSearched = false
   private autoSun: DirectionalLight | null = null
-  private updateSun() {
-    let sun = this.settings.sun
-    if (!sun && !this.sunSearched && this.object.parent) {
-      this.sunSearched = true
-      this.autoSun = findSun(this.object)
-    }
-    writeSun(this.uniforms, sun ?? this.autoSun)
-  }
-
-  private updateInteractors() {
-    writeInteractors(this.uniforms, this.settings.interactors)
-  }
 }
 
 const _cam = new Vector3()

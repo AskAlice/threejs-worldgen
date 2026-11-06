@@ -3,7 +3,7 @@ import { slopeAt, type HeightFn } from 'threejs-heightfield'
 import { hash2, mulberry32, valueNoise } from './random.ts'
 import { BILLBOARD_DENSITY_RATIO, type GrassSettings } from './grass-settings.ts'
 import { disposeInstanced, type TileGeometryStore } from './grass-geometry.ts'
-import type { Retirement } from './grass-scene.ts'
+import type { Retirement } from './retirement.ts'
 
 export interface CellCache {
   rand: () => number
@@ -34,6 +34,8 @@ export interface Tile {
   maxY: number
   seen: number
   dist: number
+  /** Frames spent stale (0 while live); releases a stale tile whose area is legitimately empty. */
+  staleFor: number
 }
 
 export interface TileStreamContext {
@@ -42,13 +44,17 @@ export interface TileStreamContext {
   billboard: () => boolean
   height: () => HeightFn
   densityAt: (dist: number) => number
-  material: () => MeshPhysicalNodeMaterial
+  /** `null` until the field has created its material; no tiles exist before then. */
+  material: () => MeshPhysicalNodeMaterial | null
   geometry: TileGeometryStore
   retirement: Retirement
 }
 
 /** Cells are built with this many times the blades they currently need. */
 const HEADROOM = 1.3
+
+/** How long a stale tile may wait for a replacement that legitimately has no blades. */
+const STALE_MAX_FRAMES = 60
 
 /** Rebuild when a cell needs more than it holds, holds far more than it needs, or detail changed.
  *  Headroom on the way up and slack on the way down stop tiles rebuilding as the camera wanders. */
@@ -153,7 +159,7 @@ export class TileStream {
   /** Pushes the current material and per-tile settings to every live (and stale) tile. */
   applySettings(): void {
     for (const tile of this.tiles.values()) this.ctx.geometry.applyTileSettings(tile)
-    for (const tile of this.staleTiles) tile.mesh.material = this.ctx.material()
+    for (const tile of this.staleTiles) this.ctx.geometry.applyTileSettings(tile)
   }
 
   /** Removes and frees every tile, live or stale. */
@@ -204,15 +210,17 @@ export class TileStream {
   }
 
   private createTile(ix: number, iz: number): Tile {
+    const material = this.ctx.material()
+    if (!material) throw new Error('Grass: tiles were updated before the material was created.')
     const geometry = new InstancedBufferGeometry()
     geometry.instanceCount = 0
-    const mesh = new Mesh(geometry, this.ctx.material())
+    const mesh = new Mesh(geometry, material)
     mesh.position.set(ix * this.ctx.settings().tileSize, 0, iz * this.ctx.settings().tileSize)
     mesh.updateMatrix()
     mesh.matrixAutoUpdate = false
     mesh.visible = false
     this.ctx.object.add(mesh)
-    return { ix, iz, size: this.ctx.settings().tileSize, built: new Int32Array(0), segments: 0, cells: [], mesh, minY: 0, maxY: 0, seen: 0, dist: 0 }
+    return { ix, iz, size: this.ctx.settings().tileSize, built: new Int32Array(0), segments: 0, cells: [], mesh, minY: 0, maxY: 0, seen: 0, dist: 0, staleFor: 0 }
   }
 
   private buildTile(tile: Tile, needs: Int32Array, segments: number) {
@@ -351,7 +359,8 @@ export class TileStream {
       const z0 = stale.iz * stale.size
       const z1 = z0 + stale.size
       let overlaps = false
-      let covered = true
+      let ready = true
+      let shown = false
       for (const tile of this.tiles.values()) {
         const nx0 = tile.ix * ts
         const nx1 = nx0 + ts
@@ -359,13 +368,20 @@ export class TileStream {
         const nz1 = nz0 + ts
         if (x0 < nx1 && nx0 < x1 && z0 < nz1 && nz0 < z1) {
           overlaps = true
+          // Not yet built: its blades are still coming.
           if (tile.built.length === 0) {
-            covered = false
+            ready = false
             break
           }
+          if (tile.mesh.geometry.instanceCount > 0) shown = true
         }
       }
-      if (overlaps && !covered) keep.push(stale)
+      stale.staleFor++
+      // A built replacement with no instances may be thinning blades out or may cover ground that has
+      // no grass at all; wait a bounded number of frames for blades, then let the empty grid stand
+      // instead of pinning this tile forever.
+      const covered = ready && shown
+      if (overlaps && !covered && stale.staleFor <= STALE_MAX_FRAMES) keep.push(stale)
       else this.removeTile(stale)
     }
     this.staleTiles = keep

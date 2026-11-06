@@ -192,6 +192,8 @@ class Grass {
   camera: THREE.Camera                  // may be swapped at any time
   settings: GrassSettings               // resolved settings (read-only — use set())
   sampleHeight: HeightFn                // terrain height at (x, z); NaN off-terrain
+  readonly grassMap: GrassMap | null    // shorthand for settings.grassMap
+  readonly maxDistance: number          // shorthand for settings.maxDistance
 
   set(input: GrassInput): this
   reset(input?: GrassInput): this

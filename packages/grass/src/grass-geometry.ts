@@ -4,7 +4,7 @@ import {
 } from 'three/webgpu'
 import type { GrassSettings } from './grass-settings.ts'
 import type { Tile } from './grass-tiles.ts'
-import type { Retirement } from './grass-scene.ts'
+import type { Retirement } from './retirement.ts'
 
 /**
  * The base blade shape: a tapered, folded strip with x in [-0.5, 0.5] and y in [0, 1]. Each of the
@@ -72,7 +72,8 @@ export function disposeInstanced(geometry: InstancedBufferGeometry) {
 
 interface GeometryContext {
   settings: () => GrassSettings
-  material: () => MeshPhysicalNodeMaterial
+  /** `null` until the field has created its material; tiles cannot be written or drawn before then. */
+  material: () => MeshPhysicalNodeMaterial | null
 }
 
 /** Owns the shared blade/billboard shapes and the per-tile instance buffers that reference them. */
@@ -148,8 +149,11 @@ export class TileGeometryStore {
     const s = this.ctx.settings()
     const { mesh } = tile
     const ts = s.tileSize
-    mesh.material = this.ctx.material()
+    const material = this.ctx.material()
+    if (!material) throw new Error('Grass: tile settings applied before the material was created.')
+    mesh.material = material
     mesh.receiveShadow = s.receiveShadow
+    mesh.castShadow = s.castShadow && tile.dist < s.shadowDistance
     mesh.visible = mesh.geometry.instanceCount > 0
     if (!mesh.visible) return
     // Instanced geometry can't compute its own bounds; frustum culling needs a manual sphere.

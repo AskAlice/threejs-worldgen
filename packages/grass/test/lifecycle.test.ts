@@ -1,6 +1,6 @@
 import { test, mock, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { Object3D, PerspectiveCamera } from 'three/webgpu'
+import { Mesh, Object3D, PerspectiveCamera, type MeshPhysicalNodeMaterial, type InstancedBufferGeometry } from 'three/webgpu'
 import type { Grass as GrassType, GrassLOD } from '../src/grass.ts'
 import type { GrassMap as GrassMapType } from '../src/grass-map.ts'
 
@@ -60,8 +60,8 @@ test('two fields on one scene update independently, disposing A leaves B running
   const b = new Grass({ camera: cam, scene })
   let ca = 0
   let cb = 0
-  ;(a as any).update = () => { ca++ }
-  ;(b as any).update = () => { cb++ }
+  a.update = () => { ca++ }
+  b.update = () => { cb++ }
 
   render(scene, cam)
   assert.deepEqual([ca, cb], [1, 1])
@@ -84,8 +84,8 @@ test('disposing B first then A leaves no disposed field running', () => {
   const b = new Grass({ camera: cam, scene })
   let ca = 0
   let cb = 0
-  ;(a as any).update = () => { ca++ }
-  ;(b as any).update = () => { cb++ }
+  a.update = () => { ca++ }
+  b.update = () => { cb++ }
 
   render(scene, cam)
   assert.deepEqual([ca, cb], [1, 1])
@@ -101,7 +101,7 @@ test('disposing B first then A leaves no disposed field running', () => {
   // A field created after disposal must not resurrect either disposed callback.
   const c = new Grass({ camera: cam, scene })
   let cc = 0
-  ;(c as any).update = () => { cc++ }
+  c.update = () => { cc++ }
   render(scene, cam)
   assert.deepEqual([ca, cb, cc], [2, 1, 1])
   c.dispose()
@@ -110,16 +110,17 @@ test('disposing B first then A leaves no disposed field running', () => {
 // ---------------------------------------------------------------- 03: tile size changes
 
 function visible(grass: GrassType) {
-  return grass.object.children.filter((o) => (o as any).visible).length
+  return grass.object.children.filter((o) => o.visible).length
 }
 
 function settle(grass: GrassType) {
-  for (let i = 0; i < 20 && (grass as any).staleTiles.length; i++) grass.update(Infinity)
-  assert.equal((grass as any).staleTiles.length, 0, 'stale tiles were retired')
+  // Stale tiles are extra meshes beyond the live grid; keep updating until none are left.
+  for (let i = 0; i < 20; i++) grass.update(Infinity)
+  assert.equal(grass.object.children.length, grass.stats.tiles, 'stale tiles were retired')
 }
 
 function assertNoOverlap(grass: GrassType) {
-  const meshes = grass.object.children as any[]
+  const meshes = grass.object.children
   for (let i = 0; i < meshes.length; i++) {
     for (let j = i + 1; j < meshes.length; j++) {
       const a = meshes[i].position
@@ -145,9 +146,9 @@ test('a tileSize change keeps the old field visible until replacements exist', (
   assert.ok(visible(grass) > 0, 'old tiles stay visible while the new grid streams in')
 
   settle(grass)
-  assert.equal(grass.object.children.length, (grass as any).tiles.size, 'no leftover tile meshes')
+  assert.equal(grass.object.children.length, grass.stats.tiles, 'no leftover tile meshes')
   assertNoOverlap(grass)
-  for (const mesh of grass.object.children as any[]) {
+  for (const mesh of grass.object.children) {
     assert.ok(Math.abs(mesh.position.x % 10) < 1e-9, `x ${mesh.position.x} is on the new grid`)
     assert.ok(Math.abs(mesh.position.z % 10) < 1e-9, `z ${mesh.position.z} is on the new grid`)
   }
@@ -162,8 +163,17 @@ test('repeated tileSize changes do not pile up tile meshes', () => {
     assert.ok(visible(grass) > 0, `field visible after changing to ${tileSize}`)
   }
   settle(grass)
-  assert.equal(grass.object.children.length, (grass as any).tiles.size)
+  assert.equal(grass.object.children.length, grass.stats.tiles)
   assertNoOverlap(grass)
+})
+
+test('stale tiles are released when the new grid legitimately has no blades', () => {
+  // Off-terrain: every candidate is rejected, so replacements never get instances.
+  const grass = new Grass({ camera: camera(), tileSize: 25, maxDistance: 20, terrain: () => NaN })
+  grass.update(Infinity)
+  grass.set({ tileSize: 10 })
+  for (let i = 0; i < 61; i++) grass.update(Infinity)
+  assert.equal(grass.object.children.length, grass.stats.tiles, 'empty replacements do not pin the old grid forever')
 })
 
 // ---------------------------------------------------------------- 06: delayed disposal / material reuse
@@ -173,9 +183,9 @@ test('dispose retires geometries and material instead of freeing them synchronou
   const grass = new Grass({ camera: camera(), tileSize: 25, maxDistance: 30 })
   grass.update(Infinity)
 
-  const tile = [...(grass as any).tiles.values()][0]
-  const geometry = tile.mesh.geometry
-  const material = (grass as any).material
+  const tile = grass.object.children[0] as Mesh<InstancedBufferGeometry, MeshPhysicalNodeMaterial>
+  const geometry = tile.geometry
+  const material = tile.material
   let geometryDisposed = 0
   let materialDisposed = 0
   const disposeGeometry = geometry.dispose.bind(geometry)
@@ -200,7 +210,7 @@ test('repeated create/dispose cycles free every geometry', () => {
   for (let i = 0; i < 3; i++) {
     const grass = new Grass({ camera: camera(), tileSize: 25, maxDistance: 30 })
     grass.update(Infinity)
-    const geometry = [...(grass as any).tiles.values()][0].mesh.geometry
+    const geometry = (grass.object.children[0] as Mesh).geometry
     let count = 0
     const original = geometry.dispose.bind(geometry)
     geometry.dispose = () => { count++; original() }
@@ -213,9 +223,10 @@ test('repeated create/dispose cycles free every geometry', () => {
   assert.deepEqual(fields.map((f) => f.count), [1, 1, 1])
 })
 
-test('LOD-only changes keep the material instance; layout changes rebuild it', () => {
+test('only the draw type rebuilds the material; other layout changes keep it', () => {
   const grass = new Grass({ camera: camera() })
-  const material = (grass as any).material
+  grass.update(Infinity)
+  const material = (grass.object.children[0] as Mesh).material
   const lods: GrassLOD[] = [
     { distance: 4, density: 0.9, segments: 5 },
     { distance: 12, density: 0.5, segments: 3 },
@@ -224,10 +235,14 @@ test('LOD-only changes keep the material instance; layout changes rebuild it', (
   ]
 
   grass.set({ lods })
-  assert.equal((grass as any).material, material, 'LOD distances/densities are uniform-driven')
+  assert.equal((grass.object.children[0] as Mesh).material, material, 'LOD distances/densities are uniform-driven')
   assert.deepEqual(flatten(grass.uniforms.lodDistances.value), lods.map((l) => l.distance))
   assert.deepEqual(flatten(grass.uniforms.lodDensities.value), lods.map((l) => l.density))
 
-  grass.set({ tileSize: 10 })
-  assert.notEqual((grass as any).material, material, 'a genuine layout change rebuilds the material')
+  grass.set({ tileSize: 10, density: 300, maxSlope: 0.5 })
+  assert.equal((grass.object.children[0] as Mesh).material, material, 'layout settings are uniform-driven, so they keep the material')
+
+  grass.set({ type: 'billboards' })
+  grass.update(Infinity)
+  assert.notEqual((grass.object.children[0] as Mesh).material, material, 'a different draw type rebuilds the material')
 })
