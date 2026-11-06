@@ -79,8 +79,10 @@ export const DEFAULT_SIZE_CLASSES: Record<SettlementSize, SizeClass> = {
     surfaces: PAVED, oldTown: null, mainStreet: 42, landmarks: { church: 1, townHall: 1, waterTower: 1 },
     roads: {},
     styles: {
-      downtown: { blockSize: 75, lotArea: 380, lotWidth: 9, setback: 0, coverage: 1, floors: [2, 3] },
-      residential: { blockSize: 100, lotArea: 850, lotWidth: 17, setback: 6, floors: [1, 2] },
+      // Narrower than the district defaults, to keep a town's main street tight: scaled with the
+      // `DEFAULT_ROADS` #89 retune like the district block sizes.
+      downtown: { blockSize: 85, lotArea: 380, lotWidth: 9, setback: 0, coverage: 1, floors: [2, 3] },
+      residential: { blockSize: 108, lotArea: 850, lotWidth: 17, setback: 6, floors: [1, 2] },
     },
   },
   city: {

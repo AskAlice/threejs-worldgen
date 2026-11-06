@@ -43,9 +43,11 @@ export const DEFAULT_DISTRICTS: DistrictOptions = {
   parkSize: 140,
   densityFalloff: 0.42,
   styles: {
-    downtown: { blockSize: 85, lotArea: 900, lotWidth: 16, setback: 0.5, coverage: 0.95, floors: [4, 42] },
-    residential: { blockSize: 110, lotArea: 520, lotWidth: 13, setback: 4, coverage: 0.85, floors: [1, 7] },
-    industrial: { blockSize: 190, lotArea: 3200, lotWidth: 34, setback: 6, coverage: 0.8, floors: [1, 2] },
+    // Street spacing (block sides) is the other half of the #89 retune: scaled with `DEFAULT_ROADS`'
+    // branch spacing so blocks stay town- and city-sized (see the comment there).
+    downtown: { blockSize: 110, lotArea: 900, lotWidth: 16, setback: 0.5, coverage: 0.95, floors: [4, 42] },
+    residential: { blockSize: 145, lotArea: 520, lotWidth: 13, setback: 4, coverage: 0.85, floors: [1, 7] },
+    industrial: { blockSize: 250, lotArea: 3200, lotWidth: 34, setback: 6, coverage: 0.8, floors: [1, 2] },
     park: { blockSize: 0, lotArea: 6000, lotWidth: 30, setback: 0, coverage: 0, floors: [0, 0] },
     farmland: { blockSize: 0, lotArea: 14000, lotWidth: 60, setback: 18, coverage: 0.12, floors: [1, 2] },
   },

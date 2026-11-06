@@ -64,9 +64,14 @@ export interface RoadOptions {
 
 /** Default road rules. */
 export const DEFAULT_ROADS: RoadOptions = {
-  primary: { width: 12, sidewalk: 3, segment: 48, branchSpacing: 150, branchChance: 0.85, through: 1, delay: 0 },
-  secondary: { width: 8, sidewalk: 2.5, segment: 36, branchSpacing: 110, branchChance: 0.8, through: 0.85, delay: 4 },
-  minor: { width: 6, sidewalk: 1.8, segment: 30, branchSpacing: 100, branchChance: 0.9, through: 0.6, delay: 9 },
+  // Retuned with #89's junction-angle fix: with angles measured between unit vectors most branches now
+  // survive instead of being pruned, and the old chances fragmented a grid city into ~46 m blocks.
+  // Branch spacing ×1.3, branch chances ×0.6–0.7 and a lower `through` put the median block side back
+  // at ~110 m in a town and ~85 m in a city or metropolis (seed 3, grid layout): #89's 60–120 m and
+  // 80–200 m.
+  primary: { width: 12, sidewalk: 3, segment: 48, branchSpacing: 195, branchChance: 0.6, through: 1, delay: 0 },
+  secondary: { width: 8, sidewalk: 2.5, segment: 36, branchSpacing: 143, branchChance: 0.5, through: 0.5, delay: 4 },
+  minor: { width: 6, sidewalk: 1.8, segment: 30, branchSpacing: 100, branchChance: 0.5, through: 0.4, delay: 9 },
   arms: 0,
   snapRadius: 14,
   minAngle: 32,
@@ -103,6 +108,20 @@ export interface RoadContext {
 }
 
 const DEG = Math.PI / 180
+
+/**
+ * True if a road leaving a junction along (ux, uz) meets every road direction in `dirs` at least
+ * `minAngle` apart. Directions need not be unit length: only the angles between them count.
+ */
+export function junctionClears(dirs: readonly (readonly [number, number])[], ux: number, uz: number, minAngle: number): boolean {
+  const u = Math.hypot(ux, uz) || 1
+  const minCos = Math.cos(minAngle * DEG)
+  for (const [vx, vz] of dirs) {
+    const l = Math.hypot(vx, vz) || 1
+    if ((ux * vx + uz * vz) / (u * l) >= minCos) return false
+  }
+  return true
+}
 
 /**
  * Grows a road network outwards from the centre. Generator form: yields every few dozen steps so
@@ -160,16 +179,12 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
   // True if direction (ux, uz) leaving node n is at least minAngle away from every road there.
   const angleOk = (n: number, ux: number, uz: number, extra?: [number, number][]) => {
     const node = graph.nodes[n]
-    const check = (vx: number, vz: number) => {
-      const l = Math.hypot(vx, vz) || 1
-      return (ux * vx + uz * vz) / l < minCos
-    }
+    const dirs: [number, number][] = extra ? [...extra] : []
     for (const e of node.edges) {
       const m = graph.nodes[graph.other(e, n)]
-      if (!check(m.x - node.x, m.z - node.z)) return false
+      dirs.push([m.x - node.x, m.z - node.z])
     }
-    for (const [vx, vz] of extra ?? []) if (!check(vx, vz)) return false
-    return true
+    return junctionClears(dirs, ux, uz, o.minAngle)
   }
 
   interface Step { end: number; stop: boolean; through: boolean; ux: number; uz: number }

@@ -1,14 +1,50 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULT_DISTRICTS, DEFAULT_ROADS, DEFAULT_TENSOR_FIELD, DistrictMap, generateRoads, RoadGraph, segmentIntersection, Site, TensorField } from '../src/index.ts'
+import {
+  DEFAULT_DISTRICTS, DEFAULT_ROADS, DEFAULT_TENSOR_FIELD, DistrictMap, generateRoads, junctionClears, RoadGraph, segmentIntersection, Site, TensorField,
+} from '../src/index.ts'
 
 const R = 600
-function town(seed = 1) {
-  const site = Site.around(0, 0, R * 1.45, 10).fill((x, z) => ({ height: Math.sin(x / 300) * 20, waterLevel: Math.abs(x - 250 + Math.sin(z / 100) * 30) < 20 ? -2 : NaN }))
+function town(seed = 1, dry = false) {
+  const site = Site.around(0, 0, R * 1.45, 10).fill(dry
+    ? () => ({ height: 0, waterLevel: NaN })
+    : (x, z) => ({ height: Math.sin(x / 300) * 20, waterLevel: Math.abs(x - 250 + Math.sin(z / 100) * 30) < 20 ? -2 : NaN }))
   const districts = new DistrictMap(DEFAULT_DISTRICTS, { downtown: 0.2, farmland: 0.85, industrial: 0.15, park: 0.06 }, 0, 0, R, seed)
   const field = new TensorField(DEFAULT_TENSOR_FIELD, 0, 0, R, seed, site)
   return generateRoads({ site, field, districts, cx: 0, cz: 0, radius: R, arms: 4, seed }, DEFAULT_ROADS)
 }
+
+test('junction angles are the angles between the directions, whatever their lengths', () => {
+  // Regression (#89): the test used the raw direction vector, so a long vector read as a small
+  // angle (or, reversed, as a large one) and the result depended on how far away the next node was.
+  assert.ok(junctionClears([], 1, 0, 32), 'an empty junction takes any direction')
+  assert.ok(junctionClears([[100, 0]], 0, 1, 32), 'perpendicular clears')
+  assert.ok(!junctionClears([[100, 0]], 1, 0, 32), 'the same direction blocks')
+  assert.ok(!junctionClears([[0.01, 0]], 1, 0.2, 32), '11° apart blocks, short vectors included')
+  assert.ok(junctionClears([[0.01, 0]], 1, -1, 32), '135° apart clears, even though a 0.01 vector is tiny')
+  assert.ok(!junctionClears([[1, 0], [0, 1]], 1, 0.2, 32), 'one bad direction is enough to block')
+})
+
+test('all four arterials grow from the centre junction', () => {
+  // Regression (#89): the unnormalised test let an arterial through only when it ran straight back
+  // along an existing one, so a city grew two arms (a straight line) instead of four.
+  const g = town(1, true)
+  const centre = g.nodes[0]
+  const arms = centre.edges.map((e) => g.edges[e])
+  assert.equal(arms.length, 4, 'four arms')
+  assert.ok(arms.every((e) => e.type === 'primary'), 'all arterials')
+  const dirs = arms.map((e) => {
+    const n = g.nodes[g.other(e.id, 0)]
+    return [n.x - centre.x, n.z - centre.z]
+  })
+  for (let i = 0; i < dirs.length; i++) {
+    for (let j = i + 1; j < dirs.length; j++) {
+      const [ax, az] = dirs[i], [bx, bz] = dirs[j]
+      const cos = (ax * bx + az * bz) / (Math.hypot(ax, az) * Math.hypot(bx, bz))
+      assert.ok(cos < Math.cos((DEFAULT_ROADS.minAngle * Math.PI) / 180), `arms ${i} and ${j} are distinct roads`)
+    }
+  }
+})
 
 test('addEdge refuses crossings, duplicates and nodes on the edge', () => {
   const g = new RoadGraph(10)
