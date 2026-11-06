@@ -6,6 +6,8 @@
  */
 import { Box3, Vector3, type Object3D, type Mesh, type BufferGeometry } from 'three/webgpu'
 
+export { merge, resolve } from './merge.ts'
+
 /** Returns terrain height at world (x, z), or NaN where there is no terrain. */
 export type HeightFn = (x: number, z: number) => number
 

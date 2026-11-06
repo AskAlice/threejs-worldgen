@@ -1,3 +1,7 @@
+import { merge } from 'threejs-heightfield'
+
+export { merge }
+
 /** Makes every property optional, recursively (arrays are replaced whole). */
 export type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T
 
@@ -154,19 +158,6 @@ export const CURVE_KEYS = 8
 const SHAPES: readonly EmitterShape[] = ['point', 'box', 'disc', 'sphere', 'sources']
 const SHADINGS: readonly ParticleShading[] = ['unlit', 'flame', 'smoke', 'spark', 'haze']
 const HEX = /^#[0-9a-f]{6}$/i
-
-/** Deep-merges plain-JSON `input` into `target` (objects merge, arrays and everything else replace). */
-export function merge<T>(target: T, input: unknown): T {
-  if (!input || typeof input !== 'object') return target
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (v === undefined || k === '__proto__' || k === 'constructor' || k === 'prototype') continue
-    const t = target as Record<string, unknown>
-    const cur = t[k]
-    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)) t[k] = merge({ ...(cur as object) }, v)
-    else t[k] = Array.isArray(v) ? structuredClone(v) : v
-  }
-  return target
-}
 
 /**
  * Fixes anything out of range in place and returns it: counts become positive integers, ranges are

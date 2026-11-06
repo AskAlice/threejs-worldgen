@@ -2,7 +2,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Group, Mesh, 
 import { attribute, cameraPosition, cross, int, modelWorldMatrix, normalize, positionGeometry, uniform, uniformArray, vec4 } from 'three/tsl'
 import { mulberry32 } from 'threejs-biomes'
 import type { Strike, Weather } from './weather.ts'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** Every lightning setting. Plain JSON. */
 export interface LightningOptions {

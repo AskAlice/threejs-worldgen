@@ -1,6 +1,6 @@
 import { createSample, hash01, seedOf, type DeepPartial, type LocalFrame, type World, type WorldSample } from 'threejs-biomes'
 import { createWeatherSample, type ClimatePoint, type SurfaceSample, type Weather, type WeatherSample } from './weather.ts'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** Fuel classes. Each burns, spreads and regrows at its own pace. */
 export type FuelKind = 'grass' | 'shrub' | 'tree' | 'none'

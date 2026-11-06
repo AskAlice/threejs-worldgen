@@ -1,4 +1,5 @@
 import type { DeepPartial } from 'threejs-biomes'
+import { resolve } from 'threejs-heightfield'
 import { ARCHITECTURES, type ArchitectureName, type Architecture, type Climate, type RoofMaterial, type WallMaterial } from './architecture.ts'
 import { DEFAULT_BLOCKS, type BlockOptions } from './blocks.ts'
 import { DEFAULT_BUILDINGS, type BuildingOptions } from './buildings.ts'
@@ -254,21 +255,7 @@ export const ROAD_STYLES: Record<RoadStyle, CityInput> = {
 
 /** Deep-merges plain objects (arrays and everything else are replaced). Returns a new object. */
 export function mergeOptions<T>(base: T, ...inputs: unknown[]): T {
-  let out = structuredClone(base)
-  for (const input of inputs) out = mergeInto(out, input)
-  return out
-}
-
-function mergeInto<T>(target: T, input: unknown): T {
-  if (!input || typeof input !== 'object') return target
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (v === undefined) continue
-    const t = target as Record<string, unknown>
-    const cur = t[k]
-    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)) t[k] = mergeInto(cur, v)
-    else t[k] = Array.isArray(v) ? structuredClone(v) : v
-  }
-  return target
+  return resolve(base, ...inputs)
 }
 
 /** Resolves input into full settings: defaults ← the layout style's preset ← the size class's `roads` and `styles` ← input. */

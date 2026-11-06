@@ -7,7 +7,7 @@ import { FireSim, type FireEnvironment, type FireInput, type FireOptions } from 
 import { collectFireSources, createFireSources, plumeOcclusion, smokeTransmittance, type FireSources } from './fire-front.ts'
 import { smoothSample } from './sampling.ts'
 import type { StateField } from './state-field.ts'
-import { merge, resolve } from './util.ts'
+import { merge, resolve } from 'threejs-heightfield'
 
 /** Look of a {@link Wildfire}. Plain JSON. Particle counts, quality steps, `haze.enabled` and `grid` rebuild the particle systems. */
 export interface WildfireLook {
