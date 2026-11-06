@@ -7,7 +7,7 @@
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera, Object3D } from 'three/webgpu'
-import { Grass as GrassImpl, resolveObject, type GrassInput, type GrassRenderer } from './grass.ts'
+import { Grass as GrassImpl, type GrassInput, type GrassRenderer } from './grass.ts'
 import { TerrainPainter, type Brush } from './grass-map.ts'
 import { Corn as CornImpl, type CornInput } from './corn.ts'
 import type { HeightFn, Terrain } from 'threejs-heightfield'
@@ -21,9 +21,10 @@ export { Corn as CornImpl } from './corn.ts'
 type TerrainProp = Terrain | RefObject<Object3D | null> | undefined
 
 /**
- * Resolves the `terrain` prop fresh on each call: a ref's object may mount after the field, and its
- * `current` changes without a render. Inline height functions are wrapped once (reading the latest
- * prop through a ref) so a new function identity never looks like a new terrain.
+ * The terrain source handed to the field. Inline height functions are wrapped once (reading the latest prop
+ * through a ref) so a new function identity never looks like a new terrain. Refs are passed through as-is:
+ * the field adopts whatever a ref points at on each update, so a ref that mounts late behaves the same here
+ * as in the vanilla entry point.
  */
 function useTerrain(terrain: TerrainProp) {
   const latest = useRef(terrain)
@@ -32,12 +33,8 @@ function useTerrain(terrain: TerrainProp) {
     const t = latest.current
     return typeof t === 'function' ? t(x, z) : NaN
   }, [])
-  const resolve = (): Terrain | undefined => {
-    const t = latest.current
-    return typeof t === 'function' ? height : resolveObject(t) ?? undefined
-  }
   // A ref's identity never changes, so key the field on the prop value, not the resolved object.
-  return { resolve, key: typeof terrain === 'function' ? null : terrain }
+  return { source: typeof terrain === 'function' ? height : terrain, key: typeof terrain === 'function' ? null : terrain }
 }
 
 /** Props of the `<Grass>` component: every {@link GrassInput} setting plus the ones below. */
@@ -45,9 +42,10 @@ export interface GrassProps extends GrassInput {
   /** Receives the underlying Grass instance (for `sampleHeight`, `mapNode`, `stats`, …). */
   ref?: Ref<GrassImpl | null>
   /**
-   * Mesh/group (or a ref to one) — baked when the component mounts or the object changes — or a
-   * `(x, z) => y` height function. Inline functions are fine: the latest one is always used, but
-   * tiles already built keep their heights (call `grass.setTerrain()` to force a rebuild).
+   * Mesh/group (or a ref to one) or a `(x, z) => y` height function. A ref may be empty when the component
+   * mounts: the field adopts its object on the next update (the same rule as the vanilla `Grass`), so the
+   * component never recreates the field when the ref fills. Inline functions are fine: the latest one is
+   * always used, but tiles already built keep their heights (call `grass.setTerrain()` to force a rebuild).
    */
   terrain?: Terrain | RefObject<Object3D | null>
   /** Camera the field follows. Defaults to the R3F default camera. */
@@ -76,14 +74,11 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
 
   // Height functions are often written inline; only an object/ref prop change should recreate the field.
   const terrainSource = useTerrain(terrain)
-  const adopted = useRef<Terrain | undefined>(undefined)
 
   useEffect(() => {
     let created: GrassImpl | null = null
     let cancelled = false
-    const resolved = terrainSource.resolve()
-    adopted.current = resolved
-    GrassImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: resolved, ...latest.current }).then((g) => {
+    GrassImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: terrainSource.source, ...latest.current }).then((g) => {
       if (cancelled) return g.dispose()
       created = g
       setGrass(g)
@@ -116,17 +111,8 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
   })
 
   useImperativeHandle<GrassImpl | null, GrassImpl | null>(ref, () => grass, [grass])
-  useFrame(() => {
-    if (!grass) return
-    // A ref's terrain mounts after the field and its `current` changes without a render, so the frame
-    // loop is where it gets adopted; recreating the field per render would be far more costly.
-    const resolved = terrainSource.resolve()
-    if (resolved !== adopted.current) {
-      adopted.current = resolved
-      grass.setTerrain(resolved)
-    }
-    grass.update()
-  })
+  // update() also adopts a terrain ref that mounted after the field; see `Grass.update`.
+  useFrame(() => grass?.update())
 
   return grass ? <primitive object={grass.object} /> : null
 }
@@ -135,7 +121,7 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
 export interface CornProps extends CornInput {
   /** Receives the underlying Corn instance (for `flatten`, `flattened`, `stats`, …). */
   ref?: Ref<CornImpl | null>
-  /** Mesh/group (or a ref to one) or a `(x, z) => y` height function, as for `<Grass>`. */
+  /** Mesh/group (or a ref to one) or a `(x, z) => y` height function, as for `<Grass>` (late refs are adopted). */
   terrain?: Terrain | RefObject<Object3D | null>
   /** Camera the levels of detail follow. Defaults to the R3F default camera. */
   camera?: Camera
@@ -158,14 +144,11 @@ export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX
   const latest = useRef(options)
   latest.current = options
   const terrainSource = useTerrain(terrain)
-  const adopted = useRef<Terrain | undefined>(undefined)
 
   useEffect(() => {
     let created: CornImpl | null = null
     let cancelled = false
-    const resolved = terrainSource.resolve()
-    adopted.current = resolved
-    CornImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: resolved, ...latest.current }).then((c) => {
+    CornImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: terrainSource.source, ...latest.current }).then((c) => {
       if (cancelled) return c.dispose()
       created = c
       setCorn(c)
@@ -181,15 +164,6 @@ export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX
     corn?.reset(options)
   })
   useImperativeHandle<CornImpl | null, CornImpl | null>(ref, () => corn, [corn])
-  useFrame(() => {
-    if (!corn) return
-    // Adopt a terrain ref that mounts after the field; see the Grass component for the reasoning.
-    const resolved = terrainSource.resolve()
-    if (resolved !== adopted.current) {
-      adopted.current = resolved
-      corn.setTerrain(resolved)
-    }
-    corn.update()
-  })
+  useFrame(() => corn?.update())
   return corn ? <primitive object={corn.object} /> : null
 }

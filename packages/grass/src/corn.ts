@@ -5,7 +5,8 @@ import {
 import { createHeightSampler, type HeightFn, type Terrain } from 'threejs-heightfield'
 import { FlattenMap, PLANT_STRIDE, bounds, plantRows, pointInPolygon, type CornField } from './corn-layout.ts'
 import { CORN_MODEL_HEIGHT, createCanopyMaterial, createCornMaterial, createCornUniforms, type CornUniforms } from './corn-material.ts'
-import { findSun, interactorObject, writeInteractors, writeSun, type GrassRenderer, type Interactor, type WindOptions } from './grass.ts'
+import { findSun, resolveObject, resolveTerrain, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
+import type { GrassRenderer, Interactor, ObjectRef, WindOptions } from './grass.ts'
 import { hash2 } from './random.ts'
 
 /** One of the four levels of detail of a {@link Corn} field. Density is interpolated between consecutive levels. */
@@ -94,8 +95,12 @@ export interface CornOptions extends CornInput {
   scene?: Object3D
   /** Must be a WebGPURenderer (`three/webgpu`). Initialised if needed. */
   renderer?: GrassRenderer
-  /** Mesh/group to grow on, a `(x, z) => y` function, or omit for flat ground. */
-  terrain?: Terrain
+  /**
+   * Mesh/group (or a ref to one) to grow on, a `(x, z) => y` function, or omit for flat ground.
+   * A ref that is `null` at construction is adopted on the first update after it mounts (and dropped
+   * again if it unmounts) — the same rule as `Grass`.
+   */
+  terrain?: Terrain | ObjectRef<Object3D>
 }
 
 /** Live counters of a {@link Corn} field. */
@@ -188,6 +193,9 @@ export class Corn {
   flattenMap!: FlattenMap
 
   private input: CornInput = {}
+  /** The terrain as given (object, ref or function); a ref is re-resolved on every update. */
+  private terrain: Terrain | ObjectRef<Object3D> | undefined
+  private resolvedTerrain: Terrain | undefined
   private materials: MeshPhysicalNodeMaterial[] = []
   private canopyMaterial: MeshPhysicalNodeMaterial | null = null
   private canopy: Mesh<BufferGeometry, MeshPhysicalNodeMaterial> | null = null
@@ -223,7 +231,9 @@ export class Corn {
   /** Prefer {@link Corn.create}, which also validates/initialises the renderer and pre-builds chunks. */
   constructor({ camera, scene, renderer: _renderer, terrain, ...input }: CornOptions) {
     this.camera = camera
-    this.sampleHeight = createHeightSampler(terrain)
+    this.terrain = terrain
+    this.resolvedTerrain = resolveTerrain(terrain)
+    this.sampleHeight = createHeightSampler(this.resolvedTerrain)
     this.object.name = 'Corn'
     this.baseGeometries = [0, 1, 2].map((d) => createCornGeometry(d))
     this.materials = [0, 1, 2].map((d) => createCornMaterial(this.uniforms, d))
@@ -231,12 +241,8 @@ export class Corn {
     this.set(input)
     if (scene) {
       scene.add(this.object)
-      const previous = scene.onBeforeRender
-      scene.onBeforeRender = (...args) => {
-        previous.apply(scene, args)
-        this.update()
-      }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      // Shared, per-listener scene hook: disposing one corn never restores a sibling's captured chain.
+      this.unhook = subscribeScene(scene, () => this.update())
     }
   }
 
@@ -308,8 +314,15 @@ export class Corn {
     return this
   }
 
-  /** Swaps the terrain (mesh or height function) and rebuilds plants and canopy. */
-  setTerrain(terrain?: Terrain): void {
+  /** Swaps the terrain (mesh, ref to one, or height function) and rebuilds plants and canopy. */
+  setTerrain(terrain?: Terrain | ObjectRef<Object3D>): void {
+    this.terrain = terrain
+    this.adoptTerrain(resolveTerrain(terrain))
+  }
+
+  /** Applies a resolved terrain; a ref that mounted (or unmounted) since the last update is adopted here. */
+  private adoptTerrain(terrain: Terrain | undefined): void {
+    this.resolvedTerrain = terrain
     this.sampleHeight = createHeightSampler(terrain)
     this.clearChunks()
     this.buildCanopy()
@@ -348,6 +361,8 @@ export class Corn {
    * @param budget Milliseconds allowed for chunk builds this frame. Defaults to `settings.buildBudget`.
    */
   update(budget: number = this.settings.buildBudget): void {
+    const terrain = resolveTerrain(this.terrain)
+    if (terrain !== this.resolvedTerrain) this.adoptTerrain(terrain)
     const s = this.settings
     const frame = ++this.frame
     const cam = this.camera.getWorldPosition(_v)
@@ -544,7 +559,7 @@ export class Corn {
     const frame = this.frame // update() advances it once per call
     if (s.interactionStrength <= 0) return
     for (const it of s.interactors) {
-      const obj = interactorObject(it)
+      const obj = resolveObject(it.object)
       if (!obj || !(it.radius > 0)) continue
       const p = obj.getWorldPosition(_p)
       const ground = this.sampleHeight(p.x, p.z)

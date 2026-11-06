@@ -15,7 +15,7 @@ import { Retirement } from './retirement.ts'
 import { findSun, resolveTerrain, subscribeScene, writeInteractors, writeSun } from './grass-scene.ts'
 
 export { createBillboardGeometry, createBladeGeometry } from './grass-geometry.ts'
-export { findSun, interactorObject, resolveObject, writeInteractors, writeSun } from './grass-scene.ts'
+export { findSun, resolveObject, writeInteractors, writeSun } from './grass-scene.ts'
 export type { GrassInput, GrassLOD, GrassSettings, Interactor, ObjectRef, WindOptions } from './grass-settings.ts'
 
 /** Minimal renderer shape Grass needs. Pass a `WebGPURenderer` from `three/webgpu`. */
@@ -44,7 +44,11 @@ export interface GrassOptions extends GrassInput {
   scene?: Object3D
   /** Must be a WebGPURenderer (`three/webgpu`); it falls back to WebGL2 by itself. Initialised if needed. */
   renderer?: GrassRenderer
-  /** Mesh/group (or a ref to one) to grow on, a `(x, z) => y` function, or omit for flat ground. */
+  /**
+   * Mesh/group (or a ref to one) to grow on, a `(x, z) => y` function, or omit for flat ground.
+   * A ref that is `null` at construction grows on flat ground and is adopted on the first update after it
+   * mounts (and dropped again if it unmounts) — the same rule in the vanilla and React entry points.
+   */
   terrain?: Terrain | ObjectRef<Object3D>
 }
 
@@ -75,6 +79,9 @@ export class Grass {
   sampleHeight: HeightFn
 
   private input: GrassInput = {}
+  /** The terrain as given (object, ref or function); a ref is re-resolved on every update. */
+  private terrain: Terrain | ObjectRef<Object3D> | undefined
+  private resolvedTerrain: Terrain | undefined
   private material: MeshPhysicalNodeMaterial | null = null
   private readonly retirement = new Retirement()
   private readonly geometry = new TileGeometryStore({
@@ -117,7 +124,9 @@ export class Grass {
   /** Prefer {@link Grass.create}, which also validates/initialises the renderer and pre-builds tiles. */
   constructor({ camera, scene, renderer: _renderer, terrain, ...input }: GrassOptions) {
     this.camera = camera
-    this.sampleHeight = createHeightSampler(resolveTerrain(terrain))
+    this.terrain = terrain
+    this.resolvedTerrain = resolveTerrain(terrain)
+    this.sampleHeight = createHeightSampler(this.resolvedTerrain)
     this.object.name = 'Grass'
     this.set(input)
     if (scene) {
@@ -191,7 +200,17 @@ export class Grass {
 
   /** Swaps the terrain (mesh/group, ref to one, or height function) and regenerates all tiles. */
   setTerrain(terrain?: Terrain | ObjectRef<Object3D>): void {
-    this.sampleHeight = createHeightSampler(resolveTerrain(terrain))
+    this.terrain = terrain
+    this.adoptTerrain(resolveTerrain(terrain))
+  }
+
+  /**
+   * Applies a resolved terrain. A ref that is `null` at construction resolves to flat ground and is picked up
+   * here once it mounts (and dropped again if it unmounts); see {@link Grass.update}.
+   */
+  private adoptTerrain(terrain: Terrain | undefined): void {
+    this.resolvedTerrain = terrain
+    this.sampleHeight = createHeightSampler(terrain)
     this.stream.clear()
   }
 
@@ -202,6 +221,10 @@ export class Grass {
    */
   update(budget: number = this.settings.buildBudget): void {
     const s = this.settings
+    // A terrain ref's object mounts (or unmounts) without a render, so the frame loop is where it is adopted.
+    // Both entry points share this rule: the React wrapper hands refs straight through.
+    const terrain = resolveTerrain(this.terrain)
+    if (terrain !== this.resolvedTerrain) this.adoptTerrain(terrain)
     this.retirement.beginFrame()
     const cam = this.camera.getWorldPosition(_cam)
     const { tiles, instances } = this.stream.update(cam, budget, s.castShadow, s.shadowDistance)

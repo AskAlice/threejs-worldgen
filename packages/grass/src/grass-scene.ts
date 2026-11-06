@@ -48,11 +48,6 @@ export function resolveTerrain(terrain: Terrain | ObjectRef<Object3D> | undefine
   return typeof terrain === 'function' ? terrain : resolveObject(terrain) ?? undefined
 }
 
-/** The interactor's object, or `null` while a React ref is unmounted. */
-export function interactorObject(it: Interactor | undefined): Object3D | null {
-  return it ? resolveObject(it.object) : null
-}
-
 const _v = new Vector3()
 const _t = new Vector3()
 
@@ -62,7 +57,7 @@ export function writeInteractors(u: Pick<GrassUniforms, 'interactors' | 'interac
   u.interactorCount.value = Math.min(list.length, MAX_INTERACTORS)
   for (let i = 0; i < MAX_INTERACTORS; i++) {
     const it = list[i]
-    const obj = interactorObject(it)
+    const obj = it ? resolveObject(it.object) : null
     if (!obj) {
       slots[i].set(0, 0, 0, 0)
       continue
