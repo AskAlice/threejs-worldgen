@@ -345,6 +345,10 @@ export class Fleet {
       const mounts = part.mounts
       for (let j = 0; j < view.vehicles.length; j++) {
         const v = view.vehicles[j], o = v * 8
+        if (!sim.active[v]) {
+          for (let k = 0; k < mounts.length; k++) ZERO.toArray(arr, (j * mounts.length + k) * 16)
+          continue
+        }
         this.vehicleMatrix(v, _mv)
         const active = model.stages ? sim.activeStage(v) : 0
         for (let k = 0; k < mounts.length; k++) {
@@ -410,6 +414,7 @@ export class Fleet {
       n++
     }
     for (let v = 0; v < sim.count; v++) {
+      if (!sim.active[v]) continue
       const model = sim.models[sim.model[v]], o = v * 8
       if (s.exhaust && model.exhausts.length) {
         const throttle = sim.pose[o + 7]
@@ -459,7 +464,7 @@ export class Fleet {
     let n = 0
     if (this.settings.wakes) for (let v = 0; v < sim.count; v++) {
       const model = sim.models[sim.model[v]], speed = sim.speed[v]
-      if (!model.wake || speed < 0.5 || n >= wakes.instanceMatrix.count) continue
+      if (!sim.active[v] || !model.wake || speed < 0.5 || n >= wakes.instanceMatrix.count) continue
       const o = v * 8, yaw = sim.pose[o + 3]
       const back = model.size[2] * 0.45
       _q.setFromAxisAngle(_up, yaw)

@@ -236,8 +236,21 @@ export class RoadNavigator {
     return false
   }
 
-  /** Moves vehicle `i` forward by `ds` metres, turning onto chosen edges at junctions. */
-  advance(i: number, ds: number): void {
+  /**
+   * Puts vehicle `i` on edge `e`, driving from node `from`, `u` metres along it, and picks its turn at
+   * the end. Until it reaches a corner its pose is the plain lane position (`laneAt` in `traffic.ts`).
+   */
+  placeAt(i: number, e: number, from: number, u: number): void {
+    const len = this.length(e)
+    this.edge[i] = e
+    this.from[i] = from
+    this.u[i] = Math.max(0, Math.min(len, u))
+    this.cornerIn[i] = 0
+    this.dir(e, from, this.prevDir, i * 2)
+    this.choose(i)
+  }
+
+  /** Moves vehicle `i` forward by `ds` metres, turning onto chosen edges at junctions. */  advance(i: number, ds: number): void {
     let e = this.edge[i]
     if (e < 0) return
     this.u[i] += ds

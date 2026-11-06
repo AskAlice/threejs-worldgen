@@ -287,6 +287,10 @@ export class FleetSim {
   readonly anchor: Float32Array
   /** Leader vehicle of each unit. */
   readonly unitLeader: Int32Array
+  /** 1 for vehicles that are drawn, 0 for parked-in-pool units a streaming manager has not spawned (see `Traffic`). */
+  readonly active: Uint8Array
+  /** Road navigator slot of each unit (−1 for units not on roads). */
+  readonly navSlot: Int32Array
   /** Distance along the route of each unit. */
   readonly unitS: Float64Array
   /** Current speed of each unit. */
@@ -304,7 +308,6 @@ export class FleetSim {
   private turn: Float32Array
   private prevYaw: Float32Array
   private tiltDir: Float32Array
-  private navSlot: Int32Array
   private exposed: Float64Array
   /** Trailer axle positions (x, z) per vehicle, NaN until placed: the articulation state. */
   private trail: Float64Array
@@ -391,6 +394,7 @@ export class FleetSim {
     this.prevYaw = new Float32Array(n).fill(NaN)
     this.tiltDir = new Float32Array(n)
     for (let i = 0; i < n; i++) this.tiltDir[i] = hash01(seed, i, 0, 0x711) < 0.5 ? -1 : 1
+    this.active = new Uint8Array(n).fill(1)
     this.exposed = new Float64Array(n)
     this.trail = new Float64Array(n * 2).fill(NaN)
     const units = unitLeader.length
@@ -487,6 +491,20 @@ export class FleetSim {
     return this.groups[group]?.vehicles ?? []
   }
 
+  /** Road navigator driving a group's road route, or null for other routes. */
+  navigator(group: number): RoadNavigator | null {
+    return this.groups[group]?.nav ?? null
+  }
+
+  /** Forgets a unit's motion history after it was moved somewhere else (trailer axles, turn rate), so its rig sits straight behind it. */
+  relocate(unit: number): void {
+    for (let v = this.unitLeader[unit]; v < this.count && this.unit[v] === unit; v++) {
+      this.trail[v * 2] = this.trail[v * 2 + 1] = NaN
+      this.prevYaw[v] = NaN
+      this.turn[v] = 0
+    }
+  }
+
   /** Advances the simulation by `dt` seconds and reacts to `env` (weather, fire, ground states). */
   step(dt: number, env: FleetEnvironment = {}): void {
     const s = this.settings
@@ -499,6 +517,8 @@ export class FleetSim {
       for (let k = 0; k < rt.units.length; k++) {
         const u = rt.units[k]
         const lead = this.unitLeader[u]
+        // Units a streaming manager has not spawned (or has retired) stay where they are, for free.
+        if (!this.active[lead]) continue
         const domain = this.models[this.model[lead]].domain
         // Disabled by damage or fire: land, rail and sea units roll to a stop.
         let disabled = false
