@@ -7,7 +7,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera, Object3D } from 'three/webgpu'
-import { Grass as GrassImpl, type GrassInput, type GrassRenderer } from './grass.ts'
+import { Grass as GrassImpl, resolveObject, type GrassInput, type GrassRenderer } from './grass.ts'
 import { TerrainPainter, type Brush } from './grass-map.ts'
 import { Corn as CornImpl, type CornInput } from './corn.ts'
 import type { HeightFn, Terrain } from 'threejs-heightfield'
@@ -55,16 +55,15 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
   // Height functions are often written inline; only an object/ref change should recreate the field.
   const terrainRef = useRef(terrain)
   terrainRef.current = terrain
-  const terrainKey = typeof terrain === 'function' ? 'function' : terrain
+  const heightFn = typeof terrain === 'function'
+  const terrainKey = heightFn ? null : terrain
 
   useEffect(() => {
     let created: GrassImpl | null = null
     let cancelled = false
     const t = terrainRef.current
     const resolved: Terrain | undefined =
-      typeof t === 'function' ? (x, z) => (terrainRef.current as HeightFn)(x, z)
-      : t && 'current' in t ? t.current ?? undefined
-      : t
+      typeof t === 'function' ? (x, z) => (terrainRef.current as HeightFn)(x, z) : resolveObject(t) ?? undefined
     GrassImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: resolved, ...latest.current }).then((g) => {
       if (cancelled) return g.dispose()
       created = g
@@ -97,7 +96,7 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
     if (painter.current && paint) Object.assign(painter.current.brush, paint)
   })
 
-  useImperativeHandle(ref, () => grass!, [grass])
+  useImperativeHandle<GrassImpl | null, GrassImpl | null>(ref, () => grass, [grass])
   useFrame(() => grass?.update())
 
   return grass ? <primitive object={grass.object} /> : null
@@ -131,16 +130,14 @@ export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX
   latest.current = options
   const terrainRef = useRef(terrain)
   terrainRef.current = terrain
-  const terrainKey = typeof terrain === 'function' ? 'function' : terrain
+  const terrainKey = typeof terrain === 'function' ? null : terrain
 
   useEffect(() => {
     let created: CornImpl | null = null
     let cancelled = false
     const t = terrainRef.current
     const resolved: Terrain | undefined =
-      typeof t === 'function' ? (x, z) => (terrainRef.current as HeightFn)(x, z)
-      : t && 'current' in t ? t.current ?? undefined
-      : t
+      typeof t === 'function' ? (x, z) => (terrainRef.current as HeightFn)(x, z) : resolveObject(t) ?? undefined
     CornImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: resolved, ...latest.current }).then((c) => {
       if (cancelled) return c.dispose()
       created = c
@@ -156,7 +153,7 @@ export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX
   useEffect(() => {
     corn?.reset(options)
   })
-  useImperativeHandle(ref, () => corn!, [corn])
+  useImperativeHandle<CornImpl | null, CornImpl | null>(ref, () => corn, [corn])
   useFrame(() => corn?.update())
   return corn ? <primitive object={corn.object} /> : null
 }

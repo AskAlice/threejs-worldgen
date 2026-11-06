@@ -33,13 +33,13 @@ export interface WindOptions {
   speed: number
 }
 
+/** An object, or a React-style ref to one (`current` is `null` until mounted). */
+export type ObjectRef<T extends Object3D = Object3D> = T | { current: T | null }
+
 /** Something that pushes grass aside: characters, vehicles, balls… */
 export interface Interactor {
   /** The object (or a React ref to it). Its world position is read every frame. */
-  object: Object3D | {
-    /** The referenced object; `null` until mounted. */
-    current: Object3D | null
-  }
+  object: ObjectRef
   /** Influence radius in metres. Blades inside are bent away from the object. */
   radius: number
 }
@@ -112,8 +112,8 @@ export interface GrassOptions extends GrassInput {
   scene?: Object3D
   /** Must be a WebGPURenderer (`three/webgpu`); it falls back to WebGL2 by itself. Initialised if needed. */
   renderer?: GrassRenderer
-  /** Mesh/group to grow on (baked once into a heightfield), a `(x, z) => y` function, or omit for flat ground. */
-  terrain?: Terrain
+  /** Mesh/group (or a ref to one) to grow on, a `(x, z) => y` function, or omit for flat ground. */
+  terrain?: Terrain | { current: Object3D | null }
 }
 
 const DEFAULTS: Omit<GrassSettings, keyof GrassStyle | 'wind'> = {
@@ -234,7 +234,7 @@ export class Grass {
   /** Prefer {@link Grass.create}, which also validates/initialises the renderer and pre-builds tiles. */
   constructor({ camera, scene, renderer: _renderer, terrain, ...input }: GrassOptions) {
     this.camera = camera
-    this.sampleHeight = createHeightSampler(terrain)
+    this.sampleHeight = createHeightSampler(resolveTerrain(terrain))
     this.object.name = 'Grass'
     this.set(input)
     if (scene) {
@@ -338,9 +338,9 @@ export class Grass {
     return this
   }
 
-  /** Swaps the terrain (mesh or height function) and regenerates all tiles. */
-  setTerrain(terrain?: Terrain): void {
-    this.sampleHeight = createHeightSampler(terrain)
+  /** Swaps the terrain (mesh/group, ref to one, or height function) and regenerates all tiles. */
+  setTerrain(terrain?: Terrain | { current: Object3D | null }): void {
+    this.sampleHeight = createHeightSampler(resolveTerrain(terrain))
     this.clearTiles()
   }
 
@@ -430,6 +430,16 @@ export class Grass {
     const seg = (a: number, b: number) => Math.min(1, Math.max(0, (dist - a) / Math.max(b - a, 1e-3)))
     const mix = (a: number, b: number, t: number) => a + (b - a) * t
     return mix(mix(mix(l[0].density, l[1].density, seg(l[0].distance, l[1].distance)), l[2].density, seg(l[1].distance, l[2].distance)), l[3].density, seg(l[2].distance, l[3].distance))
+  }
+
+  /** The coverage/height map grass is painted through, or `null`. Shorthand for `settings.grassMap`. */
+  get grassMap(): GrassMap | null {
+    return this.settings.grassMap
+  }
+
+  /** Radius (metres) around the camera that has grass. Shorthand for `settings.maxDistance`. */
+  get maxDistance(): number {
+    return this.settings.maxDistance
   }
 
   /** Tiles are split into ~5 m cells, each holding only as many blades as its own distance needs.
@@ -819,9 +829,24 @@ function subscribeScene(scene: Object3D, listener: () => void): () => void {
   }
 }
 
+/** Resolves an object or a ref to it; a missing ref, or one whose `current` is `null`, resolves to `null`. */
+export function resolveObject<T extends Object3D>(value: ObjectRef<T> | null | undefined): T | null {
+  if (value == null) return null
+  return isObjectRef(value) ? value.current : value
+}
+
+function isObjectRef<T extends Object3D>(value: ObjectRef<T>): value is { current: T | null } {
+  return 'current' in value
+}
+
+/** Resolves a terrain object-or-ref; height functions pass through untouched. */
+function resolveTerrain(terrain: Terrain | { current: Object3D | null } | undefined): Terrain | undefined {
+  return typeof terrain === 'function' ? terrain : resolveObject(terrain) ?? undefined
+}
+
 /** The interactor's object, or `null` while a React ref is unmounted. */
 export function interactorObject(it: Interactor | undefined): Object3D | null {
-  return (it && ('isObject3D' in it.object ? it.object : it.object.current)) ?? null
+  return it ? resolveObject(it.object) : null
 }
 
 /** Copies interactor positions and radii into the shader slots (shared by grass and corn). */

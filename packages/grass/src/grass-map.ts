@@ -19,6 +19,14 @@ export interface GrassMapOptions {
 /** What a brush stroke does: add/erase coverage, or raise/lower grass height. */
 export type BrushMode = 'add' | 'erase' | 'raise' | 'lower'
 
+/** Per-mode target channel (0 = coverage, 1 = height) and direction of the stroke. */
+const BRUSH: Record<BrushMode, { channel: 0 | 1; sign: 1 | -1 }> = {
+  add: { channel: 0, sign: 1 },
+  erase: { channel: 0, sign: -1 },
+  raise: { channel: 1, sign: 1 },
+  lower: { channel: 1, sign: -1 },
+}
+
 /** A soft round brush used by {@link GrassMap.paint} and {@link TerrainPainter}. */
 export interface Brush {
   /** What the stroke does: add/erase coverage or raise/lower height. */
@@ -110,8 +118,7 @@ export class GrassMap {
     const cx = (x - this.minX) / texel - 0.5
     const cz = (z - this.minZ) / texel - 0.5
     const rr = radius / texel
-    const channel = mode === 'add' || mode === 'erase' ? 0 : 1
-    const sign = mode === 'add' || mode === 'raise' ? 1 : -1
+    const { channel, sign } = BRUSH[mode]
     const i0 = Math.max(0, Math.floor(cx - rr))
     const i1 = Math.min(res - 1, Math.ceil(cx + rr))
     const j0 = Math.max(0, Math.floor(cz - rr))
@@ -186,7 +193,7 @@ export class TerrainPainter {
   constructor(grass: Grass, domElement: HTMLElement, brush: Partial<Brush> = {}) {
     this.grass = grass
     this.domElement = domElement
-    if (!grass.settings.grassMap) throw new Error('TerrainPainter: set a `grassMap` on the Grass first.')
+    if (!grass.grassMap) throw new Error('TerrainPainter: set a `grassMap` on the Grass first.')
     this.brush = { mode: 'erase', radius: 3, strength: 0.25, ...brush }
     this.cursor = new Mesh(
       new RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
@@ -217,7 +224,7 @@ export class TerrainPainter {
     this.ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
     this.raycaster.setFromCamera(this.ndc, this.grass.camera)
     const { origin, direction } = this.raycaster.ray
-    return raycastHeight(this.grass.sampleHeight, origin, direction, this.grass.settings.maxDistance * 2)
+    return raycastHeight(this.grass.sampleHeight, origin, direction, this.grass.maxDistance * 2)
   }
 
   private stroke(e: PointerEvent) {
@@ -226,7 +233,7 @@ export class TerrainPainter {
     if (!p) return
     this.cursor.position.set(p.x, p.y + 0.05, p.z)
     this.cursor.scale.setScalar(this.brush.radius)
-    if (this.painting) this.grass.settings.grassMap?.paint(p.x, p.z, this.brush)
+    if (this.painting) this.grass.grassMap?.paint(p.x, p.z, this.brush)
   }
 
   private onDown = (e: PointerEvent) => {
