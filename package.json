@@ -4,6 +4,10 @@
   "description": "Procedural terrain and scenery packages for three.js and react-three-fiber",
   "type": "module",
   "license": "Apache-2.0",
+  "packageManager": "npm@12.2.0",
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "packages/heightfield",
     "packages/biomes",
@@ -29,7 +33,8 @@
     "build:site": "rm -rf site && typedoc --out site/docs && vite build example --base ./ --outDir ../site/demo --emptyOutDir && node landing/build.mjs && node landing/check.mjs",
     "publish:all": "scripts/publish-all.sh",
     "readme:cards": "node landing/readme-cards.mjs",
-    "check:options": "node --conditions=worldgen-source scripts/options-coverage.mjs"
+    "check:options": "node --conditions=worldgen-source scripts/options-coverage.mjs",
+    "check:manifests": "node scripts/check-manifests.mjs"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.9",
