@@ -1,6 +1,18 @@
 import {
-  BatchedMesh, BufferGeometry, Color, Float32BufferAttribute, Group, Matrix4, Mesh, Quaternion, Uint16BufferAttribute, Uint32BufferAttribute, Vector3,
-  type Camera, type Material, type Object3D,
+  BatchedMesh,
+  BufferGeometry,
+  Color,
+  Float32BufferAttribute,
+  Group,
+  Matrix4,
+  Mesh,
+  Quaternion,
+  Uint16BufferAttribute,
+  Uint32BufferAttribute,
+  Vector3,
+  type Camera,
+  type Material,
+  type Object3D
 } from 'three/webgpu'
 import { batchIndirectIndex, hash } from 'three/tsl'
 import { hash01, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
@@ -9,7 +21,13 @@ import type { Climate } from './architecture.ts'
 import { buildingGeometry, detailGeometry, detailInstances, DETAIL_SHAPES } from './building-mesh.ts'
 import type { Building } from './buildings.ts'
 import { cityData, type CityData } from './data.ts'
-import { applyFacadeUniforms, BuildingWeather, createCityUniforms, createFacadeMaterial, createRoofMaterial } from './facade-material.ts'
+import {
+  applyFacadeUniforms,
+  BuildingWeather,
+  createCityUniforms,
+  createFacadeMaterial,
+  createRoofMaterial
+} from './facade-material.ts'
 import { createFieldMaterial } from './field-material.ts'
 import { fieldGeometry } from './field-mesh.ts'
 import type { RoadGraph } from './graph.ts'
@@ -69,7 +87,12 @@ const _q = new Quaternion()
 const _s = new Vector3()
 const _y = new Vector3(0, 1, 0)
 
-interface Batch { mesh: BatchedMesh; full: number[]; simple: number[]; instance: number[] }
+interface Batch {
+  mesh: BatchedMesh
+  full: number[]
+  simple: number[]
+  instance: number[]
+}
 
 /**
  * A procedural settlement on a threejs-biomes `World`: roads grown along a tensor field, blocks, lots and
@@ -91,7 +114,20 @@ export class City {
   /** Shader uniforms (night, window grids, weather, road look). */
   readonly uniforms = createCityUniforms()
   /** Live counters. */
-  readonly stats: CityStats = { ready: false, roadKm: 0, roads: 0, junctions: 0, bridges: 0, blocks: 0, lots: 0, buildings: 0, population: 0, modifiers: 0, generationMs: 0, detailed: 0 }
+  readonly stats: CityStats = {
+    ready: false,
+    roadKm: 0,
+    roads: 0,
+    junctions: 0,
+    bridges: 0,
+    blocks: 0,
+    lots: 0,
+    buildings: 0,
+    population: 0,
+    modifiers: 0,
+    generationMs: 0,
+    detailed: 0
+  }
   /** The world. */
   readonly world: World
   /** The frame the city is laid out in. */
@@ -156,7 +192,9 @@ export class City {
         previous.apply(scene, args)
         this.update()
       }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = () => {
+        scene.onBeforeRender = previous
+      }
     }
   }
 
@@ -216,7 +254,8 @@ export class City {
   update(budget: number = this.options.buildBudget): void {
     if (this.job) {
       const start = performance.now()
-      do { // at least one step per call, so any budget (even 0) makes progress
+      do {
+        // at least one step per call, so any budget (even 0) makes progress
         const r = this.job.next()
         if (r.done) this.finish(r.value)
       } while (this.job && performance.now() - start < budget)
@@ -279,7 +318,11 @@ export class City {
     this.clearModifiers()
     const t0 = performance.now()
     const s = this.frame.sample(o.center[0], o.center[1])
-    const climate: Climate = { temperature: s.temperature, moisture: s.moisture, biome: this.world.options.biomes[s.biomes[0]]?.id ?? '' }
+    const climate: Climate = {
+      temperature: s.temperature,
+      moisture: s.moisture,
+      biome: this.world.options.biomes[s.biomes[0]]?.id ?? ''
+    }
     this.job = planCity(Site.frameFn(this.frame), o, climate)
     this.jobTime = performance.now() - t0
     this.stats.ready = false
@@ -304,21 +347,30 @@ export class City {
     this.index.clear()
     for (const b of plan.buildings) {
       const seen = new Set<number>()
-      for (const part of b.parts) for (const [x, z] of part.tiers[0].polygon) {
-        const k = cellKey(Math.floor(x / 50), Math.floor(z / 50))
-        if (seen.has(k)) continue
-        seen.add(k)
-        const list = this.index.get(k)
-        if (list) list.push(b.id)
-        else this.index.set(k, [b.id])
-      }
+      for (const part of b.parts)
+        for (const [x, z] of part.tiers[0].polygon) {
+          const k = cellKey(Math.floor(x / 50), Math.floor(z / 50))
+          if (seen.has(k)) continue
+          seen.add(k)
+          const list = this.index.get(k)
+          if (list) list.push(b.id)
+          else this.index.set(k, [b.id])
+        }
     }
     this.buildMeshes(plan)
     const g = plan.graph
     Object.assign(this.stats, {
-      ready: true, roadKm: g.totalLength() / 1000, roads: g.edges.length, junctions: g.nodes.filter((n) => n.edges.length >= 3).length,
-      bridges: g.edges.filter((e) => e.bridge).length, blocks: plan.blocks.length, lots: plan.lots.length, buildings: plan.buildings.length,
-      population: plan.population, modifiers: this.modifiers.length, generationMs: this.jobTime + performance.now() - t0,
+      ready: true,
+      roadKm: g.totalLength() / 1000,
+      roads: g.edges.length,
+      junctions: g.nodes.filter((n) => n.edges.length >= 3).length,
+      bridges: g.edges.filter((e) => e.bridge).length,
+      blocks: plan.blocks.length,
+      lots: plan.lots.length,
+      buildings: plan.buildings.length,
+      population: plan.population,
+      modifiers: this.modifiers.length,
+      generationMs: this.jobTime + performance.now() - t0
     })
   }
 
@@ -332,12 +384,25 @@ export class City {
   }
 
   private clearMeshes() {
-    for (const b of [this.walls, this.roofs]) if (b) { b.mesh.removeFromParent(); b.mesh.dispose() }
-    if (this.details) { this.details.removeFromParent(); this.details.dispose() }
+    for (const b of [this.walls, this.roofs])
+      if (b) {
+        b.mesh.removeFromParent()
+        b.mesh.dispose()
+      }
+    if (this.details) {
+      this.details.removeFromParent()
+      this.details.dispose()
+    }
     this.details = null
     this.detailIds = []
-    if (this.roads) { this.roads.removeFromParent(); this.roads.geometry.dispose() }
-    if (this.fields) { this.fields.removeFromParent(); this.fields.geometry.dispose() }
+    if (this.roads) {
+      this.roads.removeFromParent()
+      this.roads.geometry.dispose()
+    }
+    if (this.fields) {
+      this.fields.removeFromParent()
+      this.fields.geometry.dispose()
+    }
     this.fields = null
     this.props?.dispose()
     this.props = null
@@ -364,12 +429,13 @@ export class City {
     const meshes = plan.buildings.map((b) => {
       const k = 1 + (hash01(b.id, 7, 3, 1) - 0.5) * 2 * f.variation
       const flat = b.parts[0].roof === 'flat'
-      const roofList = b.parts[0].roof === 'sawtooth' ? f.roofs.metal : flat ? f.roofs.concrete : f.roofs[b.roofMaterial]
+      const roofList =
+        b.parts[0].roof === 'sawtooth' ? f.roofs.metal : flat ? f.roofs.concrete : f.roofs[b.roofMaterial]
       return buildingGeometry(b, origin, {
         wall: rgb(b.tint ?? pickHex(f.walls[b.material], b.seed), k),
         roof: rgb(pickHex(roofList, hash01(b.id, 9, 1, 2)), 1 + (k - 1) * 0.5),
         overhang: o.architectures[plan.architecture].overhang,
-        parapet: b.style === 'house' ? 0 : 0.9,
+        parapet: b.style === 'house' ? 0 : 0.9
       })
     })
     this.weather = new BuildingWeather(plan.buildings.length)
@@ -381,9 +447,19 @@ export class City {
     // instance colour (setColorAt) would be multiplied in after colorNode and tint the snow.
     const detail = createRoofMaterial(this.uniforms, null, hash(batchIndirectIndex).mul(0.25).add(0.85))
     this.materials = [facade, roof, road.material, detail]
-    this.walls = batch(meshes.map((m) => [m.walls, m.simpleWalls]), facade)
-    this.roofs = batch(meshes.map((m) => [m.roofs, m.simpleRoofs]), roof)
-    for (const b of [this.walls, this.roofs]) if (b) { b.mesh.castShadow = b.mesh.receiveShadow = true; this.object.add(b.mesh) }
+    this.walls = batch(
+      meshes.map((m) => [m.walls, m.simpleWalls]),
+      facade
+    )
+    this.roofs = batch(
+      meshes.map((m) => [m.roofs, m.simpleRoofs]),
+      roof
+    )
+    for (const b of [this.walls, this.roofs])
+      if (b) {
+        b.mesh.castShadow = b.mesh.receiveShadow = true
+        this.object.add(b.mesh)
+      }
 
     // Repeated details (balconies, plant, tanks, chimneys, AC units, stilts): one instanced batch
     // sharing a unit geometry per shape, scaled and turned per instance.
@@ -391,16 +467,19 @@ export class City {
     const total = perBuilding.reduce((n, l) => n + l.length, 0)
     if (total) {
       const units = DETAIL_SHAPES.map((s) => toGeometry(detailGeometry(s)))
-      const verts = units.reduce((n, g) => n + g.attributes.position.count, 0), idx = units.reduce((n, g) => n + g.index!.count, 0)
+      const verts = units.reduce((n, g) => n + g.attributes.position.count, 0),
+        idx = units.reduce((n, g) => n + g.index!.count, 0)
       const mesh = new BatchedMesh(total, verts, idx, detail)
       const ids = units.map((g) => mesh.addGeometry(g))
       units.forEach((g) => g.dispose())
-      this.detailIds = perBuilding.map((list) => list.map((d) => {
-        const inst = mesh.addInstance(ids[d.shape])
-        _q.setFromAxisAngle(_y, -d.angle)
-        mesh.setMatrixAt(inst, _m.compose(_p.set(d.x, d.y, d.z), _q, _s.set(d.width, d.height, d.depth)))
-        return inst
-      }))
+      this.detailIds = perBuilding.map((list) =>
+        list.map((d) => {
+          const inst = mesh.addInstance(ids[d.shape])
+          _q.setFromAxisAngle(_y, -d.angle)
+          mesh.setMatrixAt(inst, _m.compose(_p.set(d.x, d.y, d.z), _q, _s.set(d.width, d.height, d.depth)))
+          return inst
+        })
+      )
       mesh.computeBoundingSphere()
       mesh.castShadow = mesh.receiveShadow = true
       mesh.name = 'Details'
@@ -410,7 +489,10 @@ export class City {
 
     const site = plan.site
     const roadData = roadGeometry(plan.graph, plan.profiles, origin, (x, z) => site.height(x, z), {
-      kerbHeight: o.roadLook.kerbHeight, offset: o.terrain.roadOffset, deckThickness: 1.2, pierSpacing: 24,
+      kerbHeight: o.roadLook.kerbHeight,
+      offset: o.terrain.roadOffset,
+      deckThickness: 1.2,
+      pierSpacing: 24
     })
     if (roadData.count) {
       this.roads = new Mesh(toGeometry(roadData), road.material)
@@ -422,9 +504,16 @@ export class City {
     // A farm's fields and yard, hugging the ground: the yard follows the flattened pads, fields lie clear of them.
     const farm = plan.farm
     if (farm) {
-      const ground = (x: number, z: number) => (pointInPolygon(x, z, farm.apron) ? this.frame.height(x, z) : site.height(x, z))
+      const ground = (x: number, z: number) =>
+        pointInPolygon(x, z, farm.apron) ? this.frame.height(x, z) : site.height(x, z)
       const fm = o.farm
-      const data = fieldGeometry(farm, origin, ground, { rowContrast: fm.rowContrast, tramlines: fm.tramlines, yardColor: fm.yardColor, offset: fm.fieldOffset, step: fm.fieldStep })
+      const data = fieldGeometry(farm, origin, ground, {
+        rowContrast: fm.rowContrast,
+        tramlines: fm.tramlines,
+        yardColor: fm.yardColor,
+        offset: fm.fieldOffset,
+        step: fm.fieldStep
+      })
       if (data.count) {
         const material = createFieldMaterial(this.uniforms, fm)
         this.materials.push(material)
@@ -449,14 +538,22 @@ export class City {
     if (!o.props.enabled) return
     const { enabled: _enabled, seed, ...decorate } = o.props
     const data = cityData(plan, o.roads)
-    const placements = decorateRoads(data.roads, this.world, { ...decorate, seed: seed ?? o.seed }, { frame: this.frame, lots: data.lots })
+    const placements = decorateRoads(
+      data.roads,
+      this.world,
+      { ...decorate, seed: seed ?? o.seed },
+      { frame: this.frame, lots: data.lots }
+    )
     this.props = new Props({ placements, states: o.weather.roads, nightNode: this.uniforms.night })
     this.local.add(this.props.object)
   }
 
   private updateLod() {
     const plan = this.plan
-    if (!plan || !this.camera) { this.stats.detailed = plan?.buildings.length ?? 0; return }
+    if (!plan || !this.camera) {
+      this.stats.detailed = plan?.buildings.length ?? 0
+      return
+    }
     this.camera.getWorldPosition(_cam)
     this.object.worldToLocal(_cam)
     const lod = this.options.lod
@@ -492,7 +589,9 @@ function cellKey(i: number, j: number) {
 function toGeometry(d: MeshData): BufferGeometry {
   const g = new BufferGeometry()
   for (const [k, a] of Object.entries(d.attributes)) g.setAttribute(k, new Float32BufferAttribute(a, d.itemSizes[k]))
-  g.setIndex(d.index instanceof Uint16Array ? new Uint16BufferAttribute(d.index, 1) : new Uint32BufferAttribute(d.index, 1))
+  g.setIndex(
+    d.index instanceof Uint16Array ? new Uint16BufferAttribute(d.index, 1) : new Uint32BufferAttribute(d.index, 1)
+  )
   g.computeBoundingBox()
   g.computeBoundingSphere()
   return g
@@ -500,7 +599,9 @@ function toGeometry(d: MeshData): BufferGeometry {
 
 /** One BatchedMesh holding a full and a simple geometry per building (instances switch between them). */
 function batch(pairs: [MeshData, MeshData][], material: Material): Batch | null {
-  let verts = 0, idx = 0, n = 0
+  let verts = 0,
+    idx = 0,
+    n = 0
   for (const [a, b] of pairs) {
     if (!a.count || !b.count) continue
     verts += a.count + b.count
@@ -509,13 +610,25 @@ function batch(pairs: [MeshData, MeshData][], material: Material): Batch | null 
   }
   if (!n) return null
   const mesh = new BatchedMesh(n, verts, idx, material)
-  const full: number[] = [], simple: number[] = [], instance: number[] = []
+  const full: number[] = [],
+    simple: number[] = [],
+    instance: number[] = []
   for (const [a, b] of pairs) {
-    if (!a.count || !b.count) { full.push(-1); simple.push(-1); instance.push(-1); continue }
-    const ga = toGeometry(a), gb = toGeometry(b)
-    const fa = mesh.addGeometry(ga), fb = mesh.addGeometry(gb)
-    ga.dispose(); gb.dispose()
-    full.push(fa); simple.push(fb); instance.push(mesh.addInstance(fa))
+    if (!a.count || !b.count) {
+      full.push(-1)
+      simple.push(-1)
+      instance.push(-1)
+      continue
+    }
+    const ga = toGeometry(a),
+      gb = toGeometry(b)
+    const fa = mesh.addGeometry(ga),
+      fb = mesh.addGeometry(gb)
+    ga.dispose()
+    gb.dispose()
+    full.push(fa)
+    simple.push(fb)
+    instance.push(mesh.addInstance(fa))
   }
   mesh.computeBoundingSphere()
   return { mesh, full, simple, instance }

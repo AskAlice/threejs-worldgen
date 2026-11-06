@@ -22,12 +22,18 @@ export interface TreeSkeleton {
 export function crownProfile(shape: TreeParams['crownShape'], t: number): number {
   if (t < 0 || t > 1) return 0
   switch (shape) {
-    case 'cone': return Math.min(1, (1 - t) * 1.08)
-    case 'hemisphere': return Math.sqrt(1 - t * t)
-    case 'column': return Math.sqrt(Math.max(0, 1 - Math.pow(2 * t - 1, 8))) * (1 - 0.35 * t)
-    case 'umbrella': return Math.pow(t, 0.35)
-    case 'vase': return 0.25 + 0.75 * Math.pow(t, 0.7)
-    default: return Math.sqrt(Math.max(0, 1 - (2 * t - 1) * (2 * t - 1))) // sphere, ellipsoid
+    case 'cone':
+      return Math.min(1, (1 - t) * 1.08)
+    case 'hemisphere':
+      return Math.sqrt(1 - t * t)
+    case 'column':
+      return Math.sqrt(Math.max(0, 1 - (2 * t - 1) ** 8)) * (1 - 0.35 * t)
+    case 'umbrella':
+      return t ** 0.35
+    case 'vase':
+      return 0.25 + 0.75 * t ** 0.7
+    default:
+      return Math.sqrt(Math.max(0, 1 - (2 * t - 1) * (2 * t - 1))) // sphere, ellipsoid
   }
 }
 
@@ -107,7 +113,15 @@ export function growSkeleton(params: TreeParams, rand: () => number): TreeSkelet
     for (let k = 0; k < steps; k++) {
       dir = jitterDir(dir[0], dir[1] + (params.leader ? 0.3 : 0), dir[2], params.jitter * 0.15)
       const step = length / steps
-      node = add(px[node] + dir[0] * step, py[node] + dir[1] * step, pz[node] + dir[2] * step, node, dir[0], dir[1], dir[2])
+      node = add(
+        px[node] + dir[0] * step,
+        py[node] + dir[1] * step,
+        pz[node] + dir[2] * step,
+        node,
+        dir[0],
+        dir[1],
+        dir[2]
+      )
     }
     if (s === 0) {
       topX = px[node]
@@ -129,7 +143,8 @@ export function growSkeleton(params: TreeParams, rand: () => number): TreeSkelet
   const grid = new Map<number, number[]>()
   // Numeric cell keys (cells are within ±512 of the origin for any sane tree).
   const cellKey = (cx: number, cy: number, cz: number) => ((cx + 512) * 1024 + (cy + 512)) * 1024 + (cz + 512)
-  const key = (x: number, y: number, z: number) => cellKey(Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell))
+  const key = (x: number, y: number, z: number) =>
+    cellKey(Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell))
   for (let i = 0; i < np; i++) {
     const k = key(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2])
     const list = grid.get(k)
@@ -205,7 +220,11 @@ export function growSkeleton(params: TreeParams, rand: () => number): TreeSkelet
     for (let n = first; n < px.length; n++) visit(n)
   }
 
-  return finish(px, py, pz, parent, params, [stems > 1 ? 0 : topX, crownExtent(params).bottom + crownExtent(params).height * 0.5, stems > 1 ? 0 : topZ])
+  return finish(px, py, pz, parent, params, [
+    stems > 1 ? 0 : topX,
+    crownExtent(params).bottom + crownExtent(params).height * 0.5,
+    stems > 1 ? 0 : topZ
+  ])
 }
 
 function hasChild(parent: number[], n: number, before: number) {
@@ -214,7 +233,14 @@ function hasChild(parent: number[], n: number, before: number) {
 }
 
 /** Smooths kinks, then computes tip counts, pipe-model radii and distance to tips. */
-function finish(px: number[], py: number[], pz: number[], parentList: number[], params: TreeParams, crownCenter: [number, number, number]): TreeSkeleton {
+function finish(
+  px: number[],
+  py: number[],
+  pz: number[],
+  parentList: number[],
+  params: TreeParams,
+  crownCenter: [number, number, number]
+): TreeSkeleton {
   const count = px.length
   const parent = Int32Array.from(parentList)
   const children = new Int32Array(count)
@@ -254,6 +280,6 @@ function finish(px: number[], py: number[], pz: number[], parentList: number[], 
   const radius = new Float32Array(count)
   const total = Math.max(1, tips[0])
   const inv = 1 / Math.max(0.5, params.radiusExponent)
-  for (let i = 0; i < count; i++) radius[i] = Math.max(params.tipRadius, params.baseRadius * Math.pow(tips[i] / total, inv))
+  for (let i = 0; i < count; i++) radius[i] = Math.max(params.tipRadius, params.baseRadius * (tips[i] / total) ** inv)
   return { count, positions, parent, radius, tipDistance, tips, crownCenter }
 }

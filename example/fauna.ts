@@ -49,13 +49,18 @@ async function gallery() {
   camera.position.set(0, 0.7, 3.4)
   controls.target.set(0, 0.7, 0)
   const all = { set: (input: object) => fishes.forEach((f) => f.set(input)) }
-  createPanel([{
-    name: 'threejs-fauna',
-    classes: [
-      classOf('all fish', all, { speed: 1, turn: 0 }, { ranges: { speed: [0, 4], turn: [-1, 1] } }),
-      ...fishes.map((f, i) => classOf(`Fish: ${ids[i]}`, f, f.settings, specOptions(spec.Fish))),
+  createPanel(
+    [
+      {
+        name: 'threejs-fauna',
+        classes: [
+          classOf('all fish', all, { speed: 1, turn: 0 }, { ranges: { speed: [0, 4], turn: [-1, 1] } }),
+          ...fishes.map((f, i) => classOf(`Fish: ${ids[i]}`, f, f.settings, specOptions(spec.Fish)))
+        ]
+      }
     ],
-  }], { title: 'threejs-fauna' })
+    { title: 'threejs-fauna' }
+  )
   renderer.setAnimationLoop(() => {
     controls.update()
     renderer.render(scene, camera)
@@ -71,33 +76,59 @@ async function worldMode() {
   const origin: [number, number, number] = [center[0], 0, center[1]]
   scene.add(buildTerrain(world, center, 700, 220))
   // A simple see-through sea so the fish stay visible from above.
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), new THREE.MeshBasicNodeMaterial({ color: '#2b6f8a', transparent: true, opacity: 0.35, depthWrite: false }))
+  const sea = new THREE.Mesh(
+    new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicNodeMaterial({ color: '#2b6f8a', transparent: true, opacity: 0.35, depthWrite: false })
+  )
   sea.position.y = world.options.seaLevel - origin[1]
   scene.add(sea)
   camera.position.set(-40, 25, 60)
   controls.target.set(0, -1, 0)
-  const fauna = await Fauna.create({ camera, scene, renderer, world, origin, predators: [{ object: camera, radius: 3 }] })
+  const fauna = await Fauna.create({
+    camera,
+    scene,
+    renderer,
+    world,
+    origin,
+    predators: [{ object: camera, radius: 3 }]
+  })
   Object.assign(globalThis, { fauna, THREE }) // for poking at it from the console
   // A layer per kind; its settings minus the predators (the camera: not JSON, and skipped in the panel).
   const kind = (name: 'fish' | 'birds') => ({ set: (input: object) => fauna.set({ [name]: input }) })
-  createPanel([{
-    name: 'threejs-fauna',
-    classes: [
-      classOf('FishSchools', kind('fish'), { ...fauna.layers.fish!.settings, predators: [] }, specOptions(spec.FishSchools)),
-      classOf('BirdFlocks', kind('birds'), { ...fauna.layers.birds!.settings, predators: [] }, specOptions(spec.BirdFlocks)),
+  createPanel(
+    [
+      {
+        name: 'threejs-fauna',
+        classes: [
+          classOf(
+            'FishSchools',
+            kind('fish'),
+            { ...fauna.layers.fish!.settings, predators: [] },
+            specOptions(spec.FishSchools)
+          ),
+          classOf(
+            'BirdFlocks',
+            kind('birds'),
+            { ...fauna.layers.birds!.settings, predators: [] },
+            specOptions(spec.BirdFlocks)
+          )
+        ]
+      }
     ],
-  }], { title: 'threejs-fauna' })
+    { title: 'threejs-fauna' }
+  )
   const s = createSample(8)
   renderer.setAnimationLoop(() => {
     controls.update()
     renderer.render(scene, camera)
     const t = controls.target
     frame.sample(center[0] + t.x, center[1] + t.z, s, 1)
-    const f = fauna.layers.fish?.stats, b = fauna.layers.birds?.stats
+    const f = fauna.layers.fish?.stats,
+      b = fauna.layers.birds?.stats
     hud.textContent = [
       `fish: ${f?.animals ?? 0} in ${f?.groups ?? 0} schools · ${f?.pending ?? 0} tiles pending`,
       `birds: ${b?.animals ?? 0} in ${b?.groups ?? 0} flocks`,
-      `target: ${s.waterLevel === s.waterLevel ? `${(s.waterLevel - s.elevation).toFixed(1)} m of ${s.river > 0.25 ? 'river' : 'sea'} water` : 'dry'} · ${s.temperature.toFixed(1)} °C`,
+      `target: ${s.waterLevel === s.waterLevel ? `${(s.waterLevel - s.elevation).toFixed(1)} m of ${s.river > 0.25 ? 'river' : 'sea'} water` : 'dry'} · ${s.temperature.toFixed(1)} °C`
     ].join('\n')
   })
 }
@@ -110,7 +141,8 @@ function buildTerrain(world: World, center: [number, number], size: number, segm
   const s = createSample(8)
   const c = new THREE.Color()
   for (let i = 0; i < pos.count; i++) {
-    const x = center[0] + pos.getX(i), z = center[1] + pos.getZ(i)
+    const x = center[0] + pos.getX(i),
+      z = center[1] + pos.getZ(i)
     const h = world.frame.sample(x, z, s, (size / segments) * 2).elevation
     pos.setY(i, h)
     c.set(s.river > 0.2 ? '#6b5a44' : h < world.options.seaLevel + 1.2 ? '#d8c79a' : h < 60 ? '#5f8a3c' : '#7d756b')

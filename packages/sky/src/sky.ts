@@ -7,11 +7,33 @@ import { Group, Vector3, type Camera, type Scene, type Texture, type WebGPURende
 import { applyAtmosphere, applySkyState, createSkyDome, createSkyUniforms, type SkyUniforms } from './atmosphere.ts'
 import { StarSystem, type SystemInput } from './bodies.ts'
 import { DEFAULT_LIGHTING, DayNight, computeLighting, type Lighting, type LightingOptions } from './day-night.ts'
-import { DEFAULT_OBSERVER, defaultSkyState, observe, sunTimes, type ObserverOptions, type SkyState, type SunTimes } from './observer.ts'
+import {
+  DEFAULT_OBSERVER,
+  defaultSkyState,
+  observe,
+  sunTimes,
+  type ObserverOptions,
+  type SkyState,
+  type SunTimes
+} from './observer.ts'
 import { DEFAULT_ATMOSPHERE, type AtmosphereOptions } from './scattering.ts'
 import { Clouds, DEFAULT_CLOUDS, type CloudOptions } from './clouds.ts'
-import { altitudeScale, clipPlanes, layerAt, resolveAtmosphere, type AtmosphereLayers, type LayerName } from './layers.ts'
-import { DEFAULT_NIGHT_LIGHTS, applyNightLights, bakeNightLights, setNightLightsTexture, type LightsField, type NightLightsOptions } from './night-lights.ts'
+import {
+  altitudeScale,
+  clipPlanes,
+  layerAt,
+  resolveAtmosphere,
+  type AtmosphereLayers,
+  type LayerName
+} from './layers.ts'
+import {
+  DEFAULT_NIGHT_LIGHTS,
+  applyNightLights,
+  bakeNightLights,
+  setNightLightsTexture,
+  type LightsField,
+  type NightLightsOptions
+} from './night-lights.ts'
 import { DEFAULT_SHOOTING_STARS, ShootingStars, type ShootingStarsOptions } from './shooting-stars.ts'
 import { AltitudeShells, DEFAULT_SHELLS, resolveShells, type ResolvedShell, type ShellsOptions } from './shells.ts'
 import { DEFAULT_STARS, Stars, type StarsOptions } from './stars.ts'
@@ -88,7 +110,7 @@ export const DEFAULT_SKY: SkySettings = {
   lighting: DEFAULT_LIGHTING,
   clouds: DEFAULT_CLOUDS,
   nightLights: DEFAULT_NIGHT_LIGHTS,
-  shells: DEFAULT_SHELLS,
+  shells: DEFAULT_SHELLS
 }
 
 /**
@@ -148,7 +170,11 @@ export class Sky {
   /** Lighting derived from the last update. */
   lighting: Lighting | null = null
   /** The atmosphere dome. */
-  readonly dome = createSkyDome(this.uniforms, { discs: true, steps: DEFAULT_ATMOSPHERE.steps, lightSteps: DEFAULT_ATMOSPHERE.lightSteps })
+  readonly dome = createSkyDome(this.uniforms, {
+    discs: true,
+    steps: DEFAULT_ATMOSPHERE.steps,
+    lightSteps: DEFAULT_ATMOSPHERE.lightSteps
+  })
   /** Stars and Milky Way. */
   readonly stars: Stars
   /** Meteors. */
@@ -185,7 +211,8 @@ export class Sky {
    */
   static async create(options: SkyOptions = {}): Promise<Sky> {
     const { renderer } = options
-    if (renderer && !(renderer as any).isWebGPURenderer) throw new Error('Sky requires WebGPURenderer from "three/webgpu".')
+    if (renderer && !(renderer as any).isWebGPURenderer)
+      throw new Error('Sky requires WebGPURenderer from "three/webgpu".')
     if (renderer && (renderer as any).hasInitialized?.() === false) await renderer.init()
     const sky = new Sky(options)
     sky.update(0)
@@ -199,7 +226,7 @@ export class Sky {
     this.object.name = 'Sky'
     this.stars = new Stars({}, this.uniforms)
     this.dayNight = new DayNight(this.uniforms, renderer, scene)
-    this.object.add(this.dome, this.stars.object, this.shootingStars.object, ...this.clouds.object, this.shells.object)
+    this.object.add(this.dome, this.stars.object, this.shootingStars.object, this.clouds.object, this.shells.object)
     this.dayNight.addTo(this.object)
     if (world?.onChange) this.unsubscribe = world.onChange(() => this.apply())
     this.set(input)
@@ -225,7 +252,12 @@ export class Sky {
     const planet = w?.surface === 'sphere'
     // A planet World sets the home radius and, in the local frame, where the observer stands.
     if (planet && input.system?.home?.radius === undefined) s.system = merge(s.system, { home: { radius: w.radius } })
-    if (planet && s.observer.frame === 'local' && input.observer?.latitude === undefined && input.observer?.longitude === undefined) {
+    if (
+      planet &&
+      s.observer.frame === 'local' &&
+      input.observer?.latitude === undefined &&
+      input.observer?.longitude === undefined
+    ) {
       s.observer.latitude = w.origin[0]
       s.observer.longitude = w.origin[1]
     }
@@ -265,7 +297,12 @@ export class Sky {
     this.shootingStars.reset({ ...s.shootingStars, seed: input.shootingStars?.seed ?? s.seed })
     this.dayNight.reset(s.lighting)
     this.shells.reset(s.shells)
-    this.resolvedShells = resolveShells(s.shells.shells, this.atmosphere.layers, this.system, altitudeScale(s.atmosphere, this.system.home.radius))
+    this.resolvedShells = resolveShells(
+      s.shells.shells,
+      this.atmosphere.layers,
+      this.system,
+      altitudeScale(s.atmosphere, this.system.home.radius)
+    )
     const atmosphereKey = JSON.stringify([s.atmosphere, s.moon.skyGlow, key, s.nightLights])
     if (atmosphereKey !== this.atmosphereKey) {
       this.atmosphereKey = atmosphereKey
@@ -276,7 +313,11 @@ export class Sky {
 
   private rebuildDome() {
     const a = this.settings.atmosphere
-    const next = createSkyDome(this.uniforms, { discs: true, steps: Math.max(1, Math.round(a.steps)), lightSteps: Math.max(1, Math.round(a.lightSteps)) })
+    const next = createSkyDome(this.uniforms, {
+      discs: true,
+      steps: Math.max(1, Math.round(a.steps)),
+      lightSteps: Math.max(1, Math.round(a.lightSteps))
+    })
     this.object.remove(this.dome)
     this.dome.geometry.dispose()
     this.dome.material.dispose()
@@ -285,13 +326,21 @@ export class Sky {
   }
 
   /** Lights. The sun `DirectionalLight` (size its `shadow.camera` to taste). */
-  get sun() { return this.dayNight.sun }
+  get sun() {
+    return this.dayNight.sun
+  }
   /** The moonlight `DirectionalLight`. */
-  get moonLight() { return this.dayNight.moon }
+  get moonLight() {
+    return this.dayNight.moon
+  }
   /** 0 by day … 1 at night, as a number (the TSL version is `uniforms.night`). */
-  get night(): number { return this.state.night }
+  get night(): number {
+    return this.state.night
+  }
   /** Suggested `renderer.toneMappingExposure` (smoothed); applied for you with `lighting.autoExposure`. */
-  get exposure(): number { return this.dayNight.exposure }
+  get exposure(): number {
+    return this.dayNight.exposure
+  }
 
   /**
    * Advances time and refreshes everything. Call once per frame, before rendering.
@@ -304,11 +353,16 @@ export class Sky {
     if (this.camera) {
       this.camera.updateMatrixWorld()
       const e = this.camera.matrixWorld.elements
-      cam[0] = e[12]; cam[1] = e[13]; cam[2] = e[14]
+      cam[0] = e[12]
+      cam[1] = e[13]
+      cam[2] = e[14]
     }
     const s = this.settings
     observe(this.system, this.clock.time, s.observer, cam, this.state)
-    const lighting = computeLighting(this.state, this.atmosphere, s.lighting, { starTemperature: this.system.star.temperature, moonSkyIntensity: s.moon.skyGlow })
+    const lighting = computeLighting(this.state, this.atmosphere, s.lighting, {
+      starTemperature: this.system.star.temperature,
+      moonSkyIntensity: s.moon.skyGlow
+    })
     this.lighting = lighting
     this.state.night = lighting.night
     this.state.skyLuminance = lighting.skyLuminance
@@ -323,16 +377,30 @@ export class Sky {
     const sunK = (lighting.sunIntensity / Math.max(s.lighting.sunIntensity, 1e-6)) * sunI
     const moonK = (lighting.moonIntensity / Math.max(s.lighting.moonIntensity, 1e-6)) * sunI * 0.004
     const floor = lighting.ambientIntensity * 0.01
-    this.clouds.update(this.state, cam, {
-      sun: [lighting.sunColor[0] * sunK, lighting.sunColor[1] * sunK, lighting.sunColor[2] * sunK],
-      moon: [lighting.moonColor[0] * moonK, lighting.moonColor[1] * moonK, lighting.moonColor[2] * moonK],
-      ambient: [lighting.fogColor[0] * 1.2 + floor, lighting.fogColor[1] * 1.2 + floor, lighting.fogColor[2] * 1.2 + floor * 1.3],
-      haze: lighting.fogColor,
-      hazeFade: lighting.hazeFade,
-    }, altitudeScale(s.atmosphere, this.system.home.radius), this.atmosphere.layers.troposphere, [s.observer.latitude, s.observer.longitude])
+    this.clouds.update(
+      this.state,
+      cam,
+      {
+        sun: [lighting.sunColor[0] * sunK, lighting.sunColor[1] * sunK, lighting.sunColor[2] * sunK],
+        moon: [lighting.moonColor[0] * moonK, lighting.moonColor[1] * moonK, lighting.moonColor[2] * moonK],
+        ambient: [
+          lighting.fogColor[0] * 1.2 + floor,
+          lighting.fogColor[1] * 1.2 + floor,
+          lighting.fogColor[2] * 1.2 + floor * 1.3
+        ],
+        haze: lighting.fogColor,
+        hazeFade: lighting.hazeFade
+      },
+      altitudeScale(s.atmosphere, this.system.home.radius)
+    )
     if (this.camera) {
       const c = this.state.cameraToPlanet
-      this.shells.update(this.camera, [cam[0] - c[0], cam[1] - c[1], cam[2] - c[2]], this.state.planetRadius, this.resolvedShells)
+      this.shells.update(
+        this.camera,
+        [cam[0] - c[0], cam[1] - c[1], cam[2] - c[2]],
+        this.state.planetRadius,
+        this.resolvedShells
+      )
     }
     this.dayNight.target.copy(this.followTarget ?? new Vector3(...cam))
     this.dayNight.update(this.state, lighting, realDt)
@@ -398,7 +466,10 @@ export class Sky {
   /** Next sunrise and sunset after now at the observer, as Dates (null in polar day/night). */
   sunTimes(): { sunrise: Date | null; sunset: Date | null } {
     const t: SunTimes = sunTimes(this.system, this.clock.time, this.state.latitude, this.state.longitude)
-    return { sunrise: t.sunrise === null ? null : toDate(t.sunrise), sunset: t.sunset === null ? null : toDate(t.sunset) }
+    return {
+      sunrise: t.sunrise === null ? null : toDate(t.sunrise),
+      sunset: t.sunset === null ? null : toDate(t.sunset)
+    }
   }
 
   /** Removes everything from the scene and frees GPU resources. */

@@ -2,7 +2,16 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createWaves, crestSharpness, sampleWaves, MAX_WAVES, type WaveOptions } from '../src/waves.ts'
 
-const options: WaveOptions = { count: 10, seed: 3, amplitude: 0.8, wavelength: [2, 60], direction: [1, 0.4], spread: 0.6, choppiness: 0.8, speed: 1 }
+const options: WaveOptions = {
+  count: 10,
+  seed: 3,
+  amplitude: 0.8,
+  wavelength: [2, 60],
+  direction: [1, 0.4],
+  spread: 0.6,
+  choppiness: 0.8,
+  speed: 1
+}
 
 test('waves are deterministic, bounded and never loop', () => {
   const a = createWaves(options)
@@ -41,10 +50,14 @@ test('sampleWaves finds the displaced surface point above (x, z)', () => {
   const w = waves[0]
   const x = 1.234
   const s = sampleWaves(waves, x, 0, 0)
-  let best = Infinity, height = 0
+  let best = Infinity,
+    height = 0
   for (let p = x - 2 * w.chop - 1; p < x + 2 * w.chop + 1; p += 1e-5) {
     const err = Math.abs(p + w.chop * Math.cos(w.k * p) - x)
-    if (err < best) { best = err; height = w.amplitude * Math.sin(w.k * p) }
+    if (err < best) {
+      best = err
+      height = w.amplitude * Math.sin(w.k * p)
+    }
   }
   assert.ok(Math.abs(s.height - height) < 1e-3)
   // A phase offset equals shifting time.

@@ -66,7 +66,9 @@ async function load() {
       continue // no src: nothing published
     }
     const files = await Promise.all(
-      paths.filter((p) => /\.tsx?$/.test(p)).map(async (p) => ({ path: relative(base, p), text: await readFile(p, 'utf8') })),
+      paths
+        .filter((p) => /\.tsx?$/.test(p))
+        .map(async (p) => ({ path: relative(base, p), text: await readFile(p, 'utf8') }))
     )
     packages.push({ name: pkg.name, pkg, files })
   }
@@ -93,13 +95,13 @@ function selfTest() {
             "import { b } from 'threejs-b'",
             "// import { c } from 'threejs-dead-line'",
             "/* import { d } from 'threejs-dead-block' */",
-            "import { c } from 'threejs-c/sub'",
-          ].join('\n'),
+            "import { c } from 'threejs-c/sub'"
+          ].join('\n')
         },
-        { path: 'src/react.tsx', text: '' },
-      ],
+        { path: 'src/react.tsx', text: '' }
+      ]
     },
-    { name: 'threejs-b', pkg: pkg({}, { '.': {}, './react': {} }), files: [{ path: 'src/react.tsx', text: '' }] },
+    { name: 'threejs-b', pkg: pkg({}, { '.': {}, './react': {} }), files: [{ path: 'src/react.tsx', text: '' }] }
   ])
   const [a, b] = results
   const ok =
@@ -110,7 +112,7 @@ function selfTest() {
   console.log(
     ok
       ? 'self-test ok: caught undeclared threejs-c and the missing ./react export, ignored both comment forms'
-      : `self-test FAILED: ${JSON.stringify(results)}`,
+      : `self-test FAILED: ${JSON.stringify(results)}`
   )
   return ok ? 0 : 1
 }

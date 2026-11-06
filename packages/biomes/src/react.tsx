@@ -52,7 +52,14 @@ export interface WorldTerrainProps extends TerrainInput {
  * }
  * ```
  */
-export function WorldTerrain({ world, ref, camera, createWorker, workers, ...options }: WorldTerrainProps): React.JSX.Element | null {
+export function WorldTerrain({
+  world,
+  ref,
+  camera,
+  createWorker,
+  workers,
+  ...options
+}: WorldTerrainProps): React.JSX.Element | null {
   const { camera: defaultCamera } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [terrain, setTerrain] = useState<WorldTerrainImpl | null>(null)
@@ -62,7 +69,13 @@ export function WorldTerrain({ world, ref, camera, createWorker, workers, ...opt
   workerFactory.current = createWorker
 
   useEffect(() => {
-    const t = new WorldTerrainImpl({ world, camera: activeCamera, createWorker: workerFactory.current, workers, ...latest.current })
+    const t = new WorldTerrainImpl({
+      world,
+      camera: activeCamera,
+      createWorker: workerFactory.current,
+      workers,
+      ...latest.current
+    })
     setTerrain(t)
     return () => {
       t.dispose()

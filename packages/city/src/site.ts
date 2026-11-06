@@ -89,8 +89,10 @@ export class Site {
     const n = this.count
     const fx = Math.min(n - 1, Math.max(0, (x - this.minX) / this.cell))
     const fz = Math.min(n - 1, Math.max(0, (z - this.minZ) / this.cell))
-    const i = Math.min(n - 2, Math.floor(fx)), j = Math.min(n - 2, Math.floor(fz))
-    const tx = fx - i, tz = fz - j
+    const i = Math.min(n - 2, Math.floor(fx)),
+      j = Math.min(n - 2, Math.floor(fz))
+    const tx = fx - i,
+      tz = fz - j
     const w = (k: number) => (this.water[k] === this.water[k] ? 1 : 0)
     const a = w(j * n + i) * (1 - tx) + w(j * n + i + 1) * tx
     const b = w((j + 1) * n + i) * (1 - tx) + w((j + 1) * n + i + 1) * tx
@@ -136,8 +138,10 @@ export class Site {
     const n = this.count
     const fx = Math.min(n - 1, Math.max(0, (x - this.minX) / this.cell))
     const fz = Math.min(n - 1, Math.max(0, (z - this.minZ) / this.cell))
-    const i = Math.min(n - 2, Math.floor(fx)), j = Math.min(n - 2, Math.floor(fz))
-    const tx = fx - i, tz = fz - j
+    const i = Math.min(n - 2, Math.floor(fx)),
+      j = Math.min(n - 2, Math.floor(fz))
+    const tx = fx - i,
+      tz = fz - j
     const k = j * n + i
     return (a[k] * (1 - tx) + a[k + 1] * tx) * (1 - tz) + (a[k + n] * (1 - tx) + a[k + n + 1] * tx) * tz
   }

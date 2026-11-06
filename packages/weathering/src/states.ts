@@ -1,8 +1,34 @@
 import { Color, type MeshStandardNodeMaterial, type Node, type UniformNode } from 'three/webgpu'
 import {
-  cameraPosition, clamp, dFdx, dFdy, dot, float, fwidth, length, materialColor, max, materialEmissive, materialMetalness, materialNormal, materialOpacity,
-  materialRoughness, mix, mx_noise_float, mx_worley_noise_vec2, normalView, normalWorld, positionView, positionWorld, smoothstep,
-  step, time, uniform, vec2, vec3, vertexColor,
+  cameraPosition,
+  clamp,
+  dFdx,
+  dFdy,
+  dot,
+  float,
+  fwidth,
+  length,
+  materialColor,
+  max,
+  materialEmissive,
+  materialMetalness,
+  materialNormal,
+  materialOpacity,
+  materialRoughness,
+  mix,
+  mx_noise_float,
+  mx_worley_noise_vec2,
+  normalView,
+  normalWorld,
+  positionView,
+  positionWorld,
+  smoothstep,
+  step,
+  time,
+  uniform,
+  vec2,
+  vec3,
+  vertexColor
 } from 'three/tsl'
 import { merge, resolve } from 'threejs-heightfield'
 
@@ -91,11 +117,33 @@ export interface StateLookOptions {
 /** Default state look. */
 export const DEFAULT_STATE_LOOK: StateLookOptions = {
   noiseScale: 1,
-  wetDarkening: 0.45, wetSaturation: 1.25, wetRoughness: 0.12, puddles: 0.6, puddleScale: 0.35, streaks: 0.6, streakScale: 2.5,
-  snowColor: '#f4f7fb', snowRoughness: 0.7, snowReach: 0.55, snowBreakup: 0.3, snowScale: 1.3, sparkle: 0.6, sparkleScale: 40,
-  scorchColor: '#7a5a40', charColor: '#0d0b09', ashColor: '#8d8882', emberColor: '#ff5a14', emberIntensity: 6, emberScale: 2.2,
-  leafLoss: 0.95, leafScale: 3,
-  crackColor: '#1c1814', crackScale: 2.5, crackWidth: 0.07, dentStrength: 0.6, holeThreshold: 0.7,
+  wetDarkening: 0.45,
+  wetSaturation: 1.25,
+  wetRoughness: 0.12,
+  puddles: 0.6,
+  puddleScale: 0.35,
+  streaks: 0.6,
+  streakScale: 2.5,
+  snowColor: '#f4f7fb',
+  snowRoughness: 0.7,
+  snowReach: 0.55,
+  snowBreakup: 0.3,
+  snowScale: 1.3,
+  sparkle: 0.6,
+  sparkleScale: 40,
+  scorchColor: '#7a5a40',
+  charColor: '#0d0b09',
+  ashColor: '#8d8882',
+  emberColor: '#ff5a14',
+  emberIntensity: 6,
+  emberScale: 2.2,
+  leafLoss: 0.95,
+  leafScale: 3,
+  crackColor: '#1c1814',
+  crackScale: 2.5,
+  crackWidth: 0.07,
+  dentStrength: 0.6,
+  holeThreshold: 0.7
 }
 
 /** Creates the uniforms behind a {@link StateLook} (exported so {@link StateLookUniforms} is documented in full). */
@@ -128,7 +176,7 @@ export function createStateLookUniforms(o: StateLookOptions = DEFAULT_STATE_LOOK
     /** {@link StateLookOptions.crackScale}. */ crackScale: uniform(o.crackScale),
     /** {@link StateLookOptions.crackWidth}. */ crackWidth: uniform(o.crackWidth),
     /** {@link StateLookOptions.dentStrength}. */ dentStrength: uniform(o.dentStrength),
-    /** {@link StateLookOptions.holeThreshold}. */ holeThreshold: uniform(o.holeThreshold),
+    /** {@link StateLookOptions.holeThreshold}. */ holeThreshold: uniform(o.holeThreshold)
   }
 }
 
@@ -235,7 +283,8 @@ export interface StateContext {
 }
 
 const asFloat = (v: Node<'float'> | number): Node<'float'> => (typeof v === 'number' ? float(v) : v)
-const asState = (v: Node<'float'> | number | undefined): Node<'float'> | null => (v === undefined || v === 0 ? null : asFloat(v).clamp(0, 1))
+const asState = (v: Node<'float'> | number | undefined): Node<'float'> | null =>
+  v === undefined || v === 0 ? null : asFloat(v).clamp(0, 1)
 
 // Screen-space bump of `normal` by a procedural height (Mikkelsen 2010).
 function bump(normal: Node<'vec3'>, height: Node<'float'>): Node<'vec3'> {
@@ -265,7 +314,11 @@ function bump(normal: Node<'vec3'>, height: Node<'float'>): Node<'vec3'> {
  * material.normalNode = out.normal; material.emissiveNode = out.emissive; material.opacityNode = out.opacity
  * ```
  */
-export function applyMaterialStates(surface: StateSurface, states: MaterialStateNodes, ctx: StateContext = {}): StateResult {
+export function applyMaterialStates(
+  surface: StateSurface,
+  states: MaterialStateNodes,
+  ctx: StateContext = {}
+): StateResult {
   const u = (ctx.look ?? defaultStateLook()).uniforms
   const p = (ctx.position ?? positionWorld).mul(u.noiseScale)
   const nWorld = ctx.worldNormal ?? normalWorld
@@ -298,10 +351,20 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
   // Domain-warped, mildly anisotropic, multi-scale noise with mean 0 (about ±0.5), octaves faded by footprint.
   const warped = (wavelengths: number[], amps: number[], salt: number) => {
     const w0 = wavelengths[0]
-    const warp = vec3(mx_noise_float(p.div(w0 * 2.3).add(salt)), 0, mx_noise_float(p.div(w0 * 2.3).add(salt + 31.7))).mul(w0 * 0.45)
+    const warp = vec3(
+      mx_noise_float(p.div(w0 * 2.3).add(salt)),
+      0,
+      mx_noise_float(p.div(w0 * 2.3).add(salt + 31.7))
+    ).mul(w0 * 0.45)
     const q = p.add(warp)
     let sum: Node<'float'> = float(0)
-    wavelengths.forEach((l, i) => { sum = sum.add(mx_noise_float(q.mul(vec3(1 / l, 1 / l, 0.7 / l)).add(salt * (i + 1))).mul(amps[i]).mul(resolved(l))) })
+    wavelengths.forEach((l, i) => {
+      sum = sum.add(
+        mx_noise_float(q.mul(vec3(1 / l, 1 / l, 0.7 / l)).add(salt * (i + 1)))
+          .mul(amps[i])
+          .mul(resolved(l))
+      )
+    })
     return sum
   }
 
@@ -309,13 +372,17 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
     // Cracks along Worley cell borders that spread as damage grows, dents, grime.
     const cells = mx_worley_noise_vec2(p.mul(u.crackScale))
     const grow = smoothstep(0.05, 0.5, damage.add(warped([1.4], [0.25], 3.1)))
-    const crack = smoothstep(u.crackWidth, 0, cells.y.sub(cells.x)).mul(grow).mul(resolved(float(1).div(u.crackScale)))
+    const crack = smoothstep(u.crackWidth, 0, cells.y.sub(cells.x))
+      .mul(grow)
+      .mul(resolved(float(1).div(u.crackScale)))
     const dent = mx_noise_float(p.mul(0.9)).mul(u.dentStrength).mul(damage).mul(resolved(1.1))
     color = mix(color, u.crackColor, crack.mul(0.85)).mul(damage.mul(0.18).oneMinus())
     roughness = roughness.add(damage.mul(0.12)).add(crack.mul(0.25)).clamp(0, 1)
     normal = bump(normal, dent.mul(0.04).sub(crack.mul(0.012)))
     if (ctx.cutout) {
-      const chunk = mx_noise_float(p.mul(u.crackScale.mul(0.35))).mul(0.5).add(0.5)
+      const chunk = mx_noise_float(p.mul(u.crackScale.mul(0.35)))
+        .mul(0.5)
+        .add(0.5)
       opacity = opacity.mul(step(smoothstep(u.holeThreshold, 1, damage).mul(0.6), chunk))
     }
   }
@@ -342,7 +409,9 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
       // Glowing cracks in the char, faded to their mean where too small to resolve, flickering slowly.
       const cells = mx_worley_noise_vec2(p.mul(u.emberScale))
       const cracks = mix(float(0.12), smoothstep(0.12, 0, cells.y.sub(cells.x)), resolved(float(1).div(u.emberScale)))
-      const flicker = mx_noise_float(p.mul(u.emberScale.mul(0.15)).add(vec3(0, t.mul(0.9), 0))).mul(0.5).add(0.5)
+      const flicker = mx_noise_float(p.mul(u.emberScale.mul(0.15)).add(vec3(0, t.mul(0.9), 0)))
+        .mul(0.5)
+        .add(0.5)
       const glow = heat.mul(heat).mul(heat).mul(cracks).mul(flicker.mul(0.6).add(0.4))
       emissive = emissive.add(u.emberColor.mul(u.emberIntensity).mul(glow))
       color = mix(color, u.charColor, heat.mul(0.5))
@@ -361,8 +430,14 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
     roughness = mix(roughness, u.wetRoughness, wet.mul(0.9))
     if (ctx.streaks !== false) {
       const vertical = smoothstep(0.75, 0.3, up.abs())
-      const s = mx_noise_float(vec3(p.x.mul(u.streakScale), p.y.mul(u.streakScale.mul(0.12)).add(t.mul(0.15)), p.z.mul(u.streakScale)))
-      const streak = smoothstep(0.1, 0.6, s).mul(vertical).mul(wet).mul(u.streaks).mul(resolved(float(1).div(u.streakScale)))
+      const s = mx_noise_float(
+        vec3(p.x.mul(u.streakScale), p.y.mul(u.streakScale.mul(0.12)).add(t.mul(0.15)), p.z.mul(u.streakScale))
+      )
+      const streak = smoothstep(0.1, 0.6, s)
+        .mul(vertical)
+        .mul(wet)
+        .mul(u.streaks)
+        .mul(resolved(float(1).div(u.streakScale)))
       color = color.mul(streak.mul(0.3).oneMinus())
       roughness = roughness.mul(streak.mul(0.6).oneMinus())
     }
@@ -382,8 +457,13 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
   if (snow) {
     const edge = warped([3, 0.8], [0.7, 0.3], 23.9).mul(2)
     const threshold = snow.mul(u.snowReach.add(1)).oneMinus()
-    const cover = smoothstep(threshold, threshold.add(0.12), up.add(edge.mul(u.snowBreakup))).mul(smoothstep(0, 0.08, snow))
-    const sparkle = smoothstep(0.8, 0.92, mx_noise_float(p.mul(u.sparkleScale).add(cameraPosition.mul(0.05)))).mul(cover).mul(u.sparkle).mul(resolved(float(1).div(u.sparkleScale)))
+    const cover = smoothstep(threshold, threshold.add(0.12), up.add(edge.mul(u.snowBreakup))).mul(
+      smoothstep(0, 0.08, snow)
+    )
+    const sparkle = smoothstep(0.8, 0.92, mx_noise_float(p.mul(u.sparkleScale).add(cameraPosition.mul(0.05))))
+      .mul(cover)
+      .mul(u.sparkle)
+      .mul(resolved(float(1).div(u.sparkleScale)))
     color = mix(color, u.snowColor.mul(up.mul(0.12).add(0.88)), cover).add(sparkle)
     roughness = mix(roughness, u.snowRoughness, cover).sub(sparkle.mul(0.4)).clamp(0.02, 1)
     normal = mix(normal, nGeo, cover.mul(0.85)).normalize()
@@ -408,7 +488,11 @@ export function applyMaterialStates(surface: StateSurface, states: MaterialState
  * applyMaterialStatesTo(leaves, instances.node(), { foliage: true })
  * ```
  */
-export function applyMaterialStatesTo<T extends MeshStandardNodeMaterial>(material: T, states: MaterialStateNodes, ctx: StateContext = {}): T {
+export function applyMaterialStatesTo<T extends MeshStandardNodeMaterial>(
+  material: T,
+  states: MaterialStateNodes,
+  ctx: StateContext = {}
+): T {
   const m = material
   // Fold vertex colours in here: three would multiply them in after colorNode, tinting snow and ash.
   const base = (m.colorNode as Node<'vec3'> | null) ?? materialColor
@@ -419,10 +503,10 @@ export function applyMaterialStatesTo<T extends MeshStandardNodeMaterial>(materi
       normal: (m.normalNode as Node<'vec3'> | null) ?? materialNormal,
       emissive: (m.emissiveNode as Node<'vec3'> | null) ?? materialEmissive,
       opacity: (m.opacityNode as Node<'float'> | null) ?? materialOpacity,
-      metalness: (m.metalnessNode as Node<'float'> | null) ?? materialMetalness,
+      metalness: (m.metalnessNode as Node<'float'> | null) ?? materialMetalness
     },
     states,
-    ctx,
+    ctx
   )
   m.colorNode = out.color
   m.roughnessNode = out.roughness
@@ -443,17 +527,23 @@ export type MaterialStateUniforms = Record<StateChannel | 'heat', UniformNode<'f
  * Creates one uniform per state (plus `heat`), usable directly as {@link MaterialStateNodes}. Change
  * them with `uniforms.snow.value = 0.8`, or {@link setMaterialStateUniforms}.
  */
-export function createMaterialStateUniforms(values: Partial<MaterialStates & { heat: number }> = {}): MaterialStateUniforms {
+export function createMaterialStateUniforms(
+  values: Partial<MaterialStates & { heat: number }> = {}
+): MaterialStateUniforms {
   return {
     wetness: uniform(values.wetness ?? 0),
     snow: uniform(values.snow ?? 0),
     burn: uniform(values.burn ?? 0),
     damage: uniform(values.damage ?? 0),
-    heat: uniform(values.heat ?? 0),
+    heat: uniform(values.heat ?? 0)
   }
 }
 
 /** Copies plain values into uniforms from {@link createMaterialStateUniforms}. */
-export function setMaterialStateUniforms(uniforms: MaterialStateUniforms, values: Partial<MaterialStates & { heat: number }>): void {
-  for (const [k, v] of Object.entries(values)) if (v !== undefined && k in uniforms) uniforms[k as StateChannel].value = v
+export function setMaterialStateUniforms(
+  uniforms: MaterialStateUniforms,
+  values: Partial<MaterialStates & { heat: number }>
+): void {
+  for (const [k, v] of Object.entries(values))
+    if (v !== undefined && k in uniforms) uniforms[k as StateChannel].value = v
 }

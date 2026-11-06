@@ -29,7 +29,13 @@ export interface RoadNetworkLike {
 /** A lot: threejs-city's `CityData.lots` entries fit. */
 export interface LotLike {
   /** District (`residential`, `farmland`, …). */ district?: string
-  /** Where the lot meets its street, or null. */ frontage: { x: number; z: number; nx: number; nz: number; edge: number } | null
+  /** Where the lot meets its street, or null. */ frontage: {
+    x: number
+    z: number
+    nx: number
+    nz: number
+    edge: number
+  } | null
   /** Building on the lot, or −1. */ building?: number
 }
 
@@ -45,15 +51,39 @@ export interface PropStyle {
 
 /** Fence styles per biome id (picked by hash where there are several). */
 export const FENCE_STYLES: Readonly<Record<string, readonly FenceStyle[]>> = {
-  desert: ['adobe'], badlands: ['adobe'], savanna: ['adobe', 'rail'], mediterranean: ['stone', 'adobe'], dryForest: ['adobe', 'rail'],
-  volcanic: ['stone'], alpineMeadow: ['stone', 'rail'], mountainPeaks: ['stone'], tundra: ['rail', 'stone'], glacier: ['stone'],
-  temperateRainforest: ['stone', 'rail'], coast: ['picket', 'stone'], taiga: ['rail'], steppe: ['rail'], grassland: ['rail', 'picket'],
-  deciduousForest: ['picket', 'rail', 'stone'], wetland: ['rail'], jungle: ['rail'], mangrove: ['rail'],
+  desert: ['adobe'],
+  badlands: ['adobe'],
+  savanna: ['adobe', 'rail'],
+  mediterranean: ['stone', 'adobe'],
+  dryForest: ['adobe', 'rail'],
+  volcanic: ['stone'],
+  alpineMeadow: ['stone', 'rail'],
+  mountainPeaks: ['stone'],
+  tundra: ['rail', 'stone'],
+  glacier: ['stone'],
+  temperateRainforest: ['stone', 'rail'],
+  coast: ['picket', 'stone'],
+  taiga: ['rail'],
+  steppe: ['rail'],
+  grassland: ['rail', 'picket'],
+  deciduousForest: ['picket', 'rail', 'stone'],
+  wetland: ['rail'],
+  jungle: ['rail'],
+  mangrove: ['rail']
 }
 
 const HOT_DRY = new Set(['desert', 'badlands', 'savanna', 'mediterranean', 'dryForest'])
 /** Biomes where hay is made. */
-export const FARM_BIOMES = ['grassland', 'steppe', 'savanna', 'mediterranean', 'deciduousForest', 'dryForest', 'taiga', 'coast']
+export const FARM_BIOMES = [
+  'grassland',
+  'steppe',
+  'savanna',
+  'mediterranean',
+  'deciduousForest',
+  'dryForest',
+  'taiga',
+  'coast'
+]
 /** Biomes where open wells are common. */
 export const WELL_BIOMES = ['grassland', 'steppe', 'savanna', 'desert', 'badlands', 'mediterranean', 'dryForest']
 
@@ -71,7 +101,11 @@ export function propStyleAt(world: World, frame: LocalFrame, x: number, z: numbe
   const r = hash01(Math.floor(x / 60), Math.floor(z / 60), seed, 0x5713)
   const fences = FENCE_STYLES[id] ?? ['rail']
   const dry = HOT_DRY.has(id)
-  return { fence: fences[Math.floor(r * fences.length) % fences.length], well: dry && id !== 'mediterranean' ? 'adobe' : 'stone', pole: dry && r < 0.5 ? 'concrete' : 'wood' }
+  return {
+    fence: fences[Math.floor(r * fences.length) % fences.length],
+    well: dry && id !== 'mediterranean' ? 'adobe' : 'stone',
+    pole: dry && r < 0.5 ? 'concrete' : 'wood'
+  }
 }
 
 /** Where each kind of street furniture goes. Plain JSON; a spacing of 0 turns that kind off. */
@@ -124,11 +158,13 @@ export const DEFAULT_DECORATE: DecorateOptions = {
   powerLines: { spacing: 45, offset: 3, kind: 'power-pole' },
   fences: { chance: 0.45, offset: 4, length: 2.5, style: 'auto' },
   hayBales: { density: 1.2 },
-  wells: { density: 0.6 },
+  wells: { density: 0.6 }
 }
 
 /** Partial decoration options (groups merge). */
-export type DecorateInput = { [K in keyof DecorateOptions]?: DecorateOptions[K] extends object ? Partial<DecorateOptions[K]> : DecorateOptions[K] }
+export type DecorateInput = {
+  [K in keyof DecorateOptions]?: DecorateOptions[K] extends object ? Partial<DecorateOptions[K]> : DecorateOptions[K]
+}
 
 /** Extra (non-JSON) inputs of {@link decorateRoads}. */
 export interface DecorateContext {
@@ -147,7 +183,8 @@ class Walker {
   readonly length: number
   constructor(pts: V3[]) {
     this.pts = pts
-    for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]))
+    for (let i = 1; i < pts.length; i++)
+      this.cum.push(this.cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]))
     this.length = this.cum[this.cum.length - 1]
   }
   /** Position and unit tangent at arc length s. */
@@ -155,18 +192,24 @@ class Walker {
     const c = this.cum
     let i = 0
     while (i < c.length - 2 && c[i + 1] < s) i++
-    const a = this.pts[i], b = this.pts[i + 1]
+    const a = this.pts[i],
+      b = this.pts[i + 1]
     const l = c[i + 1] - c[i] || 1e-9
     const t = Math.min(1, Math.max(0, (s - c[i]) / l))
-    const dx = b[0] - a[0], dz = b[2] - a[2], d = Math.hypot(dx, dz) || 1
+    const dx = b[0] - a[0],
+      dz = b[2] - a[2],
+      d = Math.hypot(dx, dz) || 1
     return { x: a[0] + dx * t, y: a[1] + (b[1] - a[1]) * t, z: a[2] + dz * t, ux: dx / d, uz: dz / d }
   }
   /** Arc length of the nearest point to (x, z), and its distance. */
   nearest(x: number, z: number): { s: number; d: number } {
     let best = { s: 0, d: Infinity }
     for (let i = 0; i < this.pts.length - 1; i++) {
-      const a = this.pts[i], b = this.pts[i + 1]
-      const dx = b[0] - a[0], dz = b[2] - a[2], l2 = dx * dx + dz * dz || 1e-9
+      const a = this.pts[i],
+        b = this.pts[i + 1]
+      const dx = b[0] - a[0],
+        dz = b[2] - a[2],
+        l2 = dx * dx + dz * dz || 1e-9
       const t = Math.min(1, Math.max(0, ((x - a[0]) * dx + (z - a[2]) * dz) / l2))
       const d = Math.hypot(a[0] + dx * t - x, a[2] + dz * t - z)
       if (d < best.d) best = { s: this.cum[i] + t * (this.cum[i + 1] - this.cum[i]), d }
@@ -188,8 +231,12 @@ interface Chain {
 function buildChains(net: RoadNetworkLike, height: (x: number, z: number) => number): Chain[] {
   const { nodes, edges } = net
   const adj: number[][] = nodes.map(() => [])
-  edges.forEach((e, i) => { adj[e.a].push(i); adj[e.b].push(i) })
-  const same = (p: RoadEdgeLike, q: RoadEdgeLike) => p.width === q.width && p.sidewalk === q.sidewalk && !!p.bridge === !!q.bridge && p.surface === q.surface
+  edges.forEach((e, i) => {
+    adj[e.a].push(i)
+    adj[e.b].push(i)
+  })
+  const same = (p: RoadEdgeLike, q: RoadEdgeLike) =>
+    p.width === q.width && p.sidewalk === q.sidewalk && !!p.bridge === !!q.bridge && p.surface === q.surface
   const seen = new Uint8Array(edges.length)
   const out: Chain[] = []
   const other = (e: number, n: number) => (edges[e].a === n ? edges[e].b : edges[e].a)
@@ -197,9 +244,11 @@ function buildChains(net: RoadNetworkLike, height: (x: number, z: number) => num
     if (seen[i]) continue
     seen[i] = 1
     const seq = [i]
-    let start = edges[i].a, end = edges[i].b
+    let start = edges[i].a,
+      end = edges[i].b
     for (const forward of [true, false]) {
-      let node = forward ? end : start, cur = i
+      let node = forward ? end : start,
+        cur = i
       while (adj[node].length === 2) {
         const next = adj[node][0] === cur ? adj[node][1] : adj[node][0]
         if (seen[next] || !same(edges[next], edges[i])) break
@@ -222,11 +271,13 @@ function buildChains(net: RoadNetworkLike, height: (x: number, z: number) => num
       if (edge.points?.length) ep = edge.points.map((p) => [p[0], p[1], p[2]] as V3)
       else {
         // Ungraded edge: follow the ground every 5 m between the node heights.
-        const A = nodes[edge.a], B = nodes[edge.b]
+        const A = nodes[edge.a],
+          B = nodes[edge.b]
         const k = Math.max(1, Math.ceil(Math.hypot(B.x - A.x, B.z - A.z) / 5))
         ep = Array.from({ length: k + 1 }, (_, i): V3 => {
-          const t = i / k, end = i === 0 ? A : i === k ? B : null
-          return [A.x + (B.x - A.x) * t, end ? end.y ?? NaN : NaN, A.z + (B.z - A.z) * t]
+          const t = i / k,
+            end = i === 0 ? A : i === k ? B : null
+          return [A.x + (B.x - A.x) * t, end ? (end.y ?? NaN) : NaN, A.z + (B.z - A.z) * t]
         })
       }
       if (reverse) ep = ep.reverse()
@@ -274,7 +325,12 @@ export function yawFacing(fx: number, fz: number): number {
  * city.local.add(props.object)
  * ```
  */
-export function decorateRoads(roads: RoadNetworkLike, world: World, input: DecorateInput = {}, ctx: DecorateContext = {}): PropPlacement[] {
+export function decorateRoads(
+  roads: RoadNetworkLike,
+  world: World,
+  input: DecorateInput = {},
+  ctx: DecorateContext = {}
+): PropPlacement[] {
   const o = mergeInput(DEFAULT_DECORATE, input)
   const frame = ctx.frame ?? world.frame
   const seed = seedOf(o.seed)
@@ -289,15 +345,28 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
   const cells = new Map<number, number[]>()
   const key = (i: number, j: number) => ((i + 32768) & 0xffff) | (((j + 32768) & 0xffff) << 16)
   const free = (x: number, z: number, r: number) => {
-    const ci = Math.floor(x / 4), cj = Math.floor(z / 4)
-    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-      const list = cells.get(key(i, j))
-      if (list) for (let k = 0; k < list.length; k += 3) if (Math.hypot(list[k] - x, list[k + 1] - z) < r + list[k + 2]) return false
-    }
+    const ci = Math.floor(x / 4),
+      cj = Math.floor(z / 4)
+    for (let i = ci - 1; i <= ci + 1; i++)
+      for (let j = cj - 1; j <= cj + 1; j++) {
+        const list = cells.get(key(i, j))
+        if (list)
+          for (let k = 0; k < list.length; k += 3)
+            if (Math.hypot(list[k] - x, list[k + 1] - z) < r + list[k + 2]) return false
+      }
     return true
   }
   const counter = new Map<PropKind, number>()
-  const add = (kind: PropKind, x: number, y: number, z: number, yaw: number, extra: Partial<PropPlacement> = {}, radius = 0.5, force = false): boolean => {
+  const add = (
+    kind: PropKind,
+    x: number,
+    y: number,
+    z: number,
+    yaw: number,
+    extra: Partial<PropPlacement> = {},
+    radius = 0.5,
+    force = false
+  ): boolean => {
     if (!force && (!free(x, z, radius) || !dry(x, z))) return false
     const n = counter.get(kind) ?? 0
     counter.set(kind, n + 1)
@@ -332,7 +401,10 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
 
   // Degrees for junction clearance.
   const degree = new Int32Array(roads.nodes.length)
-  for (const e of roads.edges) { degree[e.a]++; degree[e.b]++ }
+  for (const e of roads.edges) {
+    degree[e.a]++
+    degree[e.b]++
+  }
   const nodeClear = new Float64Array(roads.nodes.length)
   roads.edges.forEach((e) => {
     for (const n of [e.a, e.b]) nodeClear[n] = Math.max(nodeClear[n], e.width / 2 + e.sidewalk)
@@ -344,29 +416,58 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
     const incident = roads.edges.filter((e) => e.a === n || e.b === n).map((e) => ({ e }))
     if (incident.some(({ e }) => e.bridge)) return
     const big = incident.some(({ e }) => e.type === 'primary' || e.type === 'secondary')
-    const signals = o.trafficLights.enabled && big && incident.length >= o.trafficLights.minRoads && incident.some(({ e }) => e.sidewalk > 0)
+    const signals =
+      o.trafficLights.enabled &&
+      big &&
+      incident.length >= o.trafficLights.minRoads &&
+      incident.some(({ e }) => e.sidewalk > 0)
     incident.forEach(({ e }, k) => {
       const far = roads.nodes[e.a === n ? e.b : e.a]
       // Direction of travel towards the junction, and the approaching driver's right.
-      let dx = node.x - far.x, dz = node.z - far.z
+      let dx = node.x - far.x,
+        dz = node.z - far.z
       const pts = e.points
       if (pts && pts.length >= 2) {
         const q = e.a === n ? pts[1] : pts[pts.length - 2]
-        dx = node.x - q[0]; dz = node.z - q[2]
+        dx = node.x - q[0]
+        dz = node.z - q[2]
       }
       const l = Math.hypot(dx, dz) || 1
-      dx /= l; dz /= l
-      const rx = dz, rz = -dx
+      dx /= l
+      dz /= l
+      const rx = dz,
+        rz = -dx
       const back = nodeClear[n] + 1.2
       const lat = e.width / 2 + (e.sidewalk > 0 ? Math.min(0.6, e.sidewalk * 0.3) : 1.2)
-      const x = node.x - dx * back + rx * lat, z = node.z - dz * back + rz * lat
+      const x = node.x - dx * back + rx * lat,
+        z = node.z - dz * back + rz * lat
       const y = (Number.isFinite(node.y) ? (node.y as number) : ground(x, z)) + (e.sidewalk > 0 ? o.curbHeight : 0)
       const yaw = yawFacing(-dx, -dz)
-      if (signals) add('traffic-light', x, y, z, yaw, { variant: o.trafficLights.mast && e.type === 'primary' ? 'mast' : 'post' }, 0.4, true)
-      else if (o.signs.stop && (e.type === 'minor' || !big) && (big || h(n, 5, 0) < 0.5)) add('sign', x, y, z, yaw, { variant: 'stop' }, 0.3, true)
+      if (signals)
+        add(
+          'traffic-light',
+          x,
+          y,
+          z,
+          yaw,
+          { variant: o.trafficLights.mast && e.type === 'primary' ? 'mast' : 'post' },
+          0.4,
+          true
+        )
+      else if (o.signs.stop && (e.type === 'minor' || !big) && (big || h(n, 5, 0) < 0.5))
+        add('sign', x, y, z, yaw, { variant: 'stop' }, 0.3, true)
       if (o.signs.names && k === 0) {
-        const nx = node.x - dx * back - rx * lat, nz = node.z - dz * back - rz * lat
-        add('sign', nx, (Number.isFinite(node.y) ? (node.y as number) : ground(nx, nz)) + (e.sidewalk > 0 ? o.curbHeight : 0), nz, yaw, { variant: 'name' }, 0.3)
+        const nx = node.x - dx * back - rx * lat,
+          nz = node.z - dz * back - rz * lat
+        add(
+          'sign',
+          nx,
+          (Number.isFinite(node.y) ? (node.y as number) : ground(nx, nz)) + (e.sidewalk > 0 ? o.curbHeight : 0),
+          nz,
+          yaw,
+          { variant: 'name' },
+          0.3
+        )
       }
     })
   })
@@ -375,7 +476,8 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
   chains.forEach((c, ci) => {
     const e = c.edge
     if (e.bridge) return
-    const W = e.width / 2, sw = e.sidewalk
+    const W = e.width / 2,
+      sw = e.sidewalk
     const urban = sw > 0
     const L = c.walk.length
     const c0 = degree[c.start] >= 3 ? o.junctionClearance + nodeClear[c.start] : 1.5
@@ -384,8 +486,10 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
     // A spot `lat` metres to the `side` (+1 left of the chain's direction) at arc length s, facing the road.
     const spot = (s: number, side: number, lat: number, raise: number | 'ground') => {
       const p = c.walk.at(s)
-      const lx = -p.uz * side, lz = p.ux * side
-      const x = p.x + lx * lat, z = p.z + lz * lat
+      const lx = -p.uz * side,
+        lz = p.ux * side
+      const x = p.x + lx * lat,
+        z = p.z + lz * lat
       return { x, z, y: raise === 'ground' ? ground(x, z) : p.y + raise, yaw: yawFacing(-lx, -lz), ux: p.ux, uz: p.uz }
     }
     const every = (spacing: number, phase: number, fn: (s: number, i: number) => void) => {
@@ -398,11 +502,21 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
     }
 
     if (urban) {
-      const kerb = W + Math.min(0.6, sw * 0.3), back = W + sw - 0.5, up = o.curbHeight
-      const lightVariant = o.streetLights.variant === 'auto' ? (e.surface === 'cobblestone' || (e.type === 'minor' && h(ci, 1, 0) < 0.3) ? 'post' : 'cobra') : o.streetLights.variant
+      const kerb = W + Math.min(0.6, sw * 0.3),
+        back = W + sw - 0.5,
+        up = o.curbHeight
+      const lightVariant =
+        o.streetLights.variant === 'auto'
+          ? e.surface === 'cobblestone' || (e.type === 'minor' && h(ci, 1, 0) < 0.3)
+            ? 'post'
+            : 'cobra'
+          : o.streetLights.variant
       every(o.streetLights.spacing, 0.25, (s) => {
         // Staggered: the right-hand side half a spacing on.
-        for (const [side, at] of [[1, s], [-1, s + o.streetLights.spacing / 2]]) {
+        for (const [side, at] of [
+          [1, s],
+          [-1, s + o.streetLights.spacing / 2]
+        ]) {
           if (at > c1) continue
           const q = spot(at, side, kerb, up)
           add('street-light', q.x, q.y, q.z, q.yaw, { variant: lightVariant }, 0.5)
@@ -431,7 +545,8 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
       }
       if (o.signs.speed && L > o.signs.minLength) {
         // Facing traffic entering the road at each end (drive on the right).
-        const a = spot(c0 + 4, -1, kerb, up), b = spot(c1 - 4, 1, kerb, up)
+        const a = spot(c0 + 4, -1, kerb, up),
+          b = spot(c1 - 4, 1, kerb, up)
         add('sign', a.x, a.y, a.z, yawFacing(-a.ux, -a.uz), { variant: 'speed' }, 0.3)
         add('sign', b.x, b.y, b.z, yawFacing(b.ux, b.uz), { variant: 'speed' }, 0.3)
       }
@@ -446,7 +561,18 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
           const s = 2 + (i / n) * (L - 4)
           const q = spot(s, side, W + o.powerLines.offset, 'ground')
           if (onRoad(q.x, q.z, 0.8)) continue
-          add(o.powerLines.kind, q.x, q.y, q.z, yawFacing(q.ux, q.uz), { line: id, variant: o.powerLines.kind === 'power-pole' ? propStyleAt(world, frame, q.x, q.z, seed).pole : undefined }, 0.6)
+          add(
+            o.powerLines.kind,
+            q.x,
+            q.y,
+            q.z,
+            yawFacing(q.ux, q.uz),
+            {
+              line: id,
+              variant: o.powerLines.kind === 'power-pole' ? propStyleAt(world, frame, q.x, q.z, seed).pole : undefined
+            },
+            0.6
+          )
         }
       }
       if (o.streetLights.rural && o.streetLights.spacing > 0) {
@@ -482,20 +608,32 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
       const field = (s: number, side: number, lat: number, biomes: string[], maxSlope: number) => {
         const q = spot(s, side, lat, 'ground')
         if (onRoad(q.x, q.z, 3) || !biomes.includes(biomeIdAt(world, frame, q.x, q.z))) return null
-        const sl = Math.hypot(ground(q.x + 1, q.z) - ground(q.x - 1, q.z), ground(q.x, q.z + 1) - ground(q.x, q.z - 1)) / 2
+        const sl =
+          Math.hypot(ground(q.x + 1, q.z) - ground(q.x - 1, q.z), ground(q.x, q.z + 1) - ground(q.x, q.z - 1)) / 2
         return sl <= maxSlope ? q : null
       }
       const bales = Math.floor((L / 100) * o.hayBales.density + h(ci, 0, 12))
       for (let b = 0; b < bales; b++) {
-        const s = c0 + h(ci, b, 13) * (c1 - c0), side = h(ci, b, 14) < 0.5 ? 1 : -1
+        const s = c0 + h(ci, b, 13) * (c1 - c0),
+          side = h(ci, b, 14) < 0.5 ? 1 : -1
         const q = field(s, side, W + 10 + h(ci, b, 15) * 30, FARM_BIOMES, 0.15)
         if (!q) continue
         const round = h(ci, b, 16) < 0.6
         const group = 1 + Math.floor(h(ci, b, 17) * 4)
         for (let g = 0; g < group; g++) {
-          const a = h(ci, b, 18 + g) * Math.PI * 2, r = g ? 2.2 + h(ci, b, 30 + g) * 2 : 0
-          const x = q.x + Math.cos(a) * r, z = q.z + Math.sin(a) * r
-          add('hay-bale', x, ground(x, z), z, h(ci, b, 40 + g) * Math.PI * 2, { variant: round ? 'round' : 'square' }, 0.9)
+          const a = h(ci, b, 18 + g) * Math.PI * 2,
+            r = g ? 2.2 + h(ci, b, 30 + g) * 2 : 0
+          const x = q.x + Math.cos(a) * r,
+            z = q.z + Math.sin(a) * r
+          add(
+            'hay-bale',
+            x,
+            ground(x, z),
+            z,
+            h(ci, b, 40 + g) * Math.PI * 2,
+            { variant: round ? 'round' : 'square' },
+            0.9
+          )
         }
       }
       const wells = Math.floor((L / 1000) * o.wells.density + h(ci, 0, 50))
@@ -511,7 +649,12 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
   if (ctx.lots && o.mailboxes.chance > 0) {
     ctx.lots.forEach((lot, i) => {
       const f = lot.frontage
-      if (!f || (lot.building ?? 0) < 0 || (lot.district && lot.district !== 'residential' && lot.district !== 'farmland')) return
+      if (
+        !f ||
+        (lot.building ?? 0) < 0 ||
+        (lot.district && lot.district !== 'residential' && lot.district !== 'farmland')
+      )
+        return
       if (h(i, 0, 60) >= Math.max(o.mailboxes.chance, 0.85)) return
       // Nearest road chain to the frontage; the mailbox stands at its edge on the lot's side.
       let best: { c: Chain; s: number; d: number } | null = null
@@ -521,11 +664,13 @@ export function decorateRoads(roads: RoadNetworkLike, world: World, input: Decor
       }
       if (!best || best.c.edge.bridge || best.d > 40) return
       const p = best.c.walk.at(best.s)
-      const lx = -p.uz, lz = p.ux
+      const lx = -p.uz,
+        lz = p.ux
       const side = (f.x - p.x) * lx + (f.z - p.z) * lz >= 0 ? 1 : -1
       const e = best.c.edge
       const lat = e.width / 2 + (e.sidewalk > 0 ? e.sidewalk - 0.35 : 0.9)
-      const x = p.x + lx * side * lat, z = p.z + lz * side * lat
+      const x = p.x + lx * side * lat,
+        z = p.z + lz * side * lat
       const y = e.sidewalk > 0 ? p.y + o.curbHeight : ground(x, z)
       add(o.mailboxes.style === 'eu' ? 'mailbox-eu' : 'mailbox-us', x, y, z, yawFacing(-lx * side, -lz * side), {}, 0.3)
     })
@@ -555,10 +700,15 @@ export const DEFAULT_POWER_LINE: PowerLineOptions = { seed: 1, spacing: 300, kin
  * turned across the line, slid along it to stay out of water (spans over water just get longer). The
  * poles share one `line` id, so {@link Props} strings them with catenary cables.
  */
-export function planPowerLine(points: readonly (readonly [number, number])[], world: World, input: Partial<PowerLineOptions> = {}, frame: LocalFrame = world.frame): PropPlacement[] {
+export function planPowerLine(
+  points: readonly (readonly [number, number])[],
+  world: World,
+  input: Partial<PowerLineOptions> = {},
+  frame: LocalFrame = world.frame
+): PropPlacement[] {
   const o = { ...DEFAULT_POWER_LINE, ...input }
   const seed = seedOf(o.seed)
-  const line = o.line ?? (hash4(seed, 0x9a1, 0, 0) & 0xfffff)
+  const line = o.line ?? hash4(seed, 0x9a1, 0, 0) & 0xfffff
   const walk = new Walker(points.map((p) => [p[0], 0, p[1]] as V3))
   const n = Math.max(1, Math.round(walk.length / o.spacing))
   const sample = createSample()
@@ -572,13 +722,21 @@ export function planPowerLine(points: readonly (readonly [number, number])[], wo
     let found: ReturnType<Walker['at']> | null = null
     // Try the planned spot, then alternately further away along the line.
     for (let k = 0; k <= 8 && !found; k++) {
-      const off = k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (o.spacing * o.shift) / 4
+      const off = k === 0 ? 0 : ((k % 2 ? 1 : -1) * Math.ceil(k / 2) * (o.spacing * o.shift)) / 4
       const s = Math.min(walk.length, Math.max(0, s0 + off))
       const p = walk.at(s)
       if (!wet(p.x, p.z)) found = p
     }
     if (!found) continue
-    out.push({ kind: o.kind, x: found.x, y: frame.height(found.x, found.z), z: found.z, yaw: yawFacing(found.ux, found.uz), seed: hash4(seed, i, 0x9a2, 0) & 0x7fffffff, line })
+    out.push({
+      kind: o.kind,
+      x: found.x,
+      y: frame.height(found.x, found.z),
+      z: found.z,
+      yaw: yawFacing(found.ux, found.uz),
+      seed: hash4(seed, i, 0x9a2, 0) & 0x7fffffff,
+      line
+    })
   }
   return out
 }

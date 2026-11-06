@@ -8,7 +8,10 @@ import type { HeightFn } from 'threejs-heightfield'
 export const SIZE = 200
 
 /** Rolling hills with a steep ridge along z at x = 30. */
-export const hills: HeightFn = (x, z) => 8 * Math.sin(x * 0.045) * Math.cos(z * 0.038) + 3 * Math.sin((x + 2 * z) * 0.09) + 14 * Math.exp(-(((x - 30) / 12) ** 2))
+export const hills: HeightFn = (x, z) =>
+  8 * Math.sin(x * 0.045) * Math.cos(z * 0.038) +
+  3 * Math.sin((x + 2 * z) * 0.09) +
+  14 * Math.exp(-(((x - 30) / 12) ** 2))
 
 /** The hills as a `size` m square mesh with `segments` quads a side. */
 export function surface(size: number, segments: number): THREE.BufferGeometry {

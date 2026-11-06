@@ -98,7 +98,10 @@ export function bakeHeightfield(root: Object3D, maxResolution = 1024): HeightFn 
     const tx = fx - i
     const tz = fz - j
     const k = j * nx + i
-    const h00 = heights[k], h10 = heights[k + 1], h01 = heights[k + nx], h11 = heights[k + nx + 1]
+    const h00 = heights[k],
+      h10 = heights[k + 1],
+      h01 = heights[k + nx],
+      h11 = heights[k + nx + 1]
     return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz // NaN propagates at terrain edges
   }
 }
@@ -117,7 +120,13 @@ export function slopeAt(sample: HeightFn, x: number, z: number, e = 0.25): numbe
  * @param step March step in metres; smaller catches thinner ridges.
  * @returns The hit point (a new Vector3), or `null`.
  */
-export function raycastHeight(sample: HeightFn, origin: Vector3, dir: Vector3, maxDistance = 2000, step = 0.5): Vector3 | null {
+export function raycastHeight(
+  sample: HeightFn,
+  origin: Vector3,
+  dir: Vector3,
+  maxDistance = 2000,
+  step = 0.5
+): Vector3 | null {
   const p = new Vector3()
   let prevT = 0
   for (let t = step; t <= maxDistance; t += step) {

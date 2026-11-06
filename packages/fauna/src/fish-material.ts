@@ -1,5 +1,25 @@
 import { Color, MeshPhysicalNodeMaterial, Vector2, Vector3, Vector4 } from 'three/webgpu'
-import { abs, attribute, cos, float, floor, fract, hash, hue, length, luminance, mix, positionGeometry, sign, sin, smoothstep, step, uniform, vec2, vec3 } from 'three/tsl'
+import {
+  abs,
+  attribute,
+  cos,
+  float,
+  floor,
+  fract,
+  hash,
+  hue,
+  length,
+  luminance,
+  mix,
+  positionGeometry,
+  sign,
+  sin,
+  smoothstep,
+  step,
+  uniform,
+  vec2,
+  vec3
+} from 'three/tsl'
 import { DEFAULT_STATES, deformBeforeInstancing, type MaterialStates } from './common.ts'
 import type { FishMeshData } from './fish-geometry.ts'
 import type { FishSpecies } from './fish-species.ts'
@@ -39,7 +59,7 @@ export function createFishUniforms() {
     /** x = iridescence, y = metalness, z = roughness. */
     surface: uniform(new Vector3()),
     /** x = wetness, y = snow, z = burn, w = damage. */
-    states: uniform(new Vector4()),
+    states: uniform(new Vector4())
   }
 }
 
@@ -70,7 +90,8 @@ export function applyStates(u: { states: { value: Vector4 } }, s: MaterialStates
   u.states.value.set(s.wetness, s.snow, s.burn, s.damage)
 }
 
-const band = (x: any, lo: any, hi: any) => smoothstep(lo.sub(0.05), lo.add(0.05), x).mul(float(1).sub(smoothstep(hi.sub(0.05), hi.add(0.05), x)))
+const band = (x: any, lo: any, hi: any) =>
+  smoothstep(lo.sub(0.05), lo.add(0.05), x).mul(float(1).sub(smoothstep(hi.sub(0.05), hi.add(0.05), x)))
 
 /**
  * The fish material: swimming as vertex animation and the colour pattern, both in TSL, no textures.
@@ -86,7 +107,10 @@ export function createFishMaterial(u: FishUniforms): MeshPhysicalNodeMaterial {
   const f = attribute('fauna', 'vec4')
   const motion = attribute('faunaMotion', 'vec4')
   const look = attribute('faunaLook', 'vec4')
-  const s = f.x, h = f.y, part = f.z, w = f.w
+  const s = f.x,
+    h = f.y,
+    part = f.z,
+    w = f.w
   const p = positionGeometry
 
   // --- swimming ---
@@ -95,7 +119,17 @@ export function createFishMaterial(u: FishUniforms): MeshPhysicalNodeMaterial {
   const bend = motion.z.mul(s.mul(s))
   const paired = step(2.5, part).mul(step(part, 3.5))
   const flutter = sin(motion.w).mul(u.swim.z).mul(w).mul(paired).mul(0.05)
-  deformBeforeInstancing(m, vec3(p.x.add(wave).add(bend).add(flutter.mul(sign(p.x))), p.y.add(flutter.mul(0.6)), p.z))
+  deformBeforeInstancing(
+    m,
+    vec3(
+      p.x
+        .add(wave)
+        .add(bend)
+        .add(flutter.mul(sign(p.x))),
+      p.y.add(flutter.mul(0.6)),
+      p.z
+    )
+  )
 
   // --- colour ---
   const isFin = step(0.5, part)
@@ -105,8 +139,12 @@ export function createFishMaterial(u: FishUniforms): MeshPhysicalNodeMaterial {
 
   // Stripes: bars across (direction 0) or lines along (1) the body, optionally wavy.
   const st = u.stripes
-  const coord = mix(s, h.mul(0.5), st.z).add(st.w.mul(sin(mix(h, s, st.z).mul(9)))).add(look.z.mul(0.04))
-  const wave01 = cos(coord.mul(st.x).mul(Math.PI * 2)).mul(0.5).add(0.5)
+  const coord = mix(s, h.mul(0.5), st.z)
+    .add(st.w.mul(sin(mix(h, s, st.z).mul(9))))
+    .add(look.z.mul(0.04))
+  const wave01 = cos(coord.mul(st.x).mul(Math.PI * 2))
+    .mul(0.5)
+    .add(0.5)
   const thr = float(1).sub(st.y)
   const stripe = smoothstep(thr.sub(0.04), thr.add(0.04), wave01)
   const onStripes = step(0.5, st.x).mul(band(h, u.stripeRegion.x, u.stripeRegion.y))
@@ -122,18 +160,31 @@ export function createFishMaterial(u: FishUniforms): MeshPhysicalNodeMaterial {
   const q = vec2(s, h.mul(u.mouth.z).mul(0.5)).mul(sp.x).add(look.z.mul(7)).add(100)
   const cell = floor(q)
   const seed = cell.x.add(cell.y.mul(157))
-  const jitter = vec2(hash(seed), hash(seed.add(31))).mul(0.5).add(0.25)
+  const jitter = vec2(hash(seed), hash(seed.add(31)))
+    .mul(0.5)
+    .add(0.25)
   const d = length(fract(q).sub(jitter))
-  const spot = float(1).sub(smoothstep(sp.y.mul(0.75), sp.y, d)).mul(step(hash(seed.add(71)), 0.8)).mul(step(0.5, sp.x)).mul(band(h, sp.z, sp.w))
+  const spot = float(1)
+    .sub(smoothstep(sp.y.mul(0.75), sp.y, d))
+    .mul(step(hash(seed.add(71)), 0.8))
+    .mul(step(0.5, sp.x))
+    .mul(band(h, sp.z, sp.w))
   col = mix(col, u.spotColor, spot.mul(isBody))
 
   // Eye (projected sideways) and mouth line.
   const de = length(vec2(p.z.sub(u.eye.x), p.y.sub(u.eye.y)))
-  const iris = float(1).sub(smoothstep(u.eye.z.mul(0.85), u.eye.z, de)).mul(isBody)
-  const pupil = float(1).sub(smoothstep(u.eye.z.mul(0.45), u.eye.z.mul(0.55), de)).mul(isBody)
+  const iris = float(1)
+    .sub(smoothstep(u.eye.z.mul(0.85), u.eye.z, de))
+    .mul(isBody)
+  const pupil = float(1)
+    .sub(smoothstep(u.eye.z.mul(0.45), u.eye.z.mul(0.55), de))
+    .mul(isBody)
   col = mix(col, u.eyeColor, iris)
   col = mix(col, vec3(0.01, 0.01, 0.012), pupil)
-  const mouth = float(1).sub(smoothstep(0.003, 0.008, abs(p.y.sub(u.mouth.x)))).mul(float(1).sub(step(u.mouth.y, s))).mul(isBody)
+  const mouth = float(1)
+    .sub(smoothstep(0.003, 0.008, abs(p.y.sub(u.mouth.x))))
+    .mul(float(1).sub(step(u.mouth.y, s)))
+    .mul(isBody)
   col = col.mul(float(1).sub(mouth.mul(0.8)))
 
   // Per-fish variety, then weathering states.

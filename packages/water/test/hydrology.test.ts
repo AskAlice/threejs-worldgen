@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeHydrology, fillDepressions, flowAccumulation, flowReceivers, hydrologyWaterAt, riverModifiers, sampleGrid, type HydrologyGrid } from '../src/hydrology.ts'
+import {
+  analyzeHydrology,
+  fillDepressions,
+  flowAccumulation,
+  flowReceivers,
+  hydrologyWaterAt,
+  riverModifiers,
+  sampleGrid,
+  type HydrologyGrid
+} from '../src/hydrology.ts'
 
 const grid = (cols: number, rows: number, f: (c: number, r: number) => number, cellSize = 1): HydrologyGrid => {
   const heights = new Float64Array(cols * rows)
@@ -27,13 +36,21 @@ test('after an ε-fill every non-outlet cell drains strictly downhill to an outl
   const filled = fillDepressions(g.heights, g.cols, g.rows, 1e-3)
   const receivers = flowReceivers(filled, g.cols, g.rows)
   for (let i = 0; i < receivers.length; i++) {
-    const c = i % g.cols, r = (i / g.cols) | 0
+    const c = i % g.cols,
+      r = (i / g.cols) | 0
     const edge = c === 0 || r === 0 || c === g.cols - 1 || r === g.rows - 1
-    if (receivers[i] < 0) { assert.ok(edge, `interior sink at ${c},${r}`); continue }
+    if (receivers[i] < 0) {
+      assert.ok(edge, `interior sink at ${c},${r}`)
+      continue
+    }
     assert.ok(filled[receivers[i]] < filled[i], 'flow goes downhill')
     // Following receivers always ends at an outlet (no cycles).
-    let j = i, steps = 0
-    while (receivers[j] >= 0) { j = receivers[j]; assert.ok(++steps <= receivers.length) }
+    let j = i,
+      steps = 0
+    while (receivers[j] >= 0) {
+      j = receivers[j]
+      assert.ok(++steps <= receivers.length)
+    }
   }
 })
 
@@ -46,7 +63,8 @@ test('flow accumulation conserves area: outlets receive every cell exactly once'
   for (let i = 0; i < receivers.length; i++) if (receivers[i] < 0) atOutlets += accumulation[i]
   assert.equal(atOutlets, g.cols * g.rows * 4)
   assert.equal(new Set(order).size, receivers.length, 'order visits every cell once')
-  for (let i = 0; i < receivers.length; i++) if (receivers[i] >= 0) assert.ok(accumulation[receivers[i]] > accumulation[i])
+  for (let i = 0; i < receivers.length; i++)
+    if (receivers[i] >= 0) assert.ok(accumulation[receivers[i]] > accumulation[i])
 })
 
 test('sea cells are outlets and are never filled', () => {
@@ -67,7 +85,10 @@ test('lakes: the basin is one lake at its spill level with the right area and de
   assert.equal(lake.level, 6)
   assert.equal(lake.area, 19 * 19)
   assert.ok(Math.abs(lake.maxDepth - 4) < 1e-9)
-  assert.equal(lake.mask.reduce((a, b) => a + b, 0), 19 * 19)
+  assert.equal(
+    lake.mask.reduce((a, b) => a + b, 0),
+    19 * 19
+  )
   assert.equal(hydrologyWaterAt(result, 10, 10).kind, 'lake')
   assert.equal(hydrologyWaterAt(result, 10, 10).depth, 4)
   // Too-small lakes are dropped.

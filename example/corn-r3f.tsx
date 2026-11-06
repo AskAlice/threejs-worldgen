@@ -1,10 +1,21 @@
-import * as THREE from 'three/webgpu'
+import type * as THREE from 'three/webgpu'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { Corn, Grass, type CornImpl, type GrassImpl } from 'threejs-grass/react'
 import { panels } from './corn.panel'
-import { FIELDS, SUN, TRACTOR_RADIUS, createTractor, driveTractor, farm, farmGeometry, farmGrassMap, predrive, view } from './corn-shared'
+import {
+  FIELDS,
+  SUN,
+  TRACTOR_RADIUS,
+  createTractor,
+  driveTractor,
+  farm,
+  farmGeometry,
+  farmGrassMap,
+  predrive,
+  view
+} from './corn-shared'
 import { View, mount, useHud, useSpec } from './r3f-shared'
 import { createEnvironment, createGroundMaterial, keepAboveGround } from './shared'
 
@@ -43,9 +54,12 @@ function Scene() {
   const mature = useSpec('Corn', panels['threejs-grass'].Corn)
   const field = useControls('Field (mature)', {
     rowDirection: { value: FIELDS[0].field.rowDirection, min: -Math.PI, max: Math.PI, step: 0.01 },
-    rowSpacing: { value: FIELDS[0].field.rowSpacing, min: 0.4, max: 1.5, step: 0.01 },
+    rowSpacing: { value: FIELDS[0].field.rowSpacing, min: 0.4, max: 1.5, step: 0.01 }
   })
-  const drive = useControls('Tractor', { speed: { value: 1, min: 0, max: 5 }, radius: { value: TRACTOR_RADIUS, min: 0.3, max: 3 } })
+  const drive = useControls('Tractor', {
+    speed: { value: 1, min: 0, max: 5 },
+    radius: { value: TRACTOR_RADIUS, min: 0.3, max: 3 }
+  })
 
   useEffect(() => {
     if (grass && terrain.current) terrain.current.material = createGroundMaterial(grass)
@@ -59,7 +73,10 @@ function Scene() {
     driveTractor(tractor, time.current)
     if (corn && ++frames.current === 30) Object.assign((window as any).demo, { ready: true }) // for screenshot scripts
   })
-  useHud(() => `threejs-grass · <Corn> × ${FIELDS.length} fields · ${corn?.stats.plants.toLocaleString() ?? 0} plants near the camera\nbox tractor: interactor of radius ${drive.radius.toFixed(1)} m, flattening a track`)
+  useHud(
+    () =>
+      `threejs-grass · <Corn> × ${FIELDS.length} fields · ${corn?.stats.plants.toLocaleString() ?? 0} plants near the camera\nbox tractor: interactor of radius ${drive.radius.toFixed(1)} m, flattening a track`
+  )
 
   return (
     <>
@@ -68,11 +85,25 @@ function Scene() {
         <meshStandardNodeMaterial color="#1c2a10" />
       </mesh>
       <primitive object={tractor} />
-      <Grass ref={setGrass} terrain={farm} grassMap={grassMap} maxDistance={120} preset="perennialRyegrass" bladeHeight={0.35} patchiness={0.12} />
-      <Corn ref={setCorn} terrain={farm} {...mature}
+      <Grass
+        ref={setGrass}
+        terrain={farm}
+        grassMap={grassMap}
+        maxDistance={120}
+        preset="perennialRyegrass"
+        bladeHeight={0.35}
+        patchiness={0.12}
+      />
+      <Corn
+        ref={setCorn}
+        terrain={farm}
+        {...mature}
         fields={[{ ...FIELDS[0].field, rowDirection: field.rowDirection, rowSpacing: field.rowSpacing }]}
-        interactors={[{ object: tractor, radius: drive.radius }]} />
-      {FIELDS.slice(1).map(({ name, field, input }) => <Corn key={name} terrain={farm} fields={[field]} {...input} />)}
+        interactors={[{ object: tractor, radius: drive.radius }]}
+      />
+      {FIELDS.slice(1).map(({ name, field, input }) => (
+        <Corn key={name} terrain={farm} fields={[field]} {...input} />
+      ))}
       <View position={start.position} target={start.target} />
     </>
   )

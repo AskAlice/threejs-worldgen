@@ -2,7 +2,15 @@ import * as THREE from 'three/webgpu'
 import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { button, useControls } from 'leva'
-import { DEFAULT_SNOW_SURFACE, MPM, MPMSnowSurface, SNOW_PRESETS, resolveMPMOptions, type MPMSnowSurfaceImpl, type MPMSolverImpl } from 'threejs-particles/react'
+import {
+  DEFAULT_SNOW_SURFACE,
+  MPM,
+  MPMSnowSurface,
+  SNOW_PRESETS,
+  resolveMPMOptions,
+  type MPMSnowSurfaceImpl,
+  type MPMSolverImpl
+} from 'threejs-particles/react'
 import { panels } from './mpm-snow.panel'
 import { Walker, check, snowScene, snowStage, type SceneName } from './mpm-snow-scene'
 import { View, mount, useHud, useSpec, type V3 } from './r3f-shared'
@@ -24,7 +32,10 @@ const solverSpec = { ...panel.MPMSolver, target: resolveMPMOptions(config) }
 const surfaceSpec = { ...panel.MPMSnowSurface, target: { ...DEFAULT_SNOW_SURFACE, ...snow.surface } }
 const walker = new Walker(spec)
 /** A leva `onChange` that reloads the page with the search `search(value)` (not on the initial value). */
-const reload = (search: (value: string) => string) => (value: string, _: string, { initial }: { initial: boolean }) => void (initial || (location.search = search(value)))
+const reload =
+  (search: (value: string) => string) =>
+  (value: string, _: string, { initial }: { initial: boolean }) =>
+    void (initial || (location.search = search(value)))
 
 /** The static scenery: sky, environment light, fog, the sun with soft shadows, the bed, the snow ring, the mountains. */
 function Stage() {
@@ -62,22 +73,32 @@ function Snow() {
   const walk = () => void (latest.current.mpm && (start.current = latest.current.mpm.time))
   const release = () => latest.current.mpm && snow.release(latest.current.mpm, latest.current.releaseFriction)
   const demo = useControls('demo', {
-    scene: { value: name as string, options: ['footprints', 'avalanche'], label: 'scene (reloads)', onChange: reload((s) => `?scene=${s}`) },
-    preset: { value: preset && Object.hasOwn(SNOW_PRESETS, preset) ? preset : name === 'avalanche' ? 'packed' : 'powder', options: Object.keys(SNOW_PRESETS), label: 'snow preset (reloads)', onChange: reload((p) => `?scene=${name}&preset=${p}`) },
+    scene: {
+      value: name as string,
+      options: ['footprints', 'avalanche'],
+      label: 'scene (reloads)',
+      onChange: reload((s) => `?scene=${s}`)
+    },
+    preset: {
+      value: preset && Object.hasOwn(SNOW_PRESETS, preset) ? preset : name === 'avalanche' ? 'packed' : 'powder',
+      options: Object.keys(SNOW_PRESETS),
+      label: 'snow preset (reloads)',
+      onChange: reload((p) => `?scene=${name}&preset=${p}`)
+    },
     showParticles: { value: false, label: 'show particles' },
     'reset the snow': button(reset),
     ...(name === 'footprints'
       ? {
-        walker: { value: 'boots', options: ['boots', 'wheels'] },
-        walkSpeed: { value: 1.1, min: 0.3, max: 3, step: 0.05, label: 'speed (m/s)' },
-        sink: { value: 0.22, min: 0.05, max: 0.33, step: 0.01, label: 'sinks in (m)' },
-        showWalker: { value: true, label: 'show walker' },
-        'walk across': button(walk),
-      }
+          walker: { value: 'boots', options: ['boots', 'wheels'] },
+          walkSpeed: { value: 1.1, min: 0.3, max: 3, step: 0.05, label: 'speed (m/s)' },
+          sink: { value: 0.22, min: 0.05, max: 0.33, step: 0.01, label: 'sinks in (m)' },
+          showWalker: { value: true, label: 'show walker' },
+          'walk across': button(walk)
+        }
       : {
-        releaseFriction: { value: 0.2, min: 0, max: 1.2, step: 0.01, label: 'bed friction after release' },
-        'release the slab': button(release),
-      }),
+          releaseFriction: { value: 0.2, min: 0, max: 1.2, step: 0.01, label: 'bed friction after release' },
+          'release the slab': button(release)
+        })
   }) as Record<string, any>
   latest.current = { mpm, releaseFriction: demo.releaseFriction ?? 0.2 }
   useEffect(reset, [mpm])
@@ -85,16 +106,43 @@ function Snow() {
 
   const fps = useRef(60)
   useFrame((_, dt) => void (fps.current = fps.current * 0.95 + (1 / Math.max(1e-3, dt)) * 0.05))
-  useHud(() => (mpm ? `threejs-particles · <MPM> + <MPMSnowSurface>\n${fps.current.toFixed(0)} fps · ${mpm.count.toLocaleString()} snow particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s\n` +
-    (name === 'footprints' ? `${demo.walker === 'boots' ? 'footprints' : 'tracks'}: "walk across" in the panel; ?scene=avalanche for the slope` : `"release the slab" in the panel (bed friction ${mpm.options.friction.toFixed(2)})`) : 'starting…'))
+  useHud(() =>
+    mpm
+      ? `threejs-particles · <MPM> + <MPMSnowSurface>\n${fps.current.toFixed(0)} fps · ${mpm.count.toLocaleString()} snow particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s\n` +
+        (name === 'footprints'
+          ? `${demo.walker === 'boots' ? 'footprints' : 'tracks'}: "walk across" in the panel; ?scene=avalanche for the slope`
+          : `"release the slab" in the panel (bed friction ${mpm.options.friction.toFixed(2)})`)
+      : 'starting…'
+  )
   const gl = useThree((s) => s.gl) as unknown as THREE.WebGPURenderer
-  useEffect(() => void Object.assign(window, { mpm, surface, walk, release, reset, snowStats: () => mpm && surface && snow.stats(gl, mpm, surface, walker), walkerPrints: walker.prints, groundAt: spec.ground }), [mpm, surface]) // for the console
+  useEffect(
+    () =>
+      void Object.assign(window, {
+        mpm,
+        surface,
+        walk,
+        release,
+        reset,
+        snowStats: () => mpm && surface && snow.stats(gl, mpm, surface, walker),
+        walkerPrints: walker.prints,
+        groundAt: spec.ground
+      }),
+    [mpm, surface]
+  ) // for the console
 
   return (
     <>
       <Walking mpm={mpm} demo={demo as Demo} start={start} />
       {/* A fixed step: deterministic, and slow motion rather than instability when frames drop. */}
-      <MPM ref={setMpm} {...solver} capacity={config.capacity} resolution={config.resolution} cellSize={config.cellSize} height={spec.ground} timeStep={1 / 60} />
+      <MPM
+        ref={setMpm}
+        {...solver}
+        capacity={config.capacity}
+        resolution={config.resolution}
+        cellSize={config.cellSize}
+        height={spec.ground}
+        timeStep={1 / 60}
+      />
       {mpm && <MPMSnowSurface ref={setSurface} solver={mpm} {...surfaceOptions} detail={surfaceSpec.target.detail} />}
     </>
   )
@@ -117,4 +165,8 @@ function Check() {
   return null
 }
 
-mount(params.has('check') ? <Check /> : <Scene />, { fov: 50, near: 0.05, far: 6000 }, { toneMapping: THREE.AgXToneMapping, toneMappingExposure: spec.exposure })
+mount(
+  params.has('check') ? <Check /> : <Scene />,
+  { fov: 50, near: 0.05, far: 6000 },
+  { toneMapping: THREE.AgXToneMapping, toneMappingExposure: spec.exposure }
+)

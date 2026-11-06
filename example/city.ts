@@ -24,7 +24,8 @@ document.body.appendChild(renderer.domElement)
 await renderer.init()
 
 const scene = new THREE.Scene()
-const day = new THREE.Color('#9cc4e4'), night = new THREE.Color('#0b1020')
+const day = new THREE.Color('#9cc4e4'),
+  night = new THREE.Color('#0b1020')
 scene.background = day.clone()
 scene.fog = new THREE.Fog(day.clone(), 1500, 9000)
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 30000)
@@ -43,7 +44,13 @@ let site = best('town')
 
 // Terrain: a grid around the city, coloured by the world's ground mix; water from waterLevel.
 const terrainMaterial = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 })
-const waterMaterial = new THREE.MeshStandardNodeMaterial({ color: '#3a6f8f', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.85 })
+const waterMaterial = new THREE.MeshStandardNodeMaterial({
+  color: '#3a6f8f',
+  roughness: 0.08,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.85
+})
 const terrain = new THREE.Mesh(new THREE.BufferGeometry(), terrainMaterial)
 const water = new THREE.Mesh(new THREE.BufferGeometry(), waterMaterial)
 terrain.receiveShadow = true
@@ -51,8 +58,10 @@ scene.add(terrain, water)
 
 function buildTerrain(cx: number, cz: number, size: number) {
   const geo = worldGround(world, [cx, cz], size, 256)
-  terrain.geometry.dispose(); water.geometry.dispose()
-  terrain.geometry = geo.terrain; water.geometry = geo.water
+  terrain.geometry.dispose()
+  water.geometry.dispose()
+  terrain.geometry = geo.terrain
+  water.geometry = geo.water
 }
 
 let input: CityInput = {} // everything changed in the panel, kept when a new size moves the city to another site
@@ -97,12 +106,17 @@ let pending: CityInput = {}
 let timer: ReturnType<typeof setTimeout> | undefined
 let queue = Promise.resolve()
 function flush() {
-  queue = queue.then(async () => {
-    const p = pending
-    pending = {}
-    if (!Object.keys(p).length) return
-    if (p.size) { site = best(input.size!); await place() } else city.set(p)
-  }).catch((e) => console.error(e))
+  queue = queue
+    .then(async () => {
+      const p = pending
+      pending = {}
+      if (!Object.keys(p).length) return
+      if (p.size) {
+        site = best(input.size!)
+        await place()
+      } else city.set(p)
+    })
+    .catch((e) => console.error(e))
 }
 const cityInput = {
   set(change: CityInput) {
@@ -110,14 +124,17 @@ const cityInput = {
     pending = mergeOptions(pending, change)
     clearTimeout(timer)
     timer = setTimeout(flush, 100)
-  },
+  }
 }
 const cityClass = classOf('City', cityInput, city.options, specOptions(panels['threejs-city'].City))
 const gui = createPanel([{ name: 'threejs-city', classes: [cityClass] }], { title: 'threejs-city' })
 // Sets an option through its panel control, so keys update the panel and the shared URL too.
 function setOption(path: string[], value: unknown) {
   const parent = path.slice(0, -1).reduce((o, k) => o[k], cityClass.target)
-  gui.controllersRecursive().find((c) => c.object === parent && c.property === path.at(-1))?.setValue(value)
+  gui
+    .controllersRecursive()
+    .find((c) => c.object === parent && c.property === path.at(-1))
+    ?.setValue(value)
 }
 
 const styles = ['auto', 'grid', 'radial', 'organic']
@@ -147,11 +164,17 @@ addEventListener('resize', () => {
 renderer.setAnimationLoop(() => {
   controls.update()
   farmProps()
-  if (rebuild && performance.now() > rebuild && city.plan) { rebuild = 0; buildTerrain(site.x, site.z, city.plan.radius * 3.2) }
+  if (rebuild && performance.now() > rebuild && city.plan) {
+    rebuild = 0
+    buildTerrain(site.x, site.z, city.plan.radius * 3.2)
+  }
   if (fade !== null) {
-    const n = city.options.facade.night, next = n + (fade - n) * 0.05
-    if (Math.abs(fade - next) < 0.002) { setOption(['facade', 'night'], fade); fade = null }
-    else city.set({ facade: { night: next } }) // only while fading: uniforms only, no regeneration
+    const n = city.options.facade.night,
+      next = n + (fade - n) * 0.05
+    if (Math.abs(fade - next) < 0.002) {
+      setOption(['facade', 'night'], fade)
+      fade = null
+    } else city.set({ facade: { night: next } }) // only while fading: uniforms only, no regeneration
   }
   const nightValue = city.options.facade.night
   ;(scene.background as THREE.Color).copy(day).lerp(night, nightValue)
@@ -160,10 +183,18 @@ renderer.setAnimationLoop(() => {
   sky.intensity = 1.2 * (1 - nightValue * 0.85)
   const s = city.stats
   const farm = city.plan?.farm
-  const crops = farm ? farm.fields.reduce<Record<string, number>>((m, f) => ((m[f.crop] = (m[f.crop] ?? 0) + 1), m), {}) : null
+  const crops = farm
+    ? farm.fields.reduce<Record<string, number>>((m, f) => ((m[f.crop] = (m[f.crop] ?? 0) + 1), m), {})
+    : null
   hud.textContent = `threejs-city — ${city.options.size} (${city.plan?.architecture ?? '…'}, ${city.plan?.style ?? '…'})
 ${s.buildings} buildings · ${s.roadKm.toFixed(1)} km roads · ${s.bridges} bridges · pop ≈ ${s.population.toLocaleString()}
-${crops ? `${Object.entries(crops).map(([k, n]) => `${n} ${k}`).join(' · ')} · tractor ${farm!.vehicleSpots[0]?.working ? 'working' : 'parked'}\n` : ''}${s.detailed} at full detail · generated in ${s.generationMs.toFixed(0)} ms
+${
+  crops
+    ? `${Object.entries(crops)
+        .map(([k, n]) => `${n} ${k}`)
+        .join(' · ')} · tractor ${farm!.vehicleSpots[0]?.working ? 'working' : 'parked'}\n`
+    : ''
+}${s.detailed} at full detail · generated in ${s.generationMs.toFixed(0)} ms
 1–6 class · R seed · G layout · N night · W wet · S snow · B burn · D damage`
   renderer.render(scene, camera)
 })

@@ -24,7 +24,10 @@ export interface TrafficEntry {
 }
 
 /** A {@link TrafficEntry} of one known kind: its parameters are typed from that kind's definitions. */
-export type TrafficEntryOf<K extends VehicleType> = Omit<TrafficEntry, 'type' | 'params'> & { type: K; params: VehicleParamsOf<K> }
+export type TrafficEntryOf<K extends VehicleType> = Omit<TrafficEntry, 'type' | 'params'> & {
+  type: K
+  params: VehicleParamsOf<K>
+}
 
 /**
  * Weighted traffic by road kind: town streets (mixed cars, buses, a few pickups, box trucks and
@@ -37,14 +40,14 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
     { type: 'car', params: { style: 'bus' }, weight: 3 },
     { type: 'pickup', params: { style: 'mixed' }, weight: 7 },
     { type: 'truck', params: { body: 'rigid', cab: 'cabOver', sleeper: false, axles: 2 }, weight: 3 },
-    { type: 'bicycle', params: { style: 'mixed' }, weight: 8 },
+    { type: 'bicycle', params: { style: 'mixed' }, weight: 8 }
   ],
   highway: [
     { type: 'car', params: { style: 'mixed' }, weight: 74 },
     { type: 'pickup', params: { style: 'mixed' }, weight: 12 },
     { type: 'car', params: { style: 'bus' }, weight: 2 },
     { type: 'truck', params: { trailers: 1 }, weight: 12 },
-    { type: 'truck', params: { trailers: 2 }, weight: 2 },
+    { type: 'truck', params: { trailers: 2 }, weight: 2 }
   ],
   rural: [
     { type: 'car', params: { style: 'mixed' }, weight: 46 },
@@ -53,7 +56,7 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
     { type: 'pickup', params: { style: 'ute', ute: 'tray' }, weight: 5 },
     { type: 'pickup', params: { style: 'angular' }, weight: 2 },
     { type: 'truck', params: { trailers: 1 }, weight: 4 },
-    { type: 'tractor', params: {}, weight: 3 },
+    { type: 'tractor', params: {}, weight: 3 }
   ],
   dirtRoad: [
     { type: 'pickup', params: { style: 'fullSize', lift: 0.12 }, weight: 30 },
@@ -63,8 +66,8 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
     { type: 'car', params: { style: 'mixed' }, weight: 12 },
     { type: 'car', params: { style: 'vintage' }, weight: 2 },
     { type: 'tractor', params: {}, weight: 6 },
-    { type: 'tractor', params: { implement: 'trailer' }, weight: 3 },
-  ],
+    { type: 'tractor', params: { implement: 'trailer' }, weight: 3 }
+  ]
 }
 
 /**
@@ -76,7 +79,12 @@ export const TRAFFIC_POOLS: Record<TrafficPoolName, TrafficEntry[]> = {
  * new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: graph })
  * ```
  */
-export function trafficGroups(pool: TrafficPoolName | TrafficEntry[], count: number, route: RouteSpec, extra: Partial<FleetGroup> = {}): FleetGroup[] {
+export function trafficGroups(
+  pool: TrafficPoolName | TrafficEntry[],
+  count: number,
+  route: RouteSpec,
+  extra: Partial<FleetGroup> = {}
+): FleetGroup[] {
   const entries = typeof pool === 'string' ? TRAFFIC_POOLS[pool] : pool
   const total = entries.reduce((a, e) => a + Math.max(0, e.weight), 0)
   const n = Math.max(0, Math.floor(count))
@@ -85,7 +93,11 @@ export function trafficGroups(pool: TrafficPoolName | TrafficEntry[], count: num
   const counts = exact.map(Math.floor)
   const order = exact.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1])
   for (let k = 0, left = n - counts.reduce((a, b) => a + b, 0); k < left; k++) counts[order[k % order.length][1]]++
-  return entries.flatMap((e, i) => (counts[i] ? [{ ...extra, type: e.type, count: counts[i], params: { ...e.params }, route: structuredClone(route) }] : []))
+  return entries.flatMap((e, i) =>
+    counts[i]
+      ? [{ ...extra, type: e.type, count: counts[i], params: { ...e.params }, route: structuredClone(route) }]
+      : []
+  )
 }
 
 /** The pool a road edge draws from, from its width and how built up the area is (0 rural … 1 a town). */
@@ -99,11 +111,13 @@ export function edgePool(width: number, population = 0.5): TrafficPoolName {
 /** The `TrafficEntry`s of every pool, one per distinct type and parameters, weighted by their best pool share. */
 function poolUnion(): TrafficEntry[] {
   const byKey = new Map<string, TrafficEntry>()
-  for (const pool of Object.values(TRAFFIC_POOLS)) for (const e of pool) {
-    const key = entryKey(e.type, e.params), seen = byKey.get(key)
-    if (!seen) byKey.set(key, { type: e.type, params: { ...e.params }, weight: e.weight })
-    else seen.weight = Math.max(seen.weight, e.weight)
-  }
+  for (const pool of Object.values(TRAFFIC_POOLS))
+    for (const e of pool) {
+      const key = entryKey(e.type, e.params),
+        seen = byKey.get(key)
+      if (!seen) byKey.set(key, { type: e.type, params: { ...e.params }, weight: e.weight })
+      else seen.weight = Math.max(seen.weight, e.weight)
+    }
   return [...byKey.values()]
 }
 
@@ -119,14 +133,24 @@ function nodeY(roads: RoadNetwork, n: number, height: ((x: number, z: number) =>
  * `RoadNavigator.pose`, so a spawn can be checked for visibility before it is committed to.
  */
 export function laneAt(
-  roads: RoadNetwork, e: number, from: number, u: number, leftHand: boolean,
-  height: ((x: number, z: number) => number) | null = null, out: RoadPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 },
+  roads: RoadNetwork,
+  e: number,
+  from: number,
+  u: number,
+  leftHand: boolean,
+  height: ((x: number, z: number) => number) | null = null,
+  out: RoadPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
 ): RoadPose {
-  const ed = roads.edges[e], a = roads.nodes[from], bId = ed.a === from ? ed.b : ed.a
-  const b = roads.nodes[bId], len = Math.hypot(b.x - a.x, b.z - a.z) || 1
-  const tx = (b.x - a.x) / len, tz = (b.z - a.z) / len
+  const ed = roads.edges[e],
+    a = roads.nodes[from],
+    bId = ed.a === from ? ed.b : ed.a
+  const b = roads.nodes[bId],
+    len = Math.hypot(b.x - a.x, b.z - a.z) || 1
+  const tx = (b.x - a.x) / len,
+    tz = (b.z - a.z) / len
   const lane = (ed.width / 4) * (leftHand ? -1 : 1)
-  const ya = nodeY(roads, from, height), yb = nodeY(roads, bId, height)
+  const ya = nodeY(roads, from, height),
+    yb = nodeY(roads, bId, height)
   out.x = a.x + tx * u - tz * lane
   out.z = a.z + tz * u + tx * lane
   out.y = ya + (yb - ya) * Math.max(0, Math.min(1, u / len))
@@ -173,7 +197,7 @@ export const DEFAULT_TRAFFIC: TrafficSettings = {
   headway: 1.6,
   trains: 0,
   rail: null,
-  speeds: { urban: 0.45, highway: 1, rural: 0.55, dirtRoad: 0.35 },
+  speeds: { urban: 0.45, highway: 1, rural: 0.55, dirtRoad: 0.35 }
 }
 
 /** Non-JSON inputs of a {@link Traffic}. */
@@ -186,7 +210,9 @@ export interface TrafficOptions {
   look?: StateLook
 }
 
-const _m4 = new Matrix4(), _v = new Vector3(), _sphere = new Sphere()
+const _m4 = new Matrix4(),
+  _v = new Vector3(),
+  _sphere = new Sphere()
 const tmpPose: RoadPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
 const tmpTail = createPathSample()
 const VISIBLE = 6 // radius a vehicle counts as visible with, metres
@@ -322,11 +348,17 @@ export class Traffic {
     const groups: FleetGroup[] = trafficGroups(poolUnion(), s.max, { kind: 'roads' }, { variants: 2 })
     const ground = groups.length
     const trains = Math.max(0, Math.floor(s.trains))
-    const rail = trains > 0 && s.rail && s.rail.length >= 3 ? s.rail.map((p): [number, number, number] => [p[0], p[1], p[2]]) : null
+    const rail =
+      trains > 0 && s.rail && s.rail.length >= 3
+        ? s.rail.map((p): [number, number, number] => [p[0], p[1], p[2]])
+        : null
     if (rail) {
       groups.push({
-        type: 'train', count: trains, variants: 1, params: { car: 'locomotive', wagons: 6, cargo: 'freight', traction: 'diesel' },
-        route: { kind: 'path', points: rail, closed: true },
+        type: 'train',
+        count: trains,
+        variants: 1,
+        params: { car: 'locomotive', wagons: 6, cargo: 'freight', traction: 'diesel' },
+        route: { kind: 'path', points: rail, closed: true }
       })
     }
     const old = this.fleet
@@ -335,7 +367,8 @@ export class Traffic {
     this.object.add(this.fleet.object)
     old?.dispose()
     this.railPath = rail ? new Path(rail, true) : null
-    const sim = this.fleet.sim, units = sim.unitLeader.length
+    const sim = this.fleet.sim,
+      units = sim.unitLeader.length
     this.lead = Int32Array.from(sim.unitLeader)
     this.lastRoads = this.roads
     this.end = new Int32Array(units)
@@ -354,7 +387,8 @@ export class Traffic {
     this.lists = groups.slice(0, ground).map((g) => ({ key: entryKey(g.type, g.params ?? {}), units: [] as number[] }))
     const byKey = new Map(this.lists.map((l, i) => [l.key, i]))
     this.pools = {}
-    for (const [name, list] of Object.entries(TRAFFIC_POOLS)) this.pools[name] = Int32Array.from(list.map((e) => byKey.get(entryKey(e.type, e.params)) ?? -1))
+    for (const [name, list] of Object.entries(TRAFFIC_POOLS))
+      this.pools[name] = Int32Array.from(list.map((e) => byKey.get(entryKey(e.type, e.params)) ?? -1))
     this.fill = new Int32Array(ground)
     for (let u = 0; u < units; u++) {
       const v = this.lead[u]
@@ -377,7 +411,8 @@ export class Traffic {
   }
 
   private setActive(u: number, on: boolean): void {
-    const sim = this.fleet.sim, a = on ? 1 : 0
+    const sim = this.fleet.sim,
+      a = on ? 1 : 0
     for (let v = this.lead[u]; v < this.end[u]; v++) sim.active[v] = a
     if (on) {
       sim.relocate(u)
@@ -386,7 +421,8 @@ export class Traffic {
   }
 
   private distance(u: number, cx: number, cy: number, cz: number): number {
-    const p = this.fleet.sim.pose, o = this.lead[u] * 8
+    const p = this.fleet.sim.pose,
+      o = this.lead[u] * 8
     return Math.hypot(p[o] - cx, p[o + 1] - cy, p[o + 2] - cz)
   }
 
@@ -416,7 +452,9 @@ export class Traffic {
     camera.updateMatrixWorld()
     this.frustum.setFromProjectionMatrix(_m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
     _v.setFromMatrixPosition(camera.matrixWorld)
-    const cx = _v.x, cy = _v.y, cz = _v.z
+    const cx = _v.x,
+      cy = _v.y,
+      cz = _v.z
     for (let u = 0; u < this.lead.length; u++) {
       if (this.isActive(u) && this.distance(u, cx, cy, cz) > s.outerRadius && !this.visible(u)) this.setActive(u, false)
     }
@@ -446,7 +484,8 @@ export class Traffic {
     const h = hash4(this.seed, slot, n, 0x5a17)
     const e = h % roads.edges.length
     const ed = roads.edges[e]
-    const a = roads.nodes[ed.a], b = roads.nodes[ed.b]
+    const a = roads.nodes[ed.a],
+      b = roads.nodes[ed.b]
     const len = Math.hypot(b.x - a.x, b.z - a.z)
     if (len < 18) return false
     // Stay clear of the rounded corners at either end, so the placement is exactly the straight lane pose.
@@ -458,12 +497,17 @@ export class Traffic {
     const pool = edgePool(ed.width, this.settings.population)
     const list = TRAFFIC_POOLS[pool]
     const total = list.reduce((sum, cand) => sum + Math.max(0, cand.weight), 0)
-    let w = hash01(this.seed, slot, n, 0x9e37) * total, pickAt = list.length - 1
+    let w = hash01(this.seed, slot, n, 0x9e37) * total,
+      pickAt = list.length - 1
     for (let k = 0; k < list.length; k++) {
       w -= Math.max(0, list[k].weight)
-      if (w <= 0) { pickAt = k; break }
+      if (w <= 0) {
+        pickAt = k
+        break
+      }
     }
-    const entry = list[pickAt], g = this.pools[pool][pickAt]
+    const entry = list[pickAt],
+      g = this.pools[pool][pickAt]
     if (g < 0) return false
     const units = this.lists[g].units
     for (let k = 0; k < units.length; k++) {
@@ -481,7 +525,8 @@ export class Traffic {
       this.fill[g] = (this.fill[g] + k + 1) % units.length
       const [lo, hi] = DEFAULT_SPEEDS[entry.type]
       this.cruise[unit] = (lo + (hi - lo) * hash01(this.seed, unit, 0, 0x5eed)) * this.settings.speeds[pool]
-      this.parked[unit] = pool === 'urban' && ed.width < 8 && hash01(this.seed, slot, n, 0x9a3) < this.settings.parked ? 1 : 0
+      this.parked[unit] =
+        pool === 'urban' && ed.width < 8 && hash01(this.seed, slot, n, 0x9a3) < this.settings.parked ? 1 : 0
       this.setActive(unit, true)
       this.fleet.sim.unitSpeed[unit] = this.cruise[unit] * (this.parked[unit] ? 0 : 1)
       return true
@@ -509,7 +554,9 @@ export class Traffic {
 
   /** Per-unit target speeds this frame: car-following headway, junctions, parked cars, then the cruise. */
   private drive(): void {
-    const sim = this.fleet.sim, p = sim.pose, t = this.target
+    const sim = this.fleet.sim,
+      p = sim.pose,
+      t = this.target
     let live = 0
     for (let u = 0; u < this.lead.length; u++) {
       this.remain[u] = Infinity
@@ -517,9 +564,11 @@ export class Traffic {
       t[u] = this.parked[u] ? 0 : this.cruise[u]
       this.live[live++] = u
       if (this.kind[u] === 1) continue
-      const nav = sim.navigator(this.group[u]), slot = sim.navSlot[u]
+      const nav = sim.navigator(this.group[u]),
+        slot = sim.navSlot[u]
       if (!nav || slot < 0) continue
-      const e = nav.edge[slot], from = nav.from[slot]
+      const e = nav.edge[slot],
+        from = nav.from[slot]
       if (e < 0) continue
       const ed = this.roads?.edges[e]
       this.edgeOf[u] = e
@@ -528,13 +577,19 @@ export class Traffic {
     }
     const roads = this.roads
     for (let a = 0; a < live; a++) {
-      const u = this.live[a], ao = this.lead[u] * 8
-      const fx = Math.sin(p[ao + 3]), fz = Math.cos(p[ao + 3]), ax = p[ao], az = p[ao + 2]
+      const u = this.live[a],
+        ao = this.lead[u] * 8
+      const fx = Math.sin(p[ao + 3]),
+        fz = Math.cos(p[ao + 3]),
+        ax = p[ao],
+        az = p[ao + 2]
       const node = this.kind[u] === 0 && this.remain[u] < 14 && roads ? roads.nodes[this.nextNode[u]] : null
       for (let b = 0; b < live; b++) {
         if (a === b) continue
-        const ub = this.live[b], bo = this.lead[ub] * 8
-        const dx = p[bo] - ax, dz = p[bo + 2] - az
+        const ub = this.live[b],
+          bo = this.lead[ub] * 8
+        const dx = p[bo] - ax,
+          dz = p[bo + 2] - az
         const along = dx * fx + dz * fz
         // Headway: keep a gap to whatever is directly ahead in this lane.
         if (along > 0 && along < 60 + this.half[u] && Math.abs(dx * fz - dz * fx) < 3) {
@@ -555,6 +610,9 @@ export class Traffic {
 function mergeTraffic(base: TrafficSettings, input: Partial<TrafficSettings>): TrafficSettings {
   const out = { ...base, ...input }
   out.speeds = { ...base.speeds, ...(input.speeds ?? {}) }
-  out.rail = input.rail === undefined ? base.rail && base.rail.map((p): [number, number, number] => [p[0], p[1], p[2]]) : input.rail && input.rail.map((p): [number, number, number] => [p[0], p[1], p[2]])
+  out.rail =
+    input.rail === undefined
+      ? base.rail && base.rail.map((p): [number, number, number] => [p[0], p[1], p[2]])
+      : input.rail && input.rail.map((p): [number, number, number] => [p[0], p[1], p[2]])
   return out
 }

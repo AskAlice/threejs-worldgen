@@ -4,14 +4,30 @@
  * procedural maria and craters fixed to the moon's body frame (so the same face keeps pointing at the
  * planet), and earthshine on the dark side.
  */
-import { cross, dot, float, fwidth, length, max, mix, mx_fractal_noise_float, mx_worley_noise_float, normalize, smoothstep, sqrt, vec3 } from 'three/tsl'
+import {
+  cross,
+  dot,
+  float,
+  fwidth,
+  length,
+  max,
+  mix,
+  mx_fractal_noise_float,
+  mx_worley_noise_float,
+  normalize,
+  smoothstep,
+  sqrt,
+  vec3
+} from 'three/tsl'
 import type { SkyUniforms } from './atmosphere.ts'
 
 /** Procedural lunar albedo (≈0.07 maria … 0.18 bright highlands) at a unit body-frame normal. */
 export function moonAlbedo(n: any): any {
   const maria = smoothstep(0.05, 0.25, mx_fractal_noise_float(n.mul(1.6).add(vec3(3.1, 7.7, 1.3)), 4, 2, 0.5))
   const craters = mx_worley_noise_float(n.mul(9)) // distance to the nearest feature point
-  const rims = smoothstep(0.12, 0.2, craters).mul(smoothstep(0.32, 0.2, craters)).mul(0.035)
+  const rims = smoothstep(0.12, 0.2, craters)
+    .mul(smoothstep(0.32, 0.2, craters))
+    .mul(0.035)
   const bowls = smoothstep(0.16, 0.0, craters).mul(-0.02)
   const grain = mx_fractal_noise_float(n.mul(24), 3, 2, 0.5).mul(0.03)
   return mix(float(0.165), float(0.075), maria).add(rims).add(bowls).add(grain)
@@ -27,7 +43,9 @@ export function moonCoverage(u: SkyUniforms, d: any) {
   const sinT = length(cross(d, m)) // precise for tiny angles, unlike acos(dot)
   const h2 = float(1).sub(D.mul(D).mul(sinT).mul(sinT))
   const edge = max(fwidth(h2), 1e-5)
-  const coverage = smoothstep(edge.negate(), edge, h2).mul(dot(d, m).greaterThan(0).select(1, 0)).mul(u.moonAngularRadius.greaterThan(0).select(1, 0))
+  const coverage = smoothstep(edge.negate(), edge, h2)
+    .mul(dot(d, m).greaterThan(0).select(1, 0))
+    .mul(u.moonAngularRadius.greaterThan(0).select(1, 0))
   return { coverage, h2, D }
 }
 

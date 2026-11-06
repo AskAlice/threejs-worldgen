@@ -45,7 +45,7 @@ function isObjectRef<T extends Object3D>(value: ObjectRef<T>): value is { curren
 
 /** Resolves a terrain object-or-ref; height functions pass through untouched. */
 export function resolveTerrain(terrain: Terrain | ObjectRef<Object3D> | undefined): Terrain | undefined {
-  return typeof terrain === 'function' ? terrain : resolveObject(terrain) ?? undefined
+  return typeof terrain === 'function' ? terrain : (resolveObject(terrain) ?? undefined)
 }
 
 const _v = new Vector3()
@@ -83,6 +83,9 @@ export function writeSun(u: Pick<GrassUniforms, 'sunDirection' | 'sunColor'>, su
   if (!sun) return
   sun.updateWorldMatrix(true, false)
   sun.target.updateWorldMatrix(true, false)
-  u.sunDirection.value.setFromMatrixPosition(sun.matrixWorld).sub(_t.setFromMatrixPosition(sun.target.matrixWorld)).normalize()
+  u.sunDirection.value
+    .setFromMatrixPosition(sun.matrixWorld)
+    .sub(_t.setFromMatrixPosition(sun.target.matrixWorld))
+    .normalize()
   u.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity)
 }

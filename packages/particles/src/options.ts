@@ -3,7 +3,11 @@ import { merge } from 'threejs-heightfield'
 export { merge }
 
 /** Makes every property optional, recursively (arrays are replaced whole). */
-export type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T
+export type DeepPartial<T> = T extends readonly unknown[]
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T
 
 /** Where new particles appear. */
 export type EmitterShape = 'point' | 'box' | 'disc' | 'sphere' | 'sources'
@@ -139,17 +143,53 @@ export const DEFAULT_PARTICLES: ParticleOptions = {
   rate: 200,
   maxPerFrame: 1024,
   life: [3, 6],
-  emitter: { shape: 'point', position: [0, 0, 0], size: [1, 1, 1], velocity: [0, 1, 0], spread: 0.5, temperature: [600, 700] },
+  emitter: {
+    shape: 'point',
+    position: [0, 0, 0],
+    size: [1, 1, 1],
+    velocity: [0, 1, 0],
+    spread: 0.5,
+    temperature: [600, 700]
+  },
   forces: {
-    gravity: 0, buoyancy: 0.15, ambientTemperature: 293, cooling: 0.3, wind: [1, 0, 0], windShear: 0.3, drag: 0.8,
-    turbulence: 2, turbulenceScale: 6, turbulenceSpeed: 0.2, gridLift: 0,
+    gravity: 0,
+    buoyancy: 0.15,
+    ambientTemperature: 293,
+    cooling: 0.3,
+    wind: [1, 0, 0],
+    windShear: 0.3,
+    drag: 0.8,
+    turbulence: 2,
+    turbulenceScale: 6,
+    turbulenceSpeed: 0.2,
+    gridLift: 0
   },
   curves: { size: [0.4, 1, 1.6], opacity: [0, 1, 0.6, 0], color: ['#ffffff'] },
   render: {
-    shading: 'unlit', blending: 'alpha', size: 1, sizeRandom: [0.7, 1.3], aspect: 1, stretch: 0, intensity: 1, opacity: 1, blackbody: false,
-    softness: 1, sort: false, detail: 1, detailDistance: 600, shadowSteps: 2, lightSteps: 4, absorption: 2.5, anisotropy: 0.4,
-    silverLining: 0.5, albedo: ['#d8d6d2', '#2a2420'], glow: '#ff7a30', glowStrength: 3, refraction: 0.01, capHeight: 0,
-  },
+    shading: 'unlit',
+    blending: 'alpha',
+    size: 1,
+    sizeRandom: [0.7, 1.3],
+    aspect: 1,
+    stretch: 0,
+    intensity: 1,
+    opacity: 1,
+    blackbody: false,
+    softness: 1,
+    sort: false,
+    detail: 1,
+    detailDistance: 600,
+    shadowSteps: 2,
+    lightSteps: 4,
+    absorption: 2.5,
+    anisotropy: 0.4,
+    silverLining: 0.5,
+    albedo: ['#d8d6d2', '#2a2420'],
+    glow: '#ff7a30',
+    glowStrength: 3,
+    refraction: 0.01,
+    capHeight: 0
+  }
 }
 
 /** Curve keys used on the GPU (curves are resampled to this many evenly spaced keys). */
@@ -167,15 +207,22 @@ const HEX = /^#[0-9a-f]{6}$/i
  */
 export function sanitizeParticleOptions(o: ParticleOptions): ParticleOptions {
   const d = DEFAULT_PARTICLES
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
+  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
   const int = (v: unknown, def: number, lo: number, hi: number) => Math.round(num(v, def, lo, hi))
-  const vec = (v: unknown, def: number[], lo = -Infinity, hi = Infinity) => def.map((x, i) => num(Array.isArray(v) ? v[i] : undefined, x, lo, hi))
+  const vec = (v: unknown, def: number[], lo = -Infinity, hi = Infinity) =>
+    def.map((x, i) => num(Array.isArray(v) ? v[i] : undefined, x, lo, hi))
   const range = (v: unknown, def: [number, number], lo = 0, hi = Infinity): [number, number] => {
     const [a, b] = vec(v, def, lo, hi)
     return a <= b ? [a, b] : [b, a]
   }
   const keys = (v: unknown, def: number[], lo = 0) => {
-    const k = Array.isArray(v) ? v.filter((x) => typeof x === 'number' && Number.isFinite(x)).slice(0, CURVE_KEYS).map((x) => Math.max(lo, x)) : []
+    const k = Array.isArray(v)
+      ? v
+          .filter((x) => typeof x === 'number' && Number.isFinite(x))
+          .slice(0, CURVE_KEYS)
+          .map((x) => Math.max(lo, x))
+      : []
     return k.length ? k : [...def]
   }
   if (typeof o.seed !== 'number' && typeof o.seed !== 'string') o.seed = d.seed
@@ -205,11 +252,14 @@ export function sanitizeParticleOptions(o: ParticleOptions): ParticleOptions {
   const c = (o.curves ??= structuredClone(d.curves))
   c.size = keys(c.size, d.curves.size)
   c.opacity = keys(c.opacity, d.curves.opacity)
-  const colors = Array.isArray(c.color) ? c.color.filter((x) => typeof x === 'string' && HEX.test(x)).slice(0, CURVE_KEYS) : []
+  const colors = Array.isArray(c.color)
+    ? c.color.filter((x) => typeof x === 'string' && HEX.test(x)).slice(0, CURVE_KEYS)
+    : []
   c.color = colors.length ? colors : [...d.curves.color]
   const r = (o.render ??= structuredClone(d.render))
   if (!SHADINGS.includes(r.shading)) r.shading = d.render.shading
-  if (r.blending !== 'additive' && r.blending !== 'alpha' && r.blending !== 'premultiplied') r.blending = d.render.blending
+  if (r.blending !== 'additive' && r.blending !== 'alpha' && r.blending !== 'premultiplied')
+    r.blending = d.render.blending
   r.size = num(r.size, d.render.size, 0)
   r.sizeRandom = range(r.sizeRandom, d.render.sizeRandom, 0)
   r.aspect = num(r.aspect, d.render.aspect, 0.05, 100)
@@ -226,7 +276,9 @@ export function sanitizeParticleOptions(o: ParticleOptions): ParticleOptions {
   r.absorption = num(r.absorption, d.render.absorption, 0)
   r.anisotropy = num(r.anisotropy, d.render.anisotropy, 0, 0.95)
   r.silverLining = num(r.silverLining, d.render.silverLining, 0)
-  r.albedo = [0, 1].map((i) => (Array.isArray(r.albedo) && HEX.test(String(r.albedo[i])) ? r.albedo[i] : d.render.albedo[i])) as [string, string]
+  r.albedo = [0, 1].map((i) =>
+    Array.isArray(r.albedo) && HEX.test(String(r.albedo[i])) ? r.albedo[i] : d.render.albedo[i]
+  ) as [string, string]
   if (typeof r.glow !== 'string' || !HEX.test(r.glow)) r.glow = d.render.glow
   r.glowStrength = num(r.glowStrength, d.render.glowStrength, 0)
   r.refraction = num(r.refraction, d.render.refraction, 0, 0.2)

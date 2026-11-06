@@ -102,20 +102,31 @@ export class AssetRegistry {
   search(query: string, limit = 50, filter: AssetFilter = {}): AssetMatch[] {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
     const candidates = this.list(filter)
-    if (!words.length) return candidates.sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit).map((asset) => ({ asset, score: 0 }))
+    if (!words.length)
+      return candidates
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, limit)
+        .map((asset) => ({ asset, score: 0 }))
     const hits: AssetMatch[] = []
     for (const asset of candidates) {
       const fields: [string, number][] = [
-        [asset.name, 3], [asset.id, 2], [asset.category, 2], [asset.package, 1],
-        ...asset.tags.map((t): [string, number] => [t, 2]), ...(asset.aliases ?? []).map((a): [string, number] => [a, 2]),
-        ...(asset.placement.biomes ?? []).map((b): [string, number] => [b, 1]),
+        [asset.name, 3],
+        [asset.id, 2],
+        [asset.category, 2],
+        [asset.package, 1],
+        ...asset.tags.map((t): [string, number] => [t, 2]),
+        ...(asset.aliases ?? []).map((a): [string, number] => [a, 2]),
+        ...(asset.placement.biomes ?? []).map((b): [string, number] => [b, 1])
       ]
       let total = 0
       let all = true
       for (const w of words) {
         let best = 0
         for (const [text, weight] of fields) best = Math.max(best, fuzzyScore(w, text) * weight)
-        if (best <= 0) { all = false; break }
+        if (best <= 0) {
+          all = false
+          break
+        }
         total += best
       }
       if (all) hits.push({ asset, score: total })
@@ -132,10 +143,12 @@ export class AssetRegistry {
 }
 
 function matches(a: AssetDef, filter: AssetFilter): boolean {
-  return (!filter.category || a.category === filter.category) &&
+  return (
+    (!filter.category || a.category === filter.category) &&
     (!filter.surface || a.placement.surface === filter.surface) &&
     (!filter.package || a.package === filter.package) &&
     (!filter.biome || !a.placement.biomes?.length || a.placement.biomes.includes(filter.biome))
+  )
 }
 
 /** The default value of every parameter of an asset. */
@@ -158,10 +171,15 @@ export function fuzzyScore(word: string, text: string): number {
   if (words.some((w) => w.startsWith(word))) return 0.85
   if (t.includes(word)) return 0.7
   // Subsequence with bonuses for consecutive runs and word starts.
-  let ti = 0, run = 0, score = 0
+  let ti = 0,
+    run = 0,
+    score = 0
   for (let i = 0; i < word.length; i++) {
     const found = t.indexOf(word[i], ti)
-    if (found < 0) { score = -1; break }
+    if (found < 0) {
+      score = -1
+      break
+    }
     run = found === ti ? run + 1 : 0
     const start = found === 0 || /[^a-z0-9]/.test(t[found - 1])
     score += 1 + run * 0.5 + (start ? 0.5 : 0)
@@ -182,11 +200,13 @@ export function fuzzyScore(word: string, text: string): number {
 export function editDistance(a: string, b: string): number {
   const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)])
   for (let j = 1; j <= b.length; j++) d[0][j] = j
-  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
-    const cost = a[i - 1] === b[j - 1] ? 0 : 1
-    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
-    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
-  }
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+    }
   return d[a.length][b.length]
 }
 
@@ -196,24 +216,43 @@ const scratch: WorldSample = createSample()
  * Whether local position (x, z) of `frame` suits a placement rule. `sample` may be passed in when you
  * already have it. Slope is measured with four extra height samples `step` metres apart.
  */
-export function isPlausible(world: World, frame: LocalFrame, x: number, z: number, rule: PlacementRule, step = 1, sample = frame.sample(x, z, scratch)): boolean {
+export function isPlausible(
+  world: World,
+  frame: LocalFrame,
+  x: number,
+  z: number,
+  rule: PlacementRule,
+  step = 1,
+  sample = frame.sample(x, z, scratch)
+): boolean {
   const sea = world.options.seaLevel
   const ground = sample.elevation
   const water = sample.waterLevel
   const wet = !Number.isNaN(water) && water > ground
   const depth = wet ? water - ground : 0
   switch (rule.surface) {
-    case 'ground': if (wet) return false; break
-    case 'water': case 'underwater': if (!wet) return false; break
-    case 'shore': if (wet || ground - sea > 3) return false; break
-    case 'air': break
+    case 'ground':
+      if (wet) return false
+      break
+    case 'water':
+    case 'underwater':
+      if (!wet) return false
+      break
+    case 'shore':
+      if (wet || ground - sea > 3) return false
+      break
+    case 'air':
+      break
   }
   if (rule.depth && (depth < rule.depth[0] || depth > rule.depth[1])) return false
-  if (rule.height && rule.surface !== 'air' && (ground - sea < rule.height[0] || ground - sea > rule.height[1])) return false
-  if (rule.temperature && (sample.temperature < rule.temperature[0] || sample.temperature > rule.temperature[1])) return false
+  if (rule.height && rule.surface !== 'air' && (ground - sea < rule.height[0] || ground - sea > rule.height[1]))
+    return false
+  if (rule.temperature && (sample.temperature < rule.temperature[0] || sample.temperature > rule.temperature[1]))
+    return false
   if (rule.biomes?.length) {
     let share = 0
-    for (let i = 0; i < sample.count; i++) if (rule.biomes.includes(world.options.biomes[sample.biomes[i]].id)) share += sample.weights[i]
+    for (let i = 0; i < sample.count; i++)
+      if (rule.biomes.includes(world.options.biomes[sample.biomes[i]].id)) share += sample.weights[i]
     if (share < (rule.minBiomeWeight ?? 0.35)) return false
   }
   if (rule.slope) {
@@ -255,22 +294,43 @@ export interface SpawnPlan {
  * same call always gives the same layout — random-looking, never random), each asset keeps only spots
  * that suit its placement rule, and assets that fit the local biome are favoured.
  */
-export function planSpawns(registry: AssetRegistry, world: World, frame: LocalFrame, cx: number, cz: number, radius: number, count: number, seed: number | string = 1, filter: { category?: string; ids?: string[] } = {}): SpawnPlan[] {
+export function planSpawns(
+  registry: AssetRegistry,
+  world: World,
+  frame: LocalFrame,
+  cx: number,
+  cz: number,
+  radius: number,
+  count: number,
+  seed: number | string = 1,
+  filter: { category?: string; ids?: string[] } = {}
+): SpawnPlan[] {
   const s = seedOf(seed) ^ seedOf(world.options.seed)
-  const candidates = (filter.ids ? filter.ids.map((i) => registry.get(i)).filter((a): a is AssetDef => !!a) : registry.list({ category: filter.category }))
+  const candidates = filter.ids
+    ? filter.ids.map((i) => registry.get(i)).filter((a): a is AssetDef => !!a)
+    : registry.list({ category: filter.category })
   if (!candidates.length) return []
   const rand = mulberry32(s)
   const out: SpawnPlan[] = []
   const sample = createSample()
   for (let attempt = 0; attempt < count * 30 && out.length < count; attempt++) {
-    const r = radius * Math.sqrt(rand()), a = rand() * Math.PI * 2
-    const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r
+    const r = radius * Math.sqrt(rand()),
+      a = rand() * Math.PI * 2
+    const x = cx + Math.cos(a) * r,
+      z = cz + Math.sin(a) * r
     frame.sample(x, z, sample)
     const fits = candidates.filter((c) => isPlausible(world, frame, x, z, c.placement, 1, sample))
     if (!fits.length) continue
     const pick = fits[Math.floor(rand() * fits.length)]
     const y = surfaceY(pick.placement, sample, rand)
-    out.push({ id: pick.id, x, y, z, yaw: rand() * Math.PI * 2, seed: Math.floor(hash01(Math.floor(x * 10), Math.floor(z * 10), out.length, s) * 2 ** 31) })
+    out.push({
+      id: pick.id,
+      x,
+      y,
+      z,
+      yaw: rand() * Math.PI * 2,
+      seed: Math.floor(hash01(Math.floor(x * 10), Math.floor(z * 10), out.length, s) * 2 ** 31)
+    })
   }
   return out
 }
@@ -279,10 +339,14 @@ export function planSpawns(registry: AssetRegistry, world: World, frame: LocalFr
 function surfaceY(rule: PlacementRule, sample: WorldSample, rand: () => number): number {
   const ground = sample.elevation
   switch (rule.surface) {
-    case 'water': return sample.waterLevel
-    case 'air': return ground + (rule.height ? rule.height[0] + rand() * (rule.height[1] - rule.height[0]) : 50)
-    case 'underwater': return ground + (sample.waterLevel - ground) * (0.2 + 0.6 * rand())
-    default: return ground
+    case 'water':
+      return sample.waterLevel
+    case 'air':
+      return ground + (rule.height ? rule.height[0] + rand() * (rule.height[1] - rule.height[0]) : 50)
+    case 'underwater':
+      return ground + (sample.waterLevel - ground) * (0.2 + 0.6 * rand())
+    default:
+      return ground
   }
 }
 
@@ -299,7 +363,16 @@ export interface PlacedAsset {
  * placement rule, otherwise the built, ground/water-snapped and seeded instance. The same asset, spot,
  * seed and world always give the same instance.
  */
-export async function placeAsset(registry: AssetRegistry, id: string, world: World, frame: LocalFrame, x: number, z: number, seed: number | string = 1, overrides: Record<string, unknown> = {}): Promise<PlacedAsset | undefined> {
+export async function placeAsset(
+  registry: AssetRegistry,
+  id: string,
+  world: World,
+  frame: LocalFrame,
+  x: number,
+  z: number,
+  seed: number | string = 1,
+  overrides: Record<string, unknown> = {}
+): Promise<PlacedAsset | undefined> {
   const asset = registry.get(id)
   const sample = createSample()
   frame.sample(x, z, sample)

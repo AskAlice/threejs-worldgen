@@ -28,8 +28,16 @@ export interface SurfaceControlsOptions {
 
 /** Default controls: 1 cm to orbit. */
 export const DEFAULT_SURFACE_CONTROLS: SurfaceControlsOptions = {
-  minDistance: 0.01, maxDistance: 0, zoomSpeed: 1, rotateSpeed: 1, moveSpeed: 0.8,
-  minElevation: 0.03, maxElevation: Math.PI / 2 - 0.01, clearance: 0.3, autoClip: true, damping: 0.8,
+  minDistance: 0.01,
+  maxDistance: 0,
+  zoomSpeed: 1,
+  rotateSpeed: 1,
+  moveSpeed: 0.8,
+  minElevation: 0.03,
+  maxElevation: Math.PI / 2 - 0.01,
+  clearance: 0.3,
+  autoClip: true,
+  damping: 0.8
 }
 
 /**
@@ -81,7 +89,12 @@ export class SurfaceControls {
   readonly world: World
 
   /** Attaches to `dom` for pointer, wheel and keyboard input. */
-  constructor(camera: PerspectiveCamera, dom: HTMLElement, world: World, input: Partial<SurfaceControlsOptions> & { focus?: Vec3; distance?: number } = {}) {
+  constructor(
+    camera: PerspectiveCamera,
+    dom: HTMLElement,
+    world: World,
+    input: Partial<SurfaceControlsOptions> & { focus?: Vec3; distance?: number } = {}
+  ) {
     this.camera = camera
     this.dom = dom
     this.world = world
@@ -135,7 +148,7 @@ export class SurfaceControls {
     if (kx || kz) this.pan(kx * o.moveSpeed * this.distance * dt, kz * o.moveSpeed * this.distance * dt)
 
     // Smooth towards the targets (zoom in log space so it feels the same at every scale).
-    const k = 1 - Math.pow(o.damping, dt * 60)
+    const k = 1 - o.damping ** (dt * 60)
     this.azimuth += (this.target.azimuth - this.azimuth) * k
     this.elevation += (this.target.elevation - this.elevation) * k
     this.distance = Math.exp(Math.log(this.distance) + (Math.log(this.target.distance) - Math.log(this.distance)) * k)
@@ -144,12 +157,14 @@ export class SurfaceControls {
 
     // Camera direction in the local frame at the focus.
     const { up, east, north } = this.frameAt(this.focus)
-    const ce = Math.cos(this.elevation), se = Math.sin(this.elevation)
-    const ca = Math.cos(this.azimuth), sa = Math.sin(this.azimuth)
+    const ce = Math.cos(this.elevation),
+      se = Math.sin(this.elevation)
+    const ca = Math.cos(this.azimuth),
+      sa = Math.sin(this.azimuth)
     const dir: Vec3 = [
       up[0] * se + (east[0] * ca + north[0] * sa) * ce,
       up[1] * se + (east[1] * ca + north[1] * sa) * ce,
-      up[2] * se + (east[2] * ca + north[2] * sa) * ce,
+      up[2] * se + (east[2] * ca + north[2] * sa) * ce
     ]
     let off: Vec3 = [dir[0] * this.distance, dir[1] * this.distance, dir[2] * this.distance]
 
@@ -188,11 +203,20 @@ export class SurfaceControls {
     const l = Math.hypot(...p) || 1
     const up: Vec3 = [p[0] / l, p[1] / l, p[2] / l]
     // East = Y × up (falls back near the poles).
-    let ex = up[2], ez = -up[0]
+    let ex = up[2],
+      ez = -up[0]
     let el = Math.hypot(ex, ez)
-    if (el < 1e-6) { ex = 1; ez = 0; el = 1 }
+    if (el < 1e-6) {
+      ex = 1
+      ez = 0
+      el = 1
+    }
     const east: Vec3 = [ex / el, 0, ez / el]
-    const north: Vec3 = [up[1] * east[2] - up[2] * east[1], up[2] * east[0] - up[0] * east[2], up[0] * east[1] - up[1] * east[0]]
+    const north: Vec3 = [
+      up[1] * east[2] - up[2] * east[1],
+      up[2] * east[0] - up[0] * east[2],
+      up[0] * east[1] - up[1] * east[0]
+    ]
     return { up, east, north }
   }
 
@@ -209,7 +233,9 @@ export class SurfaceControls {
       const l = Math.hypot(...p) || 1
       const h = w.sampleAt(p[0], p[1], p[2], this.sample).elevation
       const r = w.options.radius + Math.max(h, w.options.seaLevel)
-      p[0] = (p[0] / l) * r; p[1] = (p[1] / l) * r; p[2] = (p[2] / l) * r
+      p[0] = (p[0] / l) * r
+      p[1] = (p[1] / l) * r
+      p[2] = (p[2] / l) * r
     } else {
       p[1] = Math.max(w.sampleAt(p[0], 0, p[2], this.sample).elevation, w.options.seaLevel)
     }
@@ -217,23 +243,39 @@ export class SurfaceControls {
 
   private pan(dx: number, dz: number) {
     const { east, north } = this.frameAt(this.target.focus)
-    const ca = Math.cos(this.azimuth), sa = Math.sin(this.azimuth)
+    const ca = Math.cos(this.azimuth),
+      sa = Math.sin(this.azimuth)
     // Forward = away from the camera, along the ground.
-    const fx = -(east[0] * ca + north[0] * sa), fy = -(east[1] * ca + north[1] * sa), fz = -(east[2] * ca + north[2] * sa)
-    const rx = -(east[0] * -sa + north[0] * ca), ry = -(east[1] * -sa + north[1] * ca), rz = -(east[2] * -sa + north[2] * ca)
+    const fx = -(east[0] * ca + north[0] * sa),
+      fy = -(east[1] * ca + north[1] * sa),
+      fz = -(east[2] * ca + north[2] * sa)
+    const rx = -(east[0] * -sa + north[0] * ca),
+      ry = -(east[1] * -sa + north[1] * ca),
+      rz = -(east[2] * -sa + north[2] * ca)
     const f = this.target.focus
-    f[0] += fx * dz - rx * dx; f[1] += fy * dz - ry * dx; f[2] += fz * dz - rz * dx
+    f[0] += fx * dz - rx * dx
+    f[1] += fy * dz - ry * dx
+    f[2] += fz * dz - rz * dx
     this.snapFocus(f)
   }
 
   private listen(): () => void {
     const dom = this.dom
-    let button = -1, lx = 0, ly = 0
-    const down = (e: PointerEvent) => { button = e.button; lx = e.clientX; ly = e.clientY; dom.setPointerCapture(e.pointerId) }
+    let button = -1,
+      lx = 0,
+      ly = 0
+    const down = (e: PointerEvent) => {
+      button = e.button
+      lx = e.clientX
+      ly = e.clientY
+      dom.setPointerCapture(e.pointerId)
+    }
     const move = (e: PointerEvent) => {
       if (button < 0) return
-      const dx = e.clientX - lx, dy = e.clientY - ly
-      lx = e.clientX; ly = e.clientY
+      const dx = e.clientX - lx,
+        dy = e.clientY - ly
+      lx = e.clientX
+      ly = e.clientY
       if (button === 0 && !e.shiftKey) {
         this.target.azimuth += dx * 0.005 * this.options.rotateSpeed
         this.target.elevation += dy * 0.005 * this.options.rotateSpeed
@@ -242,7 +284,10 @@ export class SurfaceControls {
         this.pan(-dx * s, dy * s)
       }
     }
-    const up = (e: PointerEvent) => { button = -1; dom.releasePointerCapture?.(e.pointerId) }
+    const up = (e: PointerEvent) => {
+      button = -1
+      dom.releasePointerCapture?.(e.pointerId)
+    }
     const wheel = (e: WheelEvent) => {
       e.preventDefault()
       this.target.distance *= Math.exp(e.deltaY * 0.0012 * this.options.zoomSpeed)

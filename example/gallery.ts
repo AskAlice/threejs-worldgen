@@ -5,7 +5,15 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { World } from 'threejs-biomes'
 import { propAssets } from 'threejs-props'
 import { vehicleAssets } from 'threejs-vehicles'
-import { AssetRegistry, defaults, placeAsset, planSpawns, type AssetDef, type AssetFilter, type SpawnPlan } from 'threejs-worldgen'
+import {
+  AssetRegistry,
+  defaults,
+  placeAsset,
+  planSpawns,
+  type AssetDef,
+  type AssetFilter,
+  type SpawnPlan
+} from 'threejs-worldgen'
 import { addOptions, type Choices, type Ranges } from './options-gui'
 import { worldGround } from './world-ground'
 
@@ -50,9 +58,21 @@ const world = new World({ seed })
 const frame = world.frame
 const C: [number, number] = [-3000, 2000]
 const ground = worldGround(world, [C[0], C[1] + 150], 1400, 200)
-const terrain = new THREE.Mesh(ground.terrain, new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 }))
+const terrain = new THREE.Mesh(
+  ground.terrain,
+  new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 })
+)
 terrain.receiveShadow = true
-const water = new THREE.Mesh(ground.water, new THREE.MeshStandardNodeMaterial({ color: '#3a6f8f', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.85 }))
+const water = new THREE.Mesh(
+  ground.water,
+  new THREE.MeshStandardNodeMaterial({
+    color: '#3a6f8f',
+    roughness: 0.08,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.85
+  })
+)
 scene.add(terrain, water)
 camera.position.set(C[0] + 90, world.height(C[0], C[1]) + 55, C[1] + 90)
 controls.target.set(C[0], world.height(C[0], C[1]), C[1])
@@ -78,9 +98,15 @@ const fill = (select: HTMLSelectElement, values: string[]) => {
 const category = $<HTMLSelectElement>('category')
 const kind = $<HTMLSelectElement>('kind')
 const packageOf = $<HTMLSelectElement>('package')
-fill(category, registry.list().map((a) => a.category))
+fill(
+  category,
+  registry.list().map((a) => a.category)
+)
 fill(kind, ['ground', 'water', 'underwater', 'air', 'shore'])
-fill(packageOf, registry.list().map((a) => a.package))
+fill(
+  packageOf,
+  registry.list().map((a) => a.package)
+)
 search.oninput = () => render()
 document.getElementById('scatter')!.onclick = () => void spawn()
 document.getElementById('save')!.onclick = save
@@ -93,14 +119,22 @@ addEventListener('resize', () => {
 
 function render() {
   const found = registry.search(search.value.trim(), 80, filter)
-  results.replaceChildren(...found.map(({ asset }) => {
-    const button = document.createElement('button')
-    button.className = asset === selected ? 'on' : ''
-    button.append(asset.name, Object.assign(document.createElement('small'), { textContent: `${asset.category} · ${asset.package} · ${asset.placement.surface}` }))
-    button.onclick = () => select(asset)
-    return button
-  }))
-  hud.textContent = `${found.length}/${registry.list().length} assets · ${placed.length} placed` +
+  results.replaceChildren(
+    ...found.map(({ asset }) => {
+      const button = document.createElement('button')
+      button.className = asset === selected ? 'on' : ''
+      button.append(
+        asset.name,
+        Object.assign(document.createElement('small'), {
+          textContent: `${asset.category} · ${asset.package} · ${asset.placement.surface}`
+        })
+      )
+      button.onclick = () => select(asset)
+      return button
+    })
+  )
+  hud.textContent =
+    `${found.length}/${registry.list().length} assets · ${placed.length} placed` +
     (selected ? `\n${selected.name} selected: click the ground to place` : '\nselect an asset to place it')
 }
 
@@ -139,7 +173,17 @@ async function place(x: number, z: number) {
 async function spawn() {
   const ids = registry.search(search.value.trim(), 80, filter).map((m) => m.asset.id)
   if (!ids.length) return
-  const plans = planSpawns(registry, world, frame, controls.target.x, controls.target.z, 140, 24, `${seed}:${placed.length}:spawn`, { ids })
+  const plans = planSpawns(
+    registry,
+    world,
+    frame,
+    controls.target.x,
+    controls.target.z,
+    140,
+    24,
+    `${seed}:${placed.length}:spawn`,
+    { ids }
+  )
   for (const plan of plans) {
     const object = await registry.create(plan.id, plan.id === selected?.id ? overrides : {}, plan.seed)
     object.position.set(plan.x, plan.y, plan.z)
@@ -153,7 +197,9 @@ async function spawn() {
 
 function save() {
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([JSON.stringify({ seed: world.options.seed, assets: placed }, null, 2)], { type: 'application/json' }))
+  a.href = URL.createObjectURL(
+    new Blob([JSON.stringify({ seed: world.options.seed, assets: placed }, null, 2)], { type: 'application/json' })
+  )
   a.download = `worldgen-gallery-${world.options.seed}.json`
   a.click()
   URL.revokeObjectURL(a.href)
@@ -170,7 +216,9 @@ function clear() {
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
 let down: [number, number] = [0, 0]
-renderer.domElement.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY] })
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  down = [e.clientX, e.clientY]
+})
 renderer.domElement.addEventListener('pointerup', (e) => {
   if (Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1)

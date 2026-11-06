@@ -3,7 +3,21 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { FluidSurface, MPMSolver, ParticleSystem, PuddleField, SplashEmitter, WATER_PRESETS } from 'threejs-particles'
 import { classOf, createPanel, specOptions } from './panel'
 import { panels } from './mpm-water.panel'
-import { RAIN, VIEWS, check, releaseDam, height, puddleOptions, splashOptions, streaks, waterConfig, waterGround, waterLoop, waterStage, waterView } from './mpm-water-scene'
+import {
+  RAIN,
+  VIEWS,
+  check,
+  releaseDam,
+  height,
+  puddleOptions,
+  splashOptions,
+  streaks,
+  waterConfig,
+  waterGround,
+  waterLoop,
+  waterStage,
+  waterView
+} from './mpm-water-scene'
 
 // threejs-particles MPM water sandbox: a weakly compressible MLS-MPM fluid on a 4.8 m patch of ground, drawn as a
 // screen-space fluid surface. A dam break collapses onto the terrain, a stream runs off a 0.6 m ledge into a plunge
@@ -47,7 +61,8 @@ async function sandbox() {
   if (soak > 0) puddles.update(soak * 60, view.rainRate)
 
   // Rain in the air, around the camera: a near layer and a far one of thin streaks.
-  const rainNear = new ParticleSystem(streaks(...RAIN.near)), rainFar = new ParticleSystem(streaks(...RAIN.far))
+  const rainNear = new ParticleSystem(streaks(...RAIN.near)),
+    rainFar = new ParticleSystem(streaks(...RAIN.far))
   const rain = { object: new THREE.Group() }
   rain.object.add(rainNear.object, rainFar.object)
   scene.add(rain.object)
@@ -66,14 +81,20 @@ async function sandbox() {
   }
   setView(params.get('view') ?? 'overview')
 
-  const gui = createPanel([{
-    name: 'threejs-particles', classes: [
-      classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
-      classOf('FluidSurface', fluid, fluid.options, specOptions(panels['threejs-particles'].FluidSurface)),
-      classOf('SplashEmitter', splash, splash.options, specOptions(panels['threejs-particles'].SplashEmitter)),
-      classOf('PuddleField', puddles, puddles.options, specOptions(panels['threejs-particles'].PuddleField)),
+  const gui = createPanel(
+    [
+      {
+        name: 'threejs-particles',
+        classes: [
+          classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
+          classOf('FluidSurface', fluid, fluid.options, specOptions(panels['threejs-particles'].FluidSurface)),
+          classOf('SplashEmitter', splash, splash.options, specOptions(panels['threejs-particles'].SplashEmitter)),
+          classOf('PuddleField', puddles, puddles.options, specOptions(panels['threejs-particles'].PuddleField))
+        ]
+      }
     ],
-  }], { title: 'threejs-particles · MPM water' })
+    { title: 'threejs-particles · MPM water' }
+  )
   const demo = gui.addFolder('demo')
   demo.add(view, 'rain').name('rain')
   demo.add(view, 'rainRate', 0, 80, 0.5).name('rain (mm/h)')
@@ -90,11 +111,26 @@ async function sandbox() {
     camera.updateProjectionMatrix()
     renderer.setSize(innerWidth, innerHeight)
   })
-  Object.assign(window, { mpm, fluid, puddles, splash, rainNear, rainFar, camera, controls, renderer, scene, view, setView, damBreak })
+  Object.assign(window, {
+    mpm,
+    fluid,
+    puddles,
+    splash,
+    rainNear,
+    rainFar,
+    camera,
+    controls,
+    renderer,
+    scene,
+    view,
+    setView,
+    damBreak
+  })
 
   const pauseAt = Number(params.get('pause') ?? Infinity) // `?pause=<s>` freezes the water at that simulated time (screenshots)
   const { frame, hud: status } = waterLoop(renderer, mpm, splash, puddles, ground, view, pauseAt)
-  let last = performance.now(), fps = 60
+  let last = performance.now(),
+    fps = 60
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.1, (now - last) / 1000)

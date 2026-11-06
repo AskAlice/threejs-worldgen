@@ -34,9 +34,13 @@
     "publish:all": "scripts/publish-all.sh",
     "readme:cards": "node landing/readme-cards.mjs",
     "check:options": "node --conditions=worldgen-source scripts/options-coverage.mjs",
-    "check:manifests": "node scripts/check-manifests.mjs"
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "@types/node": "^26.6.4",

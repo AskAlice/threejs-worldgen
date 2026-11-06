@@ -3,7 +3,16 @@ import assert from 'node:assert/strict'
 import { foamTrail, shoreFoam, whitecapFoam } from '../src/material.ts'
 import { createWaves, crestSharpness, waveJacobian, type WaveOptions } from '../src/waves.ts'
 
-const sea: WaveOptions = { count: 12, seed: 1, amplitude: 0.45, wavelength: [0.6, 42], direction: [1, 0.35], spread: 0.55, choppiness: 0.75, speed: 1 }
+const sea: WaveOptions = {
+  count: 12,
+  seed: 1,
+  amplitude: 0.45,
+  wavelength: [0.6, 42],
+  direction: [1, 0.35],
+  spread: 0.55,
+  choppiness: 0.75,
+  speed: 1
+}
 
 test('waveJacobian: flat water is 1, steep crests squeeze it toward 0, the capped sea never folds', () => {
   assert.equal(waveJacobian([], 3, -7), 1, 'no waves = undistorted surface')
@@ -17,7 +26,8 @@ test('waveJacobian: flat water is 1, steep crests squeeze it toward 0, the cappe
   // A full-choppiness sea stays positive: the Gerstner cap exists so the surface never folds over.
   const steep = createWaves({ ...sea, amplitude: 60, choppiness: 1 })
   let min = Infinity
-  for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) min = Math.min(min, waveJacobian(steep, i * 1.7, j * 1.9, i * 0.31))
+  for (let i = 0; i < 60; i++)
+    for (let j = 0; j < 60; j++) min = Math.min(min, waveJacobian(steep, i * 1.7, j * 1.9, i * 0.31))
   assert.ok(min > 0, `a capped sea never folds (min det ${min})`)
   assert.ok(min < 0.6, 'but its crests really are squeezed')
 })
@@ -43,12 +53,14 @@ test('whitecapFoam: open water is foam-free, only squeezed crests break, and the
 test('whitecapFoam: a default sea breaks on a few percent of its area, not across the surface', () => {
   const waves = createWaves(sea)
   const steepness = crestSharpness(waves)
-  let wet = 0, n = 0
-  for (let i = 0; i < 300; i++) for (let j = 0; j < 300; j++) {
-    const fold = 1 - waveJacobian(waves, i * 0.3, j * 0.3)
-    wet += whitecapFoam(fold, 0.3, steepness)
-    n++
-  }
+  let wet = 0,
+    n = 0
+  for (let i = 0; i < 300; i++)
+    for (let j = 0; j < 300; j++) {
+      const fold = 1 - waveJacobian(waves, i * 0.3, j * 0.3)
+      wet += whitecapFoam(fold, 0.3, steepness)
+      n++
+    }
   const coverage = wet / n
   assert.ok(coverage > 0.001, `the sea does break somewhere (${(coverage * 100).toFixed(2)}%)`)
   assert.ok(coverage < 0.06, `but open water stays clear (${(coverage * 100).toFixed(2)}%)`)
@@ -77,7 +89,11 @@ test('shoreFoam: a near-flat shelf does not foam; a real bank does', () => {
   // Same shallow depth over two beds: the flat floodplain stays dry, the 5% bank foams.
   assert.equal(shoreFoam(0.2, width, 1, 0, 0.001), 0, 'no bank, no foam')
   assert.ok(shoreFoam(0.2, width, 1, 0, 0.05) > 0.2, 'a bank foams')
-  assert.equal(shoreFoam(0.2, width, 1, 0, Infinity), shoreFoam(0.2, width, 1), 'an omitted slope keeps the ungated result')
+  assert.equal(
+    shoreFoam(0.2, width, 1, 0, Infinity),
+    shoreFoam(0.2, width, 1),
+    'an omitted slope keeps the ungated result'
+  )
   assert.ok(shoreFoam(0.3, width, 1, 0, 0.02) > shoreFoam(0.3, width, 1, 0, 0.008), 'foam rises with the bank')
   assert.ok(shoreFoam(0.3, width, 1, 0, 0.5) <= shoreFoam(0.3, width, 1) + 1e-12, 'a steep bank is not over-foamed')
 })

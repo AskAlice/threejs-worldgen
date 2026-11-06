@@ -1,6 +1,15 @@
 import type { TreeParams } from './species.ts'
 import { icosphere } from './rock.ts'
-import { addStrip, addTube, cross, linearColor, normalize, pushVertex, type MeshArrays, type Vec3 } from './tube-mesh.ts'
+import {
+  addStrip,
+  addTube,
+  cross,
+  linearColor,
+  normalize,
+  pushVertex,
+  type MeshArrays,
+  type Vec3
+} from './tube-mesh.ts'
 
 /** Points along a quadratic Bézier. */
 export function bezier(a: Vec3, b: Vec3, c: Vec3, steps: number): Vec3[] {
@@ -8,7 +17,11 @@ export function bezier(a: Vec3, b: Vec3, c: Vec3, steps: number): Vec3[] {
   for (let k = 0; k <= steps; k++) {
     const t = k / steps
     const u = 1 - t
-    out.push([u * u * a[0] + 2 * u * t * b[0] + t * t * c[0], u * u * a[1] + 2 * u * t * b[1] + t * t * c[1], u * u * a[2] + 2 * u * t * b[2] + t * t * c[2]])
+    out.push([
+      u * u * a[0] + 2 * u * t * b[0] + t * t * c[0],
+      u * u * a[1] + 2 * u * t * b[1] + t * t * c[1],
+      u * u * a[2] + 2 * u * t * b[2] + t * t * c[2]
+    ])
   }
   return out
 }
@@ -21,7 +34,7 @@ function arch(start: Vec3, dir: Vec3, length: number, droop: number, steps: numb
   for (let k = 0; k < steps; k++) {
     const p = pts[pts.length - 1]
     pts.push([p[0] + d[0] * step, p[1] + d[1] * step, p[2] + d[2] * step])
-    d = normalize([d[0], d[1] - droop * step / Math.max(length, 1e-3) * 3, d[2]])
+    d = normalize([d[0], d[1] - ((droop * step) / Math.max(length, 1e-3)) * 3, d[2]])
   }
   return pts
 }
@@ -32,10 +45,20 @@ const GOLDEN = Math.PI * (3 - Math.sqrt(5))
 const segs = (n: number, detail: number, min = 3) => Math.max(min, Math.round(n * (0.4 + 0.6 * detail)))
 
 /** Palm: a curved, ringed trunk and a crown of arching pinnate fronds. */
-export function generatePalm(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays): void {
+export function generatePalm(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays
+): void {
   const lean = p.trunkLean * (0.4 + 0.6 * rand())
   const az = rand() * Math.PI * 2
-  const top: Vec3 = [Math.sin(lean) * Math.cos(az) * p.height, p.height * Math.cos(lean * 0.6), Math.sin(lean) * Math.sin(az) * p.height]
+  const top: Vec3 = [
+    Math.sin(lean) * Math.cos(az) * p.height,
+    p.height * Math.cos(lean * 0.6),
+    Math.sin(lean) * Math.sin(az) * p.height
+  ]
   const mid: Vec3 = [top[0] * 0.25, p.height * 0.5, top[2] * 0.25]
   const steps = Math.max(6, Math.round((p.height / 0.35) * detail))
   const pts = bezier([0, -0.3, 0], mid, top, steps)
@@ -43,7 +66,11 @@ export function generatePalm(p: TreeParams, rand: () => number, detail: number, 
     const t = k / steps
     return p.baseRadius * (1.25 - 0.4 * t) * (1 + 0.07 * Math.sin(t * p.height * 9)) * (k === 0 ? 1.3 : 1)
   })
-  addTube(trunk, pts, radii, { segments: segs(p.radialSegments, detail), color: linearColor(p.barkColor), shade: (k) => 0.75 + 0.25 * (k / steps) })
+  addTube(trunk, pts, radii, {
+    segments: segs(p.radialSegments, detail),
+    color: linearColor(p.barkColor),
+    shade: (k) => 0.75 + 0.25 * (k / steps)
+  })
 
   const fronds = Math.max(3, Math.round(p.leafDensity * (0.5 + 0.5 * detail)))
   const color = linearColor(p.leafColor)
@@ -59,7 +86,7 @@ export function generatePalm(p: TreeParams, rand: () => number, detail: number, 
       width: (v) => length * 0.42 * Math.sin(Math.PI * Math.min(1, v * 0.9 + 0.08)),
       color: [color[0] * vary * tint, color[1] * vary * tint, color[2] * vary * tint],
       fold: 0.3,
-      card: rand(),
+      card: rand()
     })
   }
 }
@@ -80,10 +107,18 @@ export function generateCactus(p: TreeParams, rand: () => number, detail: number
       capped.push([last[0], last[1] - r + Math.sin(a) * r, last[2]])
       radii.push(Math.max(r * Math.cos(a), 1e-3))
     }
-    addTube(trunk, capped, radii, { segments, color, shape: rib, shade: (_k, q) => 0.8 + 0.2 * Math.min(1, q[1] / p.height) })
+    addTube(trunk, capped, radii, {
+      segments,
+      color,
+      shape: rib,
+      shade: (_k, q) => 0.8 + 0.2 * Math.min(1, q[1] / p.height)
+    })
   }
   const steps = Math.max(4, Math.round(p.height / 0.5))
-  column(Array.from({ length: steps + 1 }, (_, k) => [0, -0.3 + (k / steps) * (p.height + 0.3), 0] as Vec3), p.baseRadius)
+  column(
+    Array.from({ length: steps + 1 }, (_, k) => [0, -0.3 + (k / steps) * (p.height + 0.3), 0] as Vec3),
+    p.baseRadius
+  )
   for (let s = 0; s < Math.round(p.stems); s++) {
     const a = (s / Math.max(1, p.stems)) * Math.PI * 2 + rand() * 1.5
     const h = p.height * (0.3 + 0.3 * rand())
@@ -94,7 +129,7 @@ export function generateCactus(p: TreeParams, rand: () => number, detail: number
     const pts: Vec3[] = []
     for (let k = 0; k <= 8; k++) {
       const t = k / 8
-      const angle = t * Math.PI / 2
+      const angle = (t * Math.PI) / 2
       pts.push([dx * out * Math.sin(angle), h + out * (1 - Math.cos(angle)) * 0.9, dz * out * Math.sin(angle)])
     }
     const elbow = pts[pts.length - 1]
@@ -104,8 +139,22 @@ export function generateCactus(p: TreeParams, rand: () => number, detail: number
 }
 
 /** Fern: a rosette of arching fronds around a small stub. */
-export function generateFern(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays): void {
-  addTube(trunk, [[0, -0.05, 0], [0, 0.06, 0]], [p.baseRadius * 4, p.baseRadius * 2], { segments: 4, color: linearColor(p.barkColor), closeEnd: true })
+export function generateFern(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays
+): void {
+  addTube(
+    trunk,
+    [
+      [0, -0.05, 0],
+      [0, 0.06, 0]
+    ],
+    [p.baseRadius * 4, p.baseRadius * 2],
+    { segments: 4, color: linearColor(p.barkColor), closeEnd: true }
+  )
   const fronds = Math.max(3, Math.round(p.leafDensity * (0.5 + 0.5 * detail)))
   const color = linearColor(p.leafColor)
   for (let f = 0; f < fronds; f++) {
@@ -118,13 +167,19 @@ export function generateFern(p: TreeParams, rand: () => number, detail: number, 
       width: () => length * 0.42,
       color: [color[0] * vary, color[1] * vary, color[2] * vary],
       fold: 0.2,
-      card: rand(),
+      card: rand()
     })
   }
 }
 
 /** Reeds: a clump of thin stalks (some with cattail heads) and long arching blades. */
-export function generateReed(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays): void {
+export function generateReed(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays
+): void {
   const stem = linearColor(p.barkColor)
   const head = linearColor('#4a3222')
   const color = linearColor(p.leafColor)
@@ -137,10 +192,20 @@ export function generateReed(p: TreeParams, rand: () => number, detail: number, 
     const h = p.height * (0.7 + 0.35 * rand())
     const tilt: Vec3 = [x * 0.25 + (rand() - 0.5) * 0.15, 1, z * 0.25 + (rand() - 0.5) * 0.15]
     const top: Vec3 = [x + tilt[0] * h, h, z + tilt[2] * h]
-    addTube(trunk, [[x, -0.1, z], [(x + top[0]) / 2, h / 2, (z + top[2]) / 2], top], [p.baseRadius, p.baseRadius * 0.8, p.baseRadius * 0.3], { segments: 3, color: stem })
+    addTube(
+      trunk,
+      [[x, -0.1, z], [(x + top[0]) / 2, h / 2, (z + top[2]) / 2], top],
+      [p.baseRadius, p.baseRadius * 0.8, p.baseRadius * 0.3],
+      { segments: 3, color: stem }
+    )
     if (rand() < 0.5) {
       const at = (t: number): Vec3 => [x + tilt[0] * h * t, h * t, z + tilt[2] * h * t]
-      addTube(trunk, [at(0.76), at(0.78), at(0.9), at(0.92)], [p.baseRadius, p.baseRadius * 3.5, p.baseRadius * 3.5, p.baseRadius], { segments: 5, color: head })
+      addTube(
+        trunk,
+        [at(0.76), at(0.78), at(0.9), at(0.92)],
+        [p.baseRadius, p.baseRadius * 3.5, p.baseRadius * 3.5, p.baseRadius],
+        { segments: 5, color: head }
+      )
     }
     const blades = Math.max(1, Math.round(p.leafDensity))
     for (let b = 0; b < blades; b++) {
@@ -152,7 +217,7 @@ export function generateReed(p: TreeParams, rand: () => number, detail: number, 
         width: (v) => length * 0.08 * (1 - v * 0.5),
         color: [color[0] * vary, color[1] * vary, color[2] * vary],
         fold: 0.4,
-        card: rand(),
+        card: rand()
       })
     }
   }
@@ -167,8 +232,21 @@ export function addFruit(out: MeshArrays, center: Vec3, radius: number, color: V
   for (let i = 0; i < p.length; i += 3) {
     // Slightly squashed, like most fruit.
     const shade = 0.75 + 0.25 * Math.max(0, p[i + 1]) // lighter on top
-    pushVertex(out, center[0] + p[i] * radius, center[1] + p[i + 1] * radius * 0.9, center[2] + p[i + 2] * radius, p[i], p[i + 1], p[i + 2],
-      0.5 + p[i] * 0.5, 0.5 + p[i + 1] * 0.5, color[0] * shade, color[1] * shade, color[2] * shade, card)
+    pushVertex(
+      out,
+      center[0] + p[i] * radius,
+      center[1] + p[i + 1] * radius * 0.9,
+      center[2] + p[i + 2] * radius,
+      p[i],
+      p[i + 1],
+      p[i + 2],
+      0.5 + p[i] * 0.5,
+      0.5 + p[i + 1] * 0.5,
+      color[0] * shade,
+      color[1] * shade,
+      color[2] * shade,
+      card
+    )
   }
   const idx = FRUIT_SPHERE.indices
   for (let i = 0; i < idx.length; i += 3) out.indices.push3(base + idx[i], base + idx[i + 1], base + idx[i + 2])
@@ -178,7 +256,16 @@ export function addFruit(out: MeshArrays, center: Vec3, radius: number, color: V
  * Appends a flower head facing `up`: `petals` rounded petals around a centre disc, cupped upward by `cup` (0 = flat).
  * Petals take `color`; the centre is golden.
  */
-export function addFlowerHead(out: MeshArrays, center: Vec3, up: Vec3, radius: number, color: Vec3, petals: number, cup: number, card: number): void {
+export function addFlowerHead(
+  out: MeshArrays,
+  center: Vec3,
+  up: Vec3,
+  radius: number,
+  color: Vec3,
+  petals: number,
+  cup: number,
+  card: number
+): void {
   const n = normalize(up)
   const t = normalize(Math.abs(n[1]) < 0.9 ? cross(n, [0, 1, 0]) : cross(n, [1, 0, 0]))
   const b = cross(n, t)
@@ -186,7 +273,11 @@ export function addFlowerHead(out: MeshArrays, center: Vec3, up: Vec3, radius: n
   const at = (r: number, a: number, lift: number): Vec3 => {
     const c = Math.cos(a) * r
     const s = Math.sin(a) * r
-    return [center[0] + t[0] * c + b[0] * s + n[0] * lift, center[1] + t[1] * c + b[1] * s + n[1] * lift, center[2] + t[2] * c + b[2] * s + n[2] * lift]
+    return [
+      center[0] + t[0] * c + b[0] * s + n[0] * lift,
+      center[1] + t[1] * c + b[1] * s + n[1] * lift,
+      center[2] + t[2] * c + b[2] * s + n[2] * lift
+    ]
   }
   const push = (pos: Vec3, col: Vec3) => {
     pushVertex(out, pos[0], pos[1], pos[2], n[0], n[1], n[2], 0.5, 0.5, col[0], col[1], col[2], card)
@@ -217,7 +308,14 @@ function pick(colors: string[], rand: () => number): Vec3 {
 }
 
 /** Wildflowers: a few thin stalks with grassy leaves and seeded flower heads. */
-export function generateFlowers(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays, fruit: MeshArrays): void {
+export function generateFlowers(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays,
+  fruit: MeshArrays
+): void {
   const stem = linearColor(p.barkColor)
   const leaf = linearColor(p.leafColor)
   const stalks = Math.max(1, Math.round(p.stems * (0.5 + 0.5 * detail)))
@@ -228,22 +326,55 @@ export function generateFlowers(p: TreeParams, rand: () => number, detail: numbe
     const h = p.height * (0.6 + 0.4 * rand())
     const lean: Vec3 = [Math.cos(a) * 0.25 + (rand() - 0.5) * 0.3, 1, Math.sin(a) * 0.25 + (rand() - 0.5) * 0.3]
     const pts = arch(base, lean, h, 0.15, 4)
-    addTube(trunk, pts, pts.map((_, k) => p.baseRadius * (1 - k * 0.12)), { segments: 3, color: stem, card: rand() })
+    addTube(
+      trunk,
+      pts,
+      pts.map((_, k) => p.baseRadius * (1 - k * 0.12)),
+      { segments: 3, color: stem, card: rand() }
+    )
     if (rand() < p.fruit) {
       const top = pts[pts.length - 1]
-      addFlowerHead(fruit, top, [lean[0] * 0.6, 1, lean[2] * 0.6], p.fruitSize * (0.7 + 0.5 * rand()), pick(p.fruitColors, rand), 5 + Math.floor(rand() * 4), 0.25, rand())
+      addFlowerHead(
+        fruit,
+        top,
+        [lean[0] * 0.6, 1, lean[2] * 0.6],
+        p.fruitSize * (0.7 + 0.5 * rand()),
+        pick(p.fruitColors, rand),
+        5 + Math.floor(rand() * 4),
+        0.25,
+        rand()
+      )
     }
     for (let b = 0; b < Math.round(p.leafDensity); b++) {
       const ba = rand() * Math.PI * 2
       const length = p.leafSize * (0.6 + 0.4 * rand())
-      addStrip(leaves, arch(base, [Math.cos(ba) * 0.5, 1, Math.sin(ba) * 0.5], length, 0.8, 4), { width: () => length * 0.1, color: leaf, fold: 0.4, card: rand() })
+      addStrip(leaves, arch(base, [Math.cos(ba) * 0.5, 1, Math.sin(ba) * 0.5], length, 0.8, 4), {
+        width: () => length * 0.1,
+        color: leaf,
+        fold: 0.4,
+        card: rand()
+      })
     }
   }
 }
 
 /** A tuft of tall grass: blades fanning out from one root. */
-export function generateTuft(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays): void {
-  addTube(trunk, [[0, -0.05, 0], [0, 0.04, 0]], [p.baseRadius * 4, p.baseRadius * 3], { segments: 4, color: linearColor(p.barkColor), closeEnd: true })
+export function generateTuft(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays
+): void {
+  addTube(
+    trunk,
+    [
+      [0, -0.05, 0],
+      [0, 0.04, 0]
+    ],
+    [p.baseRadius * 4, p.baseRadius * 3],
+    { segments: 4, color: linearColor(p.barkColor), closeEnd: true }
+  )
   const color = linearColor(p.leafColor)
   const blades = Math.max(3, Math.round(p.leafDensity * (0.4 + 0.6 * detail)))
   for (let b = 0; b < blades; b++) {
@@ -252,12 +383,22 @@ export function generateTuft(p: TreeParams, rand: () => number, detail: number, 
     const length = p.leafSize * (0.55 + 0.45 * rand()) * (p.height / 0.9)
     const vary = 1 + (rand() * 2 - 1) * p.leafColorVariation
     const dry = rand() < 0.15 ? 1.25 : 1 // a few straw-coloured blades
-    addStrip(leaves, arch([Math.cos(a) * 0.04, 0, Math.sin(a) * 0.04], [Math.cos(a) * spread, 1, Math.sin(a) * spread], length, 0.4 + rand() * 0.8, Math.max(3, Math.round(5 * detail))), {
-      width: (v) => length * 0.035 * (1 - v * 0.6),
-      color: [color[0] * vary * dry, color[1] * vary, color[2] * vary * (2 - dry)],
-      fold: 0.5,
-      card: rand(),
-    })
+    addStrip(
+      leaves,
+      arch(
+        [Math.cos(a) * 0.04, 0, Math.sin(a) * 0.04],
+        [Math.cos(a) * spread, 1, Math.sin(a) * spread],
+        length,
+        0.4 + rand() * 0.8,
+        Math.max(3, Math.round(5 * detail))
+      ),
+      {
+        width: (v) => length * 0.035 * (1 - v * 0.6),
+        color: [color[0] * vary * dry, color[1] * vary, color[2] * vary * (2 - dry)],
+        fold: 0.5,
+        card: rand()
+      }
+    )
   }
 }
 
@@ -281,13 +422,19 @@ export function generateSucculent(p: TreeParams, rand: () => number, detail: num
       // Flattened, keeled cross-section.
       shape: (_i, theta) => 0.55 + 0.45 * Math.abs(Math.cos(theta)),
       closeEnd: true,
-      card: rand(),
+      card: rand()
     })
   }
 }
 
 /** A bamboo clump: straight segmented culms with node rings and sprays of slender leaves up top. */
-export function generateBamboo(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, leaves: MeshArrays): void {
+export function generateBamboo(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  leaves: MeshArrays
+): void {
   const culm = linearColor(p.barkColor)
   const leaf = linearColor(p.leafColor)
   const culms = Math.max(1, Math.round(p.stems * (0.5 + 0.5 * detail)))
@@ -307,7 +454,12 @@ export function generateBamboo(p: TreeParams, rand: () => number, detail: number
       return radius * (1 - 0.5 * (i / pts.length)) * ring
     })
     const tint = 0.85 + 0.3 * rand()
-    addTube(trunk, pts, radii, { segments: segs(p.radialSegments, detail), color: [culm[0] * tint, culm[1] * tint, culm[2] * tint], closeEnd: true, card: rand() })
+    addTube(trunk, pts, radii, {
+      segments: segs(p.radialSegments, detail),
+      color: [culm[0] * tint, culm[1] * tint, culm[2] * tint],
+      closeEnd: true,
+      card: rand()
+    })
     // Leaf sprays along the upper half.
     for (let i = Math.floor(pts.length * 0.45); i < pts.length; i++) {
       for (let k = 0; k < Math.round(p.leafDensity * (0.4 + 0.6 * detail)); k++) {
@@ -318,7 +470,7 @@ export function generateBamboo(p: TreeParams, rand: () => number, detail: number
           width: (v) => length * 0.16 * Math.sin(Math.PI * Math.min(1, v * 0.85 + 0.15)),
           color: leaf,
           fold: 0.3,
-          card: rand(),
+          card: rand()
         })
       }
     }
@@ -326,7 +478,13 @@ export function generateBamboo(p: TreeParams, rand: () => number, detail: number
 }
 
 /** Water lilies: flat notched pads floating at y = 0, a few with cupped flowers. */
-export function generateLilyPads(p: TreeParams, rand: () => number, detail: number, trunk: MeshArrays, fruit: MeshArrays): void {
+export function generateLilyPads(
+  p: TreeParams,
+  rand: () => number,
+  detail: number,
+  trunk: MeshArrays,
+  fruit: MeshArrays
+): void {
   const color = linearColor(p.barkColor)
   const pads = Math.max(1, Math.round(p.leafDensity))
   const sides = Math.max(8, Math.round(20 * detail))
@@ -345,11 +503,34 @@ export function generateLilyPads(p: TreeParams, rand: () => number, detail: numb
     for (let s = 0; s <= sides; s++) {
       const t = notch + 0.25 + (s / sides) * (Math.PI * 2 - 0.5)
       const rim = radius * (1 + 0.04 * Math.sin(t * 7))
-      pushVertex(trunk, c[0] + Math.cos(t) * rim, c[1] + 0.005, c[2] + Math.sin(t) * rim, 0, 1, 0, 0.5 + Math.cos(t) * 0.5, 0.5 + Math.sin(t) * 0.5, col[0], col[1], col[2], card)
+      pushVertex(
+        trunk,
+        c[0] + Math.cos(t) * rim,
+        c[1] + 0.005,
+        c[2] + Math.sin(t) * rim,
+        0,
+        1,
+        0,
+        0.5 + Math.cos(t) * 0.5,
+        0.5 + Math.sin(t) * 0.5,
+        col[0],
+        col[1],
+        col[2],
+        card
+      )
       if (s) trunk.indices.push3(base, base + s + 1, base + s)
     }
     if (rand() < p.fruit) {
-      addFlowerHead(fruit, [c[0] + radius * 0.2, c[1] + 0.03, c[2]], [0, 1, 0], p.fruitSize * (0.8 + 0.4 * rand()), pick(p.fruitColors, rand), 12, 0.9, rand())
+      addFlowerHead(
+        fruit,
+        [c[0] + radius * 0.2, c[1] + 0.03, c[2]],
+        [0, 1, 0],
+        p.fruitSize * (0.8 + 0.4 * rand()),
+        pick(p.fruitColors, rand),
+        12,
+        0.9,
+        rand()
+      )
     }
   }
 }

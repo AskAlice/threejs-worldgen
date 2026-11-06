@@ -72,11 +72,17 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   const style: RoadStyle = o.style === 'auto' ? sizeClass.style : o.style
   const [cx, cz] = o.center
   const c = o.climate ?? climate
-  const architecture: ArchitectureName = o.architecture !== 'auto' ? o.architecture : c ? architectureFor(c) : 'temperate'
+  const architecture: ArchitectureName =
+    o.architecture !== 'auto' ? o.architecture : c ? architectureFor(c) : 'temperate'
   const arch = o.architectures[architecture]
 
   // 1. Ground.
-  const site = Site.around(cx, cz, radius * (o.roads.extent + 0.15), o.siteResolution > 0 ? o.siteResolution : siteResolution(radius))
+  const site = Site.around(
+    cx,
+    cz,
+    radius * (o.roads.extent + 0.15),
+    o.siteResolution > 0 ? o.siteResolution : siteResolution(radius)
+  )
   for (let j = 0; j < site.count; j++) {
     site.fillRow(ground, j)
     if ((j & 7) === 7) yield
@@ -85,8 +91,20 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   // 2. Roads.
   const field = new TensorField(o.field, cx, cz, radius, seed, site)
   // The first arterials leave along the field's direction at the centre: that is the main street.
-  const districts = new DistrictMap(o.districts, sizeClass.districts, cx, cz, radius, seed, sizeClass.mainStreet, field.angle(cx, cz))
-  const graph = yield* growRoads({ site, field, districts, cx, cz, radius, arms: o.roads.arms > 0 ? o.roads.arms : sizeClass.arms, seed }, o.roads)
+  const districts = new DistrictMap(
+    o.districts,
+    sizeClass.districts,
+    cx,
+    cz,
+    radius,
+    seed,
+    sizeClass.mainStreet,
+    field.angle(cx, cz)
+  )
+  const graph = yield* growRoads(
+    { site, field, districts, cx, cz, radius, arms: o.roads.arms > 0 ? o.roads.arms : sizeClass.arms, seed },
+    o.roads
+  )
   assignSurfaces(graph, districts, sizeClass.surfaces, sizeClass.oldTown, o.roads)
   const profiles = gradeRoads(graph, site, o.terrain)
   yield
@@ -101,7 +119,12 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   for (const block of blocks) {
     const rand = mulberry32(hash4(seed, block.id, 17, 3))
     for (const lot of subdivideBlock(block.polygon, target, rand, o.lotJitter, block.id, lots.length)) {
-        if (lot.polygon.some(([x, z]) => site.wet(x, z)) || site.wet(lot.center[0], lot.center[1]) || crossedByRoad(lot, graph)) continue
+      if (
+        lot.polygon.some(([x, z]) => site.wet(x, z)) ||
+        site.wet(lot.center[0], lot.center[1]) ||
+        crossedByRoad(lot, graph)
+      )
+        continue
       lot.id = lots.length
       lots.push({ ...lot, district: districts.at(lot.center[0], lot.center[1]) })
     }
@@ -111,25 +134,42 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   // Roadside lots where roads run through open ground (villages, outskirts, farm roads).
   const blockGrid = new Map<number, number[]>()
   for (const b of blocks) {
-    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
-    for (const [x, z] of b.outline) { minX = Math.min(minX, x); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxZ = Math.max(maxZ, z) }
-    for (let i = Math.floor(minX / 50); i <= Math.floor(maxX / 50); i++) for (let j = Math.floor(minZ / 50); j <= Math.floor(maxZ / 50); j++) {
-      const k = ((i + 32768) & 0xffff) | (((j + 32768) & 0xffff) << 16)
-      const list = blockGrid.get(k)
-      if (list) list.push(b.id)
-      else blockGrid.set(k, [b.id])
+    let minX = Infinity,
+      minZ = Infinity,
+      maxX = -Infinity,
+      maxZ = -Infinity
+    for (const [x, z] of b.outline) {
+      minX = Math.min(minX, x)
+      minZ = Math.min(minZ, z)
+      maxX = Math.max(maxX, x)
+      maxZ = Math.max(maxZ, z)
     }
+    for (let i = Math.floor(minX / 50); i <= Math.floor(maxX / 50); i++)
+      for (let j = Math.floor(minZ / 50); j <= Math.floor(maxZ / 50); j++) {
+        const k = ((i + 32768) & 0xffff) | (((j + 32768) & 0xffff) << 16)
+        const list = blockGrid.get(k)
+        if (list) list.push(b.id)
+        else blockGrid.set(k, [b.id])
+      }
   }
   const inBlock = (x: number, z: number) => {
     const k = ((Math.floor(x / 50) + 32768) & 0xffff) | (((Math.floor(z / 50) + 32768) & 0xffff) << 16)
     for (const id of blockGrid.get(k) ?? []) if (pointInPolygon(x, z, blocks[id].outline)) return true
     return false
   }
-  const roadside = roadsideLots(graph, (x, z) => {
-    if (Math.hypot(x - cx, z - cz) > radius * 1.1) return null
-    const s = districts.style(x, z)
-    return s.coverage > 0 ? { area: s.lotArea, width: s.lotWidth } : null
-  }, (lot) => inBlock(lot.center[0], lot.center[1]) || lot.polygon.some(([x, z]) => inBlock(x, z) || site.wet(x, z)) || crossedByRoad(lot, graph), o.roadside)
+  const roadside = roadsideLots(
+    graph,
+    (x, z) => {
+      if (Math.hypot(x - cx, z - cz) > radius * 1.1) return null
+      const s = districts.style(x, z)
+      return s.coverage > 0 ? { area: s.lotArea, width: s.lotWidth } : null
+    },
+    (lot) =>
+      inBlock(lot.center[0], lot.center[1]) ||
+      lot.polygon.some(([x, z]) => inBlock(x, z) || site.wet(x, z)) ||
+      crossedByRoad(lot, graph),
+    o.roadside
+  )
   for (const lot of roadside) {
     lot.id = lots.length
     lots.push({ ...lot, district: districts.at(lot.center[0], lot.center[1]) })
@@ -137,15 +177,36 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
   yield
 
   // 4. Buildings: landmarks first (on the lots nearest the centre that fit them), then everything else.
-  const landmarks = planLandmarks(lots, sizeClass.landmarks, o.landmarks, { architecture: arch, floorHeight: o.buildings.floorHeight }, [cx, cz], radius, seed)
+  const landmarks = planLandmarks(
+    lots,
+    sizeClass.landmarks,
+    o.landmarks,
+    { architecture: arch, floorHeight: o.buildings.floorHeight },
+    [cx, cz],
+    radius,
+    seed
+  )
   const buildings: Building[] = []
   for (const lot of lots) {
     const s = o.districts.styles[lot.district]
     const rand = mulberry32(hash4(seed, lot.id, 29, 5))
-    const b = landmarks.get(lot.id) ?? planBuilding(lot, {
-      district: lot.district, density: districts.density(lot.center[0], lot.center[1]),
-      floors: s.floors, maxFloors: sizeClass.maxFloors, setback: s.setback, coverage: s.coverage, architecture: arch,
-    }, o.buildings, rand, buildings.length)
+    const b =
+      landmarks.get(lot.id) ??
+      planBuilding(
+        lot,
+        {
+          district: lot.district,
+          density: districts.density(lot.center[0], lot.center[1]),
+          floors: s.floors,
+          maxFloors: sizeClass.maxFloors,
+          setback: s.setback,
+          coverage: s.coverage,
+          architecture: arch
+        },
+        o.buildings,
+        rand,
+        buildings.length
+      )
     if (!b) continue
     b.id = buildings.length
     settleBuilding(b, site, o.terrain)
@@ -155,22 +216,46 @@ export function* planCity(ground: SiteFn, o: CityOptions, climate: Climate | nul
 
   let population = 0
   for (const b of buildings) population += b.population
-  return { center: [cx, cz], radius, style, architecture, site, districts, graph, profiles, blocks, lots, buildings, population: Math.round(population), farm: null }
+  return {
+    center: [cx, cz],
+    radius,
+    style,
+    architecture,
+    site,
+    districts,
+    graph,
+    profiles,
+    blocks,
+    lots,
+    buildings,
+    population: Math.round(population),
+    farm: null
+  }
 }
 
 /** True if a road (e.g. a dead-end street the block outline ignored) runs through or too close to the lot. */
 function crossedByRoad(lot: Lot, graph: RoadGraph): boolean {
   const p = lot.polygon
-  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
-  for (const [x, z] of p) { minX = Math.min(minX, x); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxZ = Math.max(maxZ, z) }
+  let minX = Infinity,
+    minZ = Infinity,
+    maxX = -Infinity,
+    maxZ = -Infinity
+  for (const [x, z] of p) {
+    minX = Math.min(minX, x)
+    minZ = Math.min(minZ, z)
+    maxX = Math.max(maxX, x)
+    maxZ = Math.max(maxZ, z)
+  }
   const pad = 12
   for (const id of graph.edgesInBox(minX - pad, minZ - pad, maxX + pad, maxZ + pad)) {
     const e = graph.edges[id]
-    const a = graph.nodes[e.a], b = graph.nodes[e.b]
+    const a = graph.nodes[e.a],
+      b = graph.nodes[e.b]
     const clear = e.width / 2 + e.sidewalk - 0.25
     if (pointInPolygon(a.x, a.z, p) || pointInPolygon(b.x, b.z, p)) return true
     for (let i = 0; i < p.length; i++) {
-      const q = p[i], r = p[(i + 1) % p.length]
+      const q = p[i],
+        r = p[(i + 1) % p.length]
       if (segmentIntersection(a.x, a.z, b.x, b.z, q[0], q[1], r[0], r[1])) return true
       if (pointSegment(q[0], q[1], a.x, a.z, b.x, b.z).distance < clear) return true
     }

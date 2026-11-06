@@ -17,7 +17,7 @@ export const BUILDING_VERTEX = {
   /** Walls: style code (+8 = shops), per-wall seed, wall length (0 = no windows), material. Roofs: part, seed, 0, material. */
   facade: 4,
   /** Building id (per-building weather lookup). */
-  bid: 1,
+  bid: 1
 } as const
 
 /**
@@ -38,7 +38,7 @@ export const ROOF_PARTS = {
   /** Wood (stilts). */
   wood: 5,
   /** Balcony railings. */
-  railing: 6,
+  railing: 6
 } as const
 
 /** Colours (linear RGB) and proportions for one building's geometry. */
@@ -70,7 +70,8 @@ type P3 = [number, number, number]
 /** Adds a quad/triangle, flipping its winding if its normal points away from `hint`. */
 function face(m: MeshBuilder, p: P3[], uvs: number[], hint: P3) {
   const [a, b, c] = p
-  const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
+  const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+    e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
   const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
   if (n[0] * hint[0] + n[1] * hint[1] + n[2] * hint[2] < 0) {
     p = p.slice().reverse()
@@ -88,35 +89,79 @@ const pool: Vector2[] = []
 function cap(m: MeshBuilder, poly: Vec2[], y: number, ox: number, oz: number, down = false) {
   // Reused Vector2s: no per-vertex allocations.
   while (pool.length < poly.length) pool.push(new Vector2())
-  const tris = ShapeUtils.triangulateShape(poly.map(([x, z], i) => pool[i].set(x, z)), [])
+  const tris = ShapeUtils.triangulateShape(
+    poly.map(([x, z], i) => pool[i].set(x, z)),
+    []
+  )
   m.set('normal', 0, down ? -1 : 1, 0)
   for (const [i, j, k] of tris) {
-    const a = poly[i], b = poly[j], c = poly[k]
+    const a = poly[i],
+      b = poly[j],
+      c = poly[k]
     const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-    const order = (cross < 0) !== down ? [a, b, c] : [a, c, b]
+    const order = cross < 0 !== down ? [a, b, c] : [a, c, b]
     const idx = order.map(([x, z]) => m.vertex(x - ox, y, z - oz, x - ox, z - oz))
     m.triangle(idx[0], idx[1], idx[2])
   }
 }
 
 /** Vertical walls around a polygon between y0 and y1 (relative heights for uv from `base`). */
-function walls(m: MeshBuilder, poly: Vec2[], y0: number, y1: number, base: number, ox: number, oz: number, styleCode: number, seed: number, material: number, windows: boolean) {
+function walls(
+  m: MeshBuilder,
+  poly: Vec2[],
+  y0: number,
+  y1: number,
+  base: number,
+  ox: number,
+  oz: number,
+  styleCode: number,
+  seed: number,
+  material: number,
+  windows: boolean
+) {
   for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length]
+    const a = poly[i],
+      b = poly[(i + 1) % poly.length]
     const len = Math.hypot(b[0] - a[0], b[1] - a[1])
     if (len < 1e-3) continue
     m.set('facade', styleCode, (seed * 7.31 + i * 0.618) % 1, windows ? len : 0, material)
-    m.quad([[a[0] - ox, y0, a[1] - oz], [a[0] - ox, y1, a[1] - oz], [b[0] - ox, y1, b[1] - oz], [b[0] - ox, y0, b[1] - oz]],
-      [0, y0 - base, 0, y1 - base, len, y1 - base, len, y0 - base])
+    m.quad(
+      [
+        [a[0] - ox, y0, a[1] - oz],
+        [a[0] - ox, y1, a[1] - oz],
+        [b[0] - ox, y1, b[1] - oz],
+        [b[0] - ox, y0, b[1] - oz]
+      ],
+      [0, y0 - base, 0, y1 - base, len, y1 - base, len, y0 - base]
+    )
   }
 }
 
 /** A box (or an 8-sided prism) standing on the ground plane at height y0..y1, no bottom face. */
-function box(m: MeshBuilder, cx: number, cz: number, w: number, d: number, angle: number, y0: number, y1: number, ox: number, oz: number, sides = 4) {
-  const ux = Math.cos(angle), uz = Math.sin(angle)
+function box(
+  m: MeshBuilder,
+  cx: number,
+  cz: number,
+  w: number,
+  d: number,
+  angle: number,
+  y0: number,
+  y1: number,
+  ox: number,
+  oz: number,
+  sides = 4
+) {
+  const ux = Math.cos(angle),
+    uz = Math.sin(angle)
   const ring: Vec2[] = []
   if (sides === 4) {
-    for (const [s, t] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) ring.push([cx + (ux * s * w) / 2 - (uz * t * d) / 2, cz + (uz * s * w) / 2 + (ux * t * d) / 2])
+    for (const [s, t] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1]
+    ])
+      ring.push([cx + (ux * s * w) / 2 - (uz * t * d) / 2, cz + (uz * s * w) / 2 + (ux * t * d) / 2])
   } else {
     for (let i = 0; i < sides; i++) {
       const a = (i / sides) * Math.PI * 2
@@ -124,40 +169,92 @@ function box(m: MeshBuilder, cx: number, cz: number, w: number, d: number, angle
     }
   }
   for (let i = 0; i < ring.length; i++) {
-    const a = ring[i], b = ring[(i + 1) % ring.length]
-    const mx = (a[0] + b[0]) / 2 - cx, mz = (a[1] + b[1]) / 2 - cz
+    const a = ring[i],
+      b = ring[(i + 1) % ring.length]
+    const mx = (a[0] + b[0]) / 2 - cx,
+      mz = (a[1] + b[1]) / 2 - cz
     const l = Math.hypot(b[0] - a[0], b[1] - a[1])
-    face(m, [[a[0] - ox, y0, a[1] - oz], [a[0] - ox, y1, a[1] - oz], [b[0] - ox, y1, b[1] - oz], [b[0] - ox, y0, b[1] - oz]], [0, 0, 0, y1 - y0, l, y1 - y0, l, 0], [mx, 0, mz])
+    face(
+      m,
+      [
+        [a[0] - ox, y0, a[1] - oz],
+        [a[0] - ox, y1, a[1] - oz],
+        [b[0] - ox, y1, b[1] - oz],
+        [b[0] - ox, y0, b[1] - oz]
+      ],
+      [0, 0, 0, y1 - y0, l, y1 - y0, l, 0],
+      [mx, 0, mz]
+    )
   }
   cap(m, ring, y1, ox, oz)
 }
 
-
 /** Cone roof: a fan from the outline at `top` to a point `rise` above its centroid. */
-function coneRoof(roof: MeshBuilder, poly: Vec2[], top: number, rise: number, ox: number, oz: number, seed: number, roofMaterial: number) {
+function coneRoof(
+  roof: MeshBuilder,
+  poly: Vec2[],
+  top: number,
+  rise: number,
+  ox: number,
+  oz: number,
+  seed: number,
+  roofMaterial: number
+) {
   const [cx, cz] = polygonCentroid(poly)
   roof.set('facade', ROOF_PARTS.roof, seed, 0, roofMaterial)
   for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length]
-    const mx = (a[0] + b[0]) / 2 - cx, mz = (a[1] + b[1]) / 2 - cz
+    const a = poly[i],
+      b = poly[(i + 1) % poly.length]
+    const mx = (a[0] + b[0]) / 2 - cx,
+      mz = (a[1] + b[1]) / 2 - cz
     const slant = Math.hypot(mx, mz, rise)
-    face(roof, [[a[0] - ox, top, a[1] - oz], [b[0] - ox, top, b[1] - oz], [cx - ox, top + rise, cz - oz]], [0, slant, Math.hypot(b[0] - a[0], b[1] - a[1]), slant, 0, 0], [mx, Math.hypot(mx, mz) ** 2 / Math.max(rise, 1e-3), mz])
+    face(
+      roof,
+      [
+        [a[0] - ox, top, a[1] - oz],
+        [b[0] - ox, top, b[1] - oz],
+        [cx - ox, top + rise, cz - oz]
+      ],
+      [0, slant, Math.hypot(b[0] - a[0], b[1] - a[1]), slant, 0, 0],
+      [mx, Math.hypot(mx, mz) ** 2 / Math.max(rise, 1e-3), mz]
+    )
   }
 }
 
 /** Pitched, skillion or saw-tooth roof on a part's rectangle (gable ends go into the wall mesh). */
-function pitchedRoof(roof: MeshBuilder, wall: MeshBuilder, part: BuildingPart, top: number, base: number, ox: number, oz: number, overhang: number, styleCode: number, seed: number, material: number, roofMaterial: number) {
+function pitchedRoof(
+  roof: MeshBuilder,
+  wall: MeshBuilder,
+  part: BuildingPart,
+  top: number,
+  base: number,
+  ox: number,
+  oz: number,
+  overhang: number,
+  styleCode: number,
+  seed: number,
+  material: number,
+  roofMaterial: number
+) {
   const r = part.rect!
   const [ux, uz] = r.axis
-  const vx = -uz, vz = ux
-  const L = r.halfLength, W = r.halfWidth, R = part.roofHeight
-  const at = (u: number, v: number, y: number): P3 => [r.center[0] + ux * u + vx * v - ox, y, r.center[1] + uz * u + vz * v - oz]
+  const vx = -uz,
+    vz = ux
+  const L = r.halfLength,
+    W = r.halfWidth,
+    R = part.roofHeight
+  const at = (u: number, v: number, y: number): P3 => [
+    r.center[0] + ux * u + vx * v - ox,
+    y,
+    r.center[1] + uz * u + vz * v - oz
+  ]
   const up: P3 = [0, 1, 0]
   const nrm = (u: number, v: number, y: number): P3 => [ux * u + vx * v, y, uz * u + vz * v]
   const slope = R / Math.max(W, 1e-3)
   const o = part.roof === 'sawtooth' ? 0.2 : overhang
   const eave = top - o * slope
-  const Lo = L + o, Wo = W + o
+  const Lo = L + o,
+    Wo = W + o
   const gableWall = (u: number, pts: P3[], uvs: number[]) => {
     wall.set('facade', styleCode, seed, 0, material)
     face(wall, pts, uvs, nrm(Math.sign(u), 0, 0))
@@ -166,45 +263,116 @@ function pitchedRoof(roof: MeshBuilder, wall: MeshBuilder, part: BuildingPart, t
   const slopeLen = Math.hypot(Wo, R + o * slope)
   if (part.roof === 'gable') {
     for (const s of [-1, 1]) {
-      face(roof, [at(-Lo, s * Wo, eave), at(Lo, s * Wo, eave), at(Lo, 0, top + R), at(-Lo, 0, top + R)], [0, slopeLen, 2 * Lo, slopeLen, 2 * Lo, 0, 0, 0], nrm(0, s, 1))
-      gableWall(s, [at(s * L, -W, top), at(s * L, W, top), at(s * L, 0, top + R)], [0, top - base, 2 * W, top - base, W, top + R - base])
+      face(
+        roof,
+        [at(-Lo, s * Wo, eave), at(Lo, s * Wo, eave), at(Lo, 0, top + R), at(-Lo, 0, top + R)],
+        [0, slopeLen, 2 * Lo, slopeLen, 2 * Lo, 0, 0, 0],
+        nrm(0, s, 1)
+      )
+      gableWall(
+        s,
+        [at(s * L, -W, top), at(s * L, W, top), at(s * L, 0, top + R)],
+        [0, top - base, 2 * W, top - base, W, top + R - base]
+      )
     }
   } else if (part.roof === 'gambrel') {
     // Steep lower slopes to a knee at 60 % of the rise, half-way in; shallow upper slopes to the ridge.
-    const kw = W * 0.5, kh = top + R * 0.6
+    const kw = W * 0.5,
+      kh = top + R * 0.6
     const lower = (kh - top) / (W - kw)
     const low = top - o * lower
     for (const s of [-1, 1]) {
-      const lowLen = Math.hypot(W + o - kw, kh - low), upLen = Math.hypot(kw, R * 0.4)
-      face(roof, [at(-Lo, s * Wo, low), at(Lo, s * Wo, low), at(Lo, s * kw, kh), at(-Lo, s * kw, kh)], [0, lowLen + upLen, 2 * Lo, lowLen + upLen, 2 * Lo, upLen, 0, upLen], nrm(0, s, 1))
-      face(roof, [at(-Lo, s * kw, kh), at(Lo, s * kw, kh), at(Lo, 0, top + R), at(-Lo, 0, top + R)], [0, upLen, 2 * Lo, upLen, 2 * Lo, 0, 0, 0], nrm(0, s, 1))
-      gableWall(s, [at(s * L, -W, top), at(s * L, W, top), at(s * L, kw, kh), at(s * L, -kw, kh)], [0, top - base, 2 * W, top - base, W + kw, kh - base, W - kw, kh - base])
-      gableWall(s, [at(s * L, -kw, kh), at(s * L, kw, kh), at(s * L, 0, top + R)], [W - kw, kh - base, W + kw, kh - base, W, top + R - base])
+      const lowLen = Math.hypot(W + o - kw, kh - low),
+        upLen = Math.hypot(kw, R * 0.4)
+      face(
+        roof,
+        [at(-Lo, s * Wo, low), at(Lo, s * Wo, low), at(Lo, s * kw, kh), at(-Lo, s * kw, kh)],
+        [0, lowLen + upLen, 2 * Lo, lowLen + upLen, 2 * Lo, upLen, 0, upLen],
+        nrm(0, s, 1)
+      )
+      face(
+        roof,
+        [at(-Lo, s * kw, kh), at(Lo, s * kw, kh), at(Lo, 0, top + R), at(-Lo, 0, top + R)],
+        [0, upLen, 2 * Lo, upLen, 2 * Lo, 0, 0, 0],
+        nrm(0, s, 1)
+      )
+      gableWall(
+        s,
+        [at(s * L, -W, top), at(s * L, W, top), at(s * L, kw, kh), at(s * L, -kw, kh)],
+        [0, top - base, 2 * W, top - base, W + kw, kh - base, W - kw, kh - base]
+      )
+      gableWall(
+        s,
+        [at(s * L, -kw, kh), at(s * L, kw, kh), at(s * L, 0, top + R)],
+        [W - kw, kh - base, W + kw, kh - base, W, top + R - base]
+      )
     }
   } else if (part.roof === 'hip') {
     const rl = Math.max(0, L - W)
     for (const s of [-1, 1]) {
-      face(roof, [at(-Lo, s * Wo, eave), at(Lo, s * Wo, eave), at(rl, 0, top + R), at(-rl, 0, top + R)], [0, slopeLen, 2 * Lo, slopeLen, Lo + rl, 0, Lo - rl, 0], nrm(0, s, 1))
-      face(roof, [at(s * Lo, -Wo, eave), at(s * Lo, Wo, eave), at(s * rl, 0, top + R)], [0, slopeLen, 2 * Wo, slopeLen, Wo, 0], nrm(s, 0, 1))
+      face(
+        roof,
+        [at(-Lo, s * Wo, eave), at(Lo, s * Wo, eave), at(rl, 0, top + R), at(-rl, 0, top + R)],
+        [0, slopeLen, 2 * Lo, slopeLen, Lo + rl, 0, Lo - rl, 0],
+        nrm(0, s, 1)
+      )
+      face(
+        roof,
+        [at(s * Lo, -Wo, eave), at(s * Lo, Wo, eave), at(s * rl, 0, top + R)],
+        [0, slopeLen, 2 * Wo, slopeLen, Wo, 0],
+        nrm(s, 0, 1)
+      )
     }
   } else if (part.roof === 'skillion') {
     // Mono-pitch: high along v = −W, low along v = +W.
     const hi = top + R
-    face(roof, [at(-Lo, -Wo, hi + o * (R / (2 * W))), at(Lo, -Wo, hi + o * (R / (2 * W))), at(Lo, Wo, top - o * (R / (2 * W))), at(-Lo, Wo, top - o * (R / (2 * W)))], [0, 0, 2 * Lo, 0, 2 * Lo, 2 * Wo, 0, 2 * Wo], [vx * R, 2 * W, vz * R])
+    face(
+      roof,
+      [
+        at(-Lo, -Wo, hi + o * (R / (2 * W))),
+        at(Lo, -Wo, hi + o * (R / (2 * W))),
+        at(Lo, Wo, top - o * (R / (2 * W))),
+        at(-Lo, Wo, top - o * (R / (2 * W)))
+      ],
+      [0, 0, 2 * Lo, 0, 2 * Lo, 2 * Wo, 0, 2 * Wo],
+      [vx * R, 2 * W, vz * R]
+    )
     wall.set('facade', styleCode, seed, 0, material)
-    face(wall, [at(-L, -W, top), at(L, -W, top), at(L, -W, hi), at(-L, -W, hi)], [0, top - base, 2 * L, top - base, 2 * L, hi - base, 0, hi - base], nrm(0, -1, 0))
-    for (const s of [-1, 1]) gableWall(s, [at(s * L, -W, top), at(s * L, W, top), at(s * L, -W, hi)], [0, top - base, 2 * W, top - base, 0, hi - base])
+    face(
+      wall,
+      [at(-L, -W, top), at(L, -W, top), at(L, -W, hi), at(-L, -W, hi)],
+      [0, top - base, 2 * L, top - base, 2 * L, hi - base, 0, hi - base],
+      nrm(0, -1, 0)
+    )
+    for (const s of [-1, 1])
+      gableWall(
+        s,
+        [at(s * L, -W, top), at(s * L, W, top), at(s * L, -W, hi)],
+        [0, top - base, 2 * W, top - base, 0, hi - base]
+      )
   } else if (part.roof === 'sawtooth') {
     const n = Math.max(2, Math.round((2 * L) / 7))
     const tw = (2 * L) / n
     for (let i = 0; i < n; i++) {
-      const u0 = -L + i * tw, u1 = u0 + tw
+      const u0 = -L + i * tw,
+        u1 = u0 + tw
       roof.set('facade', ROOF_PARTS.roof, seed, 0, ROOF_MATERIALS.indexOf('metal'))
-      face(roof, [at(u0, -W, top), at(u0, W, top), at(u1, W, top + R), at(u1, -W, top + R)], [0, 0, 2 * W, 0, 2 * W, tw, 0, tw], [-ux * R, tw, -uz * R])
+      face(
+        roof,
+        [at(u0, -W, top), at(u0, W, top), at(u1, W, top + R), at(u1, -W, top + R)],
+        [0, 0, 2 * W, 0, 2 * W, tw, 0, tw],
+        [-ux * R, tw, -uz * R]
+      )
       roof.set('facade', ROOF_PARTS.glass, seed, 0, 0)
-      face(roof, [at(u1, -W, top), at(u1, W, top), at(u1, W, top + R), at(u1, -W, top + R)], [0, 0, 2 * W, 0, 2 * W, R, 0, R], nrm(1, 0, 0))
+      face(
+        roof,
+        [at(u1, -W, top), at(u1, W, top), at(u1, W, top + R), at(u1, -W, top + R)],
+        [0, 0, 2 * W, 0, 2 * W, R, 0, R],
+        nrm(1, 0, 0)
+      )
       roof.set('facade', ROOF_PARTS.metal, seed, 0, 0)
-      for (const s of [-1, 1]) face(roof, [at(u0, s * W, top), at(u1, s * W, top), at(u1, s * W, top + R)], [0, 0, tw, 0, tw, R], nrm(0, s, 0))
+      for (const s of [-1, 1])
+        face(roof, [at(u0, s * W, top), at(u1, s * W, top), at(u1, s * W, top + R)], [0, 0, tw, 0, tw, R], nrm(0, s, 0))
     }
   }
 }
@@ -217,7 +385,10 @@ function pitchedRoof(roof: MeshBuilder, wall: MeshBuilder, part: BuildingPart, t
 export function buildingGeometry(b: Building, origin: Vec2, look: BuildingLook): BuildingMeshes {
   const [ox, oz] = origin
   const make = () => new MeshBuilder(BUILDING_VERTEX)
-  const w = make(), r = make(), sw = make(), sr = make()
+  const w = make(),
+    r = make(),
+    sw = make(),
+    sr = make()
   const styleCode = BUILDING_STYLES.indexOf(b.style) + (b.shops ? 8 : 0)
   const material = WALL_MATERIALS.indexOf(b.material)
   const roofMaterial = ROOF_MATERIALS.indexOf(b.roofMaterial)
@@ -238,7 +409,8 @@ export function buildingGeometry(b: Building, origin: Vec2, look: BuildingLook):
       if (!last || part.roof === 'flat') {
         r.set('facade', ROOF_PARTS.roof, b.seed, 0, flatMaterial)
         cap(r, tier.polygon, top, ox, oz)
-        if (last && look.parapet > 0 && b.style !== 'house') walls(w, tier.polygon, top, top + look.parapet, base, ox, oz, styleCode, b.seed, material, false)
+        if (last && look.parapet > 0 && b.style !== 'house')
+          walls(w, tier.polygon, top, top + look.parapet, base, ox, oz, styleCode, b.seed, material, false)
       }
       // A tier wider than the one below (a water tower's tank) needs an underside.
       if (t > 0 && polygonArea(tier.polygon) > polygonArea(part.tiers[t - 1].polygon)) {
@@ -249,7 +421,8 @@ export function buildingGeometry(b: Building, origin: Vec2, look: BuildingLook):
       below = top
     }
     const top = base + part.tiers[part.tiers.length - 1].top
-    if (part.roof === 'cone') coneRoof(r, part.tiers[part.tiers.length - 1].polygon, top, part.roofHeight, ox, oz, b.seed, roofMaterial)
+    if (part.roof === 'cone')
+      coneRoof(r, part.tiers[part.tiers.length - 1].polygon, top, part.roofHeight, ox, oz, b.seed, roofMaterial)
     else if (part.roof !== 'flat' && part.rect) {
       pitchedRoof(r, w, part, top, base, ox, oz, look.overhang, styleCode, b.seed, material, roofMaterial)
     }
@@ -266,11 +439,26 @@ export function buildingGeometry(b: Building, origin: Vec2, look: BuildingLook):
 export type DetailShape = BuildingDetail['kind'] | 'slab' | 'railing'
 
 /** Every instanced detail shape, in geometry order. */
-export const DETAIL_SHAPES: readonly DetailShape[] = ['plant', 'tank', 'antenna', 'chimney', 'ac', 'post', 'slab', 'railing']
+export const DETAIL_SHAPES: readonly DetailShape[] = [
+  'plant',
+  'tank',
+  'antenna',
+  'chimney',
+  'ac',
+  'post',
+  'slab',
+  'railing'
+]
 
 const DETAIL_PART: Record<DetailShape, number> = {
-  plant: ROOF_PARTS.concrete, tank: ROOF_PARTS.metal, antenna: ROOF_PARTS.metal, chimney: ROOF_PARTS.brick,
-  ac: ROOF_PARTS.metal, post: ROOF_PARTS.wood, slab: ROOF_PARTS.concrete, railing: ROOF_PARTS.railing,
+  plant: ROOF_PARTS.concrete,
+  tank: ROOF_PARTS.metal,
+  antenna: ROOF_PARTS.metal,
+  chimney: ROOF_PARTS.brick,
+  ac: ROOF_PARTS.metal,
+  post: ROOF_PARTS.wood,
+  slab: ROOF_PARTS.concrete,
+  railing: ROOF_PARTS.railing
 }
 
 /**
@@ -309,13 +497,41 @@ export function detailInstances(b: Building, origin: Vec2): DetailInstance[] {
   const [ox, oz] = origin
   const out: DetailInstance[] = []
   for (const d of b.details) {
-    out.push({ shape: DETAIL_SHAPES.indexOf(d.kind), x: d.x - ox, y: b.base + d.bottom, z: d.z - oz, angle: d.angle, width: d.width, height: d.top - d.bottom, depth: d.depth })
+    out.push({
+      shape: DETAIL_SHAPES.indexOf(d.kind),
+      x: d.x - ox,
+      y: b.base + d.bottom,
+      z: d.z - oz,
+      angle: d.angle,
+      width: d.width,
+      height: d.top - d.bottom,
+      depth: d.depth
+    })
   }
   for (const bal of b.balconies) {
-    const nx = Math.sin(bal.angle), nz = -Math.cos(bal.angle) // outward
+    const nx = Math.sin(bal.angle),
+      nz = -Math.cos(bal.angle) // outward
     const y = b.base + bal.y
-    out.push({ shape: 6, x: bal.x + (nx * bal.depth) / 2 - ox, y: y - 0.18, z: bal.z + (nz * bal.depth) / 2 - oz, angle: bal.angle, width: bal.width, height: 0.18, depth: bal.depth })
-    out.push({ shape: 7, x: bal.x + nx * (bal.depth - 0.03) - ox, y, z: bal.z + nz * (bal.depth - 0.03) - oz, angle: bal.angle, width: bal.width, height: 1, depth: 0.06 })
+    out.push({
+      shape: 6,
+      x: bal.x + (nx * bal.depth) / 2 - ox,
+      y: y - 0.18,
+      z: bal.z + (nz * bal.depth) / 2 - oz,
+      angle: bal.angle,
+      width: bal.width,
+      height: 0.18,
+      depth: bal.depth
+    })
+    out.push({
+      shape: 7,
+      x: bal.x + nx * (bal.depth - 0.03) - ox,
+      y,
+      z: bal.z + nz * (bal.depth - 0.03) - oz,
+      angle: bal.angle,
+      width: bal.width,
+      height: 1,
+      depth: 0.06
+    })
   }
   return out
 }

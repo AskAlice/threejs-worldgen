@@ -1,5 +1,13 @@
 // Internal: instanced quad geometry and billboard maths shared by precipitation and fire rendering.
-import { BufferAttribute, DynamicDrawUsage, InstancedBufferAttribute, InstancedBufferGeometry, Sphere, Vector3, type Node } from 'three/webgpu'
+import {
+  BufferAttribute,
+  DynamicDrawUsage,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Sphere,
+  Vector3,
+  type Node
+} from 'three/webgpu'
 import { cameraPosition, cross, modelWorldMatrix, normalize, vec3, vec4 } from 'three/tsl'
 import { mulberry32 } from 'threejs-biomes'
 
@@ -9,7 +17,10 @@ import { mulberry32 } from 'threejs-biomes'
  */
 export function createQuadInstances(max: number, seed: number, y0 = 0, withData = false): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry()
-  g.setAttribute('position', new BufferAttribute(new Float32Array([-0.5, y0, 0, 0.5, y0, 0, 0.5, y0 + 1, 0, -0.5, y0 + 1, 0]), 3))
+  g.setAttribute(
+    'position',
+    new BufferAttribute(new Float32Array([-0.5, y0, 0, 0.5, y0, 0, 0.5, y0 + 1, 0, -0.5, y0 + 1, 0]), 3)
+  )
   g.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
   g.setIndex(new BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
   const rand = new Float32Array(max * 4)
@@ -31,7 +42,13 @@ export function createQuadInstances(max: number, seed: number, y0 = 0, withData 
  * object). `axis` = the quad's long axis (e.g. up for flames, velocity for rain streaks); the quad
  * turns around it to face the camera. `corner` is the geometry position (x across, y along).
  */
-export function axisBillboard(center: Node<'vec3'>, axis: Node<'vec3'>, corner: Node<'vec3'>, width: Node<'float'>, length: Node<'float'>): Node<'vec3'> {
+export function axisBillboard(
+  center: Node<'vec3'>,
+  axis: Node<'vec3'>,
+  corner: Node<'vec3'>,
+  width: Node<'float'>,
+  length: Node<'float'>
+): Node<'vec3'> {
   const world = modelWorldMatrix.mul(vec4(center, 1)).xyz
   const toCam = normalize(cameraPosition.sub(world))
   const side = normalize(cross(axis, toCam))

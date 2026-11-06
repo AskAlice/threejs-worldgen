@@ -6,7 +6,9 @@ import { FishSchools, type FishSchoolsInput } from './fish.ts'
 import type { FaunaLayer, FaunaLayerOptions, FaunaLayerSettings } from './layer.ts'
 
 /** Creates a fauna layer from shared options plus that kind's own settings. */
-export type FaunaKindFactory = (options: FaunaLayerOptions & Record<string, unknown>) => FaunaLayer<unknown, FaunaLayerSettings>
+export type FaunaKindFactory = (
+  options: FaunaLayerOptions & Record<string, unknown>
+) => FaunaLayer<unknown, FaunaLayerSettings>
 
 /**
  * The registry of animal kinds {@link Fauna} manages, by name. Add a kind (e.g. land herds built on
@@ -14,7 +16,7 @@ export type FaunaKindFactory = (options: FaunaLayerOptions & Record<string, unkn
  */
 export const FAUNA_KINDS: Record<string, FaunaKindFactory> = {
   fish: (o) => new FishSchools(o) as unknown as FaunaLayer<unknown, FaunaLayerSettings>,
-  birds: (o) => new BirdFlocks(o) as unknown as FaunaLayer<unknown, FaunaLayerSettings>,
+  birds: (o) => new BirdFlocks(o) as unknown as FaunaLayer<unknown, FaunaLayerSettings>
 }
 
 /** Settings of {@link Fauna}: shared ones, then one entry per kind (its settings, or `false` to turn it off). */
@@ -123,7 +125,8 @@ export class Fauna {
         layer = this.layers[kind] = factory({ camera: this.camera, world: this.world, ...settings })
         this.object.add(layer.object)
       } else if (reset) layer.reset(settings)
-      else if (sharedChanged || changed[kind] !== undefined) layer.set({ ...shared, ...(changed[kind] as object | undefined) })
+      else if (sharedChanged || changed[kind] !== undefined)
+        layer.set({ ...shared, ...(changed[kind] as object | undefined) })
     }
     return this
   }

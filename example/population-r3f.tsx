@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useControls } from 'leva'
 import { World } from 'threejs-biomes'
-import { DEFAULT_POPULATION, PopulationOverlay, usePopulation, type PopulationInput, type PopulationOverlayImpl } from 'threejs-city/react'
+import {
+  DEFAULT_POPULATION,
+  PopulationOverlay,
+  usePopulation,
+  type PopulationInput,
+  type PopulationOverlayImpl
+} from 'threejs-city/react'
 import { panels } from './population.panel'
 import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 
@@ -34,17 +40,27 @@ function Scene() {
   const [impl, setImpl] = useState<PopulationOverlayImpl | null>(null)
   useEffect(() => void Object.assign(window, { world, population, overlay: impl }), [population, impl]) // for the console
   useHud(() => {
-    const d = population.data, count: Record<string, number> = {}
+    const d = population.data,
+      count: Record<string, number> = {}
     for (const s of d.settlements) count[s.class] = (count[s.class] ?? 0) + 1
-    return `threejs-city · usePopulation + <PopulationOverlay>\n${d.total.toLocaleString()} people · H3 res ${d.resolution} (${d.cellEdge.toFixed(0)} m)\n` +
-      `${Object.entries(count).map(([k, v]) => `${v} ${k}`).join(' · ')}\n${population.network.edges.length} network links`
+    return (
+      `threejs-city · usePopulation + <PopulationOverlay>\n${d.total.toLocaleString()} people · H3 res ${d.resolution} (${d.cellEdge.toFixed(0)} m)\n` +
+      `${Object.entries(count)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(' · ')}\n${population.network.edges.length} network links`
+    )
   })
 
   return (
     <>
       <Daylight night={night} target={[cx, 0, cz]} extent={radius} />
       <Ground world={world} center={[cx, cz]} size={radius * 2.4} segments={256} />
-      <PopulationOverlay ref={setImpl} population={population} {...overlay} resolution={resolution < 0 ? 'auto' : resolution} />
+      <PopulationOverlay
+        ref={setImpl}
+        population={population}
+        {...overlay}
+        resolution={resolution < 0 ? 'auto' : resolution}
+      />
       <View position={[cx, 26_000, cz + 30_000]} target={[cx, 0, cz]} />
     </>
   )

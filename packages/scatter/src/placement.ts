@@ -75,7 +75,7 @@ export const DEFAULT_PLACEMENT: Omit<PlacementRules, 'name'> = {
   randomYaw: true,
   tilt: 0,
   sink: 0,
-  colorVariation: 0,
+  colorVariation: 0
 }
 
 /**
@@ -108,7 +108,14 @@ export function groupSeed(seed: number, group: string): number {
  * @param height Terrain height; points where it returns NaN are skipped.
  * @returns One array per layer of {@link INSTANCE_STRIDE} floats per instance.
  */
-export function placeTile(layers: readonly PlacementRules[], x0: number, z0: number, size: number, seed: number, height: HeightFn): Float32Array[] {
+export function placeTile(
+  layers: readonly PlacementRules[],
+  x0: number,
+  z0: number,
+  size: number,
+  seed: number,
+  height: HeightFn
+): Float32Array[] {
   const out = layers.map(() => [] as number[])
   if (!layers.length) return out.map(() => new Float32Array(0))
   const points = poissonDisk(x0, z0, size, layers[0].spacing, seed)

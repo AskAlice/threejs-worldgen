@@ -29,11 +29,18 @@ export const DEFAULT_LAYERS: AtmosphereLayers = {
   mesosphere: 85_000,
   karman: 100_000,
   thermosphere: 600_000,
-  exosphere: 10_000_000,
+  exosphere: 10_000_000
 }
 
 /** Name of an atmosphere layer (or `'space'` beyond the exosphere, `'ground'` below the surface). */
-export type LayerName = 'ground' | 'troposphere' | 'stratosphere' | 'mesosphere' | 'thermosphere' | 'exosphere' | 'space'
+export type LayerName =
+  | 'ground'
+  | 'troposphere'
+  | 'stratosphere'
+  | 'mesosphere'
+  | 'thermosphere'
+  | 'exosphere'
+  | 'space'
 
 /** Earth's radius, metres: the reference for `scaleWithRadius`. */
 export const EARTH_RADIUS = 6.371e6
@@ -59,7 +66,13 @@ export const inSpace = (altitude: number, layers: AtmosphereLayers = DEFAULT_LAY
  * centre when that is farther (e.g. the moon's apogee). Pair it with `reversedDepthBuffer: true`.
  * @returns `[near, far]`.
  */
-export function clipPlanes(height: number, radius: number, atmosphereHeight = 100_000, reach = 0, minNear = 0.001): [number, number] {
+export function clipPlanes(
+  height: number,
+  radius: number,
+  atmosphereHeight = 100_000,
+  reach = 0,
+  minNear = 0.001
+): [number, number] {
   const h = Math.max(0, height)
   const near = Math.max(minNear, h * 0.1)
   const horizon = Math.sqrt(h * (2 * radius + h)) + Math.sqrt(atmosphereHeight * (2 * radius + atmosphereHeight))
@@ -93,8 +106,12 @@ export function resolveAtmosphere(a: AtmosphereOptions, planetRadius: number): A
     mieAbsorption: a.mieAbsorption / s,
     ozone: [a.ozone[0] / s, a.ozone[1] / s, a.ozone[2] / s],
     layers: {
-      troposphere: L.troposphere * s, stratosphere: L.stratosphere * s, mesosphere: L.mesosphere * s,
-      karman: L.karman * s, thermosphere: L.thermosphere * s, exosphere: L.exosphere * s,
-    },
+      troposphere: L.troposphere * s,
+      stratosphere: L.stratosphere * s,
+      mesosphere: L.mesosphere * s,
+      karman: L.karman * s,
+      thermosphere: L.thermosphere * s,
+      exosphere: L.exosphere * s
+    }
   }
 }

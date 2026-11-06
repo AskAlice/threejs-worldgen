@@ -5,13 +5,50 @@ import { float, positionWorld, vec3 } from 'three/tsl'
 import { mulberry32 } from 'threejs-scatter'
 import { BIOMES } from 'threejs-biomes'
 import {
-  applyImpostorWeather, createVegetationLayers, drawLeafImage, generateRock, generateTree, generateTreeLevels, growSkeleton, impostorFoliageMask, rocks, species, treeUniforms, type SpeciesName,
+  applyImpostorWeather,
+  createVegetationLayers,
+  drawLeafImage,
+  generateRock,
+  generateTree,
+  generateTreeLevels,
+  growSkeleton,
+  impostorFoliageMask,
+  rocks,
+  species,
+  treeUniforms,
+  type SpeciesName
 } from '../src/index.ts'
 
 const NAMES: SpeciesName[] = [
-  'oak', 'beech', 'maple', 'birch', 'spruce', 'pine', 'fir', 'redwood', 'acacia', 'baobab', 'palm', 'jungleEmergent', 'olive', 'cypress',
-  'mangrove', 'deadSnag', 'cactus', 'shrub', 'dwarfShrub', 'thornShrub', 'fern', 'reed', 'apple', 'berryBush', 'flowers', 'tallGrassTuft',
-  'succulent', 'bamboo', 'lilyPad',
+  'oak',
+  'beech',
+  'maple',
+  'birch',
+  'spruce',
+  'pine',
+  'fir',
+  'redwood',
+  'acacia',
+  'baobab',
+  'palm',
+  'jungleEmergent',
+  'olive',
+  'cypress',
+  'mangrove',
+  'deadSnag',
+  'cactus',
+  'shrub',
+  'dwarfShrub',
+  'thornShrub',
+  'fern',
+  'reed',
+  'apple',
+  'berryBush',
+  'flowers',
+  'tallGrassTuft',
+  'succulent',
+  'bamboo',
+  'lilyPad'
 ]
 const LEAFLESS = ['deadSnag', 'cactus', 'succulent', 'lilyPad']
 const FRUITING = ['apple', 'berryBush', 'flowers']
@@ -23,7 +60,8 @@ const positions = (g: BufferGeometry) => g.getAttribute('position').array as Flo
 function reach(g: BufferGeometry, y0: number, y1: number) {
   const p = positions(g)
   let r = 0
-  for (let i = 0; i < p.length; i += 3) if (p[i + 1] >= y0 && p[i + 1] <= y1) r = Math.max(r, Math.hypot(p[i], p[i + 2]))
+  for (let i = 0; i < p.length; i += 3)
+    if (p[i + 1] >= y0 && p[i + 1] <= y1) r = Math.max(r, Math.hypot(p[i], p[i + 2]))
   return r
 }
 
@@ -36,8 +74,12 @@ test('species: exactly the contracted keys, all generate', () => {
     assert.equal(tree.leaves === null, LEAFLESS.includes(name), `${name} leaves`)
     if (!MAYBE_FRUIT.includes(name)) assert.equal(tree.fruit !== null, FRUITING.includes(name), `${name} fruit`)
     const h = tree.bounds.max.y
-    assert.ok(h > p.height * 0.35 && (name === 'lilyPad' || h < p.height * 1.3), `${name} height ${h.toFixed(2)} vs ${p.height}`)
-    for (const g of [tree.trunk, tree.leaves, tree.fruit]) if (g) assert.equal(g.getAttribute('cardRandom').count, g.getAttribute('position').count)
+    assert.ok(
+      h > p.height * 0.35 && (name === 'lilyPad' || h < p.height * 1.3),
+      `${name} height ${h.toFixed(2)} vs ${p.height}`
+    )
+    for (const g of [tree.trunk, tree.leaves, tree.fruit])
+      if (g) assert.equal(g.getAttribute('cardRandom').count, g.getAttribute('position').count)
     for (const v of positions(tree.trunk)) assert.ok(Number.isFinite(v), `${name} finite`)
   }
 })
@@ -66,11 +108,11 @@ test('space colonisation: pipe-model radii and a connected tree', () => {
   for (let i = 1; i < sk.count; i++) assert.ok(sk.parent[i] >= 0 && sk.parent[i] < i, 'parents come first')
   const e = p.radiusExponent
   const sums = new Float64Array(sk.count)
-  for (let i = 1; i < sk.count; i++) sums[sk.parent[i]] += Math.pow(sk.radius[i], e)
+  for (let i = 1; i < sk.count; i++) sums[sk.parent[i]] += sk.radius[i] ** e
   let checked = 0
   for (let i = 0; i < sk.count; i++) {
     if (!sums[i] || sk.radius[i] <= p.tipRadius * 3) continue
-    assert.ok(Math.abs(Math.pow(sk.radius[i], e) - sums[i]) / sums[i] < 0.05, `pipe model at ${i}`)
+    assert.ok(Math.abs(sk.radius[i] ** e - sums[i]) / sums[i] < 0.05, `pipe model at ${i}`)
     checked++
   }
   assert.ok(checked > 10)
@@ -122,16 +164,29 @@ test('leaf images: soft-edged coverage, transparent corners', () => {
 
 test('createVegetationLayers: variants share a group, LODs scale with size, densities split', async () => {
   const layers = await createVegetationLayers({
-    species: [{ name: 'oak', density: 0.6, group: 'canopy' }, { name: 'fern', density: 0.9 }, { name: 'boulder', density: 0.3 }],
+    species: [
+      { name: 'oak', density: 0.6, group: 'canopy' },
+      { name: 'fern', density: 0.9 },
+      { name: 'boulder', density: 0.3 }
+    ],
     variants: 2,
-    density: (name, x) => (name === 'oak' && x < 0 ? 0 : 1),
+    density: (name, x) => (name === 'oak' && x < 0 ? 0 : 1)
   })
-  assert.deepEqual(layers.map((l) => l.name), ['oak#0', 'oak#1', 'fern#0', 'fern#1', 'boulder#0', 'boulder#1'])
-  assert.deepEqual(layers.map((l) => l.group), ['canopy', 'canopy', 'fern', 'fern', 'boulder', 'boulder'])
+  assert.deepEqual(
+    layers.map((l) => l.name),
+    ['oak#0', 'oak#1', 'fern#0', 'fern#1', 'boulder#0', 'boulder#1']
+  )
+  assert.deepEqual(
+    layers.map((l) => l.group),
+    ['canopy', 'canopy', 'fern', 'fern', 'boulder', 'boulder']
+  )
   const oak = layers[0]
   const fern = layers[2]
   assert.equal(oak.lods.length, 2)
-  assert.ok(Array.isArray(oak.lods[0].material) && oak.lods[0].geometry.groups.length === 2, 'bark + leaves in one geometry')
+  assert.ok(
+    Array.isArray(oak.lods[0].material) && oak.lods[0].geometry.groups.length === 2,
+    'bark + leaves in one geometry'
+  )
   assert.deepEqual(oak.scale, species.oak.scaleRange)
   assert.equal(oak.tilt, species.oak.leanVariation)
   assert.ok(fern.lods[1].distance < oak.lods[1].distance, 'small plants switch LOD sooner')
@@ -146,7 +201,10 @@ test('apple fruit hangs below the crown and merges as material group 2', async (
   const tree = generateTree(species.apple, 2)
   assert.ok(tree.fruit && positions(tree.fruit).length > 0)
   const [layer] = await createVegetationLayers({ species: [{ name: 'apple', density: 1 }], variants: 1 })
-  assert.deepEqual(layer.lods[0].geometry.groups.map((g) => g.materialIndex), [0, 1, 2])
+  assert.deepEqual(
+    layer.lods[0].geometry.groups.map((g) => g.materialIndex),
+    [0, 1, 2]
+  )
   assert.equal((layer.lods[0].material as unknown[]).length, 3)
 })
 
@@ -177,11 +235,18 @@ function dependsOn(node: unknown, target: unknown): boolean {
 }
 
 test('impostors get the same weather as the mesh LODs: snow by the baked normal, wet, burn, damage leaf loss', () => {
-  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5), roughness: float(0.6) }
+  const surface = {
+    color: vec3(0.2, 0.4, 0.1),
+    alpha: float(1),
+    normal: vec3(0, 1, 0),
+    mask: float(0.5),
+    roughness: float(0.6)
+  }
   const m = new MeshStandardNodeMaterial()
   applyImpostorWeather(m, surface)
   const u = treeUniforms
-  for (const k of ['snow', 'wetness', 'burn', 'damage'] as const) assert.ok(dependsOn(m.colorNode, u[k]), `colour reacts to ${k}`)
+  for (const k of ['snow', 'wetness', 'burn', 'damage'] as const)
+    assert.ok(dependsOn(m.colorNode, u[k]), `colour reacts to ${k}`)
   assert.ok(dependsOn(m.colorNode, surface.normal), 'snow settles by the baked normal')
   assert.ok(dependsOn(m.colorNode, surface.color), 'keeps the tinted baked colour')
   assert.ok(dependsOn(m.colorNode, surface.mask), 'foliage mask splits leaves from bark')
@@ -190,26 +255,52 @@ test('impostors get the same weather as the mesh LODs: snow by the baked normal,
   const snow = float(0.7)
   const own = new MeshStandardNodeMaterial()
   applyImpostorWeather(own, surface, { weather: { snow }, rock: true })
-  assert.ok(dependsOn(own.colorNode, snow) && !dependsOn(own.colorNode, u.snow), 'per-material weather inputs win, like on the meshes')
+  assert.ok(
+    dependsOn(own.colorNode, snow) && !dependsOn(own.colorNode, u.snow),
+    'per-material weather inputs win, like on the meshes'
+  )
   assert.ok(!dependsOn(own.colorNode, surface.mask), 'rocks have no foliage')
 })
 
 test('impostor parity: per-instance colour and thinning, leaf back-light, per-instance snow, damage', () => {
-  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5), roughness: float(0.6) }
+  const surface = {
+    color: vec3(0.2, 0.4, 0.1),
+    alpha: float(1),
+    normal: vec3(0, 1, 0),
+    mask: float(0.5),
+    roughness: float(0.6)
+  }
   const m = new MeshStandardNodeMaterial()
   const params = { hueVariation: 0.123, saturationVariation: 0.321, densityVariation: 0.456 }
   applyImpostorWeather(m, surface, { params })
   // The bake has no instances, so the variant's own variation is folded in at shade time, from the same per-instance
   // random the meshes read.
-  const constants = nodes(m.colorNode).filter((n) => (n as any).constructor.name === 'ConstNode').map((n) => (n as any).value)
-  assert.ok(constants.includes(2 * params.hueVariation) && constants.includes(2 * params.saturationVariation), 'per-instance hue / saturation')
+  const constants = nodes(m.colorNode)
+    .filter((n) => (n as any).constructor.name === 'ConstNode')
+    .map((n) => (n as any).value)
+  assert.ok(
+    constants.includes(2 * params.hueVariation) && constants.includes(2 * params.saturationVariation),
+    'per-instance hue / saturation'
+  )
   assert.ok(constants.includes(params.densityVariation), 'densityVariation joins the leaf loss, as on the meshes')
-  assert.ok(!dependsOn(m.colorNode, positionWorld), 'the snow noise is per instance, not painted onto the camera-facing quad')
+  assert.ok(
+    !dependsOn(m.colorNode, positionWorld),
+    'the snow noise is per instance, not painted onto the camera-facing quad'
+  )
   // The leaf material's emissive translucency: glow towards the sun, from the leaf colour, killed by burn.
-  assert.ok(dependsOn(m.emissiveNode, treeUniforms.sunDirection) && dependsOn(m.emissiveNode, treeUniforms.sunColor), 'back-light towards the sun')
-  assert.ok(dependsOn(m.emissiveNode, surface.color) && dependsOn(m.emissiveNode, treeUniforms.burn), 'glow from the leaf colour, no glow when burnt')
+  assert.ok(
+    dependsOn(m.emissiveNode, treeUniforms.sunDirection) && dependsOn(m.emissiveNode, treeUniforms.sunColor),
+    'back-light towards the sun'
+  )
+  assert.ok(
+    dependsOn(m.emissiveNode, surface.color) && dependsOn(m.emissiveNode, treeUniforms.burn),
+    'glow from the leaf colour, no glow when burnt'
+  )
   // Damage breaks branches per pixel as well as dropping leaves, so a damaged tree reads damaged at distance.
-  assert.ok(dependsOn(m.colorNode, treeUniforms.damage) && dependsOn(m.colorNode, surface.mask), 'damage drops leaves and branches')
+  assert.ok(
+    dependsOn(m.colorNode, treeUniforms.damage) && dependsOn(m.colorNode, surface.mask),
+    'damage drops leaves and branches'
+  )
   assert.ok(typeof impostorFoliageMask(false) !== 'number', 'bark bakes its card random, so damage can break branches')
 
   const rock = new MeshStandardNodeMaterial()

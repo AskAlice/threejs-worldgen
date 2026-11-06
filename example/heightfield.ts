@@ -52,7 +52,8 @@ const markerGeometry = new THREE.SphereGeometry(0.45, 8, 6)
 const markerMaterial = new THREE.MeshStandardNodeMaterial({ roughness: 0.5 })
 let markers: THREE.InstancedMesh | null = null
 let sample: HeightFn = hills
-let bakeMs = 0, hits = 0
+let bakeMs = 0,
+  hits = 0
 
 // Re-bakes the sampler: only the source and createHeightSampler's options change it.
 function build() {
@@ -78,17 +79,25 @@ function slope(x: number, z: number): number | null {
 function placeMarkers() {
   const n = view.markers
   if (markers?.count !== n * n) {
-    if (markers) { scene.remove(markers); markers.dispose() }
+    if (markers) {
+      scene.remove(markers)
+      markers.dispose()
+    }
     markers = new THREE.InstancedMesh(markerGeometry, markerMaterial, n * n)
     scene.add(markers)
   }
-  const m = new THREE.Matrix4(), c = new THREE.Color()
+  const m = new THREE.Matrix4(),
+    c = new THREE.Color()
   hits = 0
   for (let j = 0, k = 0; j < n; j++) {
     for (let i = 0; i < n; i++, k++) {
-      const x = (i / (n - 1) - 0.5) * SIZE, z = (j / (n - 1) - 0.5) * SIZE
+      const x = (i / (n - 1) - 0.5) * SIZE,
+        z = (j / (n - 1) - 0.5) * SIZE
       const y = sample(x, z)
-      if (y !== y) { markers.setMatrixAt(k, m.makeScale(0, 0, 0)); continue }
+      if (y !== y) {
+        markers.setMatrixAt(k, m.makeScale(0, 0, 0))
+        continue
+      }
       hits++
       markers.setMatrixAt(k, m.makeTranslation(x, y + 0.3, z))
       const s = slope(x, z) // rise / run: 1 = 45°
@@ -102,12 +111,16 @@ function placeMarkers() {
 }
 
 // raycastHeight under the pointer.
-const cursor = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 12), new THREE.MeshStandardNodeMaterial({ color: '#ffffff', emissive: '#ff5a1f' }))
+const cursor = new THREE.Mesh(
+  new THREE.SphereGeometry(1.4, 16, 12),
+  new THREE.MeshStandardNodeMaterial({ color: '#ffffff', emissive: '#ff5a1f' })
+)
 cursor.visible = false
 scene.add(cursor)
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2(0, 0)
-let hit: THREE.Vector3 | null = null, castUs = 0
+let hit: THREE.Vector3 | null = null,
+  castUs = 0
 function cast() {
   camera.updateMatrixWorld()
   raycaster.setFromCamera(pointer, camera)
@@ -124,29 +137,45 @@ renderer.domElement.addEventListener('pointermove', (e) => {
 })
 
 function showHud() {
-  const source = view.source === 'mesh' ? `mesh baked at maxResolution ${sampler.maxResolution} in ${bakeMs.toFixed(1)} ms` : 'height function (used as-is; maxResolution only applies to meshes)'
+  const source =
+    view.source === 'mesh'
+      ? `mesh baked at maxResolution ${sampler.maxResolution} in ${bakeMs.toFixed(1)} ms`
+      : 'height function (used as-is; maxResolution only applies to meshes)'
   const s = hit ? slope(hit.x, hit.z) : null
-  const at = hit ? `hit (${hit.x.toFixed(1)}, ${hit.y.toFixed(2)}, ${hit.z.toFixed(1)}) · slope ${s?.toFixed(2) ?? '—'}` : 'no hit'
+  const at = hit
+    ? `hit (${hit.x.toFixed(1)}, ${hit.y.toFixed(2)}, ${hit.z.toFixed(1)}) · slope ${s?.toFixed(2) ?? '—'}`
+    : 'no hit'
   hud.textContent = `threejs-heightfield — ${source}
 ${hits.toLocaleString()} / ${(view.markers ** 2).toLocaleString()} samples on terrain (NaN elsewhere)
 raycastHeight: ${at} · ${castUs.toFixed(0)} µs`
 }
 
-createPanel([
-  {
-    name: 'threejs-heightfield',
-    classes: [
-      { name: 'createHeightSampler', target: sampler, onChange: build, ...specOptions(spec.createHeightSampler) },
-      { name: 'slopeAt', target: slopeOptions, onChange: placeMarkers, ...specOptions(spec.slopeAt) },
-      { name: 'raycastHeight', target: ray, onChange: cast, ...specOptions(spec.raycastHeight) },
-    ],
-  },
-  { name: 'sandbox', classes: [{
-    name: 'view', target: view, choices: { source: ['function', 'mesh'] }, ranges: { markers: [8, 256, 1] },
-    // Only a new source re-bakes; markers re-place on the same sampler, showSource only toggles the meshes.
-    onChange: ([key]) => (key === 'source' ? build() : key === 'markers' ? placeMarkers() : showSource()),
-  }] },
-], { title: 'threejs-heightfield' })
+createPanel(
+  [
+    {
+      name: 'threejs-heightfield',
+      classes: [
+        { name: 'createHeightSampler', target: sampler, onChange: build, ...specOptions(spec.createHeightSampler) },
+        { name: 'slopeAt', target: slopeOptions, onChange: placeMarkers, ...specOptions(spec.slopeAt) },
+        { name: 'raycastHeight', target: ray, onChange: cast, ...specOptions(spec.raycastHeight) }
+      ]
+    },
+    {
+      name: 'sandbox',
+      classes: [
+        {
+          name: 'view',
+          target: view,
+          choices: { source: ['function', 'mesh'] },
+          ranges: { markers: [8, 256, 1] },
+          // Only a new source re-bakes; markers re-place on the same sampler, showSource only toggles the meshes.
+          onChange: ([key]) => (key === 'source' ? build() : key === 'markers' ? placeMarkers() : showSource())
+        }
+      ]
+    }
+  ],
+  { title: 'threejs-heightfield' }
+)
 build()
 
 addEventListener('resize', () => {

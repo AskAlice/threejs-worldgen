@@ -8,7 +8,16 @@ import { WorldTerrain, type WorldTerrainImpl } from 'threejs-biomes/react'
 import TerrainWorker from 'threejs-biomes/worker?worker'
 import { Sky, type SkyImpl } from 'threejs-sky/react'
 import {
-  LAVA_PRESETS, MPM, MPMLava, ParticleLighting, Particles, resolveLavaOptions, resolveMPMOptions, type MPMLavaImpl, type MPMSolverImpl, type ParticleSystemImpl,
+  type LAVA_PRESETS,
+  MPM,
+  MPMLava,
+  ParticleLighting,
+  Particles,
+  resolveLavaOptions,
+  resolveMPMOptions,
+  type MPMLavaImpl,
+  type MPMSolverImpl,
+  type ParticleSystemImpl
 } from 'threejs-particles/react'
 import { panels } from './mpm-lava.panel'
 import { HAZE, SPARKS, check, emitLayer, lavaConfig, lavaInput, lavaScene, lavaStats } from './mpm-lava-scene'
@@ -47,7 +56,10 @@ function Vent({ mpm, lava, demo }: { mpm: MPMSolverImpl; lava: Ref<MPMLavaImpl>;
     const step = 1 / 60
     if (lava.current && demo.vent && mpm.count + 200 < mpm.capacity) {
       layerClock.current += step * demo.ventSpeed
-      while (layerClock.current >= DX / 2) { emitLayer(lava.current, world, v, demo.ventRadius, demo.ventSpeed); layerClock.current -= DX / 2 }
+      while (layerClock.current >= DX / 2) {
+        emitLayer(lava.current, world, v, demo.ventRadius, demo.ventSpeed)
+        layerClock.current -= DX / 2
+      }
     }
     lighting.fromScene(scene)
   })
@@ -60,15 +72,22 @@ function Eruption({ sky, terrain }: { sky: SkyImpl; terrain: Ref<WorldTerrainImp
   const lavaOptions = useSpec('MPMLava', lavaSpec)
   const [mpm, setMpm] = useState<MPMSolverImpl | null>(null)
   const lava = useRef<MPMLavaImpl>(null)
-  const haze = useRef<ParticleSystemImpl>(null), sparks = useRef<ParticleSystemImpl>(null)
+  const haze = useRef<ParticleSystemImpl>(null),
+    sparks = useRef<ParticleSystemImpl>(null)
   const demo = useControls('demo', {
-    preset: { value: presetName as string, options: ['pahoehoe', 'aa'], label: 'preset (pāhoehoe / ʻaʻā, reloads)', onChange: (p: string, _: string, { initial }: { initial: boolean }) => void (initial || (location.search = `?preset=${p}`)) },
+    preset: {
+      value: presetName as string,
+      options: ['pahoehoe', 'aa'],
+      label: 'preset (pāhoehoe / ʻaʻā, reloads)',
+      onChange: (p: string, _: string, { initial }: { initial: boolean }) =>
+        void (initial || (location.search = `?preset=${p}`))
+    },
     night: { value: params.has('night'), label: 'night' },
     vent: { value: true, label: 'vent erupting' },
     ventSpeed: { value: 0.5, min: 0.1, max: 2, step: 0.05, label: 'vent speed (m/s)' },
     ventRadius: { value: 0.6, min: 0.2, max: 1.2, step: 0.01, label: 'vent radius (m)' },
     follow: { value: false, label: 'domain follows camera target' },
-    'clear the lava': button(() => latest.current?.clear()),
+    'clear the lava': button(() => latest.current?.clear())
   }) as Demo & { night: boolean }
   const latest = useRef(mpm)
   latest.current = mpm
@@ -77,11 +96,15 @@ function Eruption({ sky, terrain }: { sky: SkyImpl; terrain: Ref<WorldTerrainImp
   // Day: late morning; night: a moonless hour before midnight (the lava is the light).
   useEffect(() => void sky.setTimeOfDay(demo.night ? 22.5 : 10.5), [sky, demo.night])
   const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3 } | null
-  useEffect(() => { if (controls) sky.follow(controls.target) }, [sky, controls])
+  useEffect(() => {
+    if (controls) sky.follow(controls.target)
+  }, [sky, controls])
 
   // The terrain's aerial perspective (when its material has one) follows the sky's sun and horizon colour.
   useFrame(() => {
-    const aerial = terrain.current?.uniforms as { sunDirection?: { value: THREE.Vector3 }; hazeColor?: { value: THREE.Color } } | undefined
+    const aerial = terrain.current?.uniforms as
+      | { sunDirection?: { value: THREE.Vector3 }; hazeColor?: { value: THREE.Color } }
+      | undefined
     aerial?.sunDirection?.value.set(...sky.state.sunDirection)
     const fog = sky.lighting?.fogColor
     if (fog) aerial?.hazeColor?.value.setRGB(fog[0], fog[1], fog[2])
@@ -93,22 +116,52 @@ function Eruption({ sky, terrain }: { sky: SkyImpl; terrain: Ref<WorldTerrainImp
   const fps = useRef(60)
   useFrame((_, dt) => {
     fps.current = fps.current * 0.95 + (1 / Math.max(1e-3, Math.min(0.1, dt))) * 0.05
-    if (!stats && mpm && lava.current && haze.current && sparks.current) setStats(lavaStats(gl, mpm, lava.current, haze.current, sparks.current, glows, v))
-    const now = performance.now(), r = read.current
-    if (stats && mpm && !r.busy && mpm.time > 0.5 && now - r.last > 1500) { r.last = now; r.busy = true; void stats.measure().finally(() => (r.busy = false)) }
+    if (!stats && mpm && lava.current && haze.current && sparks.current)
+      setStats(lavaStats(gl, mpm, lava.current, haze.current, sparks.current, glows, v))
+    const now = performance.now(),
+      r = read.current
+    if (stats && mpm && !r.busy && mpm.time > 0.5 && now - r.last > 1500) {
+      r.last = now
+      r.busy = true
+      void stats.measure().finally(() => (r.busy = false))
+    }
   })
-  useHud(() => `threejs-particles · <MPM> + <MPMLava> + <Particles>\n${stats?.hud(fps.current, `${presetName}${demo.night ? ' · night' : ''}`) ?? 'starting…'}`)
-  useEffect(() => void Object.assign(window, { mpm, lava, world, sky, terrain, lavaStats: stats?.stats, vent: v }), [mpm, stats]) // for the console
+  useHud(
+    () =>
+      `threejs-particles · <MPM> + <MPMLava> + <Particles>\n${stats?.hud(fps.current, `${presetName}${demo.night ? ' · night' : ''}`) ?? 'starting…'}`
+  )
+  useEffect(
+    () => void Object.assign(window, { mpm, lava, world, sky, terrain, lavaStats: stats?.stats, vent: v }),
+    [mpm, stats]
+  ) // for the console
 
   return (
     <>
-      {glows.map((light, i) => <primitive key={i} object={light} />)}
+      {glows.map((light, i) => (
+        <primitive key={i} object={light} />
+      ))}
       {/* MPMLava steps the solver with its thermal step, so <MPM> doesn't step itself. */}
-      <MPM ref={setMpm} {...solver} capacity={config.capacity} resolution={RES} cellSize={DX} origin={origin} height={world.height} timeStep={0} />
+      <MPM
+        ref={setMpm}
+        {...solver}
+        capacity={config.capacity}
+        resolution={RES}
+        cellSize={DX}
+        origin={origin}
+        height={world.height}
+        timeStep={0}
+      />
       {mpm && (
         <>
           <Vent mpm={mpm} lava={lava} demo={demo} />
-          <MPMLava ref={lava} solver={mpm} {...lavaOptions} material={lavaSpec.target.material} lighting={lighting} timeStep={1 / 60} />
+          <MPMLava
+            ref={lava}
+            solver={mpm}
+            {...lavaOptions}
+            material={lavaSpec.target.material}
+            lighting={lighting}
+            timeStep={1 / 60}
+          />
           {/* Heat haze and sparks over the hottest lava (their sources come from the read-back). */}
           <Particles ref={haze} {...HAZE} lighting={lighting} />
           <Particles ref={sparks} {...SPARKS} lighting={lighting} />
@@ -126,7 +179,12 @@ function Scene() {
       {/* Ground: the biomes terrain (its LOD reaches centimetres at the camera, on the same heights the solver collides with). */}
       <WorldTerrain ref={terrain} world={world} createWorker={createWorker} castShadow />
       {/* Sky over Kīlauea, a day after full moon (a moonlit night); exposure capped like a camera at an eruption: at night it exposes for the lava. */}
-      <Sky ref={setSky} observer={{ latitude: 19.4, longitude: -155.3 }} clock={{ date: '2026-03-04T12:00:00Z', paused: true }} lighting={{ autoExposure: true, exposureRange: [0.25, 0.7] }} />
+      <Sky
+        ref={setSky}
+        observer={{ latitude: 19.4, longitude: -155.3 }}
+        clock={{ date: '2026-03-04T12:00:00Z', paused: true }}
+        lighting={{ autoExposure: true, exposureRange: [0.25, 0.7] }}
+      />
       {sky && <Eruption sky={sky} terrain={terrain} />}
       {/* Bloom: the glare of incandescent lava; AgX's "punchy" look, a saturation lift so incandescence stays orange. */}
       <Post output={(color) => saturation(color.add(bloom(color, 0.35, 0.5, 0.6)), 1.35)} />
@@ -142,4 +200,8 @@ function Check() {
   return null
 }
 
-mount(params.has('check') ? <Check /> : <Scene />, { fov: 45, near: 0.05, far: 30000 }, { toneMapping: THREE.AgXToneMapping })
+mount(
+  params.has('check') ? <Check /> : <Scene />,
+  { fov: 45, near: 0.05, far: 30000 },
+  { toneMapping: THREE.AgXToneMapping }
+)

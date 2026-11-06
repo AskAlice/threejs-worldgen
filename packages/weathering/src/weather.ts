@@ -1,4 +1,17 @@
-import { clamp, fbm, hash01, hash4, noise3, seedOf, smoothstep, createSample, type DeepPartial, type FractalOptions, type LocalFrame, type World } from 'threejs-biomes'
+import {
+  clamp,
+  fbm,
+  hash01,
+  hash4,
+  noise3,
+  seedOf,
+  smoothstep,
+  createSample,
+  type DeepPartial,
+  type FractalOptions,
+  type LocalFrame,
+  type World
+} from 'threejs-biomes'
 import { merge, resolve } from 'threejs-heightfield'
 
 /** What falls from the sky. `sleet` is the mixed band between {@link RainSettings.snowTemperature} and `rainTemperature`. */
@@ -135,12 +148,31 @@ export const DEFAULT_WEATHER: WeatherOptions = {
   seed: 1,
   temperatureOffset: 0,
   climate: { temperature: 12, moisture: 0.5 },
-  wind: { direction: null, speed: 6, variability: 0.5, veer: 0.6, veerPeriod: 6 * 3600, gustiness: 0.45, gustScale: 90, gustPeriod: 9 },
+  wind: {
+    direction: null,
+    speed: 6,
+    variability: 0.5,
+    veer: 0.6,
+    veerPeriod: 6 * 3600,
+    gustiness: 0.45,
+    gustScale: 90,
+    gustPeriod: 9
+  },
   fronts: { scale: 14_000, speed: 9, evolution: 5 * 3600, coverage: 0, climate: 0.8, octaves: 4 },
   precipitation: { threshold: 0.75, maxRate: 7, snowTemperature: 0, rainTemperature: 2.5 },
-  storms: { enabled: true, spacing: 9000, radius: 1800, lifetime: 3600, chance: 0.3, minTemperature: 8, rain: 30, wind: 14, lightning: 6 },
+  storms: {
+    enabled: true,
+    spacing: 9000,
+    radius: 1800,
+    lifetime: 3600,
+    chance: 0.3,
+    minTemperature: 8,
+    rain: 30,
+    wind: 14,
+    lightning: 6
+  },
   fog: { humidity: 0.86, maxWind: 5, density: 1 },
-  surface: { memory: 24 * 3600, samples: 12, dryTime: 4 * 3600, wetDepth: 1.5, coverDepth: 4, meltRate: 0.25 },
+  surface: { memory: 24 * 3600, samples: 12, dryTime: 4 * 3600, wetDepth: 1.5, coverDepth: 4, meltRate: 0.25 }
 }
 
 /** The weather at one place and time. Reuse one object across calls (pass it as `out`). */
@@ -175,7 +207,21 @@ export interface WeatherSample {
 
 /** Creates an empty {@link WeatherSample}. */
 export function createWeatherSample(): WeatherSample {
-  return { cloudCover: 0, precipitation: 0, snowFraction: 0, type: 'none', temperature: 0, humidity: 0, windX: 0, windZ: 0, windSpeed: 0, gust: 0, storm: 0, lightning: 0, fog: 0 }
+  return {
+    cloudCover: 0,
+    precipitation: 0,
+    snowFraction: 0,
+    type: 'none',
+    temperature: 0,
+    humidity: 0,
+    windX: 0,
+    windZ: 0,
+    windSpeed: 0,
+    gust: 0,
+    storm: 0,
+    lightning: 0,
+    fog: 0
+  }
 }
 
 /** The static climate at a point, from the world. Cache it for points you query often (see {@link Weather.at}). */
@@ -308,13 +354,20 @@ export class Weather {
   private prepare() {
     const o = this.options
     this.seed = seedOf(o.seed) ^ 0x3c6ef372
-    const d = o.wind.direction ?? (this.world && this.world.options.surface === 'plane' ? this.world.options.climate.windDirection : [1, 0])
+    const d =
+      o.wind.direction ??
+      (this.world && this.world.options.surface === 'plane' ? this.world.options.climate.windDirection : [1, 0])
     const len = Math.hypot(d[0], d[1]) || 1
     this.dirX = d[0] / len
     this.dirZ = d[1] / len
     this.frontX = this.dirX * o.fronts.speed
     this.frontZ = this.dirZ * o.fronts.speed
-    this.cloudFractal = { frequency: 1 / o.fronts.scale, octaves: Math.max(1, Math.round(o.fronts.octaves)), lacunarity: 2, gain: 0.5 }
+    this.cloudFractal = {
+      frequency: 1 / o.fronts.scale,
+      octaves: Math.max(1, Math.round(o.fronts.octaves)),
+      lacunarity: 2,
+      gain: 0.5
+    }
     this.windFractal = { frequency: 2 / o.fronts.scale, octaves: 2, lacunarity: 2, gain: 0.5 }
     this.storms.clear()
   }
@@ -325,7 +378,11 @@ export class Weather {
   }
 
   /** Static climate at local (x, z): from the world, or `options.climate` without one. */
-  climateAt(x: number, z: number, out: ClimatePoint = { temperature: 0, moisture: 0, elevation: 0, water: false }): ClimatePoint {
+  climateAt(
+    x: number,
+    z: number,
+    out: ClimatePoint = { temperature: 0, moisture: 0, elevation: 0, water: false }
+  ): ClimatePoint {
     if (!this.frame) {
       out.temperature = this.options.climate.temperature
       out.moisture = this.options.climate.moisture
@@ -346,7 +403,13 @@ export class Weather {
    * @param climate Pass a cached {@link ClimatePoint} for this position to skip sampling the world
    *   (the climate never changes with time, so per-texel or per-instance caches are exact).
    */
-  at(x: number, z: number, time: number, out: WeatherSample = createWeatherSample(), climate?: ClimatePoint): WeatherSample {
+  at(
+    x: number,
+    z: number,
+    time: number,
+    out: WeatherSample = createWeatherSample(),
+    climate?: ClimatePoint
+  ): WeatherSample {
     const o = this.options
     const c = climate ?? this.climateAt(x, z, this.climateScratch)
     const seed = this.seed
@@ -368,25 +431,50 @@ export class Weather {
 
     // Precipitation and its type.
     const p = o.precipitation
-    const frontal = p.maxRate * Math.pow(smoothstep(p.threshold, 1, cloud), 1.5) * (0.35 + 0.65 * c.moisture)
+    const frontal = p.maxRate * smoothstep(p.threshold, 1, cloud) ** 1.5 * (0.35 + 0.65 * c.moisture)
     const precipitation = frontal + o.storms.rain * storm * storm
     const temperature = c.temperature + o.temperatureOffset - 4 * storm
     const snowFraction = smoothstep(p.rainTemperature, p.snowTemperature, temperature)
 
     // Wind: prevailing direction with slow veering, speed varying with the systems, gusts riding the wind.
     const w = o.wind
-    const veer = w.veer * (spread(noise3(seed + 20, time / w.veerPeriod, 0.37, 0.71)) + 0.3 * spread(fbm(seed + 21, ax, evolve * o.fronts.scale * 0.5, az, this.windFractal)))
-    const base = w.speed * Math.max(0.05, 1 + w.variability * spread(fbm(seed + 22, ax + 913.7, evolve * o.fronts.scale, az - 377.1, this.windFractal))) * (0.75 + 0.5 * cloud)
+    const veer =
+      w.veer *
+      (spread(noise3(seed + 20, time / w.veerPeriod, 0.37, 0.71)) +
+        0.3 * spread(fbm(seed + 21, ax, evolve * o.fronts.scale * 0.5, az, this.windFractal)))
+    const base =
+      w.speed *
+      Math.max(
+        0.05,
+        1 + w.variability * spread(fbm(seed + 22, ax + 913.7, evolve * o.fronts.scale, az - 377.1, this.windFractal))
+      ) *
+      (0.75 + 0.5 * cloud)
     const gx = x - this.dirX * w.speed * time
     const gz = z - this.dirZ * w.speed * time
     const gustNoise = Math.max(0, spread(noise3(seed + 23, gx / w.gustScale, time / w.gustPeriod, gz / w.gustScale)))
     const gust = w.gustiness * base * 1.6 * gustNoise + o.storms.wind * storm * (0.6 + 0.4 * gustNoise)
     const speed = base + gust
-    const cos = Math.cos(veer), sin = Math.sin(veer)
+    const cos = Math.cos(veer),
+      sin = Math.sin(veer)
 
     // Humidity and fog.
-    const humidity = clamp(0.2 + 0.55 * c.moisture + 0.3 * cloud + 0.25 * Math.min(1, precipitation / 3) + (c.water ? 0.08 : 0) - 0.008 * Math.max(0, temperature - 25), 0, 1)
-    const fog = clamp(smoothstep(o.fog.humidity, 1, humidity) * (1 - smoothstep(o.fog.maxWind * 0.4, o.fog.maxWind, speed)) * o.fog.density, 0, 1)
+    const humidity = clamp(
+      0.2 +
+        0.55 * c.moisture +
+        0.3 * cloud +
+        0.25 * Math.min(1, precipitation / 3) +
+        (c.water ? 0.08 : 0) -
+        0.008 * Math.max(0, temperature - 25),
+      0,
+      1
+    )
+    const fog = clamp(
+      smoothstep(o.fog.humidity, 1, humidity) *
+        (1 - smoothstep(o.fog.maxWind * 0.4, o.fog.maxWind, speed)) *
+        o.fog.density,
+      0,
+      1
+    )
 
     out.cloudCover = cloud
     out.precipitation = precipitation
@@ -409,13 +497,20 @@ export class Weather {
    * seconds of weather integrated with drying and melting. Still a pure function of time (it re-samples
    * the history), so scrubbing works. Costs `surface.samples` × {@link Weather.at}.
    */
-  surfaceAt(x: number, z: number, time: number, out: SurfaceSample = { wetness: 0, snow: 0, snowDepth: 0, water: 0 }, climate?: ClimatePoint): SurfaceSample {
+  surfaceAt(
+    x: number,
+    z: number,
+    time: number,
+    out: SurfaceSample = { wetness: 0, snow: 0, snowDepth: 0, water: 0 },
+    climate?: ClimatePoint
+  ): SurfaceSample {
     const s = this.options.surface
     const c = climate ?? this.climateAt(x, z, { temperature: 0, moisture: 0, elevation: 0, water: false })
     const n = Math.max(1, Math.round(s.samples))
     const dt = s.memory / n
     const dry = Math.exp(-dt / s.dryTime)
-    let water = 0, snow = 0
+    let water = 0,
+      snow = 0
     const w = this.historySample
     for (let k = n - 1; k >= 0; k--) {
       this.at(x, z, time - dt * (k + 0.5), w, c)
@@ -436,43 +531,56 @@ export class Weather {
    * `t0 <= time < t1`, sorted by time. Deterministic: the same window always gives the same strikes,
    * and splitting a window into pieces gives the same strikes as asking for it whole.
    */
-  strikes(minX: number, minZ: number, maxX: number, maxZ: number, t0: number, t1: number, out: Strike[] = []): Strike[] {
+  strikes(
+    minX: number,
+    minZ: number,
+    maxX: number,
+    maxZ: number,
+    t0: number,
+    t1: number,
+    out: Strike[] = []
+  ): Strike[] {
     const cv = this.options.storms
     if (!cv.enabled || cv.lightning <= 0 || cv.chance <= 0 || !(t1 > t0)) return out
-    const S = cv.spacing, T = cv.lifetime
-    const fx = this.frontX, fz = this.frontZ
+    const S = cv.spacing,
+      T = cv.lifetime
+    const fx = this.frontX,
+      fz = this.frontZ
     const pad = S * 0.5
     const first = out.length
     for (let c0 = Math.floor(t0 / T) * T; c0 < t1; c0 += T) {
-      const a = Math.max(t0, c0), b = Math.min(t1, c0 + T)
+      const a = Math.max(t0, c0),
+        b = Math.min(t1, c0 + T)
       // The query box in advected coordinates over [a, b].
       const i0 = Math.floor((Math.min(minX - fx * a, minX - fx * b) - pad) / S)
       const i1 = Math.floor((Math.max(maxX - fx * a, maxX - fx * b) + pad) / S)
       const j0 = Math.floor((Math.min(minZ - fz * a, minZ - fz * b) - pad) / S)
       const j1 = Math.floor((Math.max(maxZ - fz * a, maxZ - fz * b) + pad) / S)
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const phase = this.phase(i, j)
-        for (let e = Math.floor((a + phase) / T); e <= Math.floor((b + phase) / T); e++) {
-          const s = this.storm(i, j, e, phase)
-          if (!s) continue
-          const lifeStart = e * T - phase
-          const lo = Math.max(a, lifeStart), hi = Math.min(b, lifeStart + T)
-          for (let k = Math.floor(lo / STRIKE_SLOT); k * STRIKE_SLOT < hi; k++) {
-            const time = (k + hash01(i, j, k, this.seed + 85)) * STRIKE_SLOT
-            if (time < lo || time >= hi) continue
-            const life = Math.sin(Math.PI * ((time - lifeStart) / T)) ** 2
-            const rate = cv.lightning * s.strength * life // strikes per minute
-            if (hash01(i, j, k, this.seed + 81) >= (rate / 60) * STRIKE_SLOT) continue
-            const sigma = s.r * 0.5
-            const rr = sigma * Math.sqrt(-2 * Math.log(Math.max(1e-9, hash01(i, j, k, this.seed + 82))))
-            const ang = 2 * Math.PI * hash01(i, j, k, this.seed + 83)
-            const x = s.cx + fx * time + Math.cos(ang) * rr
-            const z = s.cz + fz * time + Math.sin(ang) * rr
-            if (x < minX || x > maxX || z < minZ || z > maxZ) continue
-            out.push({ x, z, time, intensity: s.strength * life, seed: hash4(i, j, k, this.seed + 84) })
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const phase = this.phase(i, j)
+          for (let e = Math.floor((a + phase) / T); e <= Math.floor((b + phase) / T); e++) {
+            const s = this.storm(i, j, e, phase)
+            if (!s) continue
+            const lifeStart = e * T - phase
+            const lo = Math.max(a, lifeStart),
+              hi = Math.min(b, lifeStart + T)
+            for (let k = Math.floor(lo / STRIKE_SLOT); k * STRIKE_SLOT < hi; k++) {
+              const time = (k + hash01(i, j, k, this.seed + 85)) * STRIKE_SLOT
+              if (time < lo || time >= hi) continue
+              const life = Math.sin(Math.PI * ((time - lifeStart) / T)) ** 2
+              const rate = cv.lightning * s.strength * life // strikes per minute
+              if (hash01(i, j, k, this.seed + 81) >= (rate / 60) * STRIKE_SLOT) continue
+              const sigma = s.r * 0.5
+              const rr = sigma * Math.sqrt(-2 * Math.log(Math.max(1e-9, hash01(i, j, k, this.seed + 82))))
+              const ang = 2 * Math.PI * hash01(i, j, k, this.seed + 83)
+              const x = s.cx + fx * time + Math.cos(ang) * rr
+              const z = s.cz + fz * time + Math.sin(ang) * rr
+              if (x < minX || x > maxX || z < minZ || z > maxZ) continue
+              out.push({ x, z, time, intensity: s.strength * life, seed: hash4(i, j, k, this.seed + 84) })
+            }
           }
         }
-      }
     }
     const added = out.splice(first).sort((p, q) => p.time - q.time || p.seed - q.seed)
     out.push(...added)
@@ -486,11 +594,15 @@ export class Weather {
   /** The storm of cell (i, j) in its `e`-th lifetime, or null. Climate is taken at its mid-life position. */
   private storm(i: number, j: number, e: number, phase: number): Storm | null {
     // Packed numeric key (fast); strings only far outside the packable range.
-    const key = Math.abs(i) < 32768 && Math.abs(j) < 32768 && e >= 0 && e < 2097152 ? ((i + 32768) * 65536 + (j + 32768)) * 2097152 + e : `${i},${j},${e}`
+    const key =
+      Math.abs(i) < 32768 && Math.abs(j) < 32768 && e >= 0 && e < 2097152
+        ? ((i + 32768) * 65536 + (j + 32768)) * 2097152 + e
+        : `${i},${j},${e}`
     const cached = this.storms.get(key)
     if (cached !== undefined) return cached
     const cv = this.options.storms
-    const S = cv.spacing, T = cv.lifetime
+    const S = cv.spacing,
+      T = cv.lifetime
     let storm: Storm | null = null
     const roll = hash01(i, j, e, this.seed + 72)
     if (roll < cv.chance) {
@@ -498,12 +610,16 @@ export class Weather {
       const cz = (j + 0.2 + 0.6 * hash01(i, j, e, this.seed + 74)) * S
       const mid = (e + 0.5) * T - phase
       const c = this.climateAt(cx + this.frontX * mid, cz + this.frontZ * mid, this.stormClimate)
-      const factor = smoothstep(cv.minTemperature, cv.minTemperature + 12, c.temperature + this.options.temperatureOffset) * smoothstep(0.15, 0.65, c.moisture) * (c.water ? 0.6 : 1)
+      const factor =
+        smoothstep(cv.minTemperature, cv.minTemperature + 12, c.temperature + this.options.temperatureOffset) *
+        smoothstep(0.15, 0.65, c.moisture) *
+        (c.water ? 0.6 : 1)
       if (roll < cv.chance * factor) {
         storm = {
-          cx, cz,
+          cx,
+          cz,
           r: Math.min(S * 0.25, cv.radius * (0.6 + 0.8 * hash01(i, j, e, this.seed + 75))),
-          strength: 0.5 + 0.5 * hash01(i, j, e, this.seed + 76),
+          strength: 0.5 + 0.5 * hash01(i, j, e, this.seed + 76)
         }
       }
     }
@@ -517,23 +633,27 @@ export class Weather {
     this.stormLightning = 0
     const cv = this.options.storms
     if (!cv.enabled || cv.chance <= 0) return
-    const S = cv.spacing, T = cv.lifetime
-    const ci = Math.floor(ax / S), cj = Math.floor(az / S)
-    for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) {
-      const phase = this.phase(i, j)
-      const e = Math.floor((time + phase) / T)
-      const s = this.storm(i, j, e, phase)
-      if (!s) continue
-      const dx = ax - s.cx, dz = az - s.cz
-      const d2 = dx * dx + dz * dz
-      const r2 = s.r * s.r
-      if (d2 > 9 * r2) continue
-      const life = Math.sin(Math.PI * ((time + phase) / T - e)) ** 2
-      const a = s.strength * life
-      this.stormIntensity = Math.max(this.stormIntensity, a * Math.exp(-d2 / r2))
-      // Strike density of a Gaussian with σ = r / 2 (matches `strikes`), per km².
-      const sigma2 = r2 * 0.25
-      this.stormLightning += ((cv.lightning * a * Math.exp(-d2 / (2 * sigma2))) / (2 * Math.PI * sigma2)) * 1e6
-    }
+    const S = cv.spacing,
+      T = cv.lifetime
+    const ci = Math.floor(ax / S),
+      cj = Math.floor(az / S)
+    for (let j = cj - 1; j <= cj + 1; j++)
+      for (let i = ci - 1; i <= ci + 1; i++) {
+        const phase = this.phase(i, j)
+        const e = Math.floor((time + phase) / T)
+        const s = this.storm(i, j, e, phase)
+        if (!s) continue
+        const dx = ax - s.cx,
+          dz = az - s.cz
+        const d2 = dx * dx + dz * dz
+        const r2 = s.r * s.r
+        if (d2 > 9 * r2) continue
+        const life = Math.sin(Math.PI * ((time + phase) / T - e)) ** 2
+        const a = s.strength * life
+        this.stormIntensity = Math.max(this.stormIntensity, a * Math.exp(-d2 / r2))
+        // Strike density of a Gaussian with σ = r / 2 (matches `strikes`), per km².
+        const sigma2 = r2 * 0.25
+        this.stormLightning += ((cv.lightning * a * Math.exp(-d2 / (2 * sigma2))) / (2 * Math.PI * sigma2)) * 1e6
+      }
   }
 }

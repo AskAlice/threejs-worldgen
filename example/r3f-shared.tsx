@@ -24,7 +24,11 @@ export type V3 = [number, number, number]
  * Renders `scene` into `#root` on a WebGPURenderer (`?webgl` forces the WebGL backend), as the grass R3F demo does.
  * `renderer` settings (e.g. the three.js sandbox's tone mapping) are applied once it is created.
  */
-export function mount(scene: ReactNode, camera: CameraProps, renderer: Partial<Pick<THREE.WebGPURenderer, 'toneMapping' | 'toneMappingExposure'>> = {}) {
+export function mount(
+  scene: ReactNode,
+  camera: CameraProps,
+  renderer: Partial<Pick<THREE.WebGPURenderer, 'toneMapping' | 'toneMappingExposure'>> = {}
+) {
   Object.assign(window, { levaStore }) // for the console: levaStore.setValueAtPath('City.facade.facade/night', 1, true)
   createRoot(document.getElementById('root')!).render(
     <Canvas
@@ -33,19 +37,30 @@ export function mount(scene: ReactNode, camera: CameraProps, renderer: Partial<P
       camera={camera}
       onCreated={({ gl }) => void Object.assign(gl, renderer)}
       gl={async (props) => {
-        const renderer = new THREE.WebGPURenderer({ ...(props as any), antialias: true, forceWebGL: location.search.includes('webgl') })
+        const renderer = new THREE.WebGPURenderer({
+          ...(props as any),
+          antialias: true,
+          forceWebGL: location.search.includes('webgl')
+        })
         await renderer.init()
         return renderer
       }}
     >
       {scene}
-    </Canvas>,
+    </Canvas>
   )
 }
 
 /** leva controls for a package's JSON options (see {@link levaSchema}), returned nested, ready to spread onto the package's component. */
-export function useOptions(name: string, defaults: object, opts: SchemaOptions = {}, collapsed = false): Record<string, any> {
-  const [values] = useControls(name, () => levaSchema(defaults, folder, opts) as any, { collapsed }, []) as unknown as [Record<string, unknown>]
+export function useOptions(
+  name: string,
+  defaults: object,
+  opts: SchemaOptions = {},
+  collapsed = false
+): Record<string, any> {
+  const [values] = useControls(name, () => levaSchema(defaults, folder, opts) as any, { collapsed }, []) as unknown as [
+    Record<string, unknown>
+  ]
   return nest(values)
 }
 
@@ -55,7 +70,11 @@ export function useOptions(name: string, defaults: object, opts: SchemaOptions =
  * is named after the class (or `folder`, for one folder per instance); scripts/options-coverage.mjs checks every class
  * a manifest's `r3f` lists this way.
  */
-export function useSpec(name: string, spec: PanelClassSpec, { collapsed = false, folder = name }: { collapsed?: boolean; folder?: string } = {}): Record<string, any> {
+export function useSpec(
+  name: string,
+  spec: PanelClassSpec,
+  { collapsed = false, folder = name }: { collapsed?: boolean; folder?: string } = {}
+): Record<string, any> {
   return useOptions(folder, (spec.target ?? spec.defaults) as object, specSchema(spec), collapsed)
 }
 
@@ -80,7 +99,12 @@ export function Backdrop({ color, fog }: { color: string; fog?: [near: number, f
   const scene = useThree((s) => s.scene)
   useEffect(() => {
     scene.background = new THREE.Color(color)
-    scene.fog = fog === undefined ? null : typeof fog === 'number' ? new THREE.FogExp2(color, fog) : new THREE.Fog(color, fog[0], fog[1])
+    scene.fog =
+      fog === undefined
+        ? null
+        : typeof fog === 'number'
+          ? new THREE.FogExp2(color, fog)
+          : new THREE.Fog(color, fog[0], fog[1])
     return () => void ((scene.background = null), (scene.fog = null))
   }, [scene, color, JSON.stringify(fog)])
   return null
@@ -97,10 +121,21 @@ export function useHud(text: () => string) {
   })
 }
 
-const DAY = new THREE.Color('#9cc4e4'), NIGHT = new THREE.Color('#0b1020')
+const DAY = new THREE.Color('#9cc4e4'),
+  NIGHT = new THREE.Color('#0b1020')
 
 /** Sky colour, fog, a shadow-casting sun over `target` (shadows cover ±`extent` m) and sky light; `night` 0…1 dims it all. */
-export function Daylight({ night = 0, target = [0, 0, 0], extent = 200, fog }: { night?: number; target?: V3; extent?: number; fog?: [near: number, far: number] }) {
+export function Daylight({
+  night = 0,
+  target = [0, 0, 0],
+  extent = 200,
+  fog
+}: {
+  night?: number
+  target?: V3
+  extent?: number
+  fog?: [near: number, far: number]
+}) {
   const scene = useThree((s) => s.scene)
   const sun = useRef<THREE.DirectionalLight>(null)
   const [aim] = useState(() => new THREE.Object3D())
@@ -118,7 +153,15 @@ export function Daylight({ night = 0, target = [0, 0, 0], extent = 200, fog }: {
   return (
     <>
       <primitive object={aim} position={target} />
-      <directionalLight ref={sun} target={aim} position={[x - extent * 0.8, y + extent * 2, z - extent * 0.6]} color="#fff1dc" intensity={3 * (1 - night) + 0.05} castShadow shadow-mapSize={[2048, 2048]} />
+      <directionalLight
+        ref={sun}
+        target={aim}
+        position={[x - extent * 0.8, y + extent * 2, z - extent * 0.6]}
+        color="#fff1dc"
+        intensity={3 * (1 - night) + 0.05}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+      />
       <hemisphereLight color="#cfe3ff" groundColor="#5a5040" intensity={1.2 * (1 - night * 0.85)} />
     </>
   )
@@ -135,7 +178,19 @@ export function View({ position, target }: { position: V3; target: V3 }) {
  * Terrain and water over a `size` m square around `center` (frame-local [x, z]), coloured by the world's
  * ground mix like the three.js demos. Rebuilt when the world changes (e.g. a city flattening its site).
  */
-export function Ground({ world, center, size, segments = 200, waterOpacity = 0.85 }: { world: World; center: [number, number]; size: number; segments?: number; waterOpacity?: number }) {
+export function Ground({
+  world,
+  center,
+  size,
+  segments = 200,
+  waterOpacity = 0.85
+}: {
+  world: World
+  center: [number, number]
+  size: number
+  segments?: number
+  waterOpacity?: number
+}) {
   const [version, setVersion] = useState(0)
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -145,7 +200,10 @@ export function Ground({ world, center, size, segments = 200, waterOpacity = 0.8
     })
     return () => (clearTimeout(timer), off())
   }, [world])
-  const { terrain, water } = useMemo(() => worldGround(world, center, size, segments), [world, center[0], center[1], size, segments, version])
+  const { terrain, water } = useMemo(
+    () => worldGround(world, center, size, segments),
+    [world, center[0], center[1], size, segments, version]
+  )
   useEffect(() => () => (terrain.dispose(), water.dispose()), [terrain, water])
   return (
     <>
@@ -153,7 +211,14 @@ export function Ground({ world, center, size, segments = 200, waterOpacity = 0.8
         <meshStandardNodeMaterial vertexColors roughness={0.95} />
       </mesh>
       <mesh geometry={water}>
-        <meshStandardNodeMaterial color="#3a6f8f" roughness={0.08} metalness={0.1} transparent opacity={waterOpacity} depthWrite={waterOpacity > 0.5} />
+        <meshStandardNodeMaterial
+          color="#3a6f8f"
+          roughness={0.08}
+          metalness={0.1}
+          transparent
+          opacity={waterOpacity}
+          depthWrite={waterOpacity > 0.5}
+        />
       </mesh>
     </>
   )

@@ -2,18 +2,46 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Object3D } from 'three/webgpu'
 import { World, type LocalFrame } from 'threejs-biomes'
-import { AssetRegistry, editDistance, fuzzyScore, isPlausible, placeAsset, planSpawns, type AssetDef, type PlacementRule } from '../src/assets.ts'
+import {
+  AssetRegistry,
+  editDistance,
+  fuzzyScore,
+  isPlausible,
+  placeAsset,
+  planSpawns,
+  type AssetDef,
+  type PlacementRule
+} from '../src/assets.ts'
 
-const make = (id: string, name: string, category: string, tags: string[], placement: AssetDef['placement'], aliases: string[] = []): AssetDef =>
-  ({ id, name, package: 'test', category, tags, aliases, params: {}, placement, create: () => new Object3D() })
+const make = (
+  id: string,
+  name: string,
+  category: string,
+  tags: string[],
+  placement: AssetDef['placement'],
+  aliases: string[] = []
+): AssetDef => ({
+  id,
+  name,
+  package: 'test',
+  category,
+  tags,
+  aliases,
+  params: {},
+  placement,
+  create: () => new Object3D()
+})
 
 const registry = new AssetRegistry().register(
-  make('trees/redwood', 'Redwood', 'tree', ['conifer', 'giant'], { surface: 'ground', slope: [0, 0.6] }, ['sequoia', 'big tree']),
+  make('trees/redwood', 'Redwood', 'tree', ['conifer', 'giant'], { surface: 'ground', slope: [0, 0.6] }, [
+    'sequoia',
+    'big tree'
+  ]),
   make('trees/palm', 'Palm tree', 'tree', ['tropical', 'coast'], { surface: 'ground' }),
   make('city/skyscraper', 'Skyscraper', 'building', ['tower', 'office'], { surface: 'ground' }),
   make('fauna/trout', 'Trout', 'fish', ['freshwater'], { surface: 'underwater', depth: [0.5, 100] }),
   make('plants/cactus', 'Cactus', 'plant', ['desert'], { surface: 'ground', biomes: ['desert'] }, ['succulent']),
-  make('vehicles/fishing-boat', 'Fishing boat', 'vehicle', ['boat', 'sea'], { surface: 'water', depth: [2, 1000] }),
+  make('vehicles/fishing-boat', 'Fishing boat', 'vehicle', ['boat', 'sea'], { surface: 'water', depth: [2, 1000] })
 )
 
 test('fuzzy search tolerates typos and partial words', () => {
@@ -47,9 +75,18 @@ test('search matches aliases like tags', () => {
 })
 
 test('filters narrow by category, placement kind, package and biome', () => {
-  assert.deepEqual(registry.list({ category: 'tree' }).map((a) => a.id), ['trees/redwood', 'trees/palm'])
-  assert.deepEqual(registry.list({ surface: 'water' }).map((a) => a.id), ['vehicles/fishing-boat'])
-  assert.deepEqual(registry.list({ surface: 'underwater' }).map((a) => a.id), ['fauna/trout'])
+  assert.deepEqual(
+    registry.list({ category: 'tree' }).map((a) => a.id),
+    ['trees/redwood', 'trees/palm']
+  )
+  assert.deepEqual(
+    registry.list({ surface: 'water' }).map((a) => a.id),
+    ['vehicles/fishing-boat']
+  )
+  assert.deepEqual(
+    registry.list({ surface: 'underwater' }).map((a) => a.id),
+    ['fauna/trout']
+  )
   assert.equal(registry.list({ package: 'test' }).length, registry.list().length)
   assert.ok(!registry.list({ biome: 'tundra' }).some((a) => a.id === 'plants/cactus'))
   assert.ok(registry.list({ biome: 'desert' }).some((a) => a.id === 'plants/cactus'))
@@ -57,9 +94,15 @@ test('filters narrow by category, placement kind, package and biome', () => {
 })
 
 test('search honours the same filters', () => {
-  assert.deepEqual(registry.search('boat', 50, { surface: 'water' }).map((m) => m.asset.id), ['vehicles/fishing-boat'])
+  assert.deepEqual(
+    registry.search('boat', 50, { surface: 'water' }).map((m) => m.asset.id),
+    ['vehicles/fishing-boat']
+  )
   assert.equal(registry.search('boat', 50, { surface: 'ground' }).length, 0)
-  assert.deepEqual(registry.search('', 50, { category: 'fish' }).map((m) => m.asset.id), ['fauna/trout'])
+  assert.deepEqual(
+    registry.search('', 50, { category: 'fish' }).map((m) => m.asset.id),
+    ['fauna/trout']
+  )
   assert.equal(registry.search('', 2).length, 2, 'limit applies to an empty query')
 })
 
@@ -95,10 +138,11 @@ test('placeAsset snaps to the ground and is deterministic, and refuses implausib
 
 /** The first frame-local spot on a coarse grid where `rule` fits, on land when `wet` is false. */
 function spot(world: World, frame: LocalFrame, rule: PlacementRule, wet: boolean): [number, number] | undefined {
-  for (let x = -5000; x <= 5000; x += 250) for (let z = -5000; z <= 5000; z += 250) {
-    const s = frame.sample(x, z)
-    if ((!Number.isNaN(s.waterLevel) && s.waterLevel > s.elevation) !== wet) continue
-    if (isPlausible(world, frame, x, z, rule)) return [x, z]
-  }
+  for (let x = -5000; x <= 5000; x += 250)
+    for (let z = -5000; z <= 5000; z += 250) {
+      const s = frame.sample(x, z)
+      if ((!Number.isNaN(s.waterLevel) && s.waterLevel > s.elevation) !== wet) continue
+      if (isPlausible(world, frame, x, z, rule)) return [x, z]
+    }
   return undefined
 }

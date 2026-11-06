@@ -62,7 +62,14 @@ export interface GroupSpawn {
  * (`yield` after every few samples); the result is the same however it is driven. Use
  * {@link spawnTileNow} to run it to completion.
  */
-export function* spawnTile<S>(ix: number, iz: number, species: Readonly<Record<string, S>>, habitat: Habitat<S>, sampler: FaunaSampler, o: SpawnOptions): Generator<void, GroupSpawn[]> {
+export function* spawnTile<S>(
+  ix: number,
+  iz: number,
+  species: Readonly<Record<string, S>>,
+  habitat: Habitat<S>,
+  sampler: FaunaSampler,
+  o: SpawnOptions
+): Generator<void, GroupSpawn[]> {
   const rand = mulberry32(hash4(o.seed, ix, iz, o.salt))
   const area = (o.tileSize * o.tileSize) / 1e6
   const expected = o.density * area
@@ -74,14 +81,22 @@ export function* spawnTile<S>(ix: number, iz: number, species: Readonly<Record<s
   const out: GroupSpawn[] = []
   for (let k = 0; k < n; k++) {
     // Fixed draws per candidate, so rejecting one never shifts the next.
-    const x = (ix + rand()) * o.tileSize, z = (iz + rand()) * o.tileSize
-    const pick = rand(), sizeRand = rand(), seed = hash4(o.seed, ix, iz, k * 7919 + o.salt)
+    const x = (ix + rand()) * o.tileSize,
+      z = (iz + rand()) * o.tileSize
+    const pick = rand(),
+      sizeRand = rand(),
+      seed = hash4(o.seed, ix, iz, k * 7919 + o.salt)
     sampler.sample(x, z, sample, o.minWavelength)
     let total = 0
     ids.forEach((id, i) => (total += weights[i] = Math.max(0, habitat.suitability(species[id], sample))))
     if (total <= 0) continue
-    let r = pick * Math.max(total, 1), chosen = -1
-    for (let i = 0; i < ids.length; i++) if ((r -= weights[i]) < 0) { chosen = i; break }
+    let r = pick * Math.max(total, 1),
+      chosen = -1
+    for (let i = 0; i < ids.length; i++)
+      if ((r -= weights[i]) < 0) {
+        chosen = i
+        break
+      }
     if (chosen < 0) continue
     const sp = species[ids[chosen]]
     yield
@@ -90,7 +105,8 @@ export function* spawnTile<S>(ix: number, iz: number, species: Readonly<Record<s
     const res = Math.max(3, Math.floor(o.gridResolution))
     const R = Math.max(1, habitat.roam(sp))
     const cell = (2 * R) / (res - 1)
-    const floors = new Float64Array(res * res), tops = new Float64Array(res * res)
+    const floors = new Float64Array(res * res),
+      tops = new Float64Array(res * res)
     for (let j = 0; j < res; j++) {
       for (let i = 0; i < res; i++) {
         sampler.sample(x - R + i * cell, z - R + j * cell, sample, o.minWavelength)
@@ -102,13 +118,20 @@ export function* spawnTile<S>(ix: number, iz: number, species: Readonly<Record<s
     }
     const env = new GridEnvironment(x - R, z - R, cell, res, floors, tops, habitat.minThickness(sp))
     // Home: the centre cell if usable, else the usable cell nearest to it.
-    let hx = NaN, hz = NaN, best = Infinity
+    let hx = NaN,
+      hz = NaN,
+      best = Infinity
     for (let j = 0; j < res - 1; j++) {
       for (let i = 0; i < res - 1; i++) {
-        const cx = x - R + (i + 0.5) * cell, cz = z - R + (j + 0.5) * cell
+        const cx = x - R + (i + 0.5) * cell,
+          cz = z - R + (j + 0.5) * cell
         if (!env.band(cx, cz, band)) continue
         const d = Math.hypot(cx - x, cz - z)
-        if (d < best) { best = d; hx = cx; hz = cz }
+        if (d < best) {
+          best = d
+          hx = cx
+          hz = cz
+        }
       }
     }
     if (!(best < R)) continue
@@ -119,14 +142,21 @@ export function* spawnTile<S>(ix: number, iz: number, species: Readonly<Record<s
       seed,
       count: Math.max(1, Math.round(lo + (hi - lo) * sizeRand)),
       home: [hx, (band.floor + band.top) * 0.5, hz],
-      environment: env,
+      environment: env
     })
   }
   return out
 }
 
 /** Runs {@link spawnTile} to completion. */
-export function spawnTileNow<S>(ix: number, iz: number, species: Readonly<Record<string, S>>, habitat: Habitat<S>, sampler: FaunaSampler, o: SpawnOptions): GroupSpawn[] {
+export function spawnTileNow<S>(
+  ix: number,
+  iz: number,
+  species: Readonly<Record<string, S>>,
+  habitat: Habitat<S>,
+  sampler: FaunaSampler,
+  o: SpawnOptions
+): GroupSpawn[] {
   const g = spawnTile(ix, iz, species, habitat, sampler, o)
   for (;;) {
     const step = g.next()

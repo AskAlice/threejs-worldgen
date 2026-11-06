@@ -3,7 +3,14 @@ import { hash01, hash4, seedOf } from 'threejs-biomes'
 import { InstanceStates, type MaterialStates } from 'threejs-weathering'
 import { createWaves, sampleWaves, type Wave, type WaveOptions, type WaveSample } from 'threejs-water'
 import { rgb } from './mesh.ts'
-import { buildVehicle, VEHICLE_KINDS, type VehicleModel, type VehicleParams, type VehicleParamsOf, type VehicleType } from './models.ts'
+import {
+  buildVehicle,
+  VEHICLE_KINDS,
+  type VehicleModel,
+  type VehicleParams,
+  type VehicleParamsOf,
+  type VehicleType
+} from './models.ts'
 import { Path, RoadNavigator, circlePoints, createPathSample, type RoadNetwork, type RoadPose } from './paths.ts'
 
 /** Where a group of vehicles goes. Plain JSON. */
@@ -17,7 +24,14 @@ export type RouteSpec =
   /** Parked in a row along x from `position` (galleries, car parks); parts still animate with speed. */
   | { kind: 'static'; position: [x: number, y: number, z: number]; heading?: number; spacing?: number }
   /** Rocket launch pad: countdown, launch, stage separation, repeat every `period` seconds. */
-  | { kind: 'pad'; position: [x: number, y: number, z: number]; heading?: number; period?: number; delay?: number; countdown?: number }
+  | {
+      kind: 'pad'
+      position: [x: number, y: number, z: number]
+      heading?: number
+      period?: number
+      delay?: number
+      countdown?: number
+    }
   /** Parked on the host spots of another group's vehicles (jets on a carrier deck). */
   | { kind: 'host'; group: number }
 
@@ -46,7 +60,10 @@ export interface FleetGroup {
  * unknown key or a wrong value type is a compile error. `FleetGroup` stays loose when the type is only known
  * at runtime.
  */
-export type FleetGroupOf<K extends VehicleType> = Omit<FleetGroup, 'type' | 'params'> & { type: K; params?: VehicleParamsOf<K> }
+export type FleetGroupOf<K extends VehicleType> = Omit<FleetGroup, 'type' | 'params'> & {
+  type: K
+  params?: VehicleParamsOf<K>
+}
 
 /** How vehicles weather: rain and snow exposure, drying, snow shed at speed, catching fire. */
 export interface ExposureSettings {
@@ -131,7 +148,9 @@ export interface FleetSettings {
 }
 
 /** Recursive partial; arrays are replaced, not merged. */
-export type DeepPartial<T> = { [K in keyof T]?: T[K] extends readonly unknown[] ? T[K] : T[K] extends object | null ? DeepPartial<T[K]> : T[K] }
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends readonly unknown[] ? T[K] : T[K] extends object | null ? DeepPartial<T[K]> : T[K]
+}
 
 /** Partial settings accepted by `Fleet`, `set` and `reset`. */
 export type FleetInput = DeepPartial<FleetSettings>
@@ -153,17 +172,41 @@ export const DEFAULT_FLEET: FleetSettings = {
   receiveShadow: true,
   states: { wetness: 0, snow: 0, burn: 0, damage: 0, heat: 0 },
   exposure: {
-    rain: 0, snowfall: 0, wetRate: 0.4, dryRate: 1 / 300, snowRate: 1 / 40, meltRate: 1 / 600, shedSpeed: 12, shedRate: 0.05,
-    ignition: 0.35, burnRate: 1 / 25, burnTime: 90, fireDamage: 1 / 40, douseTime: 30, stopDamage: 0.6, budget: 400,
+    rain: 0,
+    snowfall: 0,
+    wetRate: 0.4,
+    dryRate: 1 / 300,
+    snowRate: 1 / 40,
+    meltRate: 1 / 600,
+    shedSpeed: 12,
+    shedRate: 0.05,
+    ignition: 0.35,
+    burnRate: 1 / 25,
+    burnTime: 90,
+    fireDamage: 1 / 40,
+    douseTime: 30,
+    stopDamage: 0.6,
+    budget: 400
   },
-  rocket: { accel: 9, turn: 5000, separation: [32, 70], fallTime: 40 },
+  rocket: { accel: 9, turn: 5000, separation: [32, 70], fallTime: 40 }
 }
 
 /** Default cruise speeds (m/s) by type. */
 export const DEFAULT_SPEEDS: Record<VehicleType, [number, number]> = {
-  car: [9, 15], pickup: [9, 15], truck: [14, 24], tractor: [4, 8], bicycle: [4, 7], train: [18, 26],
-  'fishing-boat': [3, 5], 'cruise-liner': [6, 9], speedboat: [12, 20], hovercraft: [10, 15], 'aircraft-carrier': [5, 8],
-  airplane: [70, 85], 'fighter-jet': [140, 190], rocket: [0, 0],
+  car: [9, 15],
+  pickup: [9, 15],
+  truck: [14, 24],
+  tractor: [4, 8],
+  bicycle: [4, 7],
+  train: [18, 26],
+  'fishing-boat': [3, 5],
+  'cruise-liner': [6, 9],
+  speedboat: [12, 20],
+  hovercraft: [10, 15],
+  'aircraft-carrier': [5, 8],
+  airplane: [70, 85],
+  'fighter-jet': [140, 190],
+  rocket: [0, 0]
 }
 
 /** Something with weather on the ground (threejs-weathering `Weather`). */
@@ -212,9 +255,14 @@ export interface RocketState {
  * Analytic gravity-turn ascent: altitude ½·a·t², downrange altitude²/(2·turn), so the rocket rises
  * straight off the pad and pitches over smoothly. Pure, so any instant can be scrubbed to.
  */
-export function rocketAt(t: number, flight: Pick<RocketFlight, 'accel' | 'turn'>, out: RocketState = { altitude: 0, downrange: 0, tilt: 0, vUp: 0, vDown: 0 }): RocketState {
+export function rocketAt(
+  t: number,
+  flight: Pick<RocketFlight, 'accel' | 'turn'>,
+  out: RocketState = { altitude: 0, downrange: 0, tilt: 0, vUp: 0, vDown: 0 }
+): RocketState {
   const tt = Math.max(0, t)
-  const h = 0.5 * flight.accel * tt * tt, vh = flight.accel * tt
+  const h = 0.5 * flight.accel * tt * tt,
+    vh = flight.accel * tt
   out.altitude = h
   out.downrange = (h * h) / (2 * flight.turn)
   out.vUp = vh
@@ -236,7 +284,12 @@ const tmpSample = createPathSample()
 const tmpRoad: RoadPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
 const tmpWave: WaveSample = { height: 0, nx: 0, ny: 1, nz: 0 }
 const tmpRocket: RocketState = { altitude: 0, downrange: 0, tilt: 0, vUp: 0, vDown: 0 }
-const _m = new Matrix4(), _m2 = new Matrix4(), _q = new Quaternion(), _e = new Euler(0, 0, 0, 'YXZ'), _v = new Vector3(), _s = new Vector3(1, 1, 1)
+const _m = new Matrix4(),
+  _m2 = new Matrix4(),
+  _q = new Quaternion(),
+  _e = new Euler(0, 0, 0, 'YXZ'),
+  _v = new Vector3(),
+  _s = new Vector3(1, 1, 1)
 
 const wrap = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
 
@@ -248,8 +301,14 @@ function trailerCount(params: VehicleParams | undefined): number {
 
 /** Number of vehicles a group expands to (trains: locomotive + wagons per unit; trucks: tractor + trailers). */
 export function groupVehicleCount(g: FleetGroup): number {
-  const per = g.type === 'train' ? 1 + Math.max(0, Math.round(Number(g.params?.wagons ?? VEHICLE_KINDS.train.params.wagons.default)))
-    : g.type === 'truck' ? 1 + trailerCount(g.params) : g.type === 'tractor' && g.params?.implement === 'trailer' ? 2 : 1
+  const per =
+    g.type === 'train'
+      ? 1 + Math.max(0, Math.round(Number(g.params?.wagons ?? VEHICLE_KINDS.train.params.wagons.default)))
+      : g.type === 'truck'
+        ? 1 + trailerCount(g.params)
+        : g.type === 'tractor' && g.params?.implement === 'trailer'
+          ? 2
+          : 1
   return Math.max(0, Math.floor(g.count)) * per
 }
 
@@ -321,7 +380,11 @@ export class FleetSim {
   private cursor = 0
 
   /** Builds every model and places every vehicle at time 0. */
-  constructor(settings: FleetSettings, roads: RoadNetwork | null = null, height: ((x: number, z: number) => number) | null = null) {
+  constructor(
+    settings: FleetSettings,
+    roads: RoadNetwork | null = null,
+    height: ((x: number, z: number) => number) | null = null
+  ) {
     this.settings = settings
     this.roads = roads
     this.height = height
@@ -338,8 +401,13 @@ export class FleetSim {
       return i
     }
     // Expand groups → units → vehicles.
-    const vModel: number[] = [], vGroup: number[] = [], vUnit: number[] = [], vOffset: number[] = [], vTint: number[] = []
-    const unitLeader: number[] = [], unitCruise: number[] = []
+    const vModel: number[] = [],
+      vGroup: number[] = [],
+      vUnit: number[] = [],
+      vOffset: number[] = [],
+      vTint: number[] = []
+    const unitLeader: number[] = [],
+      unitCruise: number[] = []
     settings.groups.forEach((spec, g) => {
       const rt: GroupRuntime = { spec, units: [], vehicles: [], path: null, nav: null }
       this.groups.push(rt)
@@ -365,9 +433,13 @@ export class FleetSim {
         } else if (spec.type === 'truck') {
           members.push({ type: 'truck', params: { ...params, piece: 'tractor' }, salt: 0 })
           const n = trailerCount(params)
-          for (let w = 0; w < n; w++) members.push({ type: 'truck', params: { ...params, piece: 'trailer', slot: w, trailers: n }, salt: w + 1 })
+          for (let w = 0; w < n; w++)
+            members.push({ type: 'truck', params: { ...params, piece: 'trailer', slot: w, trailers: n }, salt: w + 1 })
         } else if (spec.type === 'tractor' && params.implement === 'trailer') {
-          members.push({ type: 'tractor', params, salt: 0 }, { type: 'tractor', params: { ...params, piece: 'trailer' }, salt: 1 })
+          members.push(
+            { type: 'tractor', params, salt: 0 },
+            { type: 'tractor', params: { ...params, piece: 'trailer' }, salt: 1 }
+          )
         } else members.push({ type: spec.type, params, salt: 0 })
         let behind = 0
         members.forEach((mem, k) => {
@@ -375,7 +447,10 @@ export class FleetSim {
           const mi = modelOf(mem.type, mem.params, hash4(seed, g, variant, mem.salt + 0x11))
           const len = this.models[mi].size[2]
           if (k > 0) behind += len / 2 + 0.8
-          vModel.push(mi); vGroup.push(g); vUnit.push(unit); vOffset.push(behind)
+          vModel.push(mi)
+          vGroup.push(g)
+          vUnit.push(unit)
+          vOffset.push(behind)
           behind += len / 2
           const palette = this.models[mi].palette
           const hex = spec.tint || palette[hash4(seed, g, u, mem.salt * 31 + 0x3) % palette.length]
@@ -418,7 +493,10 @@ export class FleetSim {
       if (r.kind === 'circle') rt.path = new Path(circlePoints(r.center, r.radius, 64, r.clockwise), true, 1)
       if (rt.path) {
         const L = rt.path.length
-        rt.units.forEach((u, k) => { this.unitS[u] = (k / Math.max(1, rt.units.length)) * L + hash01(seed, g, k, 0x9) * (L / Math.max(1, rt.units.length)) * 0.3 })
+        rt.units.forEach((u, k) => {
+          this.unitS[u] =
+            (k / Math.max(1, rt.units.length)) * L + hash01(seed, g, k, 0x9) * (L / Math.max(1, rt.units.length)) * 0.3
+        })
       }
       if (r.kind === 'roads') this.placeOnRoads(rt, g)
       if (rt.path) for (const u of rt.units) this.primeTrailers(u, rt)
@@ -431,18 +509,23 @@ export class FleetSim {
    * to its start over the length of the rig, so the trailers start on the path, not straight behind.
    */
   private primeTrailers(u: number, rt: GroupRuntime): void {
-    const lead = this.unitLeader[u], n = this.count
-    if (lead + 1 >= n || this.unit[lead + 1] !== u || !this.models[this.model[lead + 1]].hitch?.kingpin || !rt.path) return
+    const lead = this.unitLeader[u],
+      n = this.count
+    if (lead + 1 >= n || this.unit[lead + 1] !== u || !this.models[this.model[lead + 1]].hitch?.kingpin || !rt.path)
+      return
     let span = 0
     for (let v = lead; v < n && this.unit[v] === u; v++) span += this.models[this.model[v]].size[2]
-    const p = this.pose, lane = rt.spec.lane ?? 0
+    const p = this.pose,
+      lane = rt.spec.lane ?? 0
     // On an open path, walking back past its start would reflect the walk (the tractor would reverse
     // mid-priming): start no earlier than the path's start; the rest of the rig is seeded straight behind.
     const back = rt.path.closed ? span + 10 : Math.min(span + 10, Math.max(0, this.unitS[u]))
     for (let d = back; d >= 0; d -= 0.5) {
       const ps = rt.path.sample(this.unitS[u] - d, tmpSample)
       const hl = Math.hypot(ps.tx, ps.tz) || 1
-      p[lead * 8] = ps.x - (ps.tz / hl) * lane; p[lead * 8 + 1] = ps.y; p[lead * 8 + 2] = ps.z + (ps.tx / hl) * lane
+      p[lead * 8] = ps.x - (ps.tz / hl) * lane
+      p[lead * 8 + 1] = ps.y
+      p[lead * 8 + 2] = ps.z + (ps.tx / hl) * lane
       p[lead * 8 + 3] = Math.atan2(ps.tx, ps.tz)
       for (let v = lead + 1; v < n && this.unit[v] === u; v++) this.placeTrailer(v)
     }
@@ -453,39 +536,66 @@ export class FleetSim {
    * and its axle is dragged towards it (a tractrix), so trailers cut inside on turns (off-tracking).
    */
   private placeTrailer(v: number): void {
-    const p = this.pose, prev = v - 1, po = prev * 8, o = v * 8
-    const pm = this.models[this.model[prev]], m = this.models[this.model[v]]
+    const p = this.pose,
+      prev = v - 1,
+      po = prev * 8,
+      o = v * 8
+    const pm = this.models[this.model[prev]],
+      m = this.models[this.model[v]]
     const c = pm.hitch?.coupling ?? -pm.size[2] / 2
     const yawP = p[po + 3]
-    const hx = p[po] + Math.sin(yawP) * c, hz = p[po + 2] + Math.cos(yawP) * c
-    const kp = m.hitch?.kingpin ?? 0, len = Math.max(0.5, kp - (m.hitch?.axle ?? 0))
+    const hx = p[po] + Math.sin(yawP) * c,
+      hz = p[po + 2] + Math.cos(yawP) * c
+    const kp = m.hitch?.kingpin ?? 0,
+      len = Math.max(0.5, kp - (m.hitch?.axle ?? 0))
     const t = this.trail
     // The tractrix is only stable when pulled: when the axle is not behind the hitch along the heading
     // in front (first placement, or the rig turned round at the end of an open path), seed it straight behind.
     if (!(t[v * 2] === t[v * 2]) || (hx - t[v * 2]) * Math.sin(yawP) + (hz - t[v * 2 + 1]) * Math.cos(yawP) <= 0) {
-      t[v * 2] = hx - Math.sin(yawP) * len; t[v * 2 + 1] = hz - Math.cos(yawP) * len
+      t[v * 2] = hx - Math.sin(yawP) * len
+      t[v * 2 + 1] = hz - Math.cos(yawP) * len
     }
-    const dx = hx - t[v * 2], dz = hz - t[v * 2 + 1], d = Math.hypot(dx, dz) || 1
-    t[v * 2] = hx - (dx / d) * len; t[v * 2 + 1] = hz - (dz / d) * len
+    const dx = hx - t[v * 2],
+      dz = hz - t[v * 2 + 1],
+      d = Math.hypot(dx, dz) || 1
+    t[v * 2] = hx - (dx / d) * len
+    t[v * 2 + 1] = hz - (dz / d) * len
     const yaw = Math.atan2(dx, dz)
-    p[o] = hx - Math.sin(yaw) * kp; p[o + 1] = p[po + 1]; p[o + 2] = hz - Math.cos(yaw) * kp
-    p[o + 3] = yaw; p[o + 4] = 0; p[o + 5] = 0; p[o + 6] = 0; p[o + 7] = p[po + 7]
+    p[o] = hx - Math.sin(yaw) * kp
+    p[o + 1] = p[po + 1]
+    p[o + 2] = hz - Math.cos(yaw) * kp
+    p[o + 3] = yaw
+    p[o + 4] = 0
+    p[o + 5] = 0
+    p[o + 6] = 0
+    p[o + 7] = p[po + 7]
     this.setAnchor(v, p[o], p[o + 1], p[o + 2], yaw)
   }
 
   private placeOnRoads(rt: GroupRuntime, g: number): void {
     if (!this.roads) return
     for (const v of rt.vehicles) this.trail[v * 2] = this.trail[v * 2 + 1] = NaN
-    const nav = (rt.nav = new RoadNavigator(this.roads, rt.units.length, hash4(seedOf(this.settings.seed), g, 0, 0x60ad)))
+    const nav = (rt.nav = new RoadNavigator(
+      this.roads,
+      rt.units.length,
+      hash4(seedOf(this.settings.seed), g, 0, 0x60ad)
+    ))
     nav.leftHand = this.settings.leftHand
     nav.height = this.height
-    rt.units.forEach((u, k) => { if (nav.place(k)) this.navSlot[u] = k })
+    rt.units.forEach((u, k) => {
+      if (nav.place(k)) this.navSlot[u] = k
+    })
   }
 
   /** Swaps the road network (re-places `roads` groups). */
   setRoads(roads: RoadNetwork | null): void {
     this.roads = roads
-    this.groups.forEach((rt, g) => { if (rt.spec.route.kind === 'roads') { rt.nav = null; this.placeOnRoads(rt, g) } })
+    this.groups.forEach((rt, g) => {
+      if (rt.spec.route.kind === 'roads') {
+        rt.nav = null
+        this.placeOnRoads(rt, g)
+      }
+    })
   }
 
   /** Changes the waves boats bob on. */
@@ -556,20 +666,33 @@ export class FleetSim {
     const p = this.pose
     const o = v * 8
     const model = this.models[this.model[v]]
-    if (model.hitch?.kingpin !== undefined && v !== this.unitLeader[u]) return this.placeTrailer(v)
+    if (model.hitch?.kingpin !== undefined && v !== this.unitLeader[u]) {
+      this.placeTrailer(v)
+      return
+    }
     let rate = NaN
-    let x = 0, y = 0, z = 0, yaw = 0, pitch = 0, roll = 0, throttle = Math.min(1, this.speed[v] / Math.max(1, this.unitCruise[u]))
+    let x = 0,
+      y = 0,
+      z = 0,
+      yaw = 0,
+      pitch = 0,
+      roll = 0,
+      throttle = Math.min(1, this.speed[v] / Math.max(1, this.unitCruise[u]))
     switch (route.kind) {
-      case 'path': case 'circle': {
+      case 'path':
+      case 'circle': {
         if (!rt.path) break
         const ps = rt.path.sample(this.unitS[u] - this.offset[v], tmpSample)
         const lane = rt.spec.lane ?? 0
         const hl = Math.hypot(ps.tx, ps.tz) || 1
-        x = ps.x - (ps.tz / hl) * lane; y = ps.y; z = ps.z + (ps.tx / hl) * lane
+        x = ps.x - (ps.tz / hl) * lane
+        y = ps.y
+        z = ps.z + (ps.tx / hl) * lane
         yaw = Math.atan2(ps.tx, ps.tz)
         pitch = Math.asin(Math.max(-1, Math.min(1, ps.ty)))
         // Turn rate from the path's curvature (look-ahead), not frame differences: smooth on polylines.
-        const d = Math.max(3, this.speed[v] * 0.8), at = this.unitS[u] - this.offset[v]
+        const d = Math.max(3, this.speed[v] * 0.8),
+          at = this.unitS[u] - this.offset[v]
         const ahead = rt.path.sample(at + d, tmpSample)
         const ya = Math.atan2(ahead.tx, ahead.tz)
         const behind = rt.path.sample(at - d, tmpSample)
@@ -580,12 +703,18 @@ export class FleetSim {
         const slot = this.navSlot[u]
         if (!rt.nav || slot < 0) break
         rt.nav.pose(slot, tmpRoad)
-        x = tmpRoad.x; y = tmpRoad.y; z = tmpRoad.z; yaw = tmpRoad.yaw; pitch = tmpRoad.pitch
+        x = tmpRoad.x
+        y = tmpRoad.y
+        z = tmpRoad.z
+        yaw = tmpRoad.yaw
+        pitch = tmpRoad.pitch
         break
       }
       case 'static': {
-        const h = route.heading ?? 0, spacing = route.spacing ?? Math.max(4, model.size[0] * 1.5)
-        const along = -this.offset[v], across = k * spacing
+        const h = route.heading ?? 0,
+          spacing = route.spacing ?? Math.max(4, model.size[0] * 1.5)
+        const along = -this.offset[v],
+          across = k * spacing
         x = route.position[0] + Math.sin(h) * along + Math.cos(h) * across
         y = route.position[1]
         z = route.position[2] + Math.cos(h) * along - Math.sin(h) * across
@@ -593,14 +722,19 @@ export class FleetSim {
         break
       }
       case 'pad': {
-        const h = route.heading ?? 0, period = route.period ?? 120, countdown = route.countdown ?? 10
+        const h = route.heading ?? 0,
+          period = route.period ?? 120,
+          countdown = route.countdown ?? 10
         const units = rt.units.length
         const t = ((((this.time - (route.delay ?? 0) - (k / units) * period) % period) + period) % period) - countdown
         this.flightTime[v] = t
         const f = rocketAt(t, this.settings.rocket, tmpRocket)
-        const px = route.position[0] + k * 120 * Math.cos(h), pz = route.position[2] - k * 120 * Math.sin(h)
+        const px = route.position[0] + k * 120 * Math.cos(h),
+          pz = route.position[2] - k * 120 * Math.sin(h)
         this.setAnchor(v, px, route.position[1], pz, h)
-        x = px + Math.sin(h) * f.downrange; y = route.position[1] + f.altitude; z = pz + Math.cos(h) * f.downrange
+        x = px + Math.sin(h) * f.downrange
+        y = route.position[1] + f.altitude
+        z = pz + Math.cos(h) * f.downrange
         yaw = h
         pitch = -f.tilt // stored as a nose-up angle; for a rocket standing on its tail, "nose up" tilts the top downrange
         throttle = t > -2 ? Math.min(1, (t + 2) / 2) : 0
@@ -610,18 +744,40 @@ export class FleetSim {
       case 'host': {
         const host = this.groups[route.kind === 'host' ? route.group : -1]
         if (!host || !host.vehicles.length) break
-        const hv = host.vehicles[Math.floor(k / Math.max(1, this.models[this.model[host.vehicles[0]]].hosts.length || 1)) % host.vehicles.length]
+        const hv =
+          host.vehicles[
+            Math.floor(k / Math.max(1, this.models[this.model[host.vehicles[0]]].hosts.length || 1)) %
+              host.vehicles.length
+          ]
         const spots = this.models[this.model[hv]].hosts
         const spot = spots.length ? spots[k % spots.length] : { position: [0, 0, 0] as const, yaw: 0 }
         const ho = hv * 8
-        _m.compose(_v.set(p[ho], p[ho + 1], p[ho + 2]), _q.setFromEuler(_e.set(p[ho + 4], p[ho + 3], p[ho + 5], 'YXZ')), _s.set(1, 1, 1))
-        _m2.makeRotationY(spot.yaw).setPosition(spot.position[0], spot.position[1] - (model.parts[0].mesh.bounds[1] ?? 0), spot.position[2])
+        _m.compose(
+          _v.set(p[ho], p[ho + 1], p[ho + 2]),
+          _q.setFromEuler(_e.set(p[ho + 4], p[ho + 3], p[ho + 5], 'YXZ')),
+          _s.set(1, 1, 1)
+        )
+        _m2
+          .makeRotationY(spot.yaw)
+          .setPosition(spot.position[0], spot.position[1] - (model.parts[0].mesh.bounds[1] ?? 0), spot.position[2])
         _m.multiply(_m2)
         _m.decompose(_v, _q, _s)
         _e.setFromQuaternion(_q, 'YXZ')
-        x = _v.x; y = _v.y; z = _v.z; yaw = _e.y; pitch = -_e.x; roll = _e.z
+        x = _v.x
+        y = _v.y
+        z = _v.z
+        yaw = _e.y
+        pitch = -_e.x
+        roll = _e.z
         throttle = 0
-        p[o] = x; p[o + 1] = y; p[o + 2] = z; p[o + 3] = yaw; p[o + 4] = -pitch; p[o + 5] = roll; p[o + 6] = 0; p[o + 7] = 0
+        p[o] = x
+        p[o + 1] = y
+        p[o + 2] = z
+        p[o + 3] = yaw
+        p[o + 4] = -pitch
+        p[o + 5] = roll
+        p[o + 6] = 0
+        p[o + 7] = 0
         this.setAnchor(v, x, y, z, yaw)
         return
       }
@@ -633,17 +789,24 @@ export class FleetSim {
     this.prevYaw[v] = yaw
     this.turn[v] += (rate - this.turn[v]) * Math.min(1, dt * 4)
     const speed = this.speed[v]
-    const steer = model.wheelBase > 0 ? Math.max(-0.6, Math.min(0.6, Math.atan((model.wheelBase * this.turn[v]) / Math.max(speed, 0.5)))) : 0
+    const steer =
+      model.wheelBase > 0
+        ? Math.max(-0.6, Math.min(0.6, Math.atan((model.wheelBase * this.turn[v]) / Math.max(speed, 0.5))))
+        : 0
     roll -= Math.max(-1.2, Math.min(1.2, Math.atan((speed * this.turn[v]) / G))) * model.bank
     // Boats: heave, pitch and roll from the waves under bow, stern and both sides.
     if (model.domain === 'sea') {
       const hover = model.type === 'hovercraft'
       if (this.waves.length) {
-        const hl = model.size[2] * 0.4, hw = model.size[0] * 0.4
-        const fx = Math.sin(yaw), fz = Math.cos(yaw)
+        const hl = model.size[2] * 0.4,
+          hw = model.size[0] * 0.4
+        const fx = Math.sin(yaw),
+          fz = Math.cos(yaw)
         const at = (dx: number, dz: number) => sampleWaves(this.waves, x + dx, z + dz, this.time, tmpWave).height
-        const bow = at(fx * hl, fz * hl), stern = at(-fx * hl, -fz * hl)
-        const port = at(fz * hw, -fx * hw), star = at(-fz * hw, fx * hw)
+        const bow = at(fx * hl, fz * hl),
+          stern = at(-fx * hl, -fz * hl)
+        const port = at(fz * hw, -fx * hw),
+          star = at(-fz * hw, fx * hw)
         y += ((bow + stern + port + star) / 4) * (hover ? 0.6 : 1)
         pitch += Math.atan2(bow - stern, hl * 2) * (hover ? 0.4 : 1)
         roll += Math.atan2(port - star, hw * 2) * (hover ? 0.4 : 1)
@@ -658,26 +821,44 @@ export class FleetSim {
       pitch += this.tiltDir[v] * dmg * 0.03
       y -= dmg * dmg * (model.domain === 'sea' ? model.size[1] * 0.12 : 0.1)
     }
-    p[o] = x; p[o + 1] = y; p[o + 2] = z; p[o + 3] = yaw; p[o + 4] = -pitch; p[o + 5] = roll; p[o + 6] = steer; p[o + 7] = throttle
+    p[o] = x
+    p[o + 1] = y
+    p[o + 2] = z
+    p[o + 3] = yaw
+    p[o + 4] = -pitch
+    p[o + 5] = roll
+    p[o + 6] = steer
+    p[o + 7] = throttle
     if (route.kind !== 'pad') this.setAnchor(v, x, y, z, yaw)
   }
 
   private setAnchor(v: number, x: number, y: number, z: number, heading: number): void {
     const a = this.anchor
-    a[v * 4] = x; a[v * 4 + 1] = y; a[v * 4 + 2] = z; a[v * 4 + 3] = heading
+    a[v * 4] = x
+    a[v * 4 + 1] = y
+    a[v * 4 + 2] = z
+    a[v * 4 + 3] = heading
   }
 
   /**
    * World matrix data of a separated rocket stage of vehicle `v` (position and Euler YXZ), or null
    * while the stage is still attached (or after it has fallen for `fallTime` seconds — then `hidden`).
    */
-  stageState(v: number, stage: number, out: { x: number; y: number; z: number; rx: number; ry: number; rz: number; hidden: boolean }): typeof out | null {
+  stageState(
+    v: number,
+    stage: number,
+    out: { x: number; y: number; z: number; rx: number; ry: number; rz: number; hidden: boolean }
+  ): typeof out | null {
     const t = this.flightTime[v]
     const sep = this.settings.rocket.separation[stage]
     if (!(t === t) || sep === undefined || t < sep) return null
     const tau = t - sep
     const f = rocketAt(sep, this.settings.rocket, tmpRocket)
-    const a = this.anchor, px = a[v * 4], py = a[v * 4 + 1], pz = a[v * 4 + 2], h = a[v * 4 + 3]
+    const a = this.anchor,
+      px = a[v * 4],
+      py = a[v * 4 + 1],
+      pz = a[v * 4 + 2],
+      h = a[v * 4 + 3]
     const d = f.downrange + f.vDown * tau
     out.x = px + Math.sin(h) * d
     out.z = pz + Math.cos(h) * d
@@ -712,18 +893,24 @@ export class FleetSim {
       const el = this.time - this.exposed[v]
       this.exposed[v] = this.time
       if (el <= 0 && dt > 0) continue
-      const x = this.pose[v * 8], z = this.pose[v * 8 + 2]
+      const x = this.pose[v * 8],
+        z = this.pose[v * 8 + 2]
       const model = this.models[this.model[v]]
       const grounded = model.domain !== 'air' && (model.domain !== 'space' || !(this.flightTime[v] > 0))
-      let wetT = e.rain, snowT = e.snowfall
+      let wetT = e.rain,
+        snowT = e.snowfall
       if (env.weather) {
         const w = env.weather.surfaceAt(x, z, time)
-        wetT = Math.max(wetT, w.wetness); snowT = Math.max(snowT, w.snow)
+        wetT = Math.max(wetT, w.wetness)
+        snowT = Math.max(snowT, w.snow)
       }
       const o = v * 4
       if (env.field) {
         const f = env.field.sample(x, z)
-        if (!env.weather) { wetT = Math.max(wetT, f.wetness); snowT = Math.max(snowT, f.snow) }
+        if (!env.weather) {
+          wetT = Math.max(wetT, f.wetness)
+          snowT = Math.max(snowT, f.snow)
+        }
         if (grounded) st[o + 3] = Math.max(st[o + 3], f.damage)
       }
       if (env.fire && grounded) {
@@ -733,12 +920,16 @@ export class FleetSim {
       const heat = this.heat[v]
       // Wetness.
       let wet = st[o]
-      wet = wetT > wet ? wet + (wetT - wet) * (1 - Math.exp(-e.wetRate * el)) : Math.max(wetT, wet - e.dryRate * el * (1 + heat * 20))
+      wet =
+        wetT > wet
+          ? wet + (wetT - wet) * (1 - Math.exp(-e.wetRate * el))
+          : Math.max(wetT, wet - e.dryRate * el * (1 + heat * 20))
       // Snow settles on slow vehicles, blows off fast ones, melts when it stops falling or they burn.
       let snow = st[o + 1]
       const fast = this.speed[v] > e.shedSpeed
       if (snowT > snow && !fast && heat < 0.05) snow += (snowT - snow) * (1 - Math.exp(-e.snowRate * el))
-      else snow = Math.max(0, snow - (e.meltRate * (snowT > 0.05 ? 0.2 : 1) + (fast ? e.shedRate : 0) + heat * 0.5) * el)
+      else
+        snow = Math.max(0, snow - (e.meltRate * (snowT > 0.05 ? 0.2 : 1) + (fast ? e.shedRate : 0) + heat * 0.5) * el)
       // Fire.
       if (heat > 0) {
         st[o + 2] = Math.min(1, st[o + 2] + e.burnRate * heat * el)

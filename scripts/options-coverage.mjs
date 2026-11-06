@@ -42,7 +42,13 @@ export function coverage(defaults, { target = defaults, skip = {}, arrays = fals
       if (v instanceof UnparsedDefault) unparsed.push(`${p.join('.')} = ${v.source}`)
       if (skipped(p)) continue
       if (isPlain(v)) walk(v, p)
-      else if (!editable(p.reduce((t, key) => (t != null && Object.hasOwn(Object(t), key) ? t[key] : undefined), target), arrays)) uncovered.push(p.join('.'))
+      else if (
+        !editable(
+          p.reduce((t, key) => (t != null && Object.hasOwn(Object(t), key) ? t[key] : undefined), target),
+          arrays
+        )
+      )
+        uncovered.push(p.join('.'))
     }
   }
   walk(defaults, [])
@@ -50,13 +56,15 @@ export function coverage(defaults, { target = defaults, skip = {}, arrays = fals
     uncovered,
     unreasoned: Object.keys(skip).filter((k) => typeof skip[k] !== 'string' || !skip[k].trim()),
     unused: Object.keys(skip).filter((k) => !used.has(k)),
-    unparsed,
+    unparsed
   }
 }
 
 /** A parameter default {@link paramDefaults} could not evaluate (it refers to something out of scope): reported, never dropped. */
 export class UnparsedDefault {
-  constructor(source) { this.source = source }
+  constructor(source) {
+    this.source = source
+  }
 }
 
 /**
@@ -83,9 +91,18 @@ function scan(s, i, stop) {
   let depth = 0
   for (; i < s.length; i++) {
     const c = s[i]
-    if (c === '"' || c === "'" || c === '`') { for (i++; i < s.length && s[i] !== c; i++) if (s[i] === '\\') i++; continue }
-    if (c === '/' && s[i + 1] === '*') { i = s.indexOf('*/', i + 2) + 1 || s.length; continue }
-    if (c === '/' && s[i + 1] === '/') { i = s.indexOf('\n', i) >>> 0; continue }
+    if (c === '"' || c === "'" || c === '`') {
+      for (i++; i < s.length && s[i] !== c; i++) if (s[i] === '\\') i++
+      continue
+    }
+    if (c === '/' && s[i + 1] === '*') {
+      i = s.indexOf('*/', i + 2) + 1 || s.length
+      continue
+    }
+    if (c === '/' && s[i + 1] === '/') {
+      i = s.indexOf('\n', i) >>> 0
+      continue
+    }
     if (depth === 0 && stop.includes(c)) return i
     if ('([{'.includes(c)) depth++
     else if (')]}'.includes(c)) depth--
@@ -96,9 +113,14 @@ function scan(s, i, stop) {
 // Splits at top-level commas.
 function split(s) {
   const parts = []
-  for (let i = 0; i <= s.length;) {
+  for (let i = 0; i <= s.length; ) {
     const j = scan(s, i, ',')
-    parts.push(s.slice(i, j).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '').trim())
+    parts.push(
+      s
+        .slice(i, j)
+        .replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+        .trim()
+    )
     i = j + 1
   }
   return parts.filter(Boolean)
@@ -112,7 +134,10 @@ function pattern(list, out, scope, keyed = false) {
     let lhs = part.slice(0, eq).trim()
     const rhs = eq < part.length ? part.slice(eq + 1).trim() : null
     let key = null
-    if (keyed && /^[\w$]+\s*:/.test(lhs)) { key = lhs.slice(0, lhs.indexOf(':')).trim(); lhs = lhs.slice(lhs.indexOf(':') + 1).trim() }
+    if (keyed && /^[\w$]+\s*:/.test(lhs)) {
+      key = lhs.slice(0, lhs.indexOf(':')).trim()
+      lhs = lhs.slice(lhs.indexOf(':') + 1).trim()
+    }
     if (lhs.startsWith('{') || lhs.startsWith('[')) {
       const inner = {}
       pattern(lhs.slice(1, scan(lhs, 1, lhs[0] === '{' ? '}' : ']')), inner, scope, lhs[0] === '{')
@@ -137,14 +162,19 @@ function evaluate(expr, scope) {
 }
 
 const isPlain = (v) => !!v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype
-const editable = (v, arrays) => ['number', 'string', 'boolean'].includes(typeof v) || (arrays && Array.isArray(v) && v.length > 0)
+const editable = (v, arrays) =>
+  ['number', 'string', 'boolean'].includes(typeof v) || (arrays && Array.isArray(v) && v.length > 0)
 
 /**
  * What an R3F sandbox edits for a manifest class: the leaf values of the leva schema `useSpec` builds from it
  * (example/leva-options.ts), nested back into an options object, for {@link coverage}'s `target`.
  */
 export function levaTarget(spec, defaults, { levaSchema, specSchema, schemaValues, nest }) {
-  const schema = levaSchema(spec.target ?? defaults, (inner, settings) => ({ schema: inner, settings }), specSchema(spec))
+  const schema = levaSchema(
+    spec.target ?? defaults,
+    (inner, settings) => ({ schema: inner, settings }),
+    specSchema(spec)
+  )
   return nest(schemaValues(schema))
 }
 
@@ -163,7 +193,8 @@ if (import.meta.main) {
     for (const k of r.unreasoned) console.log(`    skipped without a reason: ${k}`)
     for (const k of r.unused) console.log(`    skip matches no option: ${k}`)
     for (const k of r.unparsed) console.log(`    unparsed default (checked by name only): ${k}`)
-    for (const [k, why] of Object.entries(spec.skip ?? {})) if (!r.unused.includes(k)) console.log(`    skip ${k}: ${why}`)
+    for (const [k, why] of Object.entries(spec.skip ?? {}))
+      if (!r.unused.includes(k)) console.log(`    skip ${k}: ${why}`)
   }
   const checkedPages = new Set()
   for (const file of files.filter((f) => f.endsWith('.panel.ts')).sort()) {
@@ -173,7 +204,11 @@ if (import.meta.main) {
     for (const [pkg, classes] of Object.entries(panels)) {
       for (const [name, spec] of Object.entries(classes)) {
         const defaults = defaultsOf(spec)
-        report(`${file} ${pkg} ${name}`, spec, coverage(defaults, { target: spec.target ?? defaults, skip: spec.skip, arrays: spec.arrays }))
+        report(
+          `${file} ${pkg} ${name}`,
+          spec,
+          coverage(defaults, { target: spec.target ?? defaults, skip: spec.skip, arrays: spec.arrays })
+        )
       }
     }
     // The R3F pages built from this manifest: they must use it (`useSpec('<class>', …)` from './<demo>.panel'), and
@@ -181,21 +216,36 @@ if (import.meta.main) {
     for (const [page, names] of Object.entries(r3f)) {
       checkedPages.add(page)
       let src = ''
-      try { src = readFileSync(new URL(page, dir), 'utf8') } catch { /* reported below */ }
+      try {
+        src = readFileSync(new URL(page, dir), 'utf8')
+      } catch {
+        /* reported below */
+      }
       for (const name of names) {
         const spec = all[name]
         const label = `${page} (via ${file}) ${name}`
         const problems = []
         if (!src) problems.push(`page ${page} not found`)
-        else if (!src.includes(`'./${file.replace(/\.ts$/, '')}'`)) problems.push(`page does not import ./${file.replace(/\.ts$/, '')}`)
+        else if (!src.includes(`'./${file.replace(/\.ts$/, '')}'`))
+          problems.push(`page does not import ./${file.replace(/\.ts$/, '')}`)
         else if (!src.includes(`useSpec('${name}'`)) problems.push(`page does not call useSpec('${name}', …)`)
         if (!spec) problems.push(`no class ${name} in the manifest`)
-        if (problems.length) { failed = true; console.log(`✗ ${label}`); for (const p of problems) console.log(`    ${p}`); continue }
+        if (problems.length) {
+          failed = true
+          console.log(`✗ ${label}`)
+          for (const p of problems) console.log(`    ${p}`)
+          continue
+        }
         const defaults = defaultsOf(spec)
-        report(label, spec, coverage(defaults, { target: levaTarget(spec, defaults, leva), skip: spec.skip, arrays: spec.arrays }))
+        report(
+          label,
+          spec,
+          coverage(defaults, { target: levaTarget(spec, defaults, leva), skip: spec.skip, arrays: spec.arrays })
+        )
       }
     }
   }
-  for (const page of files.filter((f) => f.endsWith('-r3f.tsx') && !checkedPages.has(f)).sort()) console.log(`· ${page}: no panel manifest lists it (not checked)`)
+  for (const page of files.filter((f) => f.endsWith('-r3f.tsx') && !checkedPages.has(f)).sort())
+    console.log(`· ${page}: no panel manifest lists it (not checked)`)
   process.exit(failed ? 1 : 0)
 }

@@ -6,8 +6,18 @@ import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Scatter, disposeLayers, type ScatterLayer } from 'threejs-scatter'
 import {
-  createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, createVegetationLayers, generateRock, generateTree, rocks, setTreeEnvironment, species,
-  type SpeciesName, type VegetationSpecies,
+  createBarkMaterial,
+  createFruitMaterial,
+  createLeafMaterial,
+  createRockMaterial,
+  createVegetationLayers,
+  generateRock,
+  generateTree,
+  rocks,
+  setTreeEnvironment,
+  species,
+  type SpeciesName,
+  type VegetationSpecies
 } from 'threejs-trees'
 import { patch } from './options-gui'
 import { classOf, createPanel, type PanelClass } from './panel'
@@ -30,7 +40,10 @@ controls.enableDamping = true
 const env = createEnvironment(renderer, scene, camera)
 const height = lineup ? () => 0 : hills
 
-const ground = new THREE.Mesh(lineup ? new THREE.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2) : hillsGeometry(2400, 480), createGroundMaterial())
+const ground = new THREE.Mesh(
+  lineup ? new THREE.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2) : hillsGeometry(2400, 480),
+  createGroundMaterial()
+)
 ground.receiveShadow = true
 scene.add(ground)
 
@@ -80,19 +93,28 @@ if (lineup) {
     { name: 'shrub', density: 0.25, cluster: { scale: 40, threshold: 0.5, strength: 0.7 } },
     { name: 'fern', density: 0.5, cluster: { scale: 25, threshold: 0.45, strength: 0.8 } },
     { name: 'boulder', density: 0.15 },
-    { name: 'rock', density: 0.2 },
+    { name: 'rock', density: 0.2 }
   ]
   // Every createVegetationLayers option in the panel; a change regenerates (and re-bakes) all layers.
   const veg = {
-    seed: 3, variants: 3, simplifiedDetail: 0.35, castShadow: true, impostors: !params.has('noimpostors'),
+    seed: 3,
+    variants: 3,
+    simplifiedDetail: 0.35,
+    castShadow: true,
+    impostors: !params.has('noimpostors'),
     impostor: { mode: 'octahedral', frames: 8, size: 512, hemisphere: true, alphaTest: 0.5 },
-    density: Object.fromEntries(set.map((s) => [s.name, s.density])) as Record<string, number>,
+    density: Object.fromEntries(set.map((s) => [s.name, s.density])) as Record<string, number>
   }
   const build = async () => {
     const t = performance.now()
     const layers = await createVegetationLayers({
-      species: set.map((s) => ({ ...s, density: veg.density[s.name] })), variants: veg.variants, seed: veg.seed, simplifiedDetail: veg.simplifiedDetail,
-      castShadow: veg.castShadow, renderer: veg.impostors ? renderer : null, impostor: veg.impostor as VegetationImpostor,
+      species: set.map((s) => ({ ...s, density: veg.density[s.name] })),
+      variants: veg.variants,
+      seed: veg.seed,
+      simplifiedDetail: veg.simplifiedDetail,
+      castShadow: veg.castShadow,
+      renderer: veg.impostors ? renderer : null,
+      impostor: veg.impostor as VegetationImpostor
     })
     console.log(`vegetation layers: ${(performance.now() - t).toFixed(0)} ms`)
     return layers
@@ -114,9 +136,19 @@ if (lineup) {
     }, 300)
   }
   vegetation = {
-    name: 'createVegetationLayers', target: veg, onChange: rebuild,
-    ranges: { seed: [1, 100, 1], variants: [1, 6, 1], simplifiedDetail: [0.05, 1, 0.05], frames: [2, 16, 1], size: [128, 2048, 128], alphaTest: [0, 1, 0.01], ...Object.fromEntries(set.map((s) => [s.name, [0, 1, 0.01]])) },
-    choices: { mode: ['octahedral', 'billboard'] },
+    name: 'createVegetationLayers',
+    target: veg,
+    onChange: rebuild,
+    ranges: {
+      seed: [1, 100, 1],
+      variants: [1, 6, 1],
+      simplifiedDetail: [0.05, 1, 0.05],
+      frames: [2, 16, 1],
+      size: [128, 2048, 128],
+      alphaTest: [0, 1, 0.01],
+      ...Object.fromEntries(set.map((s) => [s.name, [0, 1, 0.01]]))
+    },
+    choices: { mode: ['octahedral', 'billboard'] }
   }
   addEventListener('beforeunload', () => {
     scatter?.dispose()
@@ -136,7 +168,19 @@ const environment = { windStrength: 0.35, windSpeed: 1, wetness: 0, snow: 0, bur
 setTreeEnvironment(environment)
 const unit: [number, number, number] = [0, 1, 0.01]
 const classes: PanelClass[] = [
-  { name: 'TreeEnvironment', target: environment, onChange: (path, value) => setTreeEnvironment(patch(path, value)), ranges: { windStrength: [0, 1.5, 0.01], windSpeed: [0, 3, 0.01], wetness: unit, snow: unit, burn: unit, damage: unit } },
+  {
+    name: 'TreeEnvironment',
+    target: environment,
+    onChange: (path, value) => setTreeEnvironment(patch(path, value)),
+    ranges: {
+      windStrength: [0, 1.5, 0.01],
+      windSpeed: [0, 3, 0.01],
+      wetness: unit,
+      snow: unit,
+      burn: unit,
+      damage: unit
+    }
+  }
 ]
 if (vegetation) classes.push(vegetation)
 const panelPackages = [{ name: 'threejs-trees', classes }]
@@ -144,9 +188,18 @@ if (scatter) {
   const { layers: _layers, ...settings } = scatter.settings
   panelPackages.unshift({
     name: 'threejs-scatter',
-    classes: [classOf('Scatter', scatter, settings, {
-      ranges: { seed: [1, 100, 1], tileSize: [16, 256, 8], maxDistance: [100, 2000, 10], buildBudget: [0.5, 20, 0.5], lodHysteresis: [0, 0.5, 0.01], refreshDistance: [0.1, 20, 0.1] },
-    })],
+    classes: [
+      classOf('Scatter', scatter, settings, {
+        ranges: {
+          seed: [1, 100, 1],
+          tileSize: [16, 256, 8],
+          maxDistance: [100, 2000, 10],
+          buildBudget: [0.5, 20, 0.5],
+          lodHysteresis: [0, 0.5, 0.01],
+          refreshDistance: [0.1, 20, 0.1]
+        }
+      })
+    ]
   })
 }
 const gui = createPanel(panelPackages)

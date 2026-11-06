@@ -20,7 +20,10 @@ export function resampleCurve(keys: readonly number[], n = CURVE_KEYS): number[]
 export function resampleColorCurve(colors: readonly string[], opacity: readonly number[], out: Vector4[]): Vector4[] {
   const c = colors.map((h) => new Color(h))
   const ch = (k: 'r' | 'g' | 'b') => resampleCurve(c.map((x) => x[k]))
-  const r = ch('r'), g = ch('g'), b = ch('b'), a = resampleCurve(opacity)
+  const r = ch('r'),
+    g = ch('g'),
+    b = ch('b'),
+    a = resampleCurve(opacity)
   for (let i = 0; i < CURVE_KEYS; i++) (out[i] ??= new Vector4()).set(r[i], g[i], b[i], a[i])
   return out
 }

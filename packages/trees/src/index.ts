@@ -14,9 +14,23 @@ export type { TreeSkeleton } from './space-colonization.ts'
 export { DEFAULT_ROCK_PARAMS, generateRock, icosphere, rocks } from './rock.ts'
 export type { RockName, RockParams } from './rock.ts'
 export {
-  applyImpostorWeather, createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, getLeafTexture, impostorFoliageMask, setTreeEnvironment, treeUniforms,
+  applyImpostorWeather,
+  createBarkMaterial,
+  createFruitMaterial,
+  createLeafMaterial,
+  createRockMaterial,
+  getLeafTexture,
+  impostorFoliageMask,
+  setTreeEnvironment,
+  treeUniforms
 } from './materials.ts'
-export type { ImpostorWeatherOptions, LeafMaterialOptions, MaterialOptions, TreeEnvironment, WeatherInputs } from './materials.ts'
+export type {
+  ImpostorWeatherOptions,
+  LeafMaterialOptions,
+  MaterialOptions,
+  TreeEnvironment,
+  WeatherInputs
+} from './materials.ts'
 export { drawLeafImage } from './leaf-texture.ts'
 export type { LeafImage } from './leaf-texture.ts'
 export { createVegetationLayers, mergeTreeGeometry } from './layers.ts'

@@ -71,7 +71,9 @@ export class Settlements {
         previous.apply(scene, args)
         this.update()
       }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = () => {
+        scene.onBeforeRender = previous
+      }
     }
   }
 
@@ -86,9 +88,15 @@ export class Settlements {
       const sizes = mergeOptions(DEFAULT_CITY.sizes, o.city.sizes)
       this.sites = planCities(this.data, sizes).slice(0, o.maxSettlements)
       // Farmsteads join the road network with a driveway: route it only when there are farms to build.
-      if (this.sites.some((s) => s.size === 'farmstead')) this.sites = planCities(this.data, sizes, generateNetworks(this.data)).slice(0, o.maxSettlements)
+      if (this.sites.some((s) => s.size === 'farmstead'))
+        this.sites = planCities(this.data, sizes, generateNetworks(this.data)).slice(0, o.maxSettlements)
       this.cities = this.sites.map((s) => {
-        const c = new City({ world: this.world, frame: this.frame, camera: this.camera ?? undefined, ...this.cityInput(s) })
+        const c = new City({
+          world: this.world,
+          frame: this.frame,
+          camera: this.camera ?? undefined,
+          ...this.cityInput(s)
+        })
         this.object.add(c.object)
         return c
       })
@@ -100,7 +108,12 @@ export class Settlements {
 
   /** Merges settings into the current ones. */
   set(input: Partial<SettlementsOptions>): this {
-    return this.reset({ ...this.options, ...input, population: mergeOptions(this.options.population, input.population), city: mergeOptions(this.options.city, input.city) })
+    return this.reset({
+      ...this.options,
+      ...input,
+      population: mergeOptions(this.options.population, input.population),
+      city: mergeOptions(this.options.city, input.city)
+    })
   }
 
   /** Updates every city (progressive generation and LOD). */
@@ -118,11 +131,37 @@ export class Settlements {
 
   /** Totals over all cities. */
   get stats(): CityStats {
-    const t: CityStats = { ready: true, roadKm: 0, roads: 0, junctions: 0, bridges: 0, blocks: 0, lots: 0, buildings: 0, population: 0, modifiers: 0, generationMs: 0, detailed: 0 }
+    const t: CityStats = {
+      ready: true,
+      roadKm: 0,
+      roads: 0,
+      junctions: 0,
+      bridges: 0,
+      blocks: 0,
+      lots: 0,
+      buildings: 0,
+      population: 0,
+      modifiers: 0,
+      generationMs: 0,
+      detailed: 0
+    }
     for (const c of this.cities) {
       const s = c.stats
       t.ready &&= s.ready
-      for (const k of ['roadKm', 'roads', 'junctions', 'bridges', 'blocks', 'lots', 'buildings', 'population', 'modifiers', 'generationMs', 'detailed'] as const) t[k] += s[k]
+      for (const k of [
+        'roadKm',
+        'roads',
+        'junctions',
+        'bridges',
+        'blocks',
+        'lots',
+        'buildings',
+        'population',
+        'modifiers',
+        'generationMs',
+        'detailed'
+      ] as const)
+        t[k] += s[k]
     }
     return t
   }
@@ -136,6 +175,12 @@ export class Settlements {
   }
 
   private cityInput(s: CitySite): CityInput {
-    return mergeOptions(this.options.city, { center: [s.x, s.z], size: s.size, radius: s.radius, seed: s.seed, farm: s.road ? { road: s.road.points, roadType: s.road.type } : undefined })
+    return mergeOptions(this.options.city, {
+      center: [s.x, s.z],
+      size: s.size,
+      radius: s.radius,
+      seed: s.seed,
+      farm: s.road ? { road: s.road.points, roadType: s.road.type } : undefined
+    })
   }
 }

@@ -2,7 +2,15 @@ import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { Grass, GrassMap, TerrainPainter, presets, type BrushMode, type PresetName } from 'threejs-grass'
-import { createEnvironment, createGroundMaterial, createMinimap, hills, hillsGeometry, keepAboveGround, paintPath } from './shared'
+import {
+  createEnvironment,
+  createGroundMaterial,
+  createMinimap,
+  hills,
+  hillsGeometry,
+  keepAboveGround,
+  paintPath
+} from './shared'
 
 // `?embed`: chrome-less background mode used by the landing page (no UI, slow camera drift).
 const embed = new URLSearchParams(location.search).has('embed')
@@ -28,7 +36,10 @@ scene.add(terrain)
 
 // Two white balls rolling through the field push the grass aside.
 const balls = [0, 1].map(() => {
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.45, 48, 24), new THREE.MeshStandardNodeMaterial({ color: '#f4f4f0', roughness: 0.35 }))
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(0.45, 48, 24),
+    new THREE.MeshStandardNodeMaterial({ color: '#f4f4f0', roughness: 0.35 })
+  )
   ball.castShadow = true
   scene.add(ball)
   return ball
@@ -45,7 +56,7 @@ const grass = await Grass.create({
   tileSize: 25,
   maxDistance: 200,
   grassMap,
-  interactors: balls.map((object) => ({ object, radius: 1.1 })),
+  interactors: balls.map((object) => ({ object, radius: 1.1 }))
 })
 terrain.material = createGroundMaterial(grass)
 Object.assign(window, { demo: { scene, camera, controls, grass, env, renderer } })
@@ -53,10 +64,19 @@ Object.assign(window, { demo: { scene, camera, controls, grass, env, renderer } 
 // ---- Controls (same set as the R3F demo's leva panel) ----
 const gui = new GUI({ title: 'threejs-grass' })
 const params = {
-  preset: 'kentuckyBluegrass', type: 'blades', maxDistance: 200, interaction: 1,
-  windStrength: 0.45, windSpeed: 0.8, windScale: 0.045, windAngle: 20,
+  preset: 'kentuckyBluegrass',
+  type: 'blades',
+  maxDistance: 200,
+  interaction: 1,
+  windStrength: 0.45,
+  windSpeed: 0.8,
+  windScale: 0.045,
+  windAngle: 20,
   debugLods: false,
-  elevation: 28, azimuth: 50, exposure: 0.6, bloom: 0.1,
+  elevation: 28,
+  azimuth: 50,
+  exposure: 0.6,
+  bloom: 0.1
 }
 const style = { ...presets.kentuckyBluegrass }
 const look = gui.addFolder('Grass')
@@ -84,7 +104,14 @@ styleFolder.add(style, 'patchiness', 0, 1).onChange(setStyle)
 styleFolder.add(style, 'translucency', 0, 1.5).onChange(setStyle)
 const setWind = () => {
   const a = (params.windAngle * Math.PI) / 180
-  grass.set({ wind: { direction: [Math.cos(a), Math.sin(a)], strength: params.windStrength, speed: params.windSpeed, scale: params.windScale } })
+  grass.set({
+    wind: {
+      direction: [Math.cos(a), Math.sin(a)],
+      strength: params.windStrength,
+      speed: params.windSpeed,
+      scale: params.windScale
+    }
+  })
 }
 const windFolder = gui.addFolder('Wind')
 windFolder.add(params, 'windStrength', 0, 1.5).name('strength').onChange(setWind)
@@ -92,7 +119,10 @@ windFolder.add(params, 'windSpeed', 0, 3).name('speed').onChange(setWind)
 windFolder.add(params, 'windScale', 0.005, 0.3).name('scale').onChange(setWind)
 windFolder.add(params, 'windAngle', 0, 360).name('angle').onChange(setWind)
 const lodFolder = gui.addFolder('Levels of detail').close()
-lodFolder.add(params, 'debugLods').name('show LODs').onChange((debugLods: boolean) => grass.set({ debugLods }))
+lodFolder
+  .add(params, 'debugLods')
+  .name('show LODs')
+  .onChange((debugLods: boolean) => grass.set({ debugLods }))
 const lods = grass.settings.lods.map((l) => ({ ...l }))
 lods.forEach((lod, i) => {
   const f = lodFolder.addFolder(`LOD ${i}`)
@@ -104,14 +134,25 @@ lods.forEach((lod, i) => {
 const painter = new TerrainPainter(grass, renderer.domElement, { mode: 'add', radius: 3, strength: 0.3 })
 painter.enabled = false
 const paintFolder = gui.addFolder('Terrain Painter')
-paintFolder.add(painter, 'enabled').name('paint (orbit off)').onChange((on: boolean) => (controls.enabled = !on))
+paintFolder
+  .add(painter, 'enabled')
+  .name('paint (orbit off)')
+  .onChange((on: boolean) => (controls.enabled = !on))
 paintFolder.add(painter.brush, 'mode', ['add', 'erase', 'raise', 'lower'] satisfies BrushMode[])
 paintFolder.add(painter.brush, 'radius', 0.5, 15)
 paintFolder.add(painter.brush, 'strength', 0.02, 1)
 paintFolder.add({ clear: () => grassMap.fill(0) }, 'clear').name('clear all')
 paintFolder.add({ fill: () => grassMap.fill(1) }, 'fill').name('fill all')
 paintFolder.add({ reset: () => (grassMap.fill(1), paintPath(grassMap)) }, 'reset').name('reset path')
-paintFolder.add({ save: () => Object.assign(document.createElement('a'), { href: grassMap.toDataURL(), download: 'grass-map.png' }).click() }, 'save').name('save map')
+paintFolder
+  .add(
+    {
+      save: () =>
+        Object.assign(document.createElement('a'), { href: grassMap.toDataURL(), download: 'grass-map.png' }).click()
+    },
+    'save'
+  )
+  .name('save map')
 const lightFolder = gui.addFolder('Lighting').close()
 lightFolder.add(params, 'elevation', 2, 89).onFinishChange(() => env.setSun(params.elevation, params.azimuth))
 lightFolder.add(params, 'azimuth', 0, 360).onFinishChange(() => env.setSun(params.elevation, params.azimuth))

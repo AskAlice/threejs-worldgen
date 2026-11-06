@@ -15,7 +15,8 @@ export function bond(u: N, v: N, w: N, h: N, joint: N): { joint: N; cell: N; fad
   const row = floor(v.div(h))
   const x = u.div(w).add(row.mod(2).mul(0.5))
   const col = floor(x)
-  const fu = fract(x).sub(0.5).mul(w), fv = fract(v.div(h)).sub(0.5).mul(h)
+  const fu = fract(x).sub(0.5).mul(w),
+    fv = fract(v.div(h)).sub(0.5).mul(h)
   const j = max(float(1).sub(band(fu, w.mul(0.5).sub(joint))), float(1).sub(band(fv, h.mul(0.5).sub(joint))))
   // Fade the pattern out when its cells shrink below a few pixels.
   const fade = float(1).sub(smoothstep(0.15, 0.5, fwidth(v).div(h)))
@@ -24,4 +25,3 @@ export function bond(u: N, v: N, w: N, h: N, joint: N): { joint: N; cell: N; fad
 
 /** 1 where `a` equals the integer code `b`, else 0. */
 export const eq = (a: N, b: number) => float(1).sub(step(0.5, abs(a.sub(b))))
-

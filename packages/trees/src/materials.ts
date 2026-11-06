@@ -1,11 +1,54 @@
 import {
-  Color, DataTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, MeshStandardNodeMaterial, RepeatWrapping, RGBAFormat, Vector2, Vector3,
-  type DirectionalLight, type Node,
+  Color,
+  DataTexture,
+  DoubleSide,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  MeshStandardNodeMaterial,
+  RepeatWrapping,
+  RGBAFormat,
+  Vector2,
+  Vector3,
+  type DirectionalLight,
+  type Node
 } from 'three/webgpu'
 import {
-  abs, attribute, cameraPosition, cos, cross, dot, float, fract, hue, max, min, mix, mx_fractal_noise_float, mx_noise_float, normalize,
-  normalViewGeometry, normalWorld, positionGeometry, positionLocal, positionView, positionWorld, pow, saturation, select, sign, sin, smoothstep, step,
-  texture, time, uniform, uv, vec2, vec3, vec4, vertexColor,
+  abs,
+  attribute,
+  cameraPosition,
+  cos,
+  cross,
+  dot,
+  float,
+  fract,
+  hue,
+  max,
+  min,
+  mix,
+  mx_fractal_noise_float,
+  mx_noise_float,
+  normalize,
+  normalViewGeometry,
+  normalWorld,
+  positionGeometry,
+  positionLocal,
+  positionView,
+  positionWorld,
+  pow,
+  saturation,
+  select,
+  sign,
+  sin,
+  smoothstep,
+  step,
+  texture,
+  time,
+  uniform,
+  uv,
+  vec2,
+  vec3,
+  vec4,
+  vertexColor
 } from 'three/tsl'
 import { scatterParamsNode, type ImpostorSurface } from 'threejs-scatter'
 import { drawLeafImage } from './leaf-texture.ts'
@@ -34,7 +77,7 @@ export const treeUniforms = {
   /** Global burn 0..1: charred bark, scorched and missing leaves. */
   burn: uniform(0),
   /** Global damage 0..1: broken branches, missing leaf mass. */
-  damage: uniform(0),
+  damage: uniform(0)
 }
 
 /** Settings for {@link setTreeEnvironment}. Unspecified fields keep their value. */
@@ -67,7 +110,10 @@ export function setTreeEnvironment(env: TreeEnvironment): void {
   if (env.sun) {
     env.sun.updateWorldMatrix(true, false)
     env.sun.target.updateWorldMatrix(true, false)
-    u.sunDirection.value.setFromMatrixPosition(env.sun.matrixWorld).sub(new Vector3().setFromMatrixPosition(env.sun.target.matrixWorld)).normalize()
+    u.sunDirection.value
+      .setFromMatrixPosition(env.sun.matrixWorld)
+      .sub(new Vector3().setFromMatrixPosition(env.sun.target.matrixWorld))
+      .normalize()
     u.sunColor.value.copy(env.sun.color).multiplyScalar(env.sun.intensity)
   }
 }
@@ -98,7 +144,12 @@ type Weather = Record<keyof WeatherInputs, any>
 function weatherOf(o: MaterialOptions): Weather {
   const u = treeUniforms
   const w = o.weather ?? {}
-  return { wetness: w.wetness ?? u.wetness, snow: w.snow ?? u.snow, burn: w.burn ?? u.burn, damage: w.damage ?? u.damage }
+  return {
+    wetness: w.wetness ?? u.wetness,
+    snow: w.snow ?? u.snow,
+    burn: w.burn ?? u.burn,
+    damage: w.damage ?? u.damage
+  }
 }
 
 /**
@@ -106,13 +157,19 @@ function weatherOf(o: MaterialOptions): Weather {
  * up the snow line; it defaults to world-position noise, and an impostor passes a per-instance value instead, because
  * its camera-facing quad has no surface of its own to sample.
  */
-function weathered(albedo: any, roughness: number, w: Weather, normal: any = normalWorld, grain: any = mx_noise_float(positionWorld.mul(1.7)).mul(0.25)) {
+function weathered(
+  albedo: any,
+  roughness: number,
+  w: Weather,
+  normal: any = normalWorld,
+  grain: any = mx_noise_float(positionWorld.mul(1.7)).mul(0.25)
+) {
   const wet = albedo.mul(mix(float(1), float(0.55), w.wetness))
   const up = normal.y.add(grain)
   const cover = smoothstep(0.15, 0.7, up).mul(w.snow).add(w.snow.mul(w.snow).mul(0.3)).clamp(0, 1)
   return {
     color: mix(wet, vec3(0.9, 0.93, 0.97), cover),
-    roughness: mix(mix(float(roughness), float(0.3), w.wetness), float(0.65), cover),
+    roughness: mix(mix(float(roughness), float(0.3), w.wetness), float(0.65), cover)
   }
 }
 
@@ -134,7 +191,20 @@ function instanceRandoms() {
 /** TSL: per-instance hue / saturation shift (`hueVariation`, `saturationVariation`), scaled by `amount`. */
 function varied(color: any, p: TreeParams, amount: any = 1): any {
   const r = instanceRandoms()
-  return saturation(hue(color, r.a.sub(0.5).mul(2 * p.hueVariation).mul(amount)), r.b.sub(0.5).mul(2 * p.saturationVariation).mul(amount).add(1))
+  return saturation(
+    hue(
+      color,
+      r.a
+        .sub(0.5)
+        .mul(2 * p.hueVariation)
+        .mul(amount)
+    ),
+    r.b
+      .sub(0.5)
+      .mul(2 * p.saturationVariation)
+      .mul(amount)
+      .add(1)
+  )
 }
 
 /**
@@ -159,14 +229,23 @@ function windOffset(height: number, flutter: number): any {
   const bend = h.mul(h)
   const t = time.mul(u.windSpeed)
   const xz = positionLocal.xz
-  const gust = mx_noise_float(vec3(xz.mul(0.015).sub(u.windDirection.mul(t.mul(0.25))), 0)).mul(0.5).add(0.5)
+  const gust = mx_noise_float(vec3(xz.mul(0.015).sub(u.windDirection.mul(t.mul(0.25))), 0))
+    .mul(0.5)
+    .add(0.5)
   const wave = sin(t.mul(1.3).sub(dot(xz, u.windDirection).mul(0.2))).mul(0.3)
-  const amount = u.windStrength.mul(bend).mul(gust.add(wave)).mul(0.05 * height)
+  const amount = u.windStrength
+    .mul(bend)
+    .mul(gust.add(wave))
+    .mul(0.05 * height)
   let offset: any = vec3(u.windDirection.x, 0, u.windDirection.y).mul(amount)
   if (flutter > 0) {
     const g = positionGeometry
     const phase = g.x.mul(7.3).add(g.y.mul(5.1)).add(g.z.mul(6.7))
-    offset = offset.add(vec3(sin(t.mul(6.1).add(phase)), sin(t.mul(7.7).add(phase.mul(1.3))).mul(0.6), cos(t.mul(5.3).add(phase))).mul(u.windStrength.mul(flutter).mul(h.min(1))))
+    offset = offset.add(
+      vec3(sin(t.mul(6.1).add(phase)), sin(t.mul(7.7).add(phase.mul(1.3))).mul(0.6), cos(t.mul(5.3).add(phase))).mul(
+        u.windStrength.mul(flutter).mul(h.min(1))
+      )
+    )
   }
   return offset
 }
@@ -187,7 +266,8 @@ const STILL: TreeParams['kind'][] = ['cactus', 'succulent', 'lilyPad']
 const GREEN: TreeParams['kind'][] = ['cactus', 'succulent', 'bamboo', 'lilyPad']
 
 /** TSL: leaves scorch brown, then black, as `burn` rises. */
-const scorched = (c: any, w: Weather) => mix(mix(c, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn)), vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
+const scorched = (c: any, w: Weather) =>
+  mix(mix(c, vec3(0.22, 0.1, 0.03), smoothstep(0, 0.5, w.burn)), vec3(0.02, 0.018, 0.015), smoothstep(0.5, 1, w.burn))
 /** TSL: share of leaf cards the weather removes (on top of the per-instance `densityVariation`). */
 const leafLoss = (w: Weather) => w.damage.add(w.burn.mul(0.8))
 const CHAR = vec3(0.025, 0.022, 0.02)
@@ -198,7 +278,10 @@ const CHAR = vec3(0.025, 0.022, 0.02)
  * Weather: wet bark darkens and shines, snow settles on top, burn chars it black along the furrows first, damage
  * breaks off side branches.
  */
-export function createBarkMaterial(params: Partial<TreeParams> = {}, options: MaterialOptions = {}): MeshStandardNodeMaterial {
+export function createBarkMaterial(
+  params: Partial<TreeParams> = {},
+  options: MaterialOptions = {}
+): MeshStandardNodeMaterial {
   const p = { ...DEFAULT_TREE_PARAMS, ...params }
   const w = weatherOf(options)
   const m = new MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 })
@@ -207,11 +290,19 @@ export function createBarkMaterial(params: Partial<TreeParams> = {}, options: Ma
   const a = uv().x.mul(Math.PI * 2)
   const ring = vec2(cos(a), sin(a))
   const v = uv().y
-  const furrows = mx_fractal_noise_float(vec3(ring.mul(1.6), v.mul(2.2)), 3, 2, 0.5).mul(0.5).add(0.5)
+  const furrows = mx_fractal_noise_float(vec3(ring.mul(1.6), v.mul(2.2)), 3, 2, 0.5)
+    .mul(0.5)
+    .add(0.5)
   const ridges = smoothstep(0.35, 0.75, furrows)
   let detail: any = mix(float(1 - p.barkContrast * 0.55), float(1), ridges)
   if (p.barkMarks > 0) {
-    const marks = smoothstep(0.55, 0.7, mx_noise_float(vec3(ring.mul(1.2), v.mul(14))).mul(0.5).add(0.5))
+    const marks = smoothstep(
+      0.55,
+      0.7,
+      mx_noise_float(vec3(ring.mul(1.2), v.mul(14)))
+        .mul(0.5)
+        .add(0.5)
+    )
     detail = detail.mul(float(1).sub(marks.mul(p.barkMarks * 0.75)))
   }
   // Green plants vary like foliage; wood only a little.
@@ -261,7 +352,10 @@ export function getLeafTexture(shape: LeafShape): DataTexture {
  * faces (so a crown shades as one volume), back-lit translucency towards the sun, wind sway plus flutter. Weather:
  * wet leaves darken, snow settles, burn scorches them brown then black and drops them, damage drops leaf mass.
  */
-export function createLeafMaterial(params: Partial<TreeParams> = {}, options: LeafMaterialOptions = {}): MeshStandardNodeMaterial {
+export function createLeafMaterial(
+  params: Partial<TreeParams> = {},
+  options: LeafMaterialOptions = {}
+): MeshStandardNodeMaterial {
   const p = { ...DEFAULT_TREE_PARAMS, ...params }
   const u = treeUniforms
   const w = weatherOf(options)
@@ -277,9 +371,15 @@ export function createLeafMaterial(params: Partial<TreeParams> = {}, options: Le
   m.normalNode = normalViewGeometry
   const viewDir = normalize(cameraPosition.sub(positionWorld))
   const back = pow(max(dot(viewDir, u.sunDirection.negate()), 0), 3)
-  m.emissiveNode = albedo.mul(u.sunColor).mul(back.mul(options.translucency ?? 0.5).mul(0.5)).mul(float(1).sub(w.burn))
+  m.emissiveNode = albedo
+    .mul(u.sunColor)
+    .mul(back.mul(options.translucency ?? 0.5).mul(0.5))
+    .mul(float(1).sub(w.burn))
   const thin = min(instanceRandoms().b.mul(p.densityVariation).add(leafLoss(w)), 1.01)
-  m.positionNode = dropped(positionLocal.add(windOffset(p.height, options.flutter ?? Math.min(0.05, p.leafSize * 0.06))), thin)
+  m.positionNode = dropped(
+    positionLocal.add(windOffset(p.height, options.flutter ?? Math.min(0.05, p.leafSize * 0.06))),
+    thin
+  )
   return m
 }
 
@@ -287,7 +387,10 @@ export function createLeafMaterial(params: Partial<TreeParams> = {}, options: Le
  * Fruit, berries and flower heads: vertex colours with per-instance hue variation, glossy skin, wind sway. Weather:
  * wet, snow, burn darkens, damage (and burn) drop fruit.
  */
-export function createFruitMaterial(params: Partial<TreeParams> = {}, options: MaterialOptions = {}): MeshStandardNodeMaterial {
+export function createFruitMaterial(
+  params: Partial<TreeParams> = {},
+  options: MaterialOptions = {}
+): MeshStandardNodeMaterial {
   const p = { ...DEFAULT_TREE_PARAMS, ...params }
   const w = weatherOf(options)
   const m = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.45, metalness: 0 })
@@ -347,7 +450,11 @@ export interface ImpostorWeatherOptions extends MaterialOptions {
  * leaves and chars bark separately, burn and damage drop leaf cards, and damage breaks branches. Bake with clear
  * weather. The back-lit glow uses the tinted colour, which the mesh keeps untinted.
  */
-export function applyImpostorWeather(material: MeshStandardNodeMaterial, surface: ImpostorSurface, options: ImpostorWeatherOptions = {}): void {
+export function applyImpostorWeather(
+  material: MeshStandardNodeMaterial,
+  surface: ImpostorSurface,
+  options: ImpostorWeatherOptions = {}
+): void {
   const p = { ...DEFAULT_TREE_PARAMS, ...options.params }
   const w = weatherOf(options)
   const s = surface as Record<keyof ImpostorSurface, any>
@@ -375,6 +482,10 @@ export function applyImpostorWeather(material: MeshStandardNodeMaterial, surface
   material.roughnessNode = look.roughness
   if (!options.rock) {
     const back = pow(max(dot(normalize(cameraPosition.sub(positionWorld)), treeUniforms.sunDirection.negate()), 0), 3)
-    material.emissiveNode = glow.mul(treeUniforms.sunColor).mul(back.mul(options.translucency ?? 0.5).mul(0.5)).mul(float(1).sub(w.burn)).mul(foliage)
+    material.emissiveNode = glow
+      .mul(treeUniforms.sunColor)
+      .mul(back.mul(options.translucency ?? 0.5).mul(0.5))
+      .mul(float(1).sub(w.burn))
+      .mul(foliage)
   }
 }

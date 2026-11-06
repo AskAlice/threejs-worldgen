@@ -48,7 +48,7 @@ export const VEHICLE_PLACEMENT: Record<VehicleType, VehiclePlacementRule> = {
   'aircraft-carrier': { network: 'sea', surface: 'water', depth: [15, 11000] },
   airplane: { network: 'air', surface: 'air', height: [300, 11000] },
   'fighter-jet': { network: 'air', surface: 'air', height: [150, 15000] },
-  rocket: { network: 'pad', surface: 'ground', slope: [0, 0.05], height: [1, 400], nearWater: 1500 },
+  rocket: { network: 'pad', surface: 'ground', slope: [0, 0.05], height: [1, 400], nearWater: 1500 }
 }
 
 /** `(x, z, rule) => fits`: pass threejs-worldgen's `isPlausible` bound to a world and frame to use it. */
@@ -61,18 +61,32 @@ const scratch: WorldSample = createSample()
  * temperature and near-water checks need threejs-worldgen's `isPlausible`; pass it as `plausible` to the
  * planners for the full rule).
  */
-export function fitsRule(world: World, frame: LocalFrame, x: number, z: number, rule: PlacementRule, step = 2): boolean {
+export function fitsRule(
+  world: World,
+  frame: LocalFrame,
+  x: number,
+  z: number,
+  rule: PlacementRule,
+  step = 2
+): boolean {
   const s = frame.sample(x, z, scratch)
   const wet = s.waterLevel === s.waterLevel && s.waterLevel > s.elevation
   const depth = wet ? s.waterLevel - s.elevation : 0
   const sea = world.options.seaLevel
-  if ((rule.surface === 'ground' && wet) || ((rule.surface === 'water' || rule.surface === 'underwater') && !wet)) return false
+  if ((rule.surface === 'ground' && wet) || ((rule.surface === 'water' || rule.surface === 'underwater') && !wet))
+    return false
   if (rule.surface === 'shore' && (wet || s.elevation - sea > 3)) return false
   if (rule.depth && (depth < rule.depth[0] || depth > rule.depth[1])) return false
-  if (rule.height && rule.surface !== 'air' && (s.elevation - sea < rule.height[0] || s.elevation - sea > rule.height[1])) return false
+  if (
+    rule.height &&
+    rule.surface !== 'air' &&
+    (s.elevation - sea < rule.height[0] || s.elevation - sea > rule.height[1])
+  )
+    return false
   if (rule.temperature && (s.temperature < rule.temperature[0] || s.temperature > rule.temperature[1])) return false
   if (rule.slope) {
-    const hx = frame.height(x + step, z) - frame.height(x - step, z), hz = frame.height(x, z + step) - frame.height(x, z - step)
+    const hx = frame.height(x + step, z) - frame.height(x - step, z),
+      hz = frame.height(x, z + step) - frame.height(x, z - step)
     const slope = Math.hypot(hx, hz) / (2 * step)
     if (slope < rule.slope[0] || slope > rule.slope[1]) return false
   }
@@ -101,7 +115,12 @@ export interface PlanRouteOptions {
  * pattern at a safe height above the highest ground beneath it, or a flat spot near water for a launch
  * pad. Seeded; returns null if nothing plausible is found.
  */
-export function planRoute(type: VehicleType, world: World, frame: LocalFrame, options: PlanRouteOptions): RouteSpec | null {
+export function planRoute(
+  type: VehicleType,
+  world: World,
+  frame: LocalFrame,
+  options: PlanRouteOptions
+): RouteSpec | null {
   const rule = VEHICLE_PLACEMENT[type]
   const { center, radius, points = 10, attempts = 24 } = options
   const ok = options.plausible ?? ((x: number, z: number, r: PlacementRule) => fitsRule(world, frame, x, z, r))
@@ -109,28 +128,45 @@ export function planRoute(type: VehicleType, world: World, frame: LocalFrame, op
   const sea = world.options.seaLevel
   if (rule.network === 'pad') {
     for (let a = 0; a < attempts * points; a++) {
-      const r = radius * Math.sqrt(rand()), t = rand() * Math.PI * 2
-      const x = center[0] + Math.cos(t) * r, z = center[1] + Math.sin(t) * r
+      const r = radius * Math.sqrt(rand()),
+        t = rand() * Math.PI * 2
+      const x = center[0] + Math.cos(t) * r,
+        z = center[1] + Math.sin(t) * r
       if (ok(x, z, rule)) return { kind: 'pad', position: [x, frame.height(x, z), z], heading: rand() * Math.PI * 2 }
     }
     return null
   }
   for (let a = 0; a < attempts; a++) {
     // Each attempt shifts the centre a little and wobbles the loop.
-    const cx = center[0] + (a ? (rand() * 2 - 1) * radius * 0.5 : 0), cz = center[1] + (a ? (rand() * 2 - 1) * radius * 0.5 : 0)
+    const cx = center[0] + (a ? (rand() * 2 - 1) * radius * 0.5 : 0),
+      cz = center[1] + (a ? (rand() * 2 - 1) * radius * 0.5 : 0)
     const loop: [number, number, number][] = []
     let fits = true
     for (let i = 0; i < points && fits; i++) {
-      const t = (i / points) * Math.PI * 2, r = radius * (0.7 + 0.3 * rand())
-      const x = cx + Math.cos(t) * r, z = cz + Math.sin(t) * r
-      if (rule.network === 'air') { loop.push([x, 0, z]); continue }
+      const t = (i / points) * Math.PI * 2,
+        r = radius * (0.7 + 0.3 * rand())
+      const x = cx + Math.cos(t) * r,
+        z = cz + Math.sin(t) * r
+      if (rule.network === 'air') {
+        loop.push([x, 0, z])
+        continue
+      }
       // Midpoint to the previous point too, so the loop doesn't cut across land (or water).
       const prev = loop[loop.length - 1]
       fits = ok(x, z, rule) && (!prev || ok((x + prev[0]) / 2, (z + prev[2]) / 2, rule))
       const s = frame.sample(x, z, scratch)
-      loop.push([x, rule.network === 'sea' ? (s.waterLevel === s.waterLevel ? s.waterLevel : sea) : s.elevation + (rule.network === 'rail' ? 0.4 : 0.05), z])
+      loop.push([
+        x,
+        rule.network === 'sea'
+          ? s.waterLevel === s.waterLevel
+            ? s.waterLevel
+            : sea
+          : s.elevation + (rule.network === 'rail' ? 0.4 : 0.05),
+        z
+      ])
     }
-    if (fits && rule.network !== 'air') fits = ok((loop[0][0] + loop[points - 1][0]) / 2, (loop[0][2] + loop[points - 1][2]) / 2, rule)
+    if (fits && rule.network !== 'air')
+      fits = ok((loop[0][0] + loop[points - 1][0]) / 2, (loop[0][2] + loop[points - 1][2]) / 2, rule)
     if (!fits) continue
     if (rule.network === 'air') {
       // Clear the highest ground under the loop by the rule's minimum height.
@@ -143,7 +179,10 @@ export function planRoute(type: VehicleType, world: World, frame: LocalFrame, op
       const y = top + h0 + rand() * Math.min(h1 - h0, h0 * 2)
       for (const p of loop) p[1] = y
     }
-    if (rule.network === 'sea') { const y = Math.min(...loop.map((p) => p[1])); for (const p of loop) p[1] = y }
+    if (rule.network === 'sea') {
+      const y = Math.min(...loop.map((p) => p[1]))
+      for (const p of loop) p[1] = y
+    }
     return { kind: 'path', points: loop, closed: true, smooth: 8 }
   }
   return null
@@ -189,10 +228,12 @@ export function vehicleAssets(): VehicleAssetDef[] {
       params: structuredClone(kind.params),
       placement: VEHICLE_PLACEMENT[type],
       create: (params, seed) => {
-        const p = Object.fromEntries(Object.entries(params).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v))) as Record<string, number | string | boolean>
+        const p = Object.fromEntries(
+          Object.entries(params).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v))
+        ) as Record<string, number | string | boolean>
         const moving = kind.domain !== 'space'
         return new Vehicle({ type, params: p, seed, speed: moving ? 5 : 0 }, { autoUpdate: true }).object
-      },
+      }
     }
   })
 }

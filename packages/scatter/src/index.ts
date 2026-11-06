@@ -5,7 +5,16 @@
  * @module threejs-scatter
  */
 export { Scatter, disposeLayers, resolveLayer } from './scatter.ts'
-export type { ScatterInput, ScatterInstance, ScatterLayer, ScatterLayerInput, ScatterLOD, ScatterOptions, ScatterSettings, ScatterStats } from './scatter.ts'
+export type {
+  ScatterInput,
+  ScatterInstance,
+  ScatterLayer,
+  ScatterLayerInput,
+  ScatterLOD,
+  ScatterOptions,
+  ScatterSettings,
+  ScatterStats
+} from './scatter.ts'
 export { DEFAULT_PLACEMENT, INSTANCE_STRIDE, clusterFactor, groupSeed, placeTile } from './placement.ts'
 export type { DensityFn, PlacementRules, ScatterCluster } from './placement.ts'
 export { poissonDisk } from './poisson.ts'

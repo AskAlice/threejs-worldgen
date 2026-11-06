@@ -28,15 +28,36 @@ export const str = (p: VehicleParams, k: string) => String(p[k])
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** Wraps parts into a {@link VehicleModel}, with the bounding size measured from the mounted parts. */
-export function model(type: VehicleType, style: string, domain: VehicleDomain, parts: ModelPart[], extra: Partial<VehicleModel> = {}): VehicleModel {
+export function model(
+  type: VehicleType,
+  style: string,
+  domain: VehicleDomain,
+  parts: ModelPart[],
+  extra: Partial<VehicleModel> = {}
+): VehicleModel {
   const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]
-  for (const part of parts) for (const m of part.mounts) for (let k = 0; k < 3; k++) {
-    b[k] = Math.min(b[k], part.mesh.bounds[k] + m.position[k])
-    b[k + 3] = Math.max(b[k + 3], part.mesh.bounds[k + 3] + m.position[k])
-  }
+  for (const part of parts)
+    for (const m of part.mounts)
+      for (let k = 0; k < 3; k++) {
+        b[k] = Math.min(b[k], part.mesh.bounds[k] + m.position[k])
+        b[k + 3] = Math.max(b[k + 3], part.mesh.bounds[k + 3] + m.position[k])
+      }
   return {
-    type, style, domain, parts, size: [b[3] - b[0], b[4] - b[1], b[5] - b[2]],
-    wheelBase: 0, exhausts: [], vents: [], hosts: [], stages: 0, palette: ['#ffffff'], wake: 0, bank: 0, trim: 0, ...extra,
+    type,
+    style,
+    domain,
+    parts,
+    size: [b[3] - b[0], b[4] - b[1], b[5] - b[2]],
+    wheelBase: 0,
+    exhausts: [],
+    vents: [],
+    hosts: [],
+    stages: 0,
+    palette: ['#ffffff'],
+    wake: 0,
+    bank: 0,
+    trim: 0,
+    ...extra
   }
 }
 
@@ -51,7 +72,12 @@ export function roadWheel(r: number, w: number, bike = false): MeshData {
     m.cylinder('x', [0, 0, 0], r * 0.08, w * 2, RIM, 6)
     for (let k = 0; k < 4; k++) {
       const a = (k / 4) * Math.PI
-      m.beam([0, Math.sin(a) * (r - w), Math.cos(a) * (r - w)], [0, -Math.sin(a) * (r - w), -Math.cos(a) * (r - w)], 0.012, RIM)
+      m.beam(
+        [0, Math.sin(a) * (r - w), Math.cos(a) * (r - w)],
+        [0, -Math.sin(a) * (r - w), -Math.cos(a) * (r - w)],
+        0.012,
+        RIM
+      )
     }
   } else {
     m.cylinder('x', [0, 0, 0], r, w, TYRE, 12, r, TYRE)
@@ -98,30 +124,90 @@ export function dualWheel(r: number, w: number, look: WheelLook, gap = 0.04): Me
 
 /** Adds a {@link smoothWheel} to `m`. */
 export function wheelInto(m: MeshBuilder, r: number, w: number, look: WheelLook): void {
-  const rr = r * look.ratio, h = w / 2
+  const rr = r * look.ratio,
+    h = w / 2
   // Tyre: tread, rounded shoulders, bulging sidewalls down to the bead at the rim.
   const prof: [number, number][] = []
   const shoulder = Math.min(w * 0.22, (r - rr) * 0.45)
-  for (let k = 0; k <= 4; k++) { const a = (k / 4) * Math.PI / 2; prof.push([r - shoulder + Math.cos(a) * shoulder, -h + shoulder - Math.sin(a) * shoulder]) }
+  for (let k = 0; k <= 4; k++) {
+    const a = ((k / 4) * Math.PI) / 2
+    prof.push([r - shoulder + Math.cos(a) * shoulder, -h + shoulder - Math.sin(a) * shoulder])
+  }
   prof.reverse()
   const tyre: [number, number][] = [[rr * 0.98, -h * 0.82], [rr + (r - rr) * 0.35, -h * 1.02], ...prof.slice(1)]
   const top = tyre.map(([a, b]) => [a, -b] as [number, number]).reverse()
   m.lathe('x', [0, 0, 0], [...tyre, ...top], TYRE, 32)
   const hub = look.hub ?? DARK
   // Rim barrel (dark inside) and the face, set into the outer side.
-  m.lathe('x', [0, 0, 0], [[rr * 0.98, h * 0.82], [rr * 0.98, -h * 0.7], [rr * 0.2, -h * 0.6]], hub, 28)
+  m.lathe(
+    'x',
+    [0, 0, 0],
+    [
+      [rr * 0.98, h * 0.82],
+      [rr * 0.98, -h * 0.7],
+      [rr * 0.2, -h * 0.6]
+    ],
+    hub,
+    28
+  )
   const face = h * 0.62
   const c = look.color
-  m.lathe('x', [0, 0, 0], [[rr * 0.985, h * 0.86], [rr * 0.9, h * 0.8], [rr * 0.86, face]], c, 28)
+  m.lathe(
+    'x',
+    [0, 0, 0],
+    [
+      [rr * 0.985, h * 0.86],
+      [rr * 0.9, h * 0.8],
+      [rr * 0.86, face]
+    ],
+    c,
+    28
+  )
   const spoke = (a: number, wIn: number, wOut: number, depth: number, s: Paint) => {
-    const u: Vec3 = [0, Math.cos(a), Math.sin(a)], v: Vec3 = [0, -Math.sin(a), Math.cos(a)]
-    m.fin([[rr * 0.2, -wIn], [rr * 0.88, -wOut], [rr * 0.88, wOut], [rr * 0.2, wIn]], [face - depth / 2, 0, 0], u, v, depth, s)
+    const u: Vec3 = [0, Math.cos(a), Math.sin(a)],
+      v: Vec3 = [0, -Math.sin(a), Math.cos(a)]
+    m.fin(
+      [
+        [rr * 0.2, -wIn],
+        [rr * 0.88, -wOut],
+        [rr * 0.88, wOut],
+        [rr * 0.2, wIn]
+      ],
+      [face - depth / 2, 0, 0],
+      u,
+      v,
+      depth,
+      s
+    )
   }
   if (look.rim === 'aero') {
-    m.lathe('x', [0, 0, 0], [[rr * 0.88, face], [rr * 0.6, face + h * 0.08], [rr * 0.2, face + h * 0.1], [0.001, face + h * 0.1]], c, 28)
+    m.lathe(
+      'x',
+      [0, 0, 0],
+      [
+        [rr * 0.88, face],
+        [rr * 0.6, face + h * 0.08],
+        [rr * 0.2, face + h * 0.1],
+        [0.001, face + h * 0.1]
+      ],
+      c,
+      28
+    )
     for (let k = 0; k < 5; k++) spoke((k / 5) * Math.PI * 2, rr * 0.03, rr * 0.05, 0.012, DARK)
   } else if (look.rim === 'steel' || look.rim === 'dish') {
-    m.lathe('x', [0, 0, 0], [[rr * 0.88, face], [rr * 0.7, face - h * 0.15], [rr * 0.45, face - h * 0.1], [rr * 0.3, face + h * 0.05], [0.001, face + h * 0.08]], c, 24)
+    m.lathe(
+      'x',
+      [0, 0, 0],
+      [
+        [rr * 0.88, face],
+        [rr * 0.7, face - h * 0.15],
+        [rr * 0.45, face - h * 0.1],
+        [rr * 0.3, face + h * 0.05],
+        [0.001, face + h * 0.08]
+      ],
+      c,
+      24
+    )
     for (let k = 0; k < (look.rim === 'steel' ? 6 : 4); k++) {
       const a = (k / 6) * Math.PI * 2
       m.cylinder('x', [face - h * 0.1, Math.cos(a) * rr * 0.56, Math.sin(a) * rr * 0.56], rr * 0.07, 0.02, DARK, 8)
@@ -130,16 +216,33 @@ export function wheelInto(m: MeshBuilder, r: number, w: number, look: WheelLook)
     m.cylinder('x', [face - 0.02, 0, 0], rr * 0.22, 0.12, hub, 12)
     for (let k = 0; k < look.spokes; k++) {
       const a = (k / look.spokes) * Math.PI * 2
-      m.beam([face - 0.05, Math.cos(a) * rr * 0.18, Math.sin(a) * rr * 0.18], [face - 0.05, Math.cos(a) * rr * 0.9, Math.sin(a) * rr * 0.9], 0.035, c)
+      m.beam(
+        [face - 0.05, Math.cos(a) * rr * 0.18, Math.sin(a) * rr * 0.18],
+        [face - 0.05, Math.cos(a) * rr * 0.9, Math.sin(a) * rr * 0.9],
+        0.035,
+        c
+      )
     }
   } else {
-    m.lathe('x', [0, 0, 0], [[rr * 0.24, face - h * 0.05], [rr * 0.2, face + h * 0.05], [0.001, face + h * 0.06]], look.rim === 'mesh' ? c : hub, 16)
+    m.lathe(
+      'x',
+      [0, 0, 0],
+      [
+        [rr * 0.24, face - h * 0.05],
+        [rr * 0.2, face + h * 0.05],
+        [0.001, face + h * 0.06]
+      ],
+      look.rim === 'mesh' ? c : hub,
+      16
+    )
     const n = look.spokes
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2
       if (look.rim === 'split') for (const d of [-0.09, 0.09]) spoke(a + d, rr * 0.05, rr * 0.035, h * 0.3, c)
-      else if (look.rim === 'mesh') { spoke(a, rr * 0.025, rr * 0.02, h * 0.25, c); spoke(a + Math.PI / n, rr * 0.02, rr * 0.03, h * 0.15, c) }
-      else spoke(a, rr * 0.09, rr * 0.07, h * 0.3, c)
+      else if (look.rim === 'mesh') {
+        spoke(a, rr * 0.025, rr * 0.02, h * 0.25, c)
+        spoke(a + Math.PI / n, rr * 0.02, rr * 0.03, h * 0.15, c)
+      } else spoke(a, rr * 0.09, rr * 0.07, h * 0.3, c)
     }
   }
 }
@@ -147,18 +250,35 @@ export function wheelInto(m: MeshBuilder, r: number, w: number, look: WheelLook)
 /** Monotone cubic interpolation through `(x, y)` keys (sorted by x): smooth body lines with no overshoot. */
 export function curve(keys: [number, number][]): (x: number) => number {
   const n = keys.length
-  const xs = keys.map((k) => k[0]), ys = keys.map((k) => k[1])
-  const d: number[] = [], m: number[] = new Array(n).fill(0)
+  const xs = keys.map((k) => k[0]),
+    ys = keys.map((k) => k[1])
+  const d: number[] = [],
+    m: number[] = new Array(n).fill(0)
   for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / Math.max(1e-9, xs[i + 1] - xs[i]))
-  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (3 * (xs[i + 1] - xs[i - 1])) / ((2 * xs[i + 1] - xs[i] - xs[i - 1]) / d[i - 1] + (xs[i + 1] + xs[i] - 2 * xs[i - 1]) / d[i])
-  if (n > 1) { m[0] = d[0]; m[n - 1] = d[n - 2] }
+  for (let i = 1; i < n - 1; i++)
+    m[i] =
+      d[i - 1] * d[i] <= 0
+        ? 0
+        : (3 * (xs[i + 1] - xs[i - 1])) /
+          ((2 * xs[i + 1] - xs[i] - xs[i - 1]) / d[i - 1] + (xs[i + 1] + xs[i] - 2 * xs[i - 1]) / d[i])
+  if (n > 1) {
+    m[0] = d[0]
+    m[n - 1] = d[n - 2]
+  }
   return (x: number) => {
     if (n === 1 || x <= xs[0]) return ys[0]
     if (x >= xs[n - 1]) return ys[n - 1]
     let i = 0
     while (x > xs[i + 1]) i++
-    const h = xs[i + 1] - xs[i], t = (x - xs[i]) / h
-    const t2 = t * t, t3 = t2 * t
-    return (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m[i + 1]
+    const h = xs[i + 1] - xs[i],
+      t = (x - xs[i]) / h
+    const t2 = t * t,
+      t3 = t2 * t
+    return (
+      (2 * t3 - 3 * t2 + 1) * ys[i] +
+      (t3 - 2 * t2 + t) * h * m[i] +
+      (-2 * t3 + 3 * t2) * ys[i + 1] +
+      (t3 - t2) * h * m[i + 1]
+    )
   }
 }

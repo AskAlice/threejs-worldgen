@@ -1,11 +1,67 @@
 import {
-  AdditiveBlending, BufferAttribute, Color, CustomBlending, OneFactor, OneMinusSrcAlphaFactor, Data3DTexture, InstancedBufferGeometry, Mesh, MeshBasicNodeMaterial, NormalBlending, Sphere, Vector3,
-  type Camera, type ComputeNode, type DirectionalLight, type HemisphereLight, type AmbientLight, type Object3D, type PerspectiveCamera, type Renderer,
+  AdditiveBlending,
+  BufferAttribute,
+  Color,
+  CustomBlending,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
+  type Data3DTexture,
+  InstancedBufferGeometry,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NormalBlending,
+  Sphere,
+  Vector3,
+  type Camera,
+  type ComputeNode,
+  type DirectionalLight,
+  type HemisphereLight,
+  type AmbientLight,
+  type Object3D,
+  type PerspectiveCamera,
+  type Renderer
 } from 'three/webgpu'
 import {
-  Fn, If, Loop, abs, cameraPosition, clamp, cross, dot, exp, float, hash, instanceIndex, instancedArray, int, length, max, mix, modelWorldMatrix,
-  normalize, perspectiveDepthToViewZ, logarithmicDepthToViewZ, cameraNear, cameraFar, positionGeometry, positionView, pow, screenUV, select, smoothstep, sqrt,
-  storage, uint, uniform, uv, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  Fn,
+  If,
+  Loop,
+  abs,
+  cameraPosition,
+  clamp,
+  cross,
+  dot,
+  exp,
+  float,
+  hash,
+  instanceIndex,
+  instancedArray,
+  int,
+  length,
+  max,
+  mix,
+  modelWorldMatrix,
+  normalize,
+  perspectiveDepthToViewZ,
+  logarithmicDepthToViewZ,
+  cameraNear,
+  cameraFar,
+  positionGeometry,
+  positionView,
+  pow,
+  screenUV,
+  select,
+  smoothstep,
+  sqrt,
+  storage,
+  uint,
+  uniform,
+  uv,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+  viewportDepthTexture,
+  viewportSharedTexture
 } from 'three/tsl'
 import { CountingSort } from 'three/addons/gpgpu/CountingSort.js'
 import { blackbodyNode } from './blackbody.ts'
@@ -21,7 +77,7 @@ export class ParticleLighting {
   readonly uniforms = {
     /** Unit vector towards the sun (world). */ sunDirection: uniform(new Vector3(0.3, 0.8, 0.2).normalize()),
     /** Sun colour × intensity (linear). */ sunColor: uniform(new Color(3, 3, 3)),
-    /** Ambient sky light colour × intensity (linear). */ ambient: uniform(new Color(0.45, 0.5, 0.6)),
+    /** Ambient sky light colour × intensity (linear). */ ambient: uniform(new Color(0.45, 0.5, 0.6))
   }
   private found: { root: Object3D; sun: DirectionalLight | null; sky: (HemisphereLight | AmbientLight)[] } | null = null
 
@@ -31,7 +87,8 @@ export class ParticleLighting {
       const f = { root, sun: null as DirectionalLight | null, sky: [] as (HemisphereLight | AmbientLight)[] }
       root.traverse((o) => {
         if (!f.sun && (o as DirectionalLight).isDirectionalLight) f.sun = o as DirectionalLight
-        if ((o as HemisphereLight).isHemisphereLight || (o as AmbientLight).isAmbientLight) f.sky.push(o as HemisphereLight)
+        if ((o as HemisphereLight).isHemisphereLight || (o as AmbientLight).isAmbientLight)
+          f.sky.push(o as HemisphereLight)
       })
       this.found = f
     }
@@ -40,7 +97,10 @@ export class ParticleLighting {
     if (sun) {
       sun.updateWorldMatrix(true, false)
       sun.target.updateWorldMatrix(true, false)
-      u.sunDirection.value.setFromMatrixPosition(sun.matrixWorld).sub(_v.setFromMatrixPosition(sun.target.matrixWorld)).normalize()
+      u.sunDirection.value
+        .setFromMatrixPosition(sun.matrixWorld)
+        .sub(_v.setFromMatrixPosition(sun.target.matrixWorld))
+        .normalize()
       u.sunColor.value.copy(sun.color).multiplyScalar(sun.visible ? sun.intensity : 0)
     }
     if (sky.length) {
@@ -183,7 +243,7 @@ export class ParticleSystem {
     /** Smoke cap height (0 = off). */ capHeight: uniform(0),
     /** Camera position in this system's local space. */ camera: uniform(new Vector3()),
     /** Radians per pixel (for minimum on-screen width of sparks). */ pixelAngle: uniform(0.001),
-    /** Farthest sort distance. */ sortRange: uniform(20000),
+    /** Farthest sort distance. */ sortRange: uniform(20000)
   }
 
   private readonly noise: Data3DTexture
@@ -214,15 +274,33 @@ export class ParticleSystem {
     this.structureKey = JSON.stringify([this.capacity, r.shading, r.blending, r.sort, r.shadowSteps, r.lightSteps])
 
     const n = this.capacity
-    this.buffers = { position: instancedArray(n, 'vec4'), velocity: instancedArray(n, 'vec4'), props: instancedArray(n, 'vec4'), light: instancedArray(n, 'vec4') }
-    this.sourceNodes = { positions: instancedArray(this.sources.positions, 'vec4'), data: instancedArray(this.sources.data, 'vec4'), motion: instancedArray(this.sources.motion, 'vec4'), cdf: instancedArray(this.sources.cdf, 'float') }
-    this.sourceUploads = [[this.sourceNodes.positions, 4], [this.sourceNodes.data, 4], [this.sourceNodes.motion, 4], [this.sourceNodes.cdf, 1]]
+    this.buffers = {
+      position: instancedArray(n, 'vec4'),
+      velocity: instancedArray(n, 'vec4'),
+      props: instancedArray(n, 'vec4'),
+      light: instancedArray(n, 'vec4')
+    }
+    this.sourceNodes = {
+      positions: instancedArray(this.sources.positions, 'vec4'),
+      data: instancedArray(this.sources.data, 'vec4'),
+      motion: instancedArray(this.sources.motion, 'vec4'),
+      cdf: instancedArray(this.sources.cdf, 'float')
+    }
+    this.sourceUploads = [
+      [this.sourceNodes.positions, 4],
+      [this.sourceNodes.data, 4],
+      [this.sourceNodes.motion, 4],
+      [this.sourceNodes.cdf, 1]
+    ]
     this.emitNode = this.buildEmit()
     this.updateNode = this.buildUpdate()
     this.sorter = r.sort ? this.buildSort() : null
 
     const g = new InstancedBufferGeometry()
-    g.setAttribute('position', new BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3))
+    g.setAttribute(
+      'position',
+      new BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3)
+    )
     g.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2))
     g.setIndex(new BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1))
     g.instanceCount = n
@@ -299,7 +377,8 @@ export class ParticleSystem {
       return []
     }
     const step = Math.min(0.1, Math.max(0, dt))
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     this.time = (this.time + step) % TIME_WRAP
     u.time.value = this.time
     u.dt.value = step
@@ -309,11 +388,17 @@ export class ParticleSystem {
       this.object.updateWorldMatrix(true, false)
       u.camera.value.setFromMatrixPosition(camera.matrixWorld).sub(_v.setFromMatrixPosition(this.object.matrixWorld))
       const pc = camera as PerspectiveCamera
-      if (pc.isPerspectiveCamera) u.pixelAngle.value = (2 * Math.tan(((pc.fov * Math.PI) / 180) / 2)) / Math.max(1, renderer.domElement?.height ?? 720)
+      if (pc.isPerspectiveCamera)
+        u.pixelAngle.value =
+          (2 * Math.tan((pc.fov * Math.PI) / 180 / 2)) / Math.max(1, renderer.domElement?.height ?? 720)
       u.sortRange.value = Math.min(20000, (pc as { far?: number }).far ?? 20000)
     }
     const weight = o.emitter.shape === 'sources' ? this.sources.total : 1
-    const batch = this.clock.step(spawnRate(o.rate, weight, this.capacity, (o.life[0] + o.life[1]) / 2), step, o.maxPerFrame)
+    const batch = this.clock.step(
+      spawnRate(o.rate, weight, this.capacity, (o.life[0] + o.life[1]) / 2),
+      step,
+      o.maxPerFrame
+    )
     const nodes: ComputeNode[] = []
     u.spawnCount.value = 0
     if (batch.count > 0 && (o.emitter.shape !== 'sources' || this.sources.count > 0)) {
@@ -334,16 +419,27 @@ export class ParticleSystem {
 
   /** Nodes of particle `index` (for grid splats and custom passes). */
   particle(index: any): SplatParticle {
-    const P = this.buffers.position.element(index), V = this.buffers.velocity.element(index), Q = this.buffers.props.element(index)
+    const P = this.buffers.position.element(index),
+      V = this.buffers.velocity.element(index),
+      Q = this.buffers.props.element(index)
     const alive = select(V.w.greaterThan(0), float(1), float(0))
     const t = clamp(P.w.div(max(V.w, 1e-6)), 0, 1)
-    return { position: P.xyz, alive, t, temperature: Q.x, size: this.uniforms.size.mul(Q.y).mul(this.curves.sizeAt(t)), tint: Q.w }
+    return {
+      position: P.xyz,
+      alive,
+      t,
+      temperature: Q.x,
+      size: this.uniforms.size.mul(Q.y).mul(this.curves.sizeAt(t)),
+      tint: Q.w
+    }
   }
 
   /** Kills every particle (next update starts empty) and restarts the serials. */
   clear(renderer: Renderer): this {
     this.clock.reset()
-    const kill = Fn(() => { this.buffers.velocity.element(instanceIndex).assign(vec4(0)) })().compute(this.capacity)
+    const kill = Fn(() => {
+      this.buffers.velocity.element(instanceIndex).assign(vec4(0))
+    })().compute(this.capacity)
     renderer.compute(kill)
     kill.dispose()
     return this
@@ -359,9 +455,16 @@ export class ParticleSystem {
   }
 
   private applyOptions(): this {
-    const o = this.options, u = this.uniforms, e = o.emitter, f = o.forces, r = o.render
+    const o = this.options,
+      u = this.uniforms,
+      e = o.emitter,
+      f = o.forces,
+      r = o.render
     const key = JSON.stringify([o.capacity, r.shading, r.blending, r.sort, r.shadowSteps, r.lightSteps])
-    if (key !== this.structureKey) console.warn('threejs-particles: capacity, shading, blending, sort, shadowSteps and lightSteps are fixed at construction')
+    if (key !== this.structureKey)
+      console.warn(
+        'threejs-particles: capacity, shading, blending, sort, shadowSteps and lightSteps are fixed at construction'
+      )
     u.seed.value = seedOf(o.seed)
     u.shape.value = SHAPE_ID[e.shape]
     u.emitPosition.value.fromArray(e.position)
@@ -411,7 +514,10 @@ export class ParticleSystem {
   }
 
   private buildEmit(): ComputeNode {
-    const u = this.uniforms, b = this.buffers, s = this.sourceNodes, cap = this.capacity
+    const u = this.uniforms,
+      b = this.buffers,
+      s = this.sourceNodes,
+      cap = this.capacity
     return Fn(() => {
       If(instanceIndex.lessThan(u.spawnCount), () => {
         // Everything random is computed into vars up front: TSL emits a temporary where it is first used,
@@ -426,20 +532,30 @@ export class ParticleSystem {
         const motion = vec4(0, 0, 0, 1).toVar()
         const box = vec3(signed(1), signed(2), signed(3)).mul(u.emitSize).toVar()
         const dir = randomDirection(r(4), r(5)).toVar()
-        If(u.shape.equal(1), () => { p.addAssign(box) })
+        If(u.shape.equal(1), () => {
+          p.addAssign(box)
+        })
         If(u.shape.equal(2), () => {
-          const a = r(1).mul(Math.PI * 2), rad = sqrt(r(2)).mul(u.emitSize.x)
+          const a = r(1).mul(Math.PI * 2),
+            rad = sqrt(r(2)).mul(u.emitSize.x)
           p.addAssign(vec3(a.cos().mul(rad), 0, a.sin().mul(rad)))
         })
-        If(u.shape.equal(3), () => { p.addAssign(randomDirection(r(1), r(2)).mul(pow(r(3), 1 / 3).mul(u.emitSize.x))) })
+        If(u.shape.equal(3), () => {
+          p.addAssign(randomDirection(r(1), r(2)).mul(pow(r(3), 1 / 3).mul(u.emitSize.x)))
+        })
         If(u.shape.equal(4), () => {
           // Weighted pick: binary search of the prefix sums.
           const target = r(0).mul(u.sourceTotal)
-          const lo = int(0).toVar(), hi = u.sourceCount.sub(1).toVar()
+          const lo = int(0).toVar(),
+            hi = u.sourceCount.sub(1).toVar()
           Loop(13, () => {
             If(lo.lessThan(hi), () => {
               const mid = lo.add(hi).div(2)
-              If(s.cdf.element(mid).lessThanEqual(target), () => { lo.assign(mid.add(1)) }).Else(() => { hi.assign(mid) })
+              If(s.cdf.element(mid).lessThanEqual(target), () => {
+                lo.assign(mid.add(1))
+              }).Else(() => {
+                hi.assign(mid)
+              })
             })
           })
           const src = s.positions.element(lo)
@@ -463,18 +579,24 @@ export class ParticleSystem {
   }
 
   private buildUpdate(): ComputeNode {
-    const u = this.uniforms, b = this.buffers, grid = this.grid, r = this.options.render
+    const u = this.uniforms,
+      b = this.buffers,
+      grid = this.grid,
+      r = this.options.render
     const L = this.lighting.uniforms
     return Fn(() => {
       const i = instanceIndex
       // Read each buffer once into registers: TSL re-evaluates un-var'd reads after the writes below.
-      const P = b.position.element(i).toVar(), V = b.velocity.element(i).toVar(), Q = b.props.element(i).toVar()
+      const P = b.position.element(i).toVar(),
+        V = b.velocity.element(i).toVar(),
+        Q = b.props.element(i).toVar()
       If(V.w.greaterThan(0), () => {
         const age = P.w.add(u.dt).toVar()
         If(age.greaterThanEqual(V.w), () => {
           b.velocity.element(i).assign(vec4(0))
         }).Else(() => {
-          const p = P.xyz, v = V.xyz
+          const p = P.xyz,
+            v = V.xyz
           const Ta = u.ambientTemperature
           const T = Ta.add(Q.x.sub(Ta).mul(exp(u.cooling.mul(u.dt).negate())))
           const lift = float(9.81).mul(u.buoyancy).mul(T.sub(Ta)).div(Ta)
@@ -482,7 +604,9 @@ export class ParticleSystem {
           const gridLift: any = grid ? u.gridLift.mul(heat.div(heat.add(1))) : float(0) // saturating: at most gridLift
           const shear = float(1).add(u.windShear.mul(max(p.y.sub(u.emitPosition.y), 0)).div(100))
           const air = u.wind.mul(shear)
-          const tp = p.div(u.turbulenceScale.mul(8)).add(vec3(0.31, 0.67, 0.53).mul(u.time.mul(u.turbulenceSpeed).div(8)))
+          const tp = p
+            .div(u.turbulenceScale.mul(8))
+            .add(vec3(0.31, 0.67, 0.53).mul(u.time.mul(u.turbulenceSpeed).div(8)))
           const turb = curlNoise(this.noise, tp).mul(u.turbulence)
           const a = vec3(0, lift.add(gridLift).sub(u.gravity), 0).add(air.sub(v).mul(u.drag)).add(turb)
           const nv = v.add(a.mul(u.dt)).toVar()
@@ -493,7 +617,8 @@ export class ParticleSystem {
             const cell = grid.uniforms.size.div(vec3(...grid.resolution))
             const stepLen = cell.x.add(cell.y).add(cell.z).div(3)
             let sum: any = float(0)
-            for (let k = 0; k < r.lightSteps; k++) sum = sum.add(grid.sample(p.add(L.sunDirection.mul(stepLen.mul(k + 0.75)))).y)
+            for (let k = 0; k < r.lightSteps; k++)
+              sum = sum.add(grid.sample(p.add(L.sunDirection.mul(stepLen.mul(k + 0.75)))).y)
             b.light.element(i).assign(vec4(exp(sum.mul(u.absorption).mul(-0.3)), heat, b.light.element(i).z, 0))
           }
           b.position.element(i).assign(vec4(np, age))
@@ -505,10 +630,12 @@ export class ParticleSystem {
   }
 
   private buildSort(): CountingSort {
-    const u = this.uniforms, b = this.buffers
+    const u = this.uniforms,
+      b = this.buffers
     const sorter = new CountingSort(this.capacity, { binCount: SORT_BINS, workgroupSize: 64 })
     sorter.setBinNode(() => {
-      const P = b.position.element(instanceIndex), V = b.velocity.element(instanceIndex)
+      const P = b.position.element(instanceIndex),
+        V = b.velocity.element(instanceIndex)
       const far = sqrt(clamp(length(P.xyz.sub(u.camera)).div(u.sortRange), 0, 1))
       return select(V.w.greaterThan(0), uint(far.oneMinus().mul(SORT_BINS - 1)), uint(SORT_BINS - 1))
     })
@@ -518,18 +645,37 @@ export class ParticleSystem {
   // ---- render ----
 
   private buildMaterial(): MeshBasicNodeMaterial {
-    const o = this.options, r = o.render, u = this.uniforms, b = this.buffers, L = this.lighting.uniforms
-    const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: r.blending === 'additive' ? AdditiveBlending : NormalBlending })
+    const o = this.options,
+      r = o.render,
+      u = this.uniforms,
+      b = this.buffers,
+      L = this.lighting.uniforms
+    const m = new MeshBasicNodeMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: r.blending === 'additive' ? AdditiveBlending : NormalBlending
+    })
     if (r.blending === 'premultiplied') {
       // Emission adds; coverage partly hides what is behind (dense flame cores read as solid).
-      Object.assign(m, { blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor, blendSrcAlpha: OneFactor, blendDstAlpha: OneMinusSrcAlphaFactor })
+      Object.assign(m, {
+        blending: CustomBlending,
+        blendSrc: OneFactor,
+        blendDst: OneMinusSrcAlphaFactor,
+        blendSrcAlpha: OneFactor,
+        blendDstAlpha: OneMinusSrcAlphaFactor
+      })
     }
     m.name = `Particles ${r.shading}`
     m.fog = r.shading === 'smoke' || r.shading === 'unlit'
 
     // Vertex: fetch the particle (sorted order if sorting), build the billboard.
-    const index = this.sorter ? storage(this.sorter.orderAttribute, 'uint', this.capacity).toReadOnly().element(instanceIndex) : instanceIndex
-    const P = b.position.element(index), V = b.velocity.element(index), Q = b.props.element(index), Lt = b.light.element(index)
+    const index = this.sorter
+      ? storage(this.sorter.orderAttribute, 'uint', this.capacity).toReadOnly().element(instanceIndex)
+      : instanceIndex
+    const P = b.position.element(index),
+      V = b.velocity.element(index),
+      Q = b.props.element(index),
+      Lt = b.light.element(index)
     const alive = select(V.w.greaterThan(0), float(1), float(0))
     const t = clamp(P.w.div(max(V.w, 1e-6)), 0, 1)
     const center = P.xyz
@@ -561,10 +707,26 @@ export class ParticleSystem {
     m.positionNode = center.add(side.mul(corner.x.mul(width).mul(keep))).add(axis.mul(corner.y.mul(len).mul(keep)))
 
     const vary = (n: any): any => varying(n)
-    const vT = vary(t), vTemp = vary(Q.x), vSeed = vary(Q.z), vTint = vary(Q.w), vLight = vary(Lt.xy), vOpacity = vary(Lt.z)
-    const vSide = vary(side), vAxis = vary(axis), vToCam = vary(toCam), vDist = vary(dist), vFade = vary(fade), vNear = vary(near)
+    const vT = vary(t),
+      vTemp = vary(Q.x),
+      vSeed = vary(Q.z),
+      vTint = vary(Q.w),
+      vLight = vary(Lt.xy),
+      vOpacity = vary(Lt.z)
+    const vSide = vary(side),
+      vAxis = vary(axis),
+      vToCam = vary(toCam),
+      vDist = vary(dist),
+      vFade = vary(fade),
+      vNear = vary(near)
     // Smoke cap: how far into the pyrocumulus top this particle is (0 below capHeight × 0.6, 1 at capHeight).
-    const vCap = vary(select(u.capHeight.greaterThan(0), smoothstep(u.capHeight.mul(0.45), u.capHeight, center.y.sub(u.emitPosition.y)), float(0)))
+    const vCap = vary(
+      select(
+        u.capHeight.greaterThan(0),
+        smoothstep(u.capHeight.mul(0.45), u.capHeight, center.y.sub(u.emitPosition.y)),
+        float(0)
+      )
+    )
 
     // Fragment.
     const q = uv()
@@ -578,14 +740,22 @@ export class ParticleSystem {
 
     if (r.shading === 'flame') {
       const tp = u.time
-      const n1 = sampleNoise(N, vec3(q.x.mul(0.35).add(vSeed.mul(7)), q.y.mul(0.45).sub(tp.mul(0.9)), vSeed.mul(3).add(vT.mul(0.3)))).w
+      const n1 = sampleNoise(
+        N,
+        vec3(q.x.mul(0.35).add(vSeed.mul(7)), q.y.mul(0.45).sub(tp.mul(0.9)), vSeed.mul(3).add(vT.mul(0.3)))
+      ).w
       const n2 = sampleNoise(N, vec3(q.x.mul(0.9).add(vSeed.mul(5)), q.y.mul(1.1).sub(tp.mul(2.1)), vSeed.mul(11))).w
       const x = c.x.add(n1.sub(0.5).mul(0.55).mul(q.y.add(0.15)))
-      const w = float(0.5).mul(pow(max(float(1).sub(q.y), 0), 0.65)).add(0.02)
+      const w = float(0.5)
+        .mul(pow(max(float(1).sub(q.y), 0), 0.65))
+        .add(0.02)
       const d = abs(x).div(w)
       const body = smoothstep(1, 0.55, d.add(n2.sub(0.5).mul(mix(0.2, 0.7, detail))))
       const density = body.mul(smoothstep(0, 0.1, q.y)).mul(smoothstep(1, 0.7, q.y.add(n1.sub(0.5).mul(0.5))))
-      const T = vTemp.mul(float(0.7).add(pow(d.oneMinus().clamp(0, 1), 2).mul(0.5))).mul(float(1).sub(q.y.mul(0.3))).mul(n2.mul(0.25).add(0.88))
+      const T = vTemp
+        .mul(float(0.7).add(pow(d.oneMinus().clamp(0, 1), 2).mul(0.5)))
+        .mul(float(1).sub(q.y.mul(0.3)))
+        .mul(n2.mul(0.25).add(0.88))
       const bb = blackbodyNode(T).mul(pow(T.div(1400), 4))
       color = mix(curve.xyz, bb.mul(curve.xyz), u.blackbody).mul(u.intensity)
       alpha = density.mul(curve.w).mul(u.opacity).mul(soft)
@@ -596,7 +766,9 @@ export class ParticleSystem {
       }
     } else if (r.shading === 'spark') {
       const across = abs(c.x).mul(2)
-      const core = pow(clamp(float(1).sub(across), 0, 1), 2).mul(smoothstep(0, 0.25, q.y)).mul(smoothstep(1, 0.55, q.y))
+      const core = pow(clamp(float(1).sub(across), 0, 1), 2)
+        .mul(smoothstep(0, 0.25, q.y))
+        .mul(smoothstep(1, 0.55, q.y))
       color = tint.mul(u.intensity)
       alpha = core.mul(curve.w).mul(u.opacity).mul(vFade).mul(soft)
     } else if (r.shading === 'haze') {
@@ -612,7 +784,8 @@ export class ParticleSystem {
         const fade = soft.toVar()
         // Rotated noise coordinates per puff, evolving over life; eroded edges merge puffs into one volume.
         const ang = vSeed.mul(Math.PI * 2).add(vT.mul(0.6))
-        const ca: any = ang.cos().toVar(), sa: any = ang.sin().toVar()
+        const ca: any = ang.cos().toVar(),
+          sa: any = ang.sin().toVar()
         const rc: any = (vec2 as any)(c.x.mul(ca).sub(c.y.mul(sa)), c.x.mul(sa).add(c.y.mul(ca))).toVar()
         const density = (o2: any) => {
           // Warped, billowing, evolving noise dominates the shape; the radial falloff only keeps it inside the quad.
@@ -633,20 +806,35 @@ export class ParticleSystem {
         // Self-shadow: a few density taps towards the sun across the billboard; skipped (branch) when far away.
         const shadow = float(0).toVar()
         if (r.shadowSteps > 0) {
-          const sx: any = dot(Ldir, vSide), sy: any = dot(Ldir, vAxis)
-          const sdir = (vec2 as any)(sx.mul(ca).add(sy.mul(sa)), sy.mul(ca).sub(sx.mul(sa))).mul(0.16).toVar()
+          const sx: any = dot(Ldir, vSide),
+            sy: any = dot(Ldir, vAxis)
+          const sdir = (vec2 as any)(sx.mul(ca).add(sy.mul(sa)), sy.mul(ca).sub(sx.mul(sa)))
+            .mul(0.16)
+            .toVar()
           If(det.greaterThan(0.05), () => {
             let sum: any = float(0)
             for (let k = 1; k <= r.shadowSteps; k++) sum = sum.add(density(rc.add(sdir.mul(k))))
             shadow.assign(sum.mul(det))
           })
         }
-        const Tself = exp(shadow.mul(u.absorption).mul(-0.6).mul(float(1).sub(vCap.mul(0.4))))
+        const Tself = exp(
+          shadow
+            .mul(u.absorption)
+            .mul(-0.6)
+            .mul(float(1).sub(vCap.mul(0.4)))
+        )
         const r2 = clamp(dot(c, c).mul(4), 0, 1)
-        const Nrm = normalize(vSide.mul(c.x).add(vAxis.mul(c.y)).add(vToCam.mul(sqrt(float(1).sub(r2)).add(0.6))))
+        const Nrm = normalize(
+          vSide
+            .mul(c.x)
+            .add(vAxis.mul(c.y))
+            .add(vToCam.mul(sqrt(float(1).sub(r2)).add(0.6)))
+        )
         const g = u.anisotropy
         const cosT = dot(Ldir.negate(), vToCam)
-        const hg = float(1).sub(g.mul(g)).div(pow(float(1).add(g.mul(g)).sub(g.mul(2).mul(cosT)), 1.5))
+        const hg = float(1)
+          .sub(g.mul(g))
+          .div(pow(float(1).add(g.mul(g)).sub(g.mul(2).mul(cosT)), 1.5))
         const phase = mix(float(1), hg, 0.5).add(hg.mul(u.silverLining).mul(float(1).sub(dens)).mul(0.5))
         const wrap = clamp(dot(Nrm, Ldir).add(0.25).div(1.25), 0, 1)
         // Multiple scattering keeps even deep smoke from going black: never less than ~30% of single-scatter light.
@@ -658,7 +846,15 @@ export class ParticleSystem {
         const hot = pow(clamp(vTemp.sub(u.ambientTemperature).sub(130).div(360), 0, 1), 2)
         const under = clamp(Nrm.y.negate().mul(0.5).add(0.6), 0, 1)
         const glow = u.glow.mul(u.glowStrength).mul(hot).mul(under)
-        return (vec4 as any)(albedo.mul(sun.add(sky).add(glow)), dens.mul(curve.w).mul(u.opacity).mul(vOpacity).mul(mix(float(1), float(1.6), vCap)).mul(fade))
+        return (vec4 as any)(
+          albedo.mul(sun.add(sky).add(glow)),
+          dens
+            .mul(curve.w)
+            .mul(u.opacity)
+            .mul(vOpacity)
+            .mul(mix(float(1), float(1.6), vCap))
+            .mul(fade)
+        )
       })()
       color = out.xyz
       alpha = out.w
@@ -682,10 +878,13 @@ function randomDirection(a: any, b: any): any {
 }
 
 /** View-space z of the opaque scene behind the current fragment (plain and logarithmic depth). */
-const sceneViewZ = () => Fn((builder: any) => {
-  const d = viewportDepthTexture().x
-  return builder.renderer.logarithmicDepthBuffer ? logarithmicDepthToViewZ(d, cameraNear, cameraFar) : perspectiveDepthToViewZ(d, cameraNear, cameraFar)
-})()
+const sceneViewZ = () =>
+  Fn((builder: any) => {
+    const d = viewportDepthTexture().x
+    return builder.renderer.logarithmicDepthBuffer
+      ? logarithmicDepthToViewZ(d, cameraNear, cameraFar)
+      : perspectiveDepthToViewZ(d, cameraNear, cameraFar)
+  })()
 
 const _v = new Vector3()
 const _c = new Color()

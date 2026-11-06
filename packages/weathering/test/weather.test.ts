@@ -13,7 +13,10 @@ test('weather is a pure function of seed, position and time (scrubbing works)', 
   const b = new Weather({ seed: 'scrub' })
   const times = [0, 5000, 123.4, 86400 * 3, 42, 5000]
   const forward = times.map((t) => ({ ...a.at(300, -200, t) }))
-  const shuffled = [...times].reverse().map((t) => ({ ...b.at(300, -200, t) })).reverse()
+  const shuffled = [...times]
+    .reverse()
+    .map((t) => ({ ...b.at(300, -200, t) }))
+    .reverse()
   assert.deepEqual(forward, shuffled)
   assert.deepEqual(forward[1], forward[5])
   assert.notDeepEqual(a.at(0, 0, 0), new Weather({ seed: 'other' }).at(0, 0, 0))
@@ -39,7 +42,12 @@ test('climate-aware: deserts rarely rain, rainforests often do', () => {
 
 test('cold precipitation is snow, warm is rain, sleet in between', () => {
   const at = (temperature: number) => {
-    const w = new Weather({ seed: 9, climate: { temperature, moisture: 0.95 }, fronts: { coverage: 1 }, storms: { enabled: false } })
+    const w = new Weather({
+      seed: 9,
+      climate: { temperature, moisture: 0.95 },
+      fronts: { coverage: 1 },
+      storms: { enabled: false }
+    })
     return w.at(0, 0, 1000)
   }
   assert.equal(at(-8).type, 'snow')
@@ -61,20 +69,50 @@ test('lightning strikes are deterministic, inside the box, and split windows agr
   const box = [-20000, -20000, 20000, 20000] as const
   const whole = w.strikes(...box, 0, 4 * HOUR)
   assert.ok(whole.length > 10, `got ${whole.length} strikes`)
-  for (const s of whole) assert.ok(s.x >= box[0] && s.x <= box[2] && s.z >= box[1] && s.z <= box[3] && s.time >= 0 && s.time < 4 * HOUR)
+  for (const s of whole)
+    assert.ok(s.x >= box[0] && s.x <= box[2] && s.z >= box[1] && s.z <= box[3] && s.time >= 0 && s.time < 4 * HOUR)
   const parts = [...w.strikes(...box, 0, 1234.5), ...w.strikes(...box, 1234.5, 4 * HOUR)]
   assert.deepEqual(parts, whole)
-  assert.deepEqual(new Weather({ seed: 'thunder', climate: { temperature: 28, moisture: 0.9 }, storms: { chance: 1 } }).strikes(...box, 0, 4 * HOUR), whole)
+  assert.deepEqual(
+    new Weather({ seed: 'thunder', climate: { temperature: 28, moisture: 0.9 }, storms: { chance: 1 } }).strikes(
+      ...box,
+      0,
+      4 * HOUR
+    ),
+    whole
+  )
   // Too cold for thunderstorms.
-  assert.equal(new Weather({ seed: 'thunder', climate: { temperature: -5, moisture: 0.9 }, storms: { chance: 1 } }).strikes(...box, 0, 4 * HOUR).length, 0)
+  assert.equal(
+    new Weather({ seed: 'thunder', climate: { temperature: -5, moisture: 0.9 }, storms: { chance: 1 } }).strikes(
+      ...box,
+      0,
+      4 * HOUR
+    ).length,
+    0
+  )
 })
 
 test('surfaces get wet in rain and dry afterwards; snow accumulates in the cold', () => {
-  const wet = new Weather({ seed: 2, climate: { temperature: 14, moisture: 1 }, fronts: { coverage: 1 }, storms: { enabled: false } })
+  const wet = new Weather({
+    seed: 2,
+    climate: { temperature: 14, moisture: 1 },
+    fronts: { coverage: 1 },
+    storms: { enabled: false }
+  })
   assert.ok(wet.surfaceAt(0, 0, 10 * HOUR).wetness > 0.8)
-  const dry = new Weather({ seed: 2, climate: { temperature: 25, moisture: 0 }, fronts: { coverage: -1 }, storms: { enabled: false } })
+  const dry = new Weather({
+    seed: 2,
+    climate: { temperature: 25, moisture: 0 },
+    fronts: { coverage: -1 },
+    storms: { enabled: false }
+  })
   assert.equal(dry.surfaceAt(0, 0, 10 * HOUR).wetness, 0)
-  const cold = new Weather({ seed: 2, climate: { temperature: -10, moisture: 1 }, fronts: { coverage: 1 }, storms: { enabled: false } })
+  const cold = new Weather({
+    seed: 2,
+    climate: { temperature: -10, moisture: 1 },
+    fronts: { coverage: 1 },
+    storms: { enabled: false }
+  })
   const s = cold.surfaceAt(0, 0, 10 * HOUR)
   assert.ok(s.snow > 0.8 && s.snowDepth > 0)
 })
@@ -87,7 +125,12 @@ test('state field paints, samples, recentres and fills from the weather', () => 
   assert.equal(field.value('burn', 500, 0), 0)
   field.set({ center: [16, 0] }) // shift by 4 texels: the scar stays where it was in the world
   assert.ok(Math.abs(field.value('burn', 0, 0) - 1) < 1e-6)
-  const w = new Weather({ seed: 2, climate: { temperature: 14, moisture: 1 }, fronts: { coverage: 1 }, storms: { enabled: false } })
+  const w = new Weather({
+    seed: 2,
+    climate: { temperature: 14, moisture: 1 },
+    fronts: { coverage: 1 },
+    storms: { enabled: false }
+  })
   while (!field.updateFromWeather(w, 10 * HOUR, 50));
   assert.ok(field.value('wetness', 5, 5) > 0.8)
   field.update()

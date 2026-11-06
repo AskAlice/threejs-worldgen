@@ -15,7 +15,15 @@ import { World } from './world.ts'
 let world: World | null = null
 
 /** Handles `world` (new settings) and `build` (one chunk) messages from `WorldTerrain`. */
-function handle(msg: { type: string; options?: World['options']; version?: number; id?: number; worker?: number; key?: ChunkKey; settings?: ChunkSettings }) {
+function handle(msg: {
+  type: string
+  options?: World['options']
+  version?: number
+  id?: number
+  worker?: number
+  key?: ChunkKey
+  settings?: ChunkSettings
+}) {
   if (msg.type === 'world') {
     world = new World(msg.options)
     world.version = msg.version ?? 0
@@ -26,7 +34,12 @@ function handle(msg: { type: string; options?: World['options']; version?: numbe
     // The index buffer is cached per resolution on both sides; send only whether it is flipped.
     const out = { ...data, index: isFlipped(data.index) }
     ;(self as unknown as Worker).postMessage({ type: 'built', id: msg.id, worker: msg.worker, data: out }, [
-      data.positions.buffer, data.morph.buffer, data.normals.buffer, data.colors.buffer, data.climate.buffer, data.biomeColors.buffer,
+      data.positions.buffer,
+      data.morph.buffer,
+      data.normals.buffer,
+      data.colors.buffer,
+      data.climate.buffer,
+      data.biomeColors.buffer
     ])
   }
 }

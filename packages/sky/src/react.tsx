@@ -5,7 +5,18 @@
  *
  * @module threejs-sky/react
  */
-import { createContext, useContext, useEffect, useImperativeHandle, useMemo, useReducer, useRef, useState, type ReactNode, type Ref } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref
+} from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera, Material, Scene, WebGPURenderer } from 'three/webgpu'
 import { Sky as SkyImpl, type SkyInput, type WorldLike } from './sky.ts'
@@ -74,7 +85,13 @@ export function Sky({ ref, world, camera, children, ...options }: SkyProps): Rea
   useEffect(() => {
     let created: SkyImpl | null = null
     let cancelled = false
-    SkyImpl.create({ renderer: gl as unknown as WebGPURenderer, scene: scene as unknown as Scene, camera: activeCamera, world, ...latest.current }).then((s) => {
+    SkyImpl.create({
+      renderer: gl as unknown as WebGPURenderer,
+      scene: scene as unknown as Scene,
+      camera: activeCamera,
+      world,
+      ...latest.current
+    }).then((s) => {
       if (cancelled) return s.dispose()
       created = s
       setSky(s)
@@ -86,9 +103,13 @@ export function Sky({ ref, world, camera, children, ...options }: SkyProps): Rea
     }
   }, [gl, scene, world])
 
-  useEffect(() => { if (sky) sky.camera = activeCamera }, [sky, activeCamera])
+  useEffect(() => {
+    if (sky) sky.camera = activeCamera
+  }, [sky, activeCamera])
   // Props are the full truth: reset() reverts removed props. Cheap, and the clock only jumps when `clock.date` changes.
-  useEffect(() => { sky?.reset(options) })
+  useEffect(() => {
+    sky?.reset(options)
+  })
   useImperativeHandle(ref, () => sky!, [sky])
   useFrame((_, dt) => sky?.update(dt))
 
@@ -110,7 +131,9 @@ export function Stars({ ref, ...options }: StarsProps): React.JSX.Element | null
   const ctx = useContext(SkyContext)
   const [stars] = useState(() => new StarsImpl(options))
   useEffect(() => () => stars.dispose(), [stars])
-  useEffect(() => { stars.reset(options) })
+  useEffect(() => {
+    stars.reset(options)
+  })
   useImperativeHandle(ref, () => stars, [stars])
   useFrame(() => stars.update(ctx?.sky?.state))
   return <primitive object={stars.object} />
@@ -130,7 +153,9 @@ export function ShootingStars({ ref, ...options }: ShootingStarsProps): React.JS
   const ctx = useContext(SkyContext)
   const [meteors] = useState(() => new ShootingStarsImpl(options))
   useEffect(() => () => meteors.dispose(), [meteors])
-  useEffect(() => { meteors.reset(options) })
+  useEffect(() => {
+    meteors.reset(options)
+  })
   useImperativeHandle(ref, () => meteors, [meteors])
   useFrame((_, dt) => {
     const sky = ctx?.sky
@@ -157,7 +182,14 @@ export interface SolarSystemProps extends SolarSystemInput {
  * The orbital view of a star system: star, planets, moons, rings and orbit lines, floating-origin safe.
  * Inside `<Sky>` it shows that sky's system at its time; outside it runs its own clock.
  */
-export function SolarSystem({ ref, clock: clockOptions, materials, camera, children, ...options }: SolarSystemProps): React.JSX.Element | null {
+export function SolarSystem({
+  ref,
+  clock: clockOptions,
+  materials,
+  camera,
+  children,
+  ...options
+}: SolarSystemProps): React.JSX.Element | null {
   const parent = useContext(SkyContext)
   const { camera: defaultCamera } = useThree()
   const activeCamera = camera ?? defaultCamera
@@ -172,9 +204,13 @@ export function SolarSystem({ ref, clock: clockOptions, materials, camera, child
     setSolar(s)
     return () => s.dispose()
   }, [sky, materials])
-  useEffect(() => { solar?.reset(options) })
+  useEffect(() => {
+    solar?.reset(options)
+  })
   const clockKey = JSON.stringify(clockOptions ?? {})
-  useEffect(() => { if (!sky) ownClock.reset(clockOptions) }, [clockKey]) // only on change, so useSkyTime() edits stick
+  useEffect(() => {
+    if (!sky) ownClock.reset(clockOptions)
+  }, [clockKey]) // only on change, so useSkyTime() edits stick
   useImperativeHandle(ref, () => solar!, [solar])
   useFrame((_, dt) => {
     if (!solar) return
@@ -183,7 +219,7 @@ export function SolarSystem({ ref, clock: clockOptions, materials, camera, child
     solar.update(sky ? sky.clock.time : ownClock.time, activeCamera)
   })
 
-  const value = useMemo(() => (parent ?? { sky: null, clock: ownClock }), [parent, ownClock])
+  const value = useMemo(() => parent ?? { sky: null, clock: ownClock }, [parent, ownClock])
   if (!solar) return null
   return (
     <SkyContext.Provider value={value}>
@@ -236,7 +272,10 @@ export function useSkyTime(fps = 4): SkyTime {
     const id = setInterval(rerender, 1000 / fps)
     return () => clearInterval(id)
   }, [fps])
-  const act = (f: () => void) => { f(); rerender() }
+  const act = (f: () => void) => {
+    f()
+    rerender()
+  }
   return {
     clock,
     time: clock.time,
@@ -249,6 +288,6 @@ export function useSkyTime(fps = 4): SkyTime {
     setDayLength: (x) => act(() => clock.set({ dayLength: x })),
     setPaused: (p) => act(() => clock.set({ paused: p })),
     advance: (sec) => act(() => clock.advance(sec)),
-    setTimeOfDay: (h) => act(() => sky?.setTimeOfDay(h)),
+    setTimeOfDay: (h) => act(() => sky?.setTimeOfDay(h))
   }
 }

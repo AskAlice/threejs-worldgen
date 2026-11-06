@@ -37,7 +37,9 @@ function linkRow(p, allDemos) {
 
 function card(p) {
   const href = p.demos[0] ? demoUrl(p.demos[0]) : landingUrl(p)
-  const img = p.thumb ? `${a(href, `<img src="${SITE}media/${p.thumb}" width="${THUMB_WIDTH}" alt="${alt(p, p.thumb)}" />`)}<br />` : ''
+  const img = p.thumb
+    ? `${a(href, `<img src="${SITE}media/${p.thumb}" width="${THUMB_WIDTH}" alt="${alt(p, p.thumb)}" />`)}<br />`
+    : ''
   return `<td valign="top" width="${THUMB_WIDTH}">${img}<b>${a(landingUrl(p), esc(p.name))}</b><br />${esc(plain(p.pitch))}<br />${linkRow(p, false)}</td>`
 }
 
@@ -55,7 +57,9 @@ export function grid(pkgs) {
 /** The block under a package README's title: hero image (if any) and the link row. */
 export function packageBlock(p) {
   const href = p.demos[0] ? demoUrl(p.demos[0]) : landingUrl(p)
-  const hero = p.heroImg ? `<p>${a(href, `<img src="${SITE}media/${p.heroImg}" alt="${alt(p, p.heroImg)}" />`)}</p>\n` : ''
+  const hero = p.heroImg
+    ? `<p>${a(href, `<img src="${SITE}media/${p.heroImg}" alt="${alt(p, p.heroImg)}" />`)}</p>\n`
+    : ''
   return `${hero}<p><b>${linkRow(p, true)}</b></p>`
 }
 
@@ -96,11 +100,12 @@ export function pairDemos(files) {
  * of `pkgs` whose lander lists one of its pages, else the one DEMOS in landing/seo.mjs names for it.
  */
 export function demoOwners(pkgs, pairs) {
-  const owner = (f) => f && (pkgs.find((p) => p.demos.some((d) => pageOf(d.href) === f)) ?? pkgs.find((p) => p.short === DEMOS[f]?.[0]))
+  const owner = (f) =>
+    f && (pkgs.find((p) => p.demos.some((d) => pageOf(d.href) === f)) ?? pkgs.find((p) => p.short === DEMOS[f]?.[0]))
   return new Map(pairs.map((d) => [d, owner(d.three) || owner(d.r3f) || null]))
 }
 
-const twin = (f, label) => f ? a(`${SITE}demo/${f}`, label) : `${label}: not yet`
+const twin = (f, label) => (f ? a(`${SITE}demo/${f}`, label) : `${label}: not yet`)
 const demoLine = (d) => `${esc(d.name)}: ${twin(d.three, 'three.js')} · ${twin(d.r3f, 'R3F')}`
 const row = (cells) => `<tr>${cells.map((c) => `<td valign="top">${c}</td>`).join('')}</tr>`
 
@@ -114,15 +119,33 @@ export function docsMap(pkgs, pairs) {
   const ownerOf = (href) => [...owners].find(([d]) => [d.three, d.r3f].includes(pageOf(href)))?.[1]
   const rank = (p, d) => p.demos.findIndex((x) => [d.three, d.r3f].includes(pageOf(x.href))) >>> 0
   const rows = pkgs.map((p) => {
-    const own = pairs.filter((d) => owners.get(d) === p) // lander order, then the package's own name, then A-Z
-      .sort((x, y) => rank(p, x) - rank(p, y) || (x.name !== p.short) - (y.name !== p.short) || x.name.localeCompare(y.name))
+    const own = pairs
+      .filter((d) => owners.get(d) === p) // lander order, then the package's own name, then A-Z
+      .sort(
+        (x, y) => rank(p, x) - rank(p, y) || (x.name !== p.short) - (y.name !== p.short) || x.name.localeCompare(y.name)
+      )
     const elsewhere = [...new Set(p.demos.map((d) => ownerOf(d.href)))].filter((o) => o && o !== p)
-    const docs = [a(apiUrl(p.name), esc(p.name)), p.react && a(apiUrl(`${p.name}/react`), esc(`${p.name}/react`)), p.landing && a(landingUrl(p), 'Landing page')]
-    const demos = own.length ? own.map(demoLine).join('<br />') : elsewhere.length ? `See ${elsewhere.map((o) => esc(o.name)).join(', ')}` : 'No demo yet'
+    const docs = [
+      a(apiUrl(p.name), esc(p.name)),
+      p.react && a(apiUrl(`${p.name}/react`), esc(`${p.name}/react`)),
+      p.landing && a(landingUrl(p), 'Landing page')
+    ]
+    const demos = own.length
+      ? own.map(demoLine).join('<br />')
+      : elsewhere.length
+        ? `See ${elsewhere.map((o) => esc(o.name)).join(', ')}`
+        : 'No demo yet'
     return row([`<b>${esc(p.name)}</b><br />${esc(plain(p.pitch))}`, docs.filter(Boolean).join('<br />'), demos])
   })
   const loose = pairs.filter((d) => !owners.get(d))
-  if (loose.length) rows.push(row(['<b>Everything together / tools</b><br />Demos that use several packages at once.', '', loose.map(demoLine).join('<br />')]))
+  if (loose.length)
+    rows.push(
+      row([
+        '<b>Everything together / tools</b><br />Demos that use several packages at once.',
+        '',
+        loose.map(demoLine).join('<br />')
+      ])
+    )
   return `<table>\n<tr><th align="left">Package</th><th align="left">API reference and landing page</th><th align="left">Demos: three.js · R3F</th></tr>\n${rows.join('\n')}\n</table>`
 }
 
@@ -135,37 +158,61 @@ export function missingFromMap(html, pkgs, pages) {
   const s = html.indexOf(MAP_START)
   const e = html.indexOf(MAP_END)
   const hrefs = new Set([...(s !== -1 && e > s ? html.slice(s, e) : '').matchAll(/href="([^"?#]*)/g)].map((m) => m[1]))
-  const want = [...pkgs.flatMap((p) => p.react ? [apiUrl(p.name), apiUrl(`${p.name}/react`)] : [apiUrl(p.name)]), ...pages.map((f) => `${SITE}demo/${f}`)]
+  const want = [
+    ...pkgs.flatMap((p) => (p.react ? [apiUrl(p.name), apiUrl(`${p.name}/react`)] : [apiUrl(p.name)])),
+    ...pages.map((f) => `${SITE}demo/${f}`)
+  ]
   return want.filter((u) => !hrefs.has(u))
 }
 
 /** The public (not `private`) workspace packages, in `workspaces` order: `{ name, short, description, react }`. */
 export function workspacePackages(root) {
   const json = (dir) => JSON.parse(readFileSync(join(root, dir, 'package.json'), 'utf8'))
-  return json('.').workspaces.map((dir) => ({ dir, pkg: json(dir) })).filter(({ pkg }) => !pkg.private).map(({ dir, pkg }) =>
-    ({ name: pkg.name, short: dir.split('/').pop(), description: pkg.description ?? '', react: !!pkg.exports?.['./react'] }))
+  return json('.')
+    .workspaces.map((dir) => ({ dir, pkg: json(dir) }))
+    .filter(({ pkg }) => !pkg.private)
+    .map(({ dir, pkg }) => ({
+      name: pkg.name,
+      short: dir.split('/').pop(),
+      description: pkg.description ?? '',
+      react: !!pkg.exports?.['./react']
+    }))
 }
 
 /** The demo pages in example/: every *.html except demos.html, the index of them all. */
-export const demoPages = (root) => readdirSync(join(root, 'example')).filter((f) => f.endsWith('.html') && f !== 'demos.html').sort()
+export const demoPages = (root) =>
+  readdirSync(join(root, 'example'))
+    .filter((f) => f.endsWith('.html') && f !== 'demos.html')
+    .sort()
 
 // ---------- CLI ----------
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = fileURLToPath(new URL('..', import.meta.url))
-  const media = (f) => f && [join(root, 'landing/media', f), join(root, 'media', f)].some(existsSync) ? f : null
+  const media = (f) => (f && [join(root, 'landing/media', f), join(root, 'media', f)].some(existsSync) ? f : null)
   const hasDemo = (href) => existsSync(join(root, 'example', href.split(/[?#]/)[0] || 'index.html'))
   const order = (x, y) => (ORDER.indexOf(x.short) >>> 0) - (ORDER.indexOf(y.short) >>> 0)
-  const pkgs = (await Promise.all(readdirSync(join(root, 'landing/packages')).filter((f) => f.endsWith('.mjs'))
-    .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default)))
-    .map((p) => ({ ...p, demos: (p.demos ?? []).filter((d) => hasDemo(d.href)),
-      thumb: media(p.thumb) ?? media(p.hero?.img), heroImg: media(p.hero?.img) ?? media(p.thumb) }))
+  const pkgs = (
+    await Promise.all(
+      readdirSync(join(root, 'landing/packages'))
+        .filter((f) => f.endsWith('.mjs'))
+        .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default)
+    )
+  )
+    .map((p) => ({
+      ...p,
+      demos: (p.demos ?? []).filter((d) => hasDemo(d.href)),
+      thumb: media(p.thumb) ?? media(p.hero?.img),
+      heroImg: media(p.hero?.img) ?? media(p.thumb)
+    }))
     .sort(order)
   // Every public package, lander or not (packages without one use their package.json description as the pitch).
-  const mapPkgs = workspacePackages(root).map((w) => {
-    const p = pkgs.find((q) => q.name === w.name)
-    return { ...w, pitch: p?.pitch ?? w.description.replace(/[^.]$/, '$&.'), landing: !!p, demos: p?.demos ?? [] }
-  }).sort(order)
+  const mapPkgs = workspacePackages(root)
+    .map((w) => {
+      const p = pkgs.find((q) => q.name === w.name)
+      return { ...w, pitch: p?.pitch ?? w.description.replace(/[^.]$/, '$&.'), landing: !!p, demos: p?.demos ?? [] }
+    })
+    .sort(order)
 
   // `blocks`: replaceBlock arguments after the text, applied in turn.
   const write = (file, ...blocks) => {

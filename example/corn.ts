@@ -3,7 +3,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Corn, Grass } from 'threejs-grass'
 import { classOf, createPanel, specOptions } from './panel'
 import { panels } from './corn.panel'
-import { FIELDS, SUN, TRACTOR_RADIUS, createTractor, driveTractor, farm, farmGeometry, farmGrassMap, predrive, view } from './corn-shared'
+import {
+  FIELDS,
+  SUN,
+  TRACTOR_RADIUS,
+  createTractor,
+  driveTractor,
+  farm,
+  farmGeometry,
+  farmGrassMap,
+  predrive,
+  view
+} from './corn-shared'
 import { createEnvironment, createGroundMaterial, keepAboveGround } from './shared'
 
 // Sandbox for threejs-grass corn: three fields (mature, harvested, young) in a grass meadow, and a box tractor
@@ -38,13 +49,32 @@ scene.add(tractor)
 const t0 = Number(params.get('t') ?? 50)
 driveTractor(tractor, t0)
 
-const grass = await Grass.create({ camera, scene, renderer, terrain: farm, grassMap: farmGrassMap(), maxDistance: 120, preset: 'perennialRyegrass', bladeHeight: 0.35, patchiness: 0.12 })
+const grass = await Grass.create({
+  camera,
+  scene,
+  renderer,
+  terrain: farm,
+  grassMap: farmGrassMap(),
+  maxDistance: 120,
+  preset: 'perennialRyegrass',
+  bladeHeight: 0.35,
+  patchiness: 0.12
+})
 terrain.material = createGroundMaterial(grass)
 
-const corns = await Promise.all(FIELDS.map(({ field, input }, i) => Corn.create({
-  camera, scene, renderer, terrain: farm, fields: [field], ...input,
-  interactors: i === 0 ? [{ object: tractor, radius: TRACTOR_RADIUS }] : [],
-})))
+const corns = await Promise.all(
+  FIELDS.map(({ field, input }, i) =>
+    Corn.create({
+      camera,
+      scene,
+      renderer,
+      terrain: farm,
+      fields: [field],
+      ...input,
+      interactors: i === 0 ? [{ object: tractor, radius: TRACTOR_RADIUS }] : []
+    })
+  )
+)
 predrive(corns[0], t0)
 
 // Panel: every Corn option per field, plus the field's row direction and spacing (the farm planner's input).
@@ -54,26 +84,46 @@ const json = (c: Corn) => {
   return rest
 }
 const tractorParams = { speed: 1, radius: TRACTOR_RADIUS }
-createPanel([{
-  name: 'threejs-grass',
-  classes: [
-    ...corns.map((c, i) => classOf(`Corn: ${FIELDS[i].name}`, c, json(c), specOptions(spec.Corn))),
-    ...corns.map((c, i) => classOf(`Field: ${FIELDS[i].name}`, { set: (p: object) => c.set({ fields: [{ ...c.settings.fields[0], ...p }] }) },
-      { rowDirection: FIELDS[i].field.rowDirection, rowSpacing: FIELDS[i].field.rowSpacing }, { ranges: { rowDirection: [-Math.PI, Math.PI, 0.01], rowSpacing: [0.4, 1.5, 0.01] } })),
-    classOf('Tractor', { set: (p: Partial<typeof tractorParams>) => {
-      Object.assign(tractorParams, p)
-      corns[0].set({ interactors: [{ object: tractor, radius: tractorParams.radius }] })
-    } }, { ...tractorParams }, { ranges: { speed: [0, 5], radius: [0.3, 3] } }),
-    classOf('Flattened', { set: () => corns.forEach((c) => c.clearFlattened()) }, { clear: false }),
+createPanel(
+  [
+    {
+      name: 'threejs-grass',
+      classes: [
+        ...corns.map((c, i) => classOf(`Corn: ${FIELDS[i].name}`, c, json(c), specOptions(spec.Corn))),
+        ...corns.map((c, i) =>
+          classOf(
+            `Field: ${FIELDS[i].name}`,
+            { set: (p: object) => c.set({ fields: [{ ...c.settings.fields[0], ...p }] }) },
+            { rowDirection: FIELDS[i].field.rowDirection, rowSpacing: FIELDS[i].field.rowSpacing },
+            { ranges: { rowDirection: [-Math.PI, Math.PI, 0.01], rowSpacing: [0.4, 1.5, 0.01] } }
+          )
+        ),
+        classOf(
+          'Tractor',
+          {
+            set: (p: Partial<typeof tractorParams>) => {
+              Object.assign(tractorParams, p)
+              corns[0].set({ interactors: [{ object: tractor, radius: tractorParams.radius }] })
+            }
+          },
+          { ...tractorParams },
+          { ranges: { speed: [0, 5], radius: [0.3, 3] } }
+        ),
+        classOf('Flattened', { set: () => corns.forEach((c) => c.clearFlattened()) }, { clear: false })
+      ]
+    }
   ],
-}], { title: 'threejs-grass · corn' })
+  { title: 'threejs-grass · corn' }
+)
 
 const setView = (name: string) => {
   const v = view(name)
   camera.position.set(...v.position)
   controls.target.set(...v.target)
 }
-Object.assign(window, { demo: { scene, camera, controls, corns, grass, tractor, env, renderer, setView, ready: false } })
+Object.assign(window, {
+  demo: { scene, camera, controls, corns, grass, tractor, env, renderer, setView, ready: false }
+})
 const backend = (renderer.backend as any).isWebGPUBackend ? 'WebGPU' : 'WebGL2 fallback'
 let frames = 0
 let total = 0

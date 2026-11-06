@@ -51,11 +51,18 @@ export function createWaves(options: WaveOptions): Wave[] {
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1)
     // Geometric spacing from long to short, jittered so the sum never repeats visibly.
-    const lambda = Math.min(hi, Math.max(lo, hi * Math.pow(lo / hi, t) * (1 + (rand() - 0.5) * 0.3)))
+    const lambda = Math.min(hi, Math.max(lo, hi * (lo / hi) ** t * (1 + (rand() - 0.5) * 0.3)))
     const angle = wind + (rand() * 2 - 1) * options.spread * Math.PI * 0.5
     const k = (2 * Math.PI) / lambda
     const amplitude = Math.max(0, options.amplitude) * (lambda / hi) * (0.7 + 0.6 * rand())
-    waves.push({ dirX: Math.cos(angle), dirZ: Math.sin(angle), k, amplitude, chop: 0, omega: Math.sqrt(GRAVITY * k) * options.speed })
+    waves.push({
+      dirX: Math.cos(angle),
+      dirZ: Math.sin(angle),
+      k,
+      amplitude,
+      chop: 0,
+      omega: Math.sqrt(GRAVITY * k) * options.speed
+    })
   }
   // Circular orbits (horizontal = vertical amplitude) at choppiness 1, scaled down if Σ k·chop would
   // pass 1: past that the Gerstner surface folds over itself at crests.
@@ -89,16 +96,28 @@ export interface WaveSample {
  * sideways, so the point that ends up above (x, z) is found by a few fixed-point iterations.
  * `phase` adds a per-wave phase (radians), as the ocean does to keep phases precise far from the origin.
  */
-export function sampleWaves(waves: readonly Wave[], x: number, z: number, time: number, out: WaveSample = { height: 0, nx: 0, ny: 1, nz: 0 }, phase?: ArrayLike<number>): WaveSample {
+export function sampleWaves(
+  waves: readonly Wave[],
+  x: number,
+  z: number,
+  time: number,
+  out: WaveSample = { height: 0, nx: 0, ny: 1, nz: 0 },
+  phase?: ArrayLike<number>
+): WaveSample {
   // Newton's method on p + D(p) = (x, z); the Jacobian stays invertible because Σ Q·k·A ≤ 1.
-  let px = x, pz = z
+  let px = x,
+    pz = z
   for (let iter = 0; iter < 6; iter++) {
-    let fx = px - x, fz = pz - z
-    let jxx = 1, jxz = 0, jzz = 1
+    let fx = px - x,
+      fz = pz - z
+    let jxx = 1,
+      jxz = 0,
+      jzz = 1
     for (let i = 0; i < waves.length; i++) {
       const w = waves[i]
       const ph = w.k * (w.dirX * px + w.dirZ * pz) - w.omega * time + (phase?.[i] ?? 0)
-      const c = Math.cos(ph), s = w.chop * w.k * Math.sin(ph)
+      const c = Math.cos(ph),
+        s = w.chop * w.k * Math.sin(ph)
       fx += w.chop * w.dirX * c
       fz += w.chop * w.dirZ * c
       jxx -= s * w.dirX * w.dirX
@@ -110,11 +129,15 @@ export function sampleWaves(waves: readonly Wave[], x: number, z: number, time: 
     px -= (jzz * fx - jxz * fz) / det
     pz -= (jxx * fz - jxz * fx) / det
   }
-  let h = 0, nx = 0, ny = 1, nz = 0
+  let h = 0,
+    nx = 0,
+    ny = 1,
+    nz = 0
   for (let i = 0; i < waves.length; i++) {
     const w = waves[i]
     const ph = w.k * (w.dirX * px + w.dirZ * pz) - w.omega * time + (phase?.[i] ?? 0)
-    const s = Math.sin(ph), c = Math.cos(ph)
+    const s = Math.sin(ph),
+      c = Math.cos(ph)
     const ka = w.k * w.amplitude
     h += w.amplitude * s
     nx -= w.dirX * ka * c
@@ -123,7 +146,9 @@ export function sampleWaves(waves: readonly Wave[], x: number, z: number, time: 
   }
   const len = Math.hypot(nx, ny, nz) || 1
   out.height = h
-  out.nx = nx / len; out.ny = ny / len; out.nz = nz / len
+  out.nx = nx / len
+  out.ny = ny / len
+  out.nz = nz / len
   return out
 }
 
@@ -132,8 +157,16 @@ export function sampleWaves(waves: readonly Wave[], x: number, z: number, time: 
  * has been squeezed into by the horizontal displacement (1 on flat water, → 0 as crests steepen and
  * fold over). Crests that squeeze the surface hardest are where real water breaks into whitecaps.
  */
-export function waveJacobian(waves: readonly Wave[], x: number, z: number, time = 0, phase?: ArrayLike<number>): number {
-  let jxx = 1, jxz = 0, jzz = 1
+export function waveJacobian(
+  waves: readonly Wave[],
+  x: number,
+  z: number,
+  time = 0,
+  phase?: ArrayLike<number>
+): number {
+  let jxx = 1,
+    jxz = 0,
+    jzz = 1
   for (let i = 0; i < waves.length; i++) {
     const w = waves[i]
     const s = w.chop * w.k * Math.sin(w.k * (w.dirX * x + w.dirZ * z) - w.omega * time + (phase?.[i] ?? 0))

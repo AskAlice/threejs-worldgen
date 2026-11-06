@@ -6,11 +6,27 @@
  *
  * @module threejs-weathering/react
  */
-import { createContext, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref
+} from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3, type Renderer } from 'three/webgpu'
 import type { World } from 'threejs-biomes'
-import { Weather as WeatherImpl, createWeatherSample, type Strike, type WeatherInput, type WeatherSample } from './weather.ts'
+import {
+  Weather as WeatherImpl,
+  createWeatherSample,
+  type Strike,
+  type WeatherInput,
+  type WeatherSample
+} from './weather.ts'
 import { StateField, type StateFieldOptions } from './state-field.ts'
 import { Precipitation as PrecipitationImpl, type PrecipitationInput } from './precipitation.ts'
 import { Lightning as LightningImpl, type LightningInput } from './lightning.ts'
@@ -83,14 +99,29 @@ export interface WeatherProps extends WeatherInput {
  * </Weather>
  * ```
  */
-export function Weather({ world = null, time, timeScale = 1, startTime = 0, field, fieldBudget = 2, followCamera = true, origin = ZERO, ref, children, ...options }: WeatherProps): React.JSX.Element {
+export function Weather({
+  world = null,
+  time,
+  timeScale = 1,
+  startTime = 0,
+  field,
+  fieldBudget = 2,
+  followCamera = true,
+  origin = ZERO,
+  ref,
+  children,
+  ...options
+}: WeatherProps): React.JSX.Element {
   const { camera } = useThree()
   const weather = useMemo(() => new WeatherImpl(options, world), [world])
   useEffect(() => void weather.reset(options))
   const clock = useRef<WeatherClock>({ time: time ?? startTime }).current
 
   const ownField = !!field && !(field instanceof StateField)
-  const stateField = useMemo(() => (field instanceof StateField ? field : field ? new StateField(field) : null), [field instanceof StateField ? field : ownField])
+  const stateField = useMemo(
+    () => (field instanceof StateField ? field : field ? new StateField(field) : null),
+    [field instanceof StateField ? field : ownField]
+  )
   useEffect(() => (ownField && stateField ? () => stateField.dispose() : undefined), [stateField, ownField])
   useEffect(() => {
     if (stateField && field && !(field instanceof StateField)) stateField.set(field)
@@ -156,7 +187,16 @@ export function Precipitation({ ground, ref, ...options }: PrecipitationProps): 
   const { camera } = useThree()
   const groundRef = useRef(ground)
   groundRef.current = ground
-  const impl = useMemo(() => new PrecipitationImpl({ weather, camera, ground: ground === undefined ? undefined : (x, z) => groundRef.current?.(x, z) ?? 0, ...options }), [weather, camera, ground === undefined])
+  const impl = useMemo(
+    () =>
+      new PrecipitationImpl({
+        weather,
+        camera,
+        ground: ground === undefined ? undefined : (x, z) => groundRef.current?.(x, z) ?? 0,
+        ...options
+      }),
+    [weather, camera, ground === undefined]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.reset(options))
   useFrame(() => impl.setOrigin(origin).update(clock.time))
@@ -207,10 +247,19 @@ export interface WildfireProps extends WildfireInput {
 export function Wildfire({ world, landscape, ref, ...options }: WildfireProps): React.JSX.Element {
   const { weather, clock, field, origin } = useWeather()
   const { gl, camera } = useThree()
-  const impl = useMemo(() => new WildfireImpl({ world: world === undefined ? weather.world : world, weather, landscape, field, ...options }), [weather, world, landscape, field])
+  const impl = useMemo(
+    () =>
+      new WildfireImpl({ world: world === undefined ? weather.world : world, weather, landscape, field, ...options }),
+    [weather, world, landscape, field]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.reset(options))
-  useFrame((_, delta) => impl.setOrigin(origin).attach(gl as unknown as Renderer, camera).update(clock.time, 8, delta))
+  useFrame((_, delta) =>
+    impl
+      .setOrigin(origin)
+      .attach(gl as unknown as Renderer, camera)
+      .update(clock.time, 8, delta)
+  )
   useImperativeHandle(ref, () => impl, [impl])
   return <primitive object={impl.object} />
 }

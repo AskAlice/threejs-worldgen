@@ -3,8 +3,17 @@ import { button, useControls } from 'leva'
 import { World } from 'threejs-biomes'
 import { applyDamage } from 'threejs-weathering'
 import {
-  PROP_KIND_IDS, PROP_KINDS, Props, RoadPath, decorateRoads, planPowerLine,
-  type DecorateOptions, type PropPlacement, type PropsImpl, type RoadNetworkLike, type RoadPathProps,
+  PROP_KIND_IDS,
+  PROP_KINDS,
+  Props,
+  RoadPath,
+  decorateRoads,
+  planPowerLine,
+  type DecorateOptions,
+  type PropPlacement,
+  type PropsImpl,
+  type RoadNetworkLike,
+  type RoadPathProps
 } from 'threejs-props/react'
 import { panels } from './props.panel'
 import { Daylight, Ground, View, mount, useHud, useSpec, type V3 } from './r3f-shared'
@@ -25,48 +34,138 @@ PROP_KIND_IDS.forEach((kind, row) => {
   if (kind === 'pylon' || kind === 'power-pole') return
   const step = kind === 'bus-stop' ? 6 : kind === 'fence' ? 3.5 : 3
   let col = 0
-  for (const variant of PROP_KINDS[kind].variants) for (let seed = 1; seed <= 3; seed++, col++) {
-    const x = G[0] + col * step, z = G[1] + row * 7
-    gallery.push({ kind, variant, seed: seed * 7919 + row, x, y: H(x, z), z, yaw: 0, length: 3 })
-  }
+  for (const variant of PROP_KINDS[kind].variants)
+    for (let seed = 1; seed <= 3; seed++, col++) {
+      const x = G[0] + col * step,
+        z = G[1] + row * 7
+      gallery.push({ kind, variant, seed: seed * 7919 + row, x, y: H(x, z), z, yaw: 0, length: 3 })
+    }
 })
-for (const [i, variant] of ['wood', 'concrete'].entries()) for (let k = 0; k < 3; k++) {
-  const x = G[0] + 70 + i * 8, z = G[1] + k * 30
-  gallery.push({ kind: 'power-pole', variant, seed: k + i * 10, x, y: H(x, z), z, yaw: 0, line: 900 + i })
-}
+for (const [i, variant] of ['wood', 'concrete'].entries())
+  for (let k = 0; k < 3; k++) {
+    const x = G[0] + 70 + i * 8,
+      z = G[1] + k * 30
+    gallery.push({ kind: 'power-pole', variant, seed: k + i * 10, x, y: H(x, z), z, yaw: 0, line: 900 + i })
+  }
 for (let k = 0; k < 2; k++) {
-  const x = G[0] + 100, z = G[1] + k * 90
+  const x = G[0] + 100,
+    z = G[1] + k * 90
   gallery.push({ kind: 'pylon', seed: k, x, y: H(x, z), z, yaw: 0, line: 902 })
 }
 
 // A town junction: primary avenue (x) × minor street (z), plus a gravel road leaving east.
 const R = 140
-const avenue = { width: 10, sidewalk: 3 }, street = { width: 7, sidewalk: 2 }
-const rural: [number, number][] = [[C[0] + R, C[1]], [C[0] + 230, C[1] + 25], [C[0] + 330, C[1] + 10], [C[0] + 440, C[1] + 60], [C[0] + 560, C[1] + 40]]
+const avenue = { width: 10, sidewalk: 3 },
+  street = { width: 7, sidewalk: 2 }
+const rural: [number, number][] = [
+  [C[0] + R, C[1]],
+  [C[0] + 230, C[1] + 25],
+  [C[0] + 330, C[1] + 10],
+  [C[0] + 440, C[1] + 60],
+  [C[0] + 560, C[1] + 40]
+]
 const net: RoadNetworkLike = {
-  nodes: [{ x: C[0], z: C[1] }, { x: C[0] - R, z: C[1] }, { x: C[0] + R, z: C[1] }, { x: C[0], z: C[1] - R }, { x: C[0], z: C[1] + R }, ...rural.slice(1).map(([x, z]) => ({ x, z }))],
-  edges: [
-    { a: 0, b: 1, type: 'primary', ...avenue, surface: 'asphalt' }, { a: 0, b: 2, type: 'primary', ...avenue, surface: 'asphalt' },
-    { a: 0, b: 3, type: 'minor', ...street, surface: 'asphalt' }, { a: 0, b: 4, type: 'minor', ...street, surface: 'asphalt' },
-    ...rural.slice(1).map((_, i) => ({ a: i === 0 ? 2 : 4 + i, b: 5 + i, type: 'minor' as const, width: 5, sidewalk: 0, surface: 'gravel' })),
+  nodes: [
+    { x: C[0], z: C[1] },
+    { x: C[0] - R, z: C[1] },
+    { x: C[0] + R, z: C[1] },
+    { x: C[0], z: C[1] - R },
+    { x: C[0], z: C[1] + R },
+    ...rural.slice(1).map(([x, z]) => ({ x, z }))
   ],
+  edges: [
+    { a: 0, b: 1, type: 'primary', ...avenue, surface: 'asphalt' },
+    { a: 0, b: 2, type: 'primary', ...avenue, surface: 'asphalt' },
+    { a: 0, b: 3, type: 'minor', ...street, surface: 'asphalt' },
+    { a: 0, b: 4, type: 'minor', ...street, surface: 'asphalt' },
+    ...rural.slice(1).map((_, i) => ({
+      a: i === 0 ? 2 : 4 + i,
+      b: 5 + i,
+      type: 'minor' as const,
+      width: 5,
+      sidewalk: 0,
+      surface: 'gravel'
+    }))
+  ]
 }
-const lots = [[200, 30], [300, -25], [380, 52], [470, 75], [520, 20]].map(([dx, dz]) => ({ district: 'farmland', building: 0, frontage: { x: C[0] + dx, z: C[1] + dz, nx: 0, nz: 1, edge: -1 } }))
-const pylons = planPowerLine([[C[0] - 500, C[1] + 330], [C[0] + 550, C[1] + 420]], world, { seed: 3, spacing: 260 })
+const lots = [
+  [200, 30],
+  [300, -25],
+  [380, 52],
+  [470, 75],
+  [520, 20]
+].map(([dx, dz]) => ({
+  district: 'farmland',
+  building: 0,
+  frontage: { x: C[0] + dx, z: C[1] + dz, nx: 0, nz: 1, edge: -1 }
+}))
+const pylons = planPowerLine(
+  [
+    [C[0] - 500, C[1] + 330],
+    [C[0] + 550, C[1] + 420]
+  ],
+  world,
+  { seed: 3, spacing: 260 }
+)
 
 // Road ribbons: the junction square and the four town arms (styled by the avenue folder), the gravel road and the dirt
 // lane (its own folder).
-const jx = street.width / 2 + street.sidewalk, jz = avenue.width / 2 + avenue.sidewalk
+const jx = street.width / 2 + street.sidewalk,
+  jz = avenue.width / 2 + avenue.sidewalk
 const town: RoadPathProps[] = [
-  { points: [[C[0] - jx, C[1]], [C[0] + jx, C[1]]], width: jz * 2, verge: 0, surface: { centreLine: 'none', edgeLines: false, laneLines: false } },
-  { points: [[C[0] - jx, C[1]], [C[0] - R, C[1]]], ...avenue, surface: { lanes: 2, centreLine: 'double' } },
-  { points: [[C[0] + jx, C[1]], [C[0] + R, C[1]]], ...avenue, surface: { lanes: 2, centreLine: 'double' } },
-  { points: [[C[0], C[1] - jz], [C[0], C[1] - R]], ...street, surface: { centreLine: 'dashed' } },
-  { points: [[C[0], C[1] + jz], [C[0], C[1] + R]], ...street, surface: { centreLine: 'dashed', wear: 0.8, cracks: 0.7 } },
+  {
+    points: [
+      [C[0] - jx, C[1]],
+      [C[0] + jx, C[1]]
+    ],
+    width: jz * 2,
+    verge: 0,
+    surface: { centreLine: 'none', edgeLines: false, laneLines: false }
+  },
+  {
+    points: [
+      [C[0] - jx, C[1]],
+      [C[0] - R, C[1]]
+    ],
+    ...avenue,
+    surface: { lanes: 2, centreLine: 'double' }
+  },
+  {
+    points: [
+      [C[0] + jx, C[1]],
+      [C[0] + R, C[1]]
+    ],
+    ...avenue,
+    surface: { lanes: 2, centreLine: 'double' }
+  },
+  {
+    points: [
+      [C[0], C[1] - jz],
+      [C[0], C[1] - R]
+    ],
+    ...street,
+    surface: { centreLine: 'dashed' }
+  },
+  {
+    points: [
+      [C[0], C[1] + jz],
+      [C[0], C[1] + R]
+    ],
+    ...street,
+    surface: { centreLine: 'dashed', wear: 0.8, cracks: 0.7 }
+  }
 ]
 const country: RoadPathProps[] = [
   { points: rural, width: 5, surface: { surface: 'gravel', centreLine: 'none', edgeLines: false } },
-  { points: [[C[0] + 330, C[1] + 10], [C[0] + 345, C[1] - 60], [C[0] + 330, C[1] - 160]], width: 3.2, surface: { surface: 'dirt', width: 3.2 } },
+  {
+    points: [
+      [C[0] + 330, C[1] + 10],
+      [C[0] + 345, C[1] - 60],
+      [C[0] + 330, C[1] - 160]
+    ],
+    width: 3.2,
+    surface: { surface: 'dirt', width: 3.2 }
+  }
 ]
 
 /** The leaves of `values` that differ from `base`, nested: what the panel changed (props.ts sends only those, too). */
@@ -82,10 +181,22 @@ function changed(values: Record<string, any>, base: Record<string, any> = {}): R
 }
 
 const spots: Record<string, [V3, V3]> = {
-  street: [[C[0] + 45, H(C[0], C[1]) + 26, C[1] + 55], [C[0] - 5, H(C[0], C[1]) + 2, C[1] - 5]],
-  gallery: [[G[0] + 30, H(G[0], G[1]) + 28, G[1] - 30], [G[0] + 30, H(G[0], G[1]) + 1, G[1] + 40]],
-  rural: [[C[0] + 300, H(C[0] + 300, C[1]) + 22, C[1] + 70], [C[0] + 360, H(C[0] + 360, C[1]) + 4, C[1] + 10]],
-  pylons: [[C[0], H(C[0], C[1] + 250) + 60, C[1] + 220], [C[0] + 50, H(C[0] + 50, C[1] + 380) + 20, C[1] + 380]],
+  street: [
+    [C[0] + 45, H(C[0], C[1]) + 26, C[1] + 55],
+    [C[0] - 5, H(C[0], C[1]) + 2, C[1] - 5]
+  ],
+  gallery: [
+    [G[0] + 30, H(G[0], G[1]) + 28, G[1] - 30],
+    [G[0] + 30, H(G[0], G[1]) + 1, G[1] + 40]
+  ],
+  rural: [
+    [C[0] + 300, H(C[0] + 300, C[1]) + 22, C[1] + 70],
+    [C[0] + 360, H(C[0] + 360, C[1]) + 4, C[1] + 10]
+  ],
+  pylons: [
+    [C[0], H(C[0], C[1] + 250) + 60, C[1] + 220],
+    [C[0] + 50, H(C[0] + 50, C[1] + 380) + 20, C[1] + 380]
+  ]
 }
 
 function Scene() {
@@ -96,23 +207,34 @@ function Scene() {
     snow: { value: 0, min: 0, max: 1, step: 0.01 },
     burn: { value: 0, min: 0, max: 1, step: 0.01 },
     damage: { value: 0, min: 0, max: 1, step: 0.01 },
-    night: { value: 0, min: 0, max: 1, step: 0.01 },
+    night: { value: 0, min: 0, max: 1, step: 0.01 }
   })
   // Per-prop events through threejs-weathering, on the instance behind <Props>.
-  const hit = (x: number, z: number, r: number, amount: number, channel?: 'burn' | 'wetness') => props && applyDamage({ instances: props.states, positions: props.positions }, x, z, r, amount, channel)
-  useControls('Events', {
-    'storm hits the rural road': button(() => hit(C[0] + 330, C[1] + 10, 90, 0.9)),
-    'fire at the junction': button(() => hit(C[0] + 20, C[1] - 20, 35, 1, 'burn')),
-    'flood the gallery': button(() => hit(G[0] + 30, G[1] + 40, 60, 1, 'wetness')),
-    'clear per-prop states': button(() => props?.states.setAll({ wetness: 0, snow: 0, burn: 0, damage: 0 })),
-  }, [props])
+  const hit = (x: number, z: number, r: number, amount: number, channel?: 'burn' | 'wetness') =>
+    props && applyDamage({ instances: props.states, positions: props.positions }, x, z, r, amount, channel)
+  useControls(
+    'Events',
+    {
+      'storm hits the rural road': button(() => hit(C[0] + 330, C[1] + 10, 90, 0.9)),
+      'fire at the junction': button(() => hit(C[0] + 20, C[1] - 20, 35, 1, 'burn')),
+      'flood the gallery': button(() => hit(G[0] + 30, G[1] + 40, 60, 1, 'wetness')),
+      'clear per-prop states': button(() => props?.states.setAll({ wetness: 0, snow: 0, burn: 0, damage: 0 }))
+    },
+    [props]
+  )
   const settings = useSpec('Props', spec.Props)
   // The avenue folder edits every town road as props.ts's does: only what it changed, over each road's own look.
-  const avenueLook = changed(useSpec('RoadSurface (avenue)', spec['RoadSurface (avenue)']), spec['RoadSurface (avenue)'].target)
+  const avenueLook = changed(
+    useSpec('RoadSurface (avenue)', spec['RoadSurface (avenue)']),
+    spec['RoadSurface (avenue)'].target
+  )
   const dirt = useSpec('RoadSurface (dirt lane)', spec['RoadSurface (dirt lane)'])
   const decorate = useSpec('decorateRoads', spec.decorateRoads) as DecorateOptions
   const decorateKey = JSON.stringify(decorate)
-  const placements = useMemo(() => [...gallery, ...decorateRoads(net, world, decorate, { lots }), ...pylons], [decorateKey])
+  const placements = useMemo(
+    () => [...gallery, ...decorateRoads(net, world, decorate, { lots }), ...pylons],
+    [decorateKey]
+  )
 
   useEffect(() => void Object.assign(window, { props, world }), [props]) // for the console
   useHud(() => {
@@ -130,8 +252,12 @@ function Scene() {
       <Daylight night={night} target={target} extent={160} fog={[400, 2200]} />
       <Ground world={world} center={[C[0], C[1] + 150]} size={1400} segments={200} />
       <Props ref={setProps} placements={placements} {...settings} states={states} night={night} />
-      {town.map((road, i) => <RoadPath key={i} height={H} {...road} surface={{ ...road.surface, ...avenueLook, states }} />)}
-      {country.map((road, i) => <RoadPath key={i} height={H} {...road} surface={{ ...road.surface, ...(i === 1 ? dirt : {}), states }} />)}
+      {town.map((road, i) => (
+        <RoadPath key={i} height={H} {...road} surface={{ ...road.surface, ...avenueLook, states }} />
+      ))}
+      {country.map((road, i) => (
+        <RoadPath key={i} height={H} {...road} surface={{ ...road.surface, ...(i === 1 ? dirt : {}), states }} />
+      ))}
       <View position={position} target={target} />
     </>
   )

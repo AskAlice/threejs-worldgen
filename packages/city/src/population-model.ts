@@ -152,21 +152,49 @@ export const DEFAULT_POPULATION: PopulationOptions = {
   habitability: {
     avoid: ['deepOcean', 'glacier', 'mountainPeaks', 'volcanic'],
     fertility: {
-      grassland: 1, deciduousForest: 0.8, mediterranean: 0.85, coast: 0.8, dryForest: 0.7, savanna: 0.6, steppe: 0.5,
-      temperateRainforest: 0.5, jungle: 0.45, taiga: 0.35, wetland: 0.3, mangrove: 0.2, alpineMeadow: 0.25, tundra: 0.1,
-      badlands: 0.1, desert: 0.05, mountainPeaks: 0, glacier: 0, deepOcean: 0, volcanic: 0,
+      grassland: 1,
+      deciduousForest: 0.8,
+      mediterranean: 0.85,
+      coast: 0.8,
+      dryForest: 0.7,
+      savanna: 0.6,
+      steppe: 0.5,
+      temperateRainforest: 0.5,
+      jungle: 0.45,
+      taiga: 0.35,
+      wetland: 0.3,
+      mangrove: 0.2,
+      alpineMeadow: 0.25,
+      tundra: 0.1,
+      badlands: 0.1,
+      desert: 0.05,
+      mountainPeaks: 0,
+      glacier: 0,
+      deepOcean: 0,
+      volcanic: 0
     },
     defaultFertility: 0.5,
     maxSlope: 0.35,
     temperature: 16,
     temperatureRange: 14,
-    water: 0.5,
+    water: 0.5
   },
   network: {
-    enabled: true, extraEdges: 0.3, gravityExponent: 2, detour: 1.35, neighbours: 6, slopeCost: 60, railSlopeCost: 400,
-    waterCost: 12, reuse: 0.55, highwayPopulation: 50_000, roadPopulation: 1_000, railPopulation: 20_000,
-    powerlinePopulation: 200, smoothing: 2,
-  },
+    enabled: true,
+    extraEdges: 0.3,
+    gravityExponent: 2,
+    detour: 1.35,
+    neighbours: 6,
+    slopeCost: 60,
+    railSlopeCost: 400,
+    waterCost: 12,
+    reuse: 0.55,
+    highwayPopulation: 50_000,
+    roadPopulation: 1_000,
+    railPopulation: 20_000,
+    powerlinePopulation: 200,
+    smoothing: 2
+  }
 }
 
 /** One fine cell of the population grid. */
@@ -256,7 +284,10 @@ export interface AggregateCell {
 }
 
 /** Fills defaults in: anything not in `input` comes from {@link DEFAULT_POPULATION}. */
-export function resolvePopulationOptions(input: PopulationInput = {}, base: PopulationOptions = DEFAULT_POPULATION): PopulationOptions {
+export function resolvePopulationOptions(
+  input: PopulationInput = {},
+  base: PopulationOptions = DEFAULT_POPULATION
+): PopulationOptions {
   return merge(structuredClone(base), input)
 }
 
@@ -294,7 +325,10 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   const k = Math.ceil(o.radius / (1.5 * edge)) + 1
   for (const c of grid.disk(grid.cellAtLocal(cx, cz, res), k)) {
     const p = grid.centerLocal(c)
-    if (Math.hypot(p[0] - cx, p[1] - cz) <= o.radius) { ids.push(c); pos.push(p) }
+    if (Math.hypot(p[0] - cx, p[1] - cz) <= o.radius) {
+      ids.push(c)
+      pos.push(p)
+    }
   }
   const index = new Map<string, number>()
   ids.forEach((c, i) => index.set(c, i))
@@ -305,10 +339,15 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   const avoid = new Set(h.avoid)
   const s = sample()
   const d = edge * 0.6
-  const elevation = new Float64Array(n), slope = new Float64Array(n), base = new Float64Array(n), wetland = new Uint8Array(n), fresh = new Float64Array(n)
+  const elevation = new Float64Array(n),
+    slope = new Float64Array(n),
+    base = new Float64Array(n),
+    wetland = new Uint8Array(n),
+    fresh = new Float64Array(n)
   for (let i = 0; i < n; i++) {
     const [x, z] = pos[i]
-    let wet = 0, valley = 0
+    let wet = 0,
+      valley = 0
     const hs = [0, 0, 0]
     for (let j = 0; j < 3; j++) {
       f.sample(x + (j === 1 ? d : 0), z + (j === 2 ? d : 0), s, edge * 0.5)
@@ -317,7 +356,8 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
       valley = Math.max(valley, s.valley, s.river)
       if (j === 0) {
         // Climate and biomes at the centre.
-        let fert = 0, avoided = 0
+        let fert = 0,
+          avoided = 0
         for (let b = 0; b < s.count; b++) {
           const id = biomes[s.biomes[b]]?.id ?? ''
           const w = s.weights[b]
@@ -335,8 +375,14 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
     base[i] *= wetland[i] ? 0 : smoothstep(h.maxSlope, h.maxSlope * 0.25, slope[i])
   }
   // Neighbours inside the region, then coasts: dry cells next to (or two steps from) water.
-  const near: number[][] = ids.map((c) => grid.disk(c, 1).map((q) => index.get(q) ?? -1).filter((j) => j >= 0 && ids[j] !== c))
-  const water = new Float64Array(n), hab = new Float64Array(n)
+  const near: number[][] = ids.map((c) =>
+    grid
+      .disk(c, 1)
+      .map((q) => index.get(q) ?? -1)
+      .filter((j) => j >= 0 && ids[j] !== c)
+  )
+  const water = new Float64Array(n),
+    hab = new Float64Array(n)
   for (let i = 0; i < n; i++) {
     let coast = 0
     for (const j of near[i]) {
@@ -348,24 +394,37 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   }
 
   // --- central places ----------------------------------------------------------------------------
-  interface Site { cell: number; level: number; score: number; position: [number, number] }
+  interface Site {
+    cell: number
+    level: number
+    score: number
+    position: [number, number]
+  }
   const sites: Site[] = []
   const taken = new Set<number>()
   for (let L = 0; L < levels; L++) {
     const r = res - (levels - 1 - L)
     const expected = 7 ** (res - r)
-    const sum = new Map<string, number>(), count = new Map<string, number>(), best = new Map<string, number>()
+    const sum = new Map<string, number>(),
+      count = new Map<string, number>(),
+      best = new Map<string, number>()
     const parentOf = r === res ? ids : ids.map((c) => grid.parent(c, r))
     for (let i = 0; i < n; i++) {
       const p = parentOf[i]
       sum.set(p, (sum.get(p) ?? 0) + hab[i])
       count.set(p, (count.get(p) ?? 0) + 1)
       const bi = best.get(p)
-      if (!taken.has(i) && hab[i] > 0 && (bi === undefined || pick(seed, ids[i], hab[i]) > pick(seed, ids[bi], hab[bi]))) best.set(p, i)
+      if (
+        !taken.has(i) &&
+        hab[i] > 0 &&
+        (bi === undefined || pick(seed, ids[i], hab[i]) > pick(seed, ids[bi], hab[bi]))
+      )
+        best.set(p, i)
     }
     // Market areas of every higher-tier place are closed to this tier.
     const blocked = new Set<string>()
-    for (const site of sites) for (const q of grid.disk(r === res ? ids[site.cell] : grid.parent(ids[site.cell], r), 1)) blocked.add(q)
+    for (const site of sites)
+      for (const q of grid.disk(r === res ? ids[site.cell] : grid.parent(ids[site.cell], r), 1)) blocked.add(q)
     const score = new Map<string, number>()
     for (const [p, total] of sum) {
       if (blocked.has(p) || (count.get(p) ?? 0) < expected * 0.5) continue
@@ -378,14 +437,20 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
       let max = true
       for (const q of grid.disk(p, 1)) {
         const w = score.get(q)
-        if (q !== p && w !== undefined && (w > v || (w === v && q < p))) { max = false; break }
+        if (q !== p && w !== undefined && (w > v || (w === v && q < p))) {
+          max = false
+          break
+        }
       }
       if (!max) continue
       const i = best.get(p)!
       const position = dryPosition(f, ids[i], pos[i], edge, seed, avoid, biomes, s)
       if (position) found.push({ cell: i, level: L, score: v, position })
     }
-    for (const site of found) { sites.push(site); taken.add(site.cell) }
+    for (const site of found) {
+      sites.push(site)
+      taken.add(site.cell)
+    }
   }
   sites.sort((a, b) => a.level - b.level || b.score - a.score || (ids[a.cell] < ids[b.cell] ? -1 : 1))
 
@@ -398,7 +463,16 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   const perKm2 = Math.max(1e-6, o.urbanDensity) / 1e6
   const settlements: Settlement[] = sites.map((site, r) => {
     const people = p1 * (r + 1) ** -o.zipf
-    return { id: r, cell: ids[site.cell], position: site.position, population: Math.round(people), class: classify(people, o.thresholds), radius: Math.sqrt(people / (Math.PI * perKm2)), level: site.level, rank: r + 1 }
+    return {
+      id: r,
+      cell: ids[site.cell],
+      position: site.position,
+      population: Math.round(people),
+      class: classify(people, o.thresholds),
+      radius: Math.sqrt(people / (Math.PI * perKm2)),
+      level: site.level,
+      rank: r + 1
+    }
   })
 
   // --- spread people over cells ------------------------------------------------------------------
@@ -406,9 +480,13 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   sites.forEach((site, r) => {
     const P = p1 * (r + 1) ** -o.zipf
     const R = settlements[r].radius
-    if (R < edge * 0.5) { people[site.cell] += P; return }
+    if (R < edge * 0.5) {
+      people[site.cell] += P
+      return
+    }
     const ring = Math.ceil((2.5 * R) / (1.5 * edge)) + 1
-    const js: number[] = [], ws: number[] = []
+    const js: number[] = [],
+      ws: number[] = []
     let wsum = 0
     for (const q of grid.disk(ids[site.cell], ring)) {
       const j = index.get(q)
@@ -416,9 +494,14 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
       const dist = Math.hypot(pos[j][0] - site.position[0], pos[j][1] - site.position[1]) / R
       const w = Math.exp(-dist * dist) * (0.25 + 0.75 * hab[j])
       if (w < 1e-6) continue
-      js.push(j); ws.push(w); wsum += w
+      js.push(j)
+      ws.push(w)
+      wsum += w
     }
-    if (wsum <= 0) { people[site.cell] += P; return }
+    if (wsum <= 0) {
+      people[site.cell] += P
+      return
+    }
     for (let m = 0; m < js.length; m++) people[js[m]] += (P * ws[m]) / wsum
   })
   const ruralBudget = total - urbanBudget
@@ -427,9 +510,14 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   for (let i = 0; i < n; i++) {
     if (hab[i] <= 0) continue
     let dn = Infinity
-    for (const st of settlements) dn = Math.min(dn, Math.max(0, Math.hypot(pos[i][0] - st.position[0], pos[i][1] - st.position[1]) - st.radius))
-    const w = hab[i] * (1 + o.corridor * water[i]) * (0.35 + 0.65 * Math.exp(-(sites.length ? dn : 0) / Math.max(1, o.ruralDecay)))
-    rural[i] = w; rsum += w
+    for (const st of settlements)
+      dn = Math.min(dn, Math.max(0, Math.hypot(pos[i][0] - st.position[0], pos[i][1] - st.position[1]) - st.radius))
+    const w =
+      hab[i] *
+      (1 + o.corridor * water[i]) *
+      (0.35 + 0.65 * Math.exp(-(sites.length ? dn : 0) / Math.max(1, o.ruralDecay)))
+    rural[i] = w
+    rsum += w
   }
   if (rsum > 0) for (let i = 0; i < n; i++) people[i] += (ruralBudget * rural[i]) / rsum
   const counts = largestRemainder(people, ids, rsum > 0 || sites.length ? total : 0)
@@ -438,23 +526,63 @@ export function generatePopulation(world: World, input: PopulationInput = {}, fr
   const cells: PopulationCell[] = ids.map((c, i) => {
     const area = grid.area(c)
     const density = counts[i] / Math.max(1e-9, area / 1e6)
-    const landUse: LandUse = wetland[i] ? 'water' : density >= o.landUse.urban ? 'urban' : density >= o.landUse.suburban ? 'suburban' : hab[i] >= o.landUse.farmland ? 'farmland' : 'wilderness'
-    return { cell: c, position: pos[i], elevation: elevation[i], slope: slope[i], area, habitability: hab[i], water: water[i], population: counts[i], density, landUse, light: wetland[i] ? 0 : lightOf(density, o.lightDensity) }
+    const landUse: LandUse = wetland[i]
+      ? 'water'
+      : density >= o.landUse.urban
+        ? 'urban'
+        : density >= o.landUse.suburban
+          ? 'suburban'
+          : hab[i] >= o.landUse.farmland
+            ? 'farmland'
+            : 'wilderness'
+    return {
+      cell: c,
+      position: pos[i],
+      elevation: elevation[i],
+      slope: slope[i],
+      area,
+      habitability: hab[i],
+      water: water[i],
+      population: counts[i],
+      density,
+      landUse,
+      light: wetland[i] ? 0 : lightOf(density, o.lightDensity)
+    }
   })
 
   // --- farmsteads: one per farmland cell, by chance ---------------------------------------------
   for (let i = 0; i < n; i++) {
     const c = cells[i]
-    if (c.landUse !== 'farmland' || taken.has(i) || c.population < 1 || hash01(seed, c.cell, 31) >= o.farmsteadChance) continue
+    if (c.landUse !== 'farmland' || taken.has(i) || c.population < 1 || hash01(seed, c.cell, 31) >= o.farmsteadChance)
+      continue
     const position = dryPosition(f, c.cell, c.position, edge, seed + 7, avoid, biomes, s)
     if (!position) continue
     const pop = Math.min(c.population, 2 + Math.floor(hash01(seed, c.cell, 32) * 9))
-    settlements.push({ id: settlements.length, cell: c.cell, position, population: pop, class: 'farmstead', radius: Math.sqrt(pop / (Math.PI * perKm2)), level: levels, rank: 0 })
+    settlements.push({
+      id: settlements.length,
+      cell: c.cell,
+      position,
+      population: pop,
+      class: 'farmstead',
+      radius: Math.sqrt(pop / (Math.PI * perKm2)),
+      level: levels,
+      rank: 0
+    })
   }
 
   let sumPeople = 0
   for (const c of cells) sumPeople += c.population
-  return { options: o, grid, resolution: res, cellEdge: edge, cells, index, neighbours: near, settlements, total: sumPeople }
+  return {
+    options: o,
+    grid,
+    resolution: res,
+    cellEdge: edge,
+    cells,
+    index,
+    neighbours: near,
+    settlements,
+    total: sumPeople
+  }
 }
 
 /**
@@ -468,13 +596,20 @@ export function aggregatePopulation(data: PopulationData, res: number): Map<stri
   const use = new Map<string, Record<LandUse, number>>()
   const add = (cell: string, people: number, area: number, hab: number, landUse: LandUse) => {
     let a = out.get(cell)
-    if (!a) { a = { cell, population: 0, area: 0, density: 0, light: 0, habitability: 0, landUse }; out.set(cell, a); use.set(cell, { urban: 0, suburban: 0, farmland: 0, wilderness: 0, water: 0 }) }
-    a.population += people; a.area += area; a.habitability += hab * area
+    if (!a) {
+      a = { cell, population: 0, area: 0, density: 0, light: 0, habitability: 0, landUse }
+      out.set(cell, a)
+      use.set(cell, { urban: 0, suburban: 0, farmland: 0, wilderness: 0, water: 0 })
+    }
+    a.population += people
+    a.area += area
+    a.habitability += hab * area
     use.get(cell)![landUse] += area
   }
   for (const c of data.cells) {
     const area = c.area
-    if (res <= data.resolution) add(res === data.resolution ? c.cell : grid.parent(c.cell, res), c.population, area, c.habitability, c.landUse)
+    if (res <= data.resolution)
+      add(res === data.resolution ? c.cell : grid.parent(c.cell, res), c.population, area, c.habitability, c.landUse)
     else {
       const kids = grid.children(c.cell, res)
       for (const k of kids) add(k, c.population / kids.length, area / kids.length, c.habitability, c.landUse)
@@ -520,7 +655,10 @@ export function nightLights(data: PopulationData, res: number = data.resolution)
   const agg = [...aggregatePopulation(data, res).values()]
   const n = agg.length
   const cells = agg.map((a) => a.cell)
-  const centers = new Float64Array(n * 3), local = new Float32Array(n * 2), intensity = new Float32Array(n), population = new Float32Array(n)
+  const centers = new Float64Array(n * 3),
+    local = new Float32Array(n * 2),
+    intensity = new Float32Array(n),
+    population = new Float32Array(n)
   const lookup = new Map<string, number>()
   const p: [number, number, number] = [0, 0, 0]
   agg.forEach((a, i) => {
@@ -531,17 +669,34 @@ export function nightLights(data: PopulationData, res: number = data.resolution)
     intensity[i] = a.light
     population[i] = a.population
   })
-  const at = (cell: string) => { const i = lookup.get(cell); return i === undefined ? 0 : intensity[i] }
+  const at = (cell: string) => {
+    const i = lookup.get(cell)
+    return i === undefined ? 0 : intensity[i]
+  }
   return {
-    resolution: res, cells, centers, local, intensity, population, cellEdge: data.grid.edgeLength(res),
+    resolution: res,
+    cells,
+    centers,
+    local,
+    intensity,
+    population,
+    cellEdge: data.grid.edgeLength(res),
     sample: (px, py, pz) => at(data.grid.cellAt(px, py, pz, res)),
-    sampleLocal: (x, z) => at(data.grid.cellAtLocal(x, z, res)),
+    sampleLocal: (x, z) => at(data.grid.cellAtLocal(x, z, res))
   }
 }
 
 /** The size class for a population. */
 export function classify(population: number, t: SettlementThresholds): SettlementClass {
-  return population >= t.metropolis ? 'metropolis' : population >= t.city ? 'city' : population >= t.town ? 'town' : population >= t.village ? 'village' : 'hamlet'
+  return population >= t.metropolis
+    ? 'metropolis'
+    : population >= t.city
+      ? 'city'
+      : population >= t.town
+        ? 'town'
+        : population >= t.village
+          ? 'village'
+          : 'hamlet'
 }
 
 // --- helpers --------------------------------------------------------------------------------------
@@ -556,8 +711,18 @@ function pick(seed: number, cell: string, hab: number): number {
 }
 
 // A seeded spot inside the cell that is dry land and not an avoided biome (else the centre; else null).
-function dryPosition(f: LocalFrame, cell: string, center: [number, number], edge: number, seed: number, avoid: Set<string>, biomes: World['options']['biomes'], s: WorldSample): [number, number] | null {
-  const a = hash01(seed, cell, 51) * Math.PI * 2, r = Math.sqrt(hash01(seed, cell, 52)) * edge * 0.4
+function dryPosition(
+  f: LocalFrame,
+  cell: string,
+  center: [number, number],
+  edge: number,
+  seed: number,
+  avoid: Set<string>,
+  biomes: World['options']['biomes'],
+  s: WorldSample
+): [number, number] | null {
+  const a = hash01(seed, cell, 51) * Math.PI * 2,
+    r = Math.sqrt(hash01(seed, cell, 52)) * edge * 0.4
   for (const [x, z] of [[center[0] + Math.cos(a) * r, center[1] + Math.sin(a) * r], center] as [number, number][]) {
     f.sample(x, z, s)
     if (s.waterLevel > s.elevation) continue
@@ -576,14 +741,32 @@ function largestRemainder(values: Float64Array, ids: string[], total: number): n
   if (sum <= 0 || total <= 0) return out
   const scaled = Array.from(values, (v) => (v * total) / sum)
   let used = 0
-  scaled.forEach((v, i) => { out[i] = Math.floor(v); used += out[i] })
-  const order = scaled.map((_, i) => i).sort((a, b) => scaled[b] - out[b] - (scaled[a] - out[a]) || (ids[a] < ids[b] ? -1 : 1))
+  scaled.forEach((v, i) => {
+    out[i] = Math.floor(v)
+    used += out[i]
+  })
+  const order = scaled
+    .map((_, i) => i)
+    .sort((a, b) => scaled[b] - out[b] - (scaled[a] - out[a]) || (ids[a] < ids[b] ? -1 : 1))
   for (let k = 0; k < total - used; k++) out[order[k % order.length]]++
   return out
 }
 
 function sample(): WorldSample {
-  return { elevation: 0, continentalness: 0, erosion: 0, mountain: 0, temperature: 0, moisture: 0, valley: 0, river: 0, waterLevel: NaN, biomes: new Int32Array(32), weights: new Float32Array(32), count: 0 }
+  return {
+    elevation: 0,
+    continentalness: 0,
+    erosion: 0,
+    mountain: 0,
+    temperature: 0,
+    moisture: 0,
+    valley: 0,
+    river: 0,
+    waterLevel: NaN,
+    biomes: new Int32Array(32),
+    weights: new Float32Array(32),
+    count: 0
+  }
 }
 
 function smoothstep(a: number, b: number, x: number): number {
@@ -606,7 +789,11 @@ function seedOf(seed: number | string): number {
 // Deterministic hash of a seed, an H3 cell and a salt to [0, 1).
 function hash01(seed: number, cell: string, salt: number): number {
   const [lo, hi] = cellKey(cell)
-  let x = Math.imul(seed | 0, 0x27d4eb2d) ^ Math.imul(lo | 0, 0x165667b1) ^ Math.imul(hi | 0, 0x9e3779b1) ^ Math.imul(salt | 0, 0x85ebca77)
+  let x =
+    Math.imul(seed | 0, 0x27d4eb2d) ^
+    Math.imul(lo | 0, 0x165667b1) ^
+    Math.imul(hi | 0, 0x9e3779b1) ^
+    Math.imul(salt | 0, 0x85ebca77)
   x = Math.imul(x ^ (x >>> 15), 0x85ebca6b)
   x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35)
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296
@@ -617,7 +804,8 @@ function merge<T>(target: T, input: unknown): T {
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
     if (v === undefined) continue
     const cur = (target as Record<string, unknown>)[k]
-    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)) (target as Record<string, unknown>)[k] = merge({ ...(cur as object) }, v)
+    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur))
+      (target as Record<string, unknown>)[k] = merge({ ...(cur as object) }, v)
     else (target as Record<string, unknown>)[k] = Array.isArray(v) ? structuredClone(v) : v
   }
   return target

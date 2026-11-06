@@ -1,5 +1,12 @@
 import type { LocalFrame, World } from 'threejs-biomes'
-import { DEFAULT_POPULATION, generatePopulation, resolvePopulationOptions, type PopulationData, type PopulationInput, type PopulationOptions } from './population-model.ts'
+import {
+  DEFAULT_POPULATION,
+  generatePopulation,
+  resolvePopulationOptions,
+  type PopulationData,
+  type PopulationInput,
+  type PopulationOptions
+} from './population-model.ts'
 import { generateNetworks, type Network } from './population-network.ts'
 
 /**
@@ -68,7 +75,10 @@ export class Population {
    */
   follow(): () => void {
     this.unsubscribe ??= this.world.onChange(() => this.changed())
-    return () => { this.unsubscribe?.(); this.unsubscribe = null }
+    return () => {
+      this.unsubscribe?.()
+      this.unsubscribe = null
+    }
   }
 
   /** Stops following the world and drops all listeners. */

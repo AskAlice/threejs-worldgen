@@ -13,7 +13,10 @@ test('shells: troposphere, ionosphere, Kármán line and the moon apogee resolve
   // The Moon's apogee is ~405 500 km from Earth's centre.
   assert.ok(Math.abs(apogee.altitude + sys.home.radius - 405_500e3) < 3_000e3, `apogee ${apogee.altitude}`)
   // Numeric altitudes scale with the atmosphere; layer names come pre-scaled.
-  assert.equal(resolveShells([{ label: 'x', altitude: 300_000, color: '#ffffff' }], DEFAULT_LAYERS, sys, 0.5)[0].altitude, 150_000)
+  assert.equal(
+    resolveShells([{ label: 'x', altitude: 300_000, color: '#ffffff' }], DEFAULT_LAYERS, sys, 0.5)[0].altitude,
+    150_000
+  )
   // No moon: no apogee shell.
   assert.equal(resolveShells(DEFAULT_SHELLS.shells, DEFAULT_LAYERS, new StarSystem({ moon: null })).length, 3)
   assert.equal(formatAltitude(100_000), '100 km')

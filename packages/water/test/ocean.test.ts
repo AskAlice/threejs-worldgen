@@ -13,7 +13,8 @@ function planetOcean() {
   const camera = new PerspectiveCamera()
   // Floating origin at the camera's foot, 6.4 million metres from the planet centre.
   const ocean = new Ocean({ camera, world, origin: frame.toWorld(0, 0, 0) })
-  const up = new Vector3(...frame.up), east = new Vector3(...frame.east)
+  const up = new Vector3(...frame.up),
+    east = new Vector3(...frame.east)
   const place = (along: number, height: number) => {
     camera.position.copy(east).multiplyScalar(along).addScaledVector(up, height)
     camera.updateMatrixWorld()
@@ -36,7 +37,8 @@ test('planet ocean: surface under a camera 3 m up, millions of metres from the p
 
 test('planet ocean: waves under the camera stay continuous while re-anchoring over 30 km of travel', () => {
   const { ocean, place } = planetOcean()
-  let jump = 0, reanchors = 0
+  let jump = 0,
+    reanchors = 0
   const anchorOf = () => JSON.stringify((ocean as any).anchor.point)
   for (let k = 0; k <= 300; k++) {
     place(k * 100, 3)
@@ -63,7 +65,11 @@ test('ring grid: rings map onto rings under ×2 scaling', () => {
 
 test('lakes: one lake mesh at the spill level of a basin', () => {
   const bowl = (x: number, z: number) => 5 + Math.hypot(x, z) * 0.05 - (Math.hypot(x, z) < 50 ? 4 : 0)
-  const hydrology = computeHydrology(bowl, { x: -200, z: -200, width: 400, depth: 400, cellSize: 4 }, { minLakeArea: 10 })
+  const hydrology = computeHydrology(
+    bowl,
+    { x: -200, z: -200, width: 400, depth: 400, cellSize: 4 },
+    { minLakeArea: 10 }
+  )
   assert.equal(hydrology.lakes.length, 1)
   const lakes = new Lakes({ hydrology })
   lakes.update(0.016)
@@ -76,21 +82,32 @@ test('lakes: one lake mesh at the spill level of a basin', () => {
 test('lakes: river ribbons stop at the lake, so no two water surfaces overlap there', () => {
   // A valley draining into a bowl: the river runs into the lake.
   const h = (x: number, z: number) => 20 + x * 0.03 - 6 * Math.exp(-((x + 60) ** 2 + z * z) / 3000)
-  const hydrology = computeHydrology(h, { x: -200, z: -200, width: 400, depth: 400, cellSize: 4 }, { riverArea: 2000, minLakeArea: 50 })
+  const hydrology = computeHydrology(
+    h,
+    { x: -200, z: -200, width: 400, depth: 400, cellSize: 4 },
+    { riverArea: 2000, minLakeArea: 50 }
+  )
   const { x0, z0, cellSize: cs, cols, rows } = hydrology.grid
   const inLake = (x: number, z: number) => {
-    const c = Math.round((x - x0) / cs), r = Math.round((z - z0) / cs)
+    const c = Math.round((x - x0) / cs),
+      r = Math.round((z - z0) / cs)
     return c >= 0 && r >= 0 && c < cols && r < rows && hydrology.lakeIndex[r * cols + c] >= 0
   }
   const points = hydrology.rivers.flatMap((v) => v.points)
-  assert.ok(points.some(([x, z]) => inLake(x, z)), 'the fixture has river points inside the lake')
+  assert.ok(
+    points.some(([x, z]) => inLake(x, z)),
+    'the fixture has river points inside the lake'
+  )
   const lakes = new Lakes({ hydrology })
   const river = lakes.object.children.find((m) => m.name === 'Hydrology rivers') as any
   const pos = river.geometry.attributes.position
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + x0, z = pos.getZ(i) + z0
+    const x = pos.getX(i) + x0,
+      z = pos.getZ(i) + z0
     // Each ribbon vertex is offset from its own river point; that point must not be in the lake.
-    const nearest = points.reduce((best, p) => (Math.hypot(p[0] - x, p[1] - z) < Math.hypot(best[0] - x, best[1] - z) ? p : best))
+    const nearest = points.reduce((best, p) =>
+      Math.hypot(p[0] - x, p[1] - z) < Math.hypot(best[0] - x, best[1] - z) ? p : best
+    )
     assert.ok(!inLake(nearest[0], nearest[1]), `river vertex ${i} comes from a point inside the lake`)
   }
   lakes.dispose()

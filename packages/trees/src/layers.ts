@@ -1,8 +1,31 @@
-import { BufferAttribute, BufferGeometry, Float32BufferAttribute, Group, Mesh, type Material, type Renderer } from 'three/webgpu'
-import { bakeImpostor, hash, hashString, type ImpostorOptions, type PlacementRules, type ScatterLayer, type ScatterLOD } from 'threejs-scatter'
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Float32BufferAttribute,
+  Group,
+  Mesh,
+  type Material,
+  type Renderer
+} from 'three/webgpu'
+import {
+  bakeImpostor,
+  hash,
+  hashString,
+  type ImpostorOptions,
+  type PlacementRules,
+  type ScatterLayer,
+  type ScatterLOD
+} from 'threejs-scatter'
 import { float } from 'three/tsl'
 import {
-  applyImpostorWeather, createBarkMaterial, createFruitMaterial, createLeafMaterial, createRockMaterial, impostorFoliageMask, treeUniforms, type WeatherInputs,
+  applyImpostorWeather,
+  createBarkMaterial,
+  createFruitMaterial,
+  createLeafMaterial,
+  createRockMaterial,
+  impostorFoliageMask,
+  treeUniforms,
+  type WeatherInputs
 } from './materials.ts'
 import { generateRock, rocks, type RockParams } from './rock.ts'
 import { DEFAULT_TREE_PARAMS, species as speciesPresets, type TreeParams } from './species.ts'
@@ -78,7 +101,8 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
   for (const sp of options.species) {
     const isRock = sp.name in rocks && !(sp.name in speciesPresets)
     const preset = isRock ? undefined : (speciesPresets as Record<string, TreeParams | undefined>)[sp.name]
-    if (!isRock && !preset && !sp.params) throw new Error(`createVegetationLayers: unknown species "${sp.name}" (give \`params\` for a custom one)`)
+    if (!isRock && !preset && !sp.params)
+      throw new Error(`createVegetationLayers: unknown species "${sp.name}" (give \`params\` for a custom one)`)
     const variants = Math.max(1, Math.round(sp.variants ?? options.variants ?? 3))
     const tree: TreeParams = { ...DEFAULT_TREE_PARAMS, ...preset, ...(sp.params as Partial<TreeParams>) }
     const rock: RockParams = { ...rocks[sp.name as keyof typeof rocks], ...(sp.params as Partial<RockParams>) }
@@ -86,7 +110,9 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
     const k = Math.min(3, Math.max(0.12, size / 15))
     const mo = { weather: options.weather }
     const materialsFor = (o: typeof mo): Material | Material[] =>
-      isRock ? createRockMaterial(o) : [createBarkMaterial(tree, o), createLeafMaterial(tree, o), createFruitMaterial(tree, o)]
+      isRock
+        ? createRockMaterial(o)
+        : [createBarkMaterial(tree, o), createLeafMaterial(tree, o), createFruitMaterial(tree, o)]
     const material = materialsFor(mo)
     // Impostors are baked from clear-weather copies; the live weather is applied on top (applyImpostorWeather), as on
     // the meshes, so it is not baked in twice or frozen at bake time.
@@ -118,7 +144,9 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
         const wind = treeUniforms.windStrength.value
         treeUniforms.windStrength.value = 0
         try {
-          const baked = await bakeImpostor(options.renderer, group, { size: 512, ...options.impostor }, (m) => impostorFoliageMask(foliage.has(m)))
+          const baked = await bakeImpostor(options.renderer, group, { size: 512, ...options.impostor }, (m) =>
+            impostorFoliageMask(foliage.has(m))
+          )
           applyImpostorWeather(baked.material, baked.surface, { ...mo, rock: isRock, params: tree })
           impostor = { distance: farD * k, geometry: baked.geometry, material: baked.material, castShadow: false }
         } finally {
@@ -143,11 +171,11 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
         colorVariation: sp.colorVariation ?? 0.12,
         lods: [
           { distance: nearD * k, geometry: full, material },
-          { distance: (impostor ? midD : farD) * k, geometry: simple, material },
+          { distance: (impostor ? midD : farD) * k, geometry: simple, material }
         ],
         impostor,
         castShadow: options.castShadow ?? true,
-        receiveShadow: true,
+        receiveShadow: true
       })
     }
     // Only ever cloned by the bake (never rendered themselves).
@@ -161,7 +189,13 @@ export async function createVegetationLayers(options: VegetationOptions): Promis
  * `[bark, leaves, fruit]` material array and a single instanced draw per level of detail. Disposes the parts.
  */
 export function mergeTreeGeometry(tree: TreeGeometry): BufferGeometry {
-  const parts = ([[tree.trunk, 0], [tree.leaves, 1], [tree.fruit, 2]] as const).filter((p): p is readonly [BufferGeometry, 0 | 1 | 2] => !!p[0])
+  const parts = (
+    [
+      [tree.trunk, 0],
+      [tree.leaves, 1],
+      [tree.fruit, 2]
+    ] as const
+  ).filter((p): p is readonly [BufferGeometry, 0 | 1 | 2] => !!p[0])
   const out = new BufferGeometry()
   for (const name of ['position', 'normal', 'uv', 'color', 'cardRandom']) {
     const size = tree.trunk.getAttribute(name).itemSize
@@ -175,7 +209,10 @@ export function mergeTreeGeometry(tree: TreeGeometry): BufferGeometry {
     out.setAttribute(name, new Float32BufferAttribute(merged, size))
   }
   const vertexCount = out.getAttribute('position').count
-  const indices = vertexCount <= 65536 ? new Uint16Array(parts.reduce((n, [g]) => n + g.index!.count, 0)) : new Uint32Array(parts.reduce((n, [g]) => n + g.index!.count, 0))
+  const indices =
+    vertexCount <= 65536
+      ? new Uint16Array(parts.reduce((n, [g]) => n + g.index!.count, 0))
+      : new Uint32Array(parts.reduce((n, [g]) => n + g.index!.count, 0))
   let start = 0
   let offset = 0
   for (const [g, materialIndex] of parts) {

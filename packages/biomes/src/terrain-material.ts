@@ -1,7 +1,27 @@
 import { Color, MeshStandardNodeMaterial, Vector2, Vector3, type Node } from 'three/webgpu'
 import {
-  Fn, If, attribute, cameraPosition, clamp, dFdx, dFdy, distance, float, mix, modelWorldMatrix, mx_noise_float, normalView,
-  positionGeometry, positionLocal, positionView, positionWorld, smoothstep, uniform, vec2, vec3, vec4,
+  Fn,
+  If,
+  attribute,
+  cameraPosition,
+  clamp,
+  dFdx,
+  dFdy,
+  distance,
+  float,
+  mix,
+  modelWorldMatrix,
+  mx_noise_float,
+  normalView,
+  positionGeometry,
+  positionLocal,
+  positionView,
+  positionWorld,
+  smoothstep,
+  uniform,
+  vec2,
+  vec3,
+  vec4
 } from 'three/tsl'
 
 /** How the terrain is coloured. */
@@ -29,7 +49,14 @@ export interface TerrainMaterialOptions {
 
 /** Default terrain look. */
 export const DEFAULT_TERRAIN_MATERIAL: TerrainMaterialOptions = {
-  debug: 'none', detail: 1, detailScale: 1, detailDistance: 220, bump: 1, brightness: 1, saturation: 1, wireframe: false,
+  debug: 'none',
+  detail: 1,
+  detailScale: 1,
+  detailDistance: 220,
+  bump: 1,
+  brightness: 1,
+  saturation: 1,
+  wireframe: false
 }
 
 /**
@@ -63,7 +90,7 @@ export function createTerrainUniforms(o: TerrainMaterialOptions = DEFAULT_TERRAI
     /** Sand colour (linear). */
     sandColor: uniform(new Color('#d8c393')),
     /** Mud colour (linear). */
-    mudColor: uniform(new Color('#3f3a2c')),
+    mudColor: uniform(new Color('#3f3a2c'))
   }
 }
 
@@ -91,7 +118,11 @@ function perturbNormal(height: Node<'float'>, scale: Node<'float'>) {
  * `userData.detailOffset` (its centre modulo the detail period, a `Vector3`), `userData.level` and
  * `userData.morphRange` (`Vector2(splitDistance, parentSplitDistance)`, the geomorph band).
  */
-export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {}): { material: MeshStandardNodeMaterial; uniforms: TerrainUniforms; setDebug: (debug: TerrainDebug) => void } {
+export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {}): {
+  material: MeshStandardNodeMaterial
+  uniforms: TerrainUniforms
+  setDebug: (debug: TerrainDebug) => void
+} {
   const o = { ...DEFAULT_TERRAIN_MATERIAL, ...input }
   const u = createTerrainUniforms(o)
   const material = new MeshStandardNodeMaterial({ wireframe: o.wireframe })
@@ -112,14 +143,24 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   // level compute the same factor at a shared vertex and still meet.
   const morph = attribute<'vec3'>('morphPosition', 'vec3')
   const morphRange = uniform(new Vector2(0, -1)).onObjectUpdate(({ object }) => object?.userData.morphRange)
-  const refine = smoothstep(morphRange.y, morphRange.x, distance(modelWorldMatrix.mul(positionGeometry), cameraPosition))
+  const refine = smoothstep(
+    morphRange.y,
+    morphRange.x,
+    distance(modelWorldMatrix.mul(positionGeometry), cameraPosition)
+  )
   material.positionNode = positionLocal.add(morph.mul(refine.oneMinus()))
 
-  const fade = smoothstep(u.detailDistance, u.detailDistance.mul(0.25), distance(positionWorld, cameraPosition)).mul(u.detail)
+  const fade = smoothstep(u.detailDistance, u.detailDistance.mul(0.25), distance(positionWorld, cameraPosition)).mul(
+    u.detail
+  )
 
   // Mid-scale ground detail (~7 m and ~30 m features) that survives to a few kilometres, so the ground
   // does not blur into flat biome colour between the metre-scale detail and the far LODs.
-  const midFade = smoothstep(u.detailDistance.mul(14), u.detailDistance.mul(3), distance(positionWorld, cameraPosition)).mul(u.detail)
+  const midFade = smoothstep(
+    u.detailDistance.mul(14),
+    u.detailDistance.mul(3),
+    distance(positionWorld, cameraPosition)
+  ).mul(u.detail)
   const mid = Fn(() => {
     const n = float(0).toVar()
     If(midFade.greaterThan(0.002), () => {
@@ -133,7 +174,9 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   const noise = Fn(() => {
     const n = vec4(0).toVar()
     If(fade.greaterThan(0.002), () => {
-      const patches = mx_noise_float(p.mul(0.08)).mul(0.5).add(mx_noise_float(p.mul(0.6)).mul(0.25))
+      const patches = mx_noise_float(p.mul(0.08))
+        .mul(0.5)
+        .add(mx_noise_float(p.mul(0.6)).mul(0.25))
       const grain = mx_noise_float(p.mul(3.1))
       const ripple = mx_noise_float(vec3(p.x.mul(0.9), patches.mul(3), p.z.mul(4.5)))
       const sparkle = smoothstep(0.82, 0.95, mx_noise_float(p.mul(37)))
@@ -141,14 +184,24 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
     })
     return n
   })()
-  const patches = noise.x, grain = noise.y, ripple = noise.z, sparkle = noise.w
+  const patches = noise.x,
+    grain = noise.y,
+    ripple = noise.z,
+    sparkle = noise.w
 
   // Ground overrides per pixel (smooth, noise-broken edges at any LOD): steep → rock, cold → snow,
   // near the waterline → sand, along rivers → mud.
-  const aboveSea = climate.x, temperature = climate.y, river = climate.z, slope = climate.w
+  const aboveSea = climate.x,
+    temperature = climate.y,
+    river = climate.z,
+    slope = climate.w
   const rock = smoothstep(u.rockSlope.mul(0.7), u.rockSlope, slope.add(patches.mul(0.25)))
-  const snow = smoothstep(u.snowTemperature.add(1.5), u.snowTemperature.sub(1.5), temperature.add(patches.mul(3))).mul(smoothstep(1.8, 1.2, slope))
-  const sand = smoothstep(u.sandBand, u.sandBand.mul(0.3), aboveSea.abs().add(patches.mul(u.sandBand).mul(0.6))).mul(rock.oneMinus())
+  const snow = smoothstep(u.snowTemperature.add(1.5), u.snowTemperature.sub(1.5), temperature.add(patches.mul(3))).mul(
+    smoothstep(1.8, 1.2, slope)
+  )
+  const sand = smoothstep(u.sandBand, u.sandBand.mul(0.3), aboveSea.abs().add(patches.mul(u.sandBand).mul(0.6))).mul(
+    rock.oneMinus()
+  )
   const wet = river.mul(0.85)
 
   let ground = mix(base, u.mudColor, wet)
@@ -163,12 +216,17 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   const lum = color.dot(vec3(0.2126, 0.7152, 0.0722))
   color = mix(vec3(lum), color, u.saturation).mul(u.brightness)
 
-  const lodTint = vec3(level.mul(12.9898), level.mul(78.233), level.mul(37.719)).sin().mul(43758.5453).fract().mul(0.7).add(0.3)
+  const lodTint = vec3(level.mul(12.9898), level.mul(78.233), level.mul(37.719))
+    .sin()
+    .mul(43758.5453)
+    .fract()
+    .mul(0.7)
+    .add(0.3)
   const views: Record<TerrainDebug, Node<'vec3'>> = {
     none: color,
     biomes: biome,
     lod: lodTint.mul(ground.add(0.25)),
-    splat: vec3(rock.add(snow), snow.add(sand), snow.add(wet)),
+    splat: vec3(rock.add(snow), snow.add(sand), snow.add(wet))
   }
   // Debug views swap the colour node (one recompile) instead of branching per fragment.
   const setDebug = (debug: TerrainDebug) => {
@@ -177,11 +235,18 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   }
   setDebug(o.debug)
 
-  material.roughnessNode = clamp(float(0.95).sub(wet.mul(0.45)).sub(snow.mul(0.2)).sub(sparkle.mul(snow).mul(0.4)), 0.15, 1)
+  material.roughnessNode = clamp(
+    float(0.95).sub(wet.mul(0.45)).sub(snow.mul(0.2)).sub(sparkle.mul(snow).mul(0.4)),
+    0.15,
+    1
+  )
   material.metalnessNode = float(0)
 
   // Micro relief bump from the same noise, stronger on rock and sand.
-  const height = patches.mul(0.6).add(grain.mul(rock.mul(0.5).add(0.15))).add(ripple.mul(sand).mul(0.4))
+  const height = patches
+    .mul(0.6)
+    .add(grain.mul(rock.mul(0.5).add(0.15)))
+    .add(ripple.mul(sand).mul(0.4))
   material.normalNode = perturbNormal(height.mul(fade).add(mid.mul(midFade).mul(0.5)), u.bump.mul(0.05))
 
   return { material, uniforms: u, setDebug }

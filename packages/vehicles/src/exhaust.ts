@@ -4,7 +4,7 @@
 // diesel locomotives haze and spike on acceleration, truck and tractor stacks puff dark smoke when
 // pulling away, and car tailpipes show mostly as condensation in cold or humid air. Electric vehicles
 // have no vents, so they emit nothing.
-import { Object3D, Vector3, type Camera, type Renderer } from 'three/webgpu'
+import { type Object3D, Vector3, type Camera, type Renderer } from 'three/webgpu'
 import { MOTION_STRIDE, ParticleSystem, SOURCE_STRIDE, type ParticleInput } from 'threejs-particles'
 import type { ExhaustVent } from './models.ts'
 import type { FleetSim, DeepPartial } from './sim.ts'
@@ -71,8 +71,8 @@ export const DEFAULT_EXHAUST: ExhaustSettings = {
     tailpipe: { rate: 60, size: 0.24, opacity: 0.14, tint: 0.1, heat: 0.6, speed: 2.2 },
     stack: { rate: 36, size: 0.9, opacity: 0.24, tint: 0.6, heat: 1, speed: 4 },
     steam: { rate: 80, size: 1.5, opacity: 0.85, tint: 0.08, heat: 1.6, speed: 7 },
-    diesel: { rate: 30, size: 1.4, opacity: 0.22, tint: 0.85, heat: 1.2, speed: 5 },
-  },
+    diesel: { rate: 30, size: 1.4, opacity: 0.22, tint: 0.85, heat: 1.2, speed: 5 }
+  }
 }
 
 /** Per-vehicle state the emission reads between frames (acceleration from speed differences), and reused selection buffers. */
@@ -89,7 +89,12 @@ export interface ExhaustState {
 
 /** A fresh {@link ExhaustState} for `count` vehicles. */
 export function createExhaustState(count: number): ExhaustState {
-  return { speed: new Float32Array(count).fill(NaN), accel: new Float32Array(count), dist: new Float32Array(count), pick: new Int32Array(count) }
+  return {
+    speed: new Float32Array(count).fill(NaN),
+    accel: new Float32Array(count),
+    dist: new Float32Array(count),
+    pick: new Int32Array(count)
+  }
 }
 
 /** Vehicle `a` comes before `b`: nearer, or as near with a lower index (deterministic). */
@@ -101,14 +106,22 @@ const nearer = (dist: Float32Array, a: number, b: number) => dist[a] < dist[b] |
  */
 function nearestFirst(pick: Int32Array, dist: Float32Array, n: number, k: number): void {
   k = Math.min(k, n)
-  let lo = 0, hi = n - 1
+  let lo = 0,
+    hi = n - 1
   while (k < n && lo < hi) {
     const pivot = pick[(lo + hi) >> 1]
-    let i = lo, j = hi
+    let i = lo,
+      j = hi
     while (i <= j) {
       while (nearer(dist, pick[i], pivot)) i++
       while (nearer(dist, pivot, pick[j])) j--
-      if (i <= j) { const t = pick[i]; pick[i] = pick[j]; pick[j] = t; i++; j-- }
+      if (i <= j) {
+        const t = pick[i]
+        pick[i] = pick[j]
+        pick[j] = t
+        i++
+        j--
+      }
     }
     if (k - 1 <= j) hi = j
     else if (k - 1 >= i) lo = i
@@ -117,7 +130,10 @@ function nearestFirst(pick: Int32Array, dist: Float32Array, n: number, k: number
   for (let i = 1; i < k; i++) {
     const x = pick[i]
     let j = i - 1
-    while (j >= 0 && nearer(dist, x, pick[j])) { pick[j + 1] = pick[j]; j-- }
+    while (j >= 0 && nearer(dist, x, pick[j])) {
+      pick[j + 1] = pick[j]
+      j--
+    }
     pick[j + 1] = x
   }
 }
@@ -132,15 +148,22 @@ export interface ExhaustBuffers {
 
 /** Buffers for up to `max` sources. */
 export function createExhaustBuffers(max: number): ExhaustBuffers {
-  return { sources: new Float32Array(max * SOURCE_STRIDE), motion: new Float32Array(max * MOTION_STRIDE), vehicle: new Int32Array(max) }
+  return {
+    sources: new Float32Array(max * SOURCE_STRIDE),
+    motion: new Float32Array(max * MOTION_STRIDE),
+    vehicle: new Int32Array(max)
+  }
 }
 
-const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
 
 /** How visible tailpipe condensation is in this air, 0…1 (cold and humid: clearly; warm and dry: hardly). */
 export function condensation(temperature: number, humidity: number): number {
   const cold = smoothstep(18, -5, temperature)
-  return Math.min(1, cold * (0.45 + 0.55 * humidity) + 0.25 * Math.max(0, humidity - 0.8) / 0.2)
+  return Math.min(1, cold * (0.45 + 0.55 * humidity) + (0.25 * Math.max(0, humidity - 0.8)) / 0.2)
 }
 
 /**
@@ -150,11 +173,20 @@ export function condensation(temperature: number, humidity: number): number {
  * air, faded by distance. Particles inherit the vehicle's velocity plus the exit speed along the
  * vent. Advances `state` by `dt`. Returns the number of sources written.
  */
-export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: number }, settings: ExhaustSettings, state: ExhaustState, dt: number, out: ExhaustBuffers): number {
-  const n = sim.count, p = sim.pose
+export function exhaustSources(
+  sim: FleetSim,
+  eye: { x: number; y: number; z: number },
+  settings: ExhaustSettings,
+  state: ExhaustState,
+  dt: number,
+  out: ExhaustBuffers
+): number {
+  const n = sim.count,
+    p = sim.pose
   // Acceleration per vehicle, smoothed (a pulling-away truck smokes for a few seconds).
   for (let v = 0; v < n; v++) {
-    const prev = state.speed[v], sp = sim.speed[v]
+    const prev = state.speed[v],
+      sp = sim.speed[v]
     const a = dt > 0 && prev === prev ? (sp - prev) / dt : 0
     state.accel[v] += (a - state.accel[v]) * Math.min(1, dt * 3)
     state.speed[v] = sp
@@ -162,7 +194,10 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
   if (!settings.enabled) return 0
   const max = Math.min(settings.maxVents, out.vehicle.length)
   const reach = settings.maxDistance
-  if (state.pick.length < n) { state.pick = new Int32Array(n); state.dist = new Float32Array(n) }
+  if (state.pick.length < n) {
+    state.pick = new Int32Array(n)
+    state.dist = new Float32Array(n)
+  }
   const { pick, dist } = state
   let candidates = 0
   for (let v = 0; v < n; v++) {
@@ -179,14 +214,23 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
   for (let c0 = 0; c0 < candidates; c0++) {
     const v = pick[c0]
     if (k >= max) break
-    const m = sim.models[sim.model[v]], o = v * 8
-    const yaw = p[o + 3], c = Math.cos(yaw), s = Math.sin(yaw), speed = sim.speed[v]
-    const throttle = p[o + 7], pull = Math.min(1.5, Math.max(0, state.accel[v]) / 2), idle = speed < 0.5
+    const m = sim.models[sim.model[v]],
+      o = v * 8
+    const yaw = p[o + 3],
+      c = Math.cos(yaw),
+      s = Math.sin(yaw),
+      speed = sim.speed[v]
+    const throttle = p[o + 7],
+      pull = Math.min(1.5, Math.max(0, state.accel[v]) / 2),
+      idle = speed < 0.5
     const fade = 1 - smoothstep(reach * 0.6, reach, dist[v])
     for (const vent of m.vents) {
       if (k >= max) break
       const look = settings.kinds[vent.kind]
-      let w = 0, alpha = look.opacity, tint = look.tint, size = look.size
+      let w = 0,
+        alpha = look.opacity,
+        tint = look.tint,
+        size = look.size
       if (vent.kind === 'tailpipe') {
         w = (idle ? 0.55 : 0.35 + 0.2 * throttle) + pull * 1.2
         w *= 0.25 + 0.75 * vis
@@ -197,7 +241,8 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
         tint = Math.min(1, tint + 0.2 * pull)
       } else if (vent.kind === 'steam') {
         // Beats: four per turn of the driving wheels; at speed they blur into a steady plume.
-        const pulse = vent.pulse ?? 1.4, beat = speed / pulse
+        const pulse = vent.pulse ?? 1.4,
+          beat = speed / pulse
         const chuff = Math.max(0, Math.cos((2 * Math.PI * sim.travel[v]) / pulse)) ** 6
         const blur = smoothstep(3, 9, beat)
         w = idle ? 0.3 : 0.5 + (1 - blur) * chuff * 2.5 + blur * 0.9 + pull * 0.8
@@ -208,8 +253,10 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
       }
       w *= look.rate * settings.intensity * fade
       if (w <= 0) continue
-      const [x, y, z] = vent.position, [dx, dy, dz] = vent.direction
-      const S = k * SOURCE_STRIDE, M = k * MOTION_STRIDE
+      const [x, y, z] = vent.position,
+        [dx, dy, dz] = vent.direction
+      const S = k * SOURCE_STRIDE,
+        M = k * MOTION_STRIDE
       out.sources[S] = p[o] + c * x + s * z
       out.sources[S + 1] = p[o + 1] + y
       out.sources[S + 2] = p[o + 2] - s * x + c * z
@@ -284,15 +331,53 @@ export class VehicleExhaust {
   particleOptions(): ParticleInput {
     const s = this.settings
     return {
-      capacity: s.capacity, rate: 1, maxPerFrame: Math.min(s.capacity, 2048), life: s.life,
-      emitter: { shape: 'sources', size: [0.06, 0.04, 0.06], velocity: [0, 0, 0], spread: 0.35, temperature: [360, 420] },
-      forces: { gravity: 0, buoyancy: 0.6, ambientTemperature: 273.15 + s.temperature, cooling: 0.45, wind: s.wind, windShear: 0.2, drag: 1.4, turbulence: 0.9, turbulenceScale: 2.5, turbulenceSpeed: 0.35, gridLift: 0 },
+      capacity: s.capacity,
+      rate: 1,
+      maxPerFrame: Math.min(s.capacity, 2048),
+      life: s.life,
+      emitter: {
+        shape: 'sources',
+        size: [0.06, 0.04, 0.06],
+        velocity: [0, 0, 0],
+        spread: 0.35,
+        temperature: [360, 420]
+      },
+      forces: {
+        gravity: 0,
+        buoyancy: 0.6,
+        ambientTemperature: 273.15 + s.temperature,
+        cooling: 0.45,
+        wind: s.wind,
+        windShear: 0.2,
+        drag: 1.4,
+        turbulence: 0.9,
+        turbulenceScale: 2.5,
+        turbulenceSpeed: 0.35,
+        gridLift: 0
+      },
       curves: { size: [0.35, 1, 1.9, 2.8, 3.6], opacity: [0, 0.75, 0.6, 0.35, 0.15, 0], color: ['#ffffff'] },
       render: {
-        shading: 'smoke', blending: 'alpha', size: s.kinds.tailpipe.size, sizeRandom: [0.75, 1.3], aspect: 1, stretch: 0, intensity: 1, opacity: 1,
-        softness: 0.6, sort: true, detail: 0.8, detailDistance: Math.min(120, s.maxDistance), shadowSteps: 1, lightSteps: 0, absorption: 1.8, anisotropy: 0.45,
-        silverLining: 0.6, albedo: ['#ecebe7', '#4a4643'], glowStrength: 0, capHeight: 0,
-      },
+        shading: 'smoke',
+        blending: 'alpha',
+        size: s.kinds.tailpipe.size,
+        sizeRandom: [0.75, 1.3],
+        aspect: 1,
+        stretch: 0,
+        intensity: 1,
+        opacity: 1,
+        softness: 0.6,
+        sort: true,
+        detail: 0.8,
+        detailDistance: Math.min(120, s.maxDistance),
+        shadowSteps: 1,
+        lightSteps: 0,
+        absorption: 1.8,
+        anisotropy: 0.45,
+        silverLining: 0.6,
+        albedo: ['#ecebe7', '#4a4643'],
+        glowStrength: 0,
+        capHeight: 0
+      }
     }
   }
 

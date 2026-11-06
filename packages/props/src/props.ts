@@ -1,11 +1,29 @@
 import {
-  BufferAttribute, BufferGeometry, Color, DynamicDrawUsage, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, Quaternion, Vector3,
-  type MeshStandardNodeMaterial, type Node, type Object3D,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  DynamicDrawUsage,
+  Group,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
+  Quaternion,
+  Vector3,
+  type MeshStandardNodeMaterial,
+  type Node,
+  type Object3D
 } from 'three/webgpu'
 import { time as tslTime } from 'three/tsl'
 import { hash01, seedOf } from 'threejs-biomes'
 import { InstanceStates, type MaterialStates, type StateLook } from 'threejs-weathering'
-import { buildProp, PROP_KINDS, quatFromUp, type PropMaterialId, type PropModel, type PropPlacement } from './catalog.ts'
+import {
+  buildProp,
+  PROP_KINDS,
+  quatFromUp,
+  type PropMaterialId,
+  type PropModel,
+  type PropPlacement
+} from './catalog.ts'
 import { catenaryPoints } from './catenary.ts'
 import { shapeData, type ShapeId } from './geometry.ts'
 import { createPropMaterial, createPropUniforms, type PropMaterialContext } from './materials.ts'
@@ -59,11 +77,14 @@ export const DEFAULT_PROPS: PropsOptions = {
   lean: 0.38,
   cables: { sag: 0.025, iceSag: 0.6, segments: 10, thickness: 0.03, color: '#1c1c1c' },
   castShadow: true,
-  receiveShadow: true,
+  receiveShadow: true
 }
 
 /** Partial settings (nested groups merge). */
-export type PropsInput = Partial<Omit<PropsOptions, 'states' | 'cables'>> & { states?: Partial<MaterialStates>; cables?: Partial<CableOptions> }
+export type PropsInput = Partial<Omit<PropsOptions, 'states' | 'cables'>> & {
+  states?: Partial<MaterialStates>
+  cables?: Partial<CableOptions>
+}
 
 /** Options of {@link Props.create}: settings plus live inputs (not JSON). */
 export interface PropsCreateOptions extends PropsInput {
@@ -86,7 +107,12 @@ interface Group_ {
   glow: number[]
 }
 
-interface Span { from: number; to: number; a: [number, number, number]; b: [number, number, number] }
+interface Span {
+  from: number
+  to: number
+  a: [number, number, number]
+  b: [number, number, number]
+}
 
 const _m = new Matrix4()
 const _l = new Matrix4()
@@ -104,9 +130,10 @@ function merge<T>(target: T, input: unknown): T {
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
     if (v === undefined) continue
     const cur = (target as Record<string, unknown>)[k]
-    ;(target as Record<string, unknown>)[k] = v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)
-      ? merge({ ...(cur as object) }, v)
-      : v
+    ;(target as Record<string, unknown>)[k] =
+      v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)
+        ? merge({ ...(cur as object) }, v)
+        : v
   }
   return target
 }
@@ -182,7 +209,9 @@ export class Props {
         previous.apply(scene, args)
         this.update()
       }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = () => {
+        scene.onBeforeRender = previous
+      }
     }
   }
 
@@ -205,7 +234,8 @@ export class Props {
   }
 
   private apply(): this {
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     u.wetness.value = o.states.wetness
     u.snow.value = o.states.snow
     u.burn.value = o.states.burn
@@ -242,7 +272,8 @@ export class Props {
 
   // Rebuilds models, instance groups and meshes from the placements.
   private layout() {
-    const o = this.options, list = o.placements
+    const o = this.options,
+      list = o.placements
     const old = this.states
     this.states = new InstanceStates(list.length)
     this.states.array.set(old.array.subarray(0, Math.min(old.array.length, this.states.array.length)))
@@ -258,7 +289,11 @@ export class Props {
       for (const part of model.parts) {
         const key = `${part.shape}|${part.material}`
         let g = this.groups.get(key)
-        if (!g) this.groups.set(key, (g = { shape: part.shape, material: part.material, prop: [], local: [], tint: [], glow: [] }))
+        if (!g)
+          this.groups.set(
+            key,
+            (g = { shape: part.shape, material: part.material, prop: [], local: [], tint: [], glow: [] })
+          )
         g.prop.push(i)
         _l.compose(_p.set(...part.p), _q.set(...part.q), _s.set(...part.s))
         g.local.push(..._l.elements)
@@ -275,7 +310,8 @@ export class Props {
       const prev = last.get(p.line)
       last.set(p.line, i)
       if (prev === undefined) return
-      const a = this.models[prev].attach, b = this.models[i].attach
+      const a = this.models[prev].attach,
+        b = this.models[i].attach
       for (let k = 0; k < Math.min(a.length, b.length); k++) this.spans.push({ from: prev, to: i, a: a[k], b: b[k] })
     })
 
@@ -285,16 +321,44 @@ export class Props {
     }
     this.meshes.clear()
     for (const [key, g] of this.groups) {
-      this.meshes.set(key, this.makeMesh(key, g.shape, g.material, g.prop.length, new Float32Array(g.tint), g.material === 'lamp' ? new Float32Array(g.glow) : null))
+      this.meshes.set(
+        key,
+        this.makeMesh(
+          key,
+          g.shape,
+          g.material,
+          g.prop.length,
+          new Float32Array(g.tint),
+          g.material === 'lamp' ? new Float32Array(g.glow) : null
+        )
+      )
     }
     const segs = Math.max(1, Math.round(o.cables.segments))
-    if (this.spans.length) this.meshes.set('cables', this.makeMesh('cables', 'wire', 'cable', this.spans.length * segs, new Float32Array(this.spans.length * segs * 3), null))
+    if (this.spans.length)
+      this.meshes.set(
+        'cables',
+        this.makeMesh(
+          'cables',
+          'wire',
+          'cable',
+          this.spans.length * segs,
+          new Float32Array(this.spans.length * segs * 3),
+          null
+        )
+      )
     this.propMatrices = new Float32Array(list.length * 16)
     this.cablePoints = new Float32Array((segs + 1) * 3)
     this.synced = -1
   }
 
-  private makeMesh(name: string, shape: ShapeId, material: PropMaterialId, count: number, tint: Float32Array, glow: Float32Array | null): InstancedMesh {
+  private makeMesh(
+    name: string,
+    shape: ShapeId,
+    material: PropMaterialId,
+    count: number,
+    tint: Float32Array,
+    glow: Float32Array | null
+  ): InstancedMesh {
     const d = shapeData(shape)
     const g = new BufferGeometry()
     // Own attribute objects per mesh (disposing one geometry frees its GPU buffers); the arrays are shared.
@@ -324,7 +388,8 @@ export class Props {
     if (this.states.attribute.version === this.synced && key === this.syncKey) return
     this.synced = this.states.attribute.version
     this.syncKey = key
-    const list = o.placements, st = this.states.array
+    const list = o.placements,
+      st = this.states.array
     // Prop matrices: position, yaw, lean away from a seeded direction as damage grows.
     for (let i = 0; i < list.length; i++) {
       const p = list[i]
@@ -364,17 +429,29 @@ export class Props {
       let n = 0
       for (const span of this.spans) {
         _m.fromArray(this.propMatrices, span.from * 16)
-        const a = _v.set(...span.a).applyMatrix4(_m).toArray()
+        const a = _v
+          .set(...span.a)
+          .applyMatrix4(_m)
+          .toArray()
         _m.fromArray(this.propMatrices, span.to * 16)
-        const b = _w.set(...span.b).applyMatrix4(_m).toArray()
+        const b = _w
+          .set(...span.b)
+          .applyMatrix4(_m)
+          .toArray()
         const snow = Math.max(st[span.from * 4 + 1], st[span.to * 4 + 1], o.states.snow)
         const L = Math.hypot(b[0] - a[0], b[2] - a[2])
         const pts = catenaryPoints(a, b, L * o.cables.sag * (1 + snow * o.cables.iceSag), segs, this.cablePoints)
         for (let k = 0; k < segs; k++, n++) {
-          const dx = pts[k * 3 + 3] - pts[k * 3], dy = pts[k * 3 + 4] - pts[k * 3 + 1], dz = pts[k * 3 + 5] - pts[k * 3 + 2]
+          const dx = pts[k * 3 + 3] - pts[k * 3],
+            dy = pts[k * 3 + 4] - pts[k * 3 + 1],
+            dz = pts[k * 3 + 5] - pts[k * 3 + 2]
           const len = Math.hypot(dx, dy, dz) || 1e-6
           const q = quatFromUp(dx / len, dy / len, dz / len)
-          _m.compose(_p.set(pts[k * 3], pts[k * 3 + 1], pts[k * 3 + 2]), _q.set(q[0], q[1], q[2], q[3]), _s.set(t, len, t)).toArray(arr, n * 16)
+          _m.compose(
+            _p.set(pts[k * 3], pts[k * 3 + 1], pts[k * 3 + 2]),
+            _q.set(q[0], q[1], q[2], q[3]),
+            _s.set(t, len, t)
+          ).toArray(arr, n * 16)
           for (let c = 0; c < 4; c++) sa[n * 4 + c] = st[span.from * 4 + c]
         }
       }

@@ -1,22 +1,50 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { START, END, MAP_START, MAP_END, grid, packageBlock, replaceBlock, pairDemos, demoOwners, docsMap, missingFromMap } from './readme-cards.mjs'
+import {
+  START,
+  END,
+  MAP_START,
+  MAP_END,
+  grid,
+  packageBlock,
+  replaceBlock,
+  pairDemos,
+  demoOwners,
+  docsMap,
+  missingFromMap
+} from './readme-cards.mjs'
 
 const SITE = 'https://askalice.github.io/threejs-worldgen/'
 const sky = {
-  short: 'sky', name: 'threejs-sky', pitch: 'A sky & stars.', hero: { img: 'sky/hero.jpg', alt: 'Sunset "over" hills' },
-  thumbAlt: 'Golden "clouds"', demos: [{ label: 'three.js demo', href: 'sky.html' }], thumb: 'sky/thumb.jpg', heroImg: 'sky/hero.jpg',
+  short: 'sky',
+  name: 'threejs-sky',
+  pitch: 'A sky & stars.',
+  hero: { img: 'sky/hero.jpg', alt: 'Sunset "over" hills' },
+  thumbAlt: 'Golden "clouds"',
+  demos: [{ label: 'three.js demo', href: 'sky.html' }],
+  thumb: 'sky/thumb.jpg',
+  heroImg: 'sky/hero.jpg'
 }
 const trees = {
-  short: 'trees', name: 'threejs-trees', pitch: 'Grown trees.', hero: { alt: 'Trees' },
-  demos: [{ label: 'Forest demo', href: 'scatter.html' }, { label: 'Species lineup', href: 'scatter.html?lineup' }],
-  thumb: null, heroImg: null,
+  short: 'trees',
+  name: 'threejs-trees',
+  pitch: 'Grown trees.',
+  hero: { alt: 'Trees' },
+  demos: [
+    { label: 'Forest demo', href: 'scatter.html' },
+    { label: 'Species lineup', href: 'scatter.html?lineup' }
+  ],
+  thumb: null,
+  heroImg: null
 }
 const nodemo = { ...sky, short: 'x', name: 'threejs-x', demos: [] }
 
 test('grid: one card per package with a demo, absolute URLs, alt text, escaped', () => {
   const md = grid([sky, trees, nodemo])
-  assert.match(md, new RegExp(`<img src="${SITE}media/sky/thumb.jpg" width="\\d+" alt="threejs-sky: Golden &quot;clouds&quot;" />`))
+  assert.match(
+    md,
+    new RegExp(`<img src="${SITE}media/sky/thumb.jpg" width="\\d+" alt="threejs-sky: Golden &quot;clouds&quot;" />`)
+  )
   assert.ok(md.includes(`href="${SITE}demo/sky.html"`))
   assert.ok(md.includes(`href="${SITE}sky/"`))
   assert.ok(md.includes('A sky &amp; stars.'))
@@ -28,7 +56,10 @@ test('grid: one card per package with a demo, absolute URLs, alt text, escaped',
 test('grid: the alt text belongs to the image shown (hero alt only when the card shows the hero)', () => {
   assert.ok(!grid([sky]).includes('Sunset'), 'a thumbnail card must not describe the hero')
   assert.ok(grid([{ ...sky, thumb: 'sky/hero.jpg' }]).includes('alt="threejs-sky: Sunset &quot;over&quot; hills"'))
-  assert.ok(grid([{ ...sky, thumbAlt: undefined }]).includes('alt="threejs-sky: A sky &amp; stars."'), 'no thumbAlt: the pitch')
+  assert.ok(
+    grid([{ ...sky, thumbAlt: undefined }]).includes('alt="threejs-sky: A sky &amp; stars."'),
+    'no thumbAlt: the pitch'
+  )
 })
 
 test('grid: a package without a thumbnail gets a text-only card', () => {
@@ -40,7 +71,11 @@ test('grid: a package without a thumbnail gets a text-only card', () => {
 
 test('packageBlock: hero links to the demo, link row has demos, landing page and API docs', () => {
   const md = packageBlock(sky)
-  assert.ok(md.includes(`<a href="${SITE}demo/sky.html"><img src="${SITE}media/sky/hero.jpg" alt="threejs-sky: Sunset &quot;over&quot; hills" /></a>`))
+  assert.ok(
+    md.includes(
+      `<a href="${SITE}demo/sky.html"><img src="${SITE}media/sky/hero.jpg" alt="threejs-sky: Sunset &quot;over&quot; hills" /></a>`
+    )
+  )
   assert.ok(md.includes(`<a href="${SITE}sky/">Landing page</a>`))
   assert.ok(md.includes(`<a href="${SITE}docs/modules/threejs-sky.html">API docs</a>`))
   assert.ok(md.includes('>Live demo</a>'))
@@ -68,7 +103,15 @@ test('replaceBlock: inserts under the title when there are no markers', () => {
 
 // ---------- docs map ----------
 
-const pkg = (short, demos, more) => ({ name: `threejs-${short}`, short, pitch: `${short} pitch.`, react: true, landing: true, demos: demos.map((href) => ({ label: href, href })), ...more })
+const pkg = (short, demos, more) => ({
+  name: `threejs-${short}`,
+  short,
+  pitch: `${short} pitch.`,
+  react: true,
+  landing: true,
+  demos: demos.map((href) => ({ label: href, href })),
+  ...more
+})
 const mapPkgs = [
   pkg('heightfield', ['heightfield.html'], { react: false }),
   pkg('scatter', ['scatter.html']),
@@ -76,9 +119,21 @@ const mapPkgs = [
   pkg('grass', ['index.html', 'r3f.html']),
   pkg('city', ['city.html', 'city-r3f.html', 'population.html']),
   pkg('particles', [], { landing: false }), // no lander: its demos come from DEMOS in landing/seo.mjs
-  pkg('worldgen', [], { landing: false }),
+  pkg('worldgen', [], { landing: false })
 ]
-const files = ['city-r3f.html', 'city.html', 'heightfield.html', 'index.html', 'mpm.html', 'particles.html', 'population.html', 'props-r3f.html', 'r3f.html', 'scatter.html', 'world.html']
+const files = [
+  'city-r3f.html',
+  'city.html',
+  'heightfield.html',
+  'index.html',
+  'mpm.html',
+  'particles.html',
+  'population.html',
+  'props-r3f.html',
+  'r3f.html',
+  'scatter.html',
+  'world.html'
+]
 const fullMap = () => `# t\n\n${MAP_START}\n${docsMap(mapPkgs, pairDemos(files))}\n${MAP_END}\n`
 
 test('pairDemos: <name>.html pairs with <name>-r3f.html, grass index.html with r3f.html, missing twins are null', () => {
@@ -102,10 +157,16 @@ test('demoOwners: lander demos first (first package wins), then DEMOS, else no o
 
 test('docsMap: API, /react and landing links, three.js and R3F side by side, "not yet" for a missing twin', () => {
   const html = docsMap(mapPkgs, pairDemos(files))
-  assert.ok(html.includes(`<a href="${SITE}docs/modules/threejs-city.html">threejs-city</a><br /><a href="${SITE}docs/modules/threejs-city_react.html">threejs-city/react</a><br /><a href="${SITE}city/">Landing page</a>`))
+  assert.ok(
+    html.includes(
+      `<a href="${SITE}docs/modules/threejs-city.html">threejs-city</a><br /><a href="${SITE}docs/modules/threejs-city_react.html">threejs-city/react</a><br /><a href="${SITE}city/">Landing page</a>`
+    )
+  )
   assert.ok(!html.includes('threejs-heightfield_react'), 'no /react module, no link')
   assert.ok(!html.includes(`${SITE}particles/`), 'no lander, no landing link')
-  assert.ok(html.includes(`grass: <a href="${SITE}demo/index.html">three.js</a> · <a href="${SITE}demo/r3f.html">R3F</a>`))
+  assert.ok(
+    html.includes(`grass: <a href="${SITE}demo/index.html">three.js</a> · <a href="${SITE}demo/r3f.html">R3F</a>`)
+  )
   assert.ok(html.includes(`heightfield: <a href="${SITE}demo/heightfield.html">three.js</a> · R3F: not yet`))
   assert.ok(html.includes(`props: three.js: not yet · <a href="${SITE}demo/props-r3f.html">R3F</a>`))
   assert.ok(/city: .*<br \/>population: /.test(html), 'lander order within a package')
@@ -123,14 +184,21 @@ test('missingFromMap: a complete map passes; removing a package or a demo from i
 
   const noCity = fullMap().replace(/<tr><td valign="top"><b>threejs-city<\/b>.*\n/, '')
   assert.deepEqual(missingFromMap(noCity, mapPkgs, pages), [
-    `${SITE}docs/modules/threejs-city.html`, `${SITE}docs/modules/threejs-city_react.html`,
-    `${SITE}demo/city-r3f.html`, `${SITE}demo/city.html`, `${SITE}demo/population.html`,
+    `${SITE}docs/modules/threejs-city.html`,
+    `${SITE}docs/modules/threejs-city_react.html`,
+    `${SITE}demo/city-r3f.html`,
+    `${SITE}demo/city.html`,
+    `${SITE}demo/population.html`
   ])
   const noMpm = fullMap().replace(/<br \/>mpm: <a [^>]*>three.js<\/a>[^<]*/, '')
   assert.deepEqual(missingFromMap(noMpm, mapPkgs, pages), [`${SITE}demo/mpm.html`])
   const noReact = fullMap().replace(/<br \/><a [^>]*>threejs-grass\/react<\/a>/, '')
   assert.deepEqual(missingFromMap(noReact, mapPkgs, pages), [`${SITE}docs/modules/threejs-grass_react.html`])
-  assert.equal(missingFromMap(fullMap(), [...mapPkgs, pkg('new', [])], [...pages, 'new.html']).length, 3, 'new until regenerated')
+  assert.equal(
+    missingFromMap(fullMap(), [...mapPkgs, pkg('new', [])], [...pages, 'new.html']).length,
+    3,
+    'new until regenerated'
+  )
 })
 
 test('missingFromMap: only links between the docs-map markers count', () => {

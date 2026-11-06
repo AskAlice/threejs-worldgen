@@ -1,5 +1,22 @@
 import { Color, MeshStandardNodeMaterial, Vector2, Vector4, type BufferGeometry, type Material } from 'three/webgpu'
-import { abs, attribute, cos, float, hue, luminance, mix, normalGeometry, positionGeometry, select, sign, sin, smoothstep, step, uniform, vec3 } from 'three/tsl'
+import {
+  abs,
+  attribute,
+  cos,
+  float,
+  hue,
+  luminance,
+  mix,
+  normalGeometry,
+  positionGeometry,
+  select,
+  sign,
+  sin,
+  smoothstep,
+  step,
+  uniform,
+  vec3
+} from 'three/tsl'
 import { DEFAULT_BOIDS, type BoidParams } from './boids.ts'
 import { applyStates } from './fish-material.ts'
 import { deformBeforeInstancing, prepareRenderer, toGeometry, type DeepPartial, type Predator } from './common.ts'
@@ -19,7 +36,7 @@ export function createBirdUniforms() {
     /** x = tip length (share of the span), y = flap amplitude, radians. */
     wing: uniform(new Vector2()),
     /** x = wetness, y = snow, z = burn, w = damage. */
-    states: uniform(new Vector4()),
+    states: uniform(new Vector4())
   }
 }
 
@@ -36,7 +53,8 @@ export function createBirdMaterial(u: BirdUniforms): MeshStandardNodeMaterial {
   const f = attribute('fauna', 'vec4')
   const motion = attribute('faunaMotion', 'vec4')
   const look = attribute('faunaLook', 'vec4')
-  const part = f.z, w = f.w
+  const part = f.z,
+    w = f.w
   const p = positionGeometry
   const isWing = step(4.5, part).mul(step(part, 5.5))
   const angle = sin(motion.x).mul(motion.y).mul(u.wing.y).mul(w.mul(0.5).add(0.5)).mul(isWing)
@@ -85,7 +103,7 @@ export const DEFAULT_BIRD_FLOCKS: BirdFlocksSettings = {
   density: 4,
   minWavelength: 16,
   boids: { ...DEFAULT_LAYER.boids, verticalDamping: 0.8, wander: 1.5, lookAhead: 2 },
-  species: structuredClone(BIRD_SPECIES) as Record<string, BirdSpecies>,
+  species: structuredClone(BIRD_SPECIES) as Record<string, BirdSpecies>
 }
 
 /**
@@ -122,19 +140,35 @@ export class BirdFlocks extends FaunaLayer<BirdSpecies, BirdFlocksSettings> {
     return super.reset(input)
   }
 
-  protected defaults(): BirdFlocksSettings { return DEFAULT_BIRD_FLOCKS }
-  protected species(): Readonly<Record<string, BirdSpecies>> { return this.settings.species }
-  protected habitat(): Habitat<BirdSpecies> { return birdHabitat(this.world.options.biomes.map((b) => b.id)) }
-  protected placementOf(sp: BirdSpecies): unknown { return [sp.biomes, sp.flight.altitude, sp.flight.overWater, sp.flock] }
-  protected maxPitch(): number { return 0.5 }
+  protected defaults(): BirdFlocksSettings {
+    return DEFAULT_BIRD_FLOCKS
+  }
+  protected species(): Readonly<Record<string, BirdSpecies>> {
+    return this.settings.species
+  }
+  protected habitat(): Habitat<BirdSpecies> {
+    return birdHabitat(this.world.options.biomes.map((b) => b.id))
+  }
+  protected placementOf(sp: BirdSpecies): unknown {
+    return [sp.biomes, sp.flight.altitude, sp.flight.overWater, sp.flock]
+  }
+  protected maxPitch(): number {
+    return 0.5
+  }
 
   protected boidParams(sp: BirdSpecies): BoidParams {
-    const v = sp.flight.speed, spacing = sp.flock.spacing
+    const v = sp.flight.speed,
+      spacing = sp.flock.spacing
     return {
       ...DEFAULT_BOIDS,
-      separationDistance: spacing, neighborRadius: spacing * 5, minDistance: spacing * 0.4,
-      minSpeed: v * 0.6, maxSpeed: v * 1.4, maxAccel: v * 0.8,
-      homeRadius: sp.flock.roam, margin: 1,
+      separationDistance: spacing,
+      neighborRadius: spacing * 5,
+      minDistance: spacing * 0.4,
+      minSpeed: v * 0.6,
+      maxSpeed: v * 1.4,
+      maxAccel: v * 0.8,
+      homeRadius: sp.flock.roam,
+      margin: 1
     }
   }
 
@@ -145,7 +179,8 @@ export class BirdFlocks extends FaunaLayer<BirdSpecies, BirdFlocksSettings> {
   }
 
   protected animate(sp: BirdSpecies, g: FaunaGroup, i: number, dt: number, _speed: number, turnRate: number): number {
-    const m = g.motion, fl = sp.flight
+    const m = g.motion,
+      fl = sp.flight
     // Glide or flap: a slow per-bird cycle (from its random) decides; climbing always flaps.
     const t = this.time * 0.25 + g.look[i * 4 + 3] * 20
     const climbing = g.flock.velocity[i * 3 + 1] > 0.5
@@ -156,8 +191,12 @@ export class BirdFlocks extends FaunaLayer<BirdSpecies, BirdFlocksSettings> {
     return Math.max(-0.7, Math.min(0.7, -turnRate * 0.6))
   }
 
-  protected geometryKey(sp: BirdSpecies): string { return JSON.stringify(sp.shape) }
-  protected createGeometry(sp: BirdSpecies): BufferGeometry { return toGeometry(buildBirdMesh(sp.shape)) }
+  protected geometryKey(sp: BirdSpecies): string {
+    return JSON.stringify(sp.shape)
+  }
+  protected createGeometry(sp: BirdSpecies): BufferGeometry {
+    return toGeometry(buildBirdMesh(sp.shape))
+  }
 
   protected createMaterial(id: string): Material {
     const u = createBirdUniforms()

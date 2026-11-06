@@ -72,10 +72,20 @@ export class MeshBuilder {
     }
     const n = this.n
     for (let i = 0; i < this.arrays.length; i++) {
-      const a = this.arrays[i], s = this.sizes[i], o = n * s
-      if (i === this.posSlot) { a[o] = x; a[o + 1] = y; a[o + 2] = z }
-      else if (i === this.uvSlot) { a[o] = u; a[o + 1] = v }
-      else { const c = this.current[i]; for (let k = 0; k < s; k++) a[o + k] = c[k] }
+      const a = this.arrays[i],
+        s = this.sizes[i],
+        o = n * s
+      if (i === this.posSlot) {
+        a[o] = x
+        a[o + 1] = y
+        a[o + 2] = z
+      } else if (i === this.uvSlot) {
+        a[o] = u
+        a[o + 1] = v
+      } else {
+        const c = this.current[i]
+        for (let k = 0; k < s; k++) a[o + k] = c[k]
+      }
     }
     return this.n++
   }
@@ -111,13 +121,23 @@ export class MeshBuilder {
   tri(p: readonly (readonly [number, number, number])[], uvs: readonly number[]): this {
     const [a, b, c] = p
     this.flatNormal(a, b, c)
-    return this.triangle(this.vertex(a[0], a[1], a[2], uvs[0], uvs[1]), this.vertex(b[0], b[1], b[2], uvs[2], uvs[3]), this.vertex(c[0], c[1], c[2], uvs[4], uvs[5]))
+    return this.triangle(
+      this.vertex(a[0], a[1], a[2], uvs[0], uvs[1]),
+      this.vertex(b[0], b[1], b[2], uvs[2], uvs[3]),
+      this.vertex(c[0], c[1], c[2], uvs[4], uvs[5])
+    )
   }
 
   private flatNormal(a: readonly number[], b: readonly number[], c: readonly number[]) {
-    const e1x = b[0] - a[0], e1y = b[1] - a[1], e1z = b[2] - a[2]
-    const e2x = c[0] - a[0], e2y = c[1] - a[1], e2z = c[2] - a[2]
-    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x
+    const e1x = b[0] - a[0],
+      e1y = b[1] - a[1],
+      e1z = b[2] - a[2]
+    const e2x = c[0] - a[0],
+      e2y = c[1] - a[1],
+      e2z = c[2] - a[2]
+    const nx = e1y * e2z - e1z * e2y,
+      ny = e1z * e2x - e1x * e2z,
+      nz = e1x * e2y - e1y * e2x
     const l = Math.hypot(nx, ny, nz) || 1
     this.set('normal', nx / l, ny / l, nz / l)
   }

@@ -1,5 +1,23 @@
 import { StorageBufferAttribute, Vector3, Vector4, type ComputeNode } from 'three/webgpu'
-import { Fn, If, atomicAdd, atomicLoad, atomicStore, clamp, exp, float, floor, int, instanceIndex, ivec3, mix, storage, uniform, vec3, vec4 } from 'three/tsl'
+import {
+  Fn,
+  If,
+  atomicAdd,
+  atomicLoad,
+  atomicStore,
+  clamp,
+  exp,
+  float,
+  floor,
+  int,
+  instanceIndex,
+  ivec3,
+  mix,
+  storage,
+  uniform,
+  vec3,
+  vec4
+} from 'three/tsl'
 import type { DeepPartial } from './options.ts'
 import { merge } from './options.ts'
 
@@ -33,7 +51,7 @@ export const DEFAULT_GRID: GridOptions = {
   advect: [1, 0, 0, 0],
   decay: [0.02, 0, 0, 0],
   wind: [0, 0, 0],
-  rise: 6,
+  rise: 6
 }
 
 const FIXED = 4096 // fixed-point scale of the atomic accumulators
@@ -63,7 +81,7 @@ export class ParticleGrid {
     /** Advection velocity (wind + rise). */ velocity: uniform(new Vector3()),
     /** Per-channel advect flags. */ advect: uniform(new Vector4()),
     /** Per-channel decay. */ decay: uniform(new Vector4()),
-    /** Seconds since the last resolve. */ dt: uniform(0),
+    /** Seconds since the last resolve. */ dt: uniform(0)
   }
   /** Atomic fixed-point accumulators, 4 ints per cell (written by splats, cleared by resolve). */
   readonly accumulator: StorageBufferAttribute
@@ -95,7 +113,9 @@ export class ParticleGrid {
     const cell = u.size.div(vec3(nx, ny, nz))
     this.resolveNode = Fn(() => {
       const i = instanceIndex
-      const x = int(i).mod(nx), y = int(i).div(nx).mod(ny), z = int(i).div(nx * ny)
+      const x = int(i).mod(nx),
+        y = int(i).div(nx).mod(ny),
+        z = int(i).div(nx * ny)
       const center = u.min.add(vec3(float(x).add(0.5), float(y).add(0.5), float(z).add(0.5)).mul(cell))
       const prev = this.sampleFrom(this.fieldNode, center.sub(u.velocity.mul(u.dt)))
       const keep = exp(u.decay.mul(u.dt).negate()).mul(u.advect)
@@ -103,7 +123,7 @@ export class ParticleGrid {
         float(atomicLoad(this.accAtomic.element(int(i).mul(4))) as any),
         float(atomicLoad(this.accAtomic.element(int(i).mul(4).add(1))) as any),
         float(atomicLoad(this.accAtomic.element(int(i).mul(4).add(2))) as any),
-        float(atomicLoad(this.accAtomic.element(int(i).mul(4).add(3))) as any),
+        float(atomicLoad(this.accAtomic.element(int(i).mul(4).add(3))) as any)
       ).div(FIXED)
       for (let c = 0; c < 4; c++) atomicStore(this.accAtomic.element(int(i).mul(4).add(c)), int(0))
       // Persistent channels integrate splats as rates (per second); instant channels are just this frame's splats.
@@ -137,16 +157,34 @@ export class ParticleGrid {
    * nearest cell, atomic). Built once per system; run it with `renderer.compute` after the system's
    * update and before {@link ParticleGrid.resolve}.
    */
-  splat(system: { capacity: number; particle: (index: any) => SplatParticle }, channel: number, value: (p: SplatParticle) => any): ComputeNode {
+  splat(
+    system: { capacity: number; particle: (index: any) => SplatParticle },
+    channel: number,
+    value: (p: SplatParticle) => any
+  ): ComputeNode {
     const [nx, ny, nz] = this.resolution
     const u = this.uniforms
     return Fn(() => {
       const p = system.particle(instanceIndex)
       If(p.alive.greaterThan(0), () => {
-        const g = p.position.toVar().sub(u.min).div(u.size).mul(vec3(nx, ny, nz)).floor()
-        const inside = g.x.greaterThanEqual(0).and(g.y.greaterThanEqual(0)).and(g.z.greaterThanEqual(0)).and(g.x.lessThan(nx)).and(g.y.lessThan(ny)).and(g.z.lessThan(nz))
+        const g = p.position
+          .toVar()
+          .sub(u.min)
+          .div(u.size)
+          .mul(vec3(nx, ny, nz))
+          .floor()
+        const inside = g.x
+          .greaterThanEqual(0)
+          .and(g.y.greaterThanEqual(0))
+          .and(g.z.greaterThanEqual(0))
+          .and(g.x.lessThan(nx))
+          .and(g.y.lessThan(ny))
+          .and(g.z.lessThan(nz))
         If(inside, () => {
-          const cellIndex = int(g.z).mul(nx * ny).add(int(g.y).mul(nx)).add(int(g.x))
+          const cellIndex = int(g.z)
+            .mul(nx * ny)
+            .add(int(g.y).mul(nx))
+            .add(int(g.x))
           atomicAdd(this.accAtomic.element(cellIndex.mul(4).add(channel)), int(value(p).mul(FIXED)))
         })
       })
@@ -178,7 +216,8 @@ export class ParticleGrid {
   }
 
   private applyOptions(): this {
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     u.min.value.fromArray(o.min)
     u.size.value.fromArray(o.size)
     u.velocity.value.set(o.wind[0], o.wind[1] + o.rise, o.wind[2])
@@ -190,16 +229,32 @@ export class ParticleGrid {
   private sampleFrom(buffer: any, p: any): any {
     const [nx, ny, nz] = this.resolution
     const u = this.uniforms
-    const g = p.sub(u.min).div(u.size).mul(vec3(nx, ny, nz)).sub(0.5)
-    const inside = clamp(g.x.add(1), 0, 1).mul(clamp(float(nx).sub(g.x), 0, 1))
-      .mul(clamp(g.y.add(1), 0, 1)).mul(clamp(float(ny).sub(g.y), 0, 1))
-      .mul(clamp(g.z.add(1), 0, 1)).mul(clamp(float(nz).sub(g.z), 0, 1))
+    const g = p
+      .sub(u.min)
+      .div(u.size)
+      .mul(vec3(nx, ny, nz))
+      .sub(0.5)
+    const inside = clamp(g.x.add(1), 0, 1)
+      .mul(clamp(float(nx).sub(g.x), 0, 1))
+      .mul(clamp(g.y.add(1), 0, 1))
+      .mul(clamp(float(ny).sub(g.y), 0, 1))
+      .mul(clamp(g.z.add(1), 0, 1))
+      .mul(clamp(float(nz).sub(g.z), 0, 1))
     const c = clamp(g, vec3(0), vec3(nx - 1, ny - 1, nz - 1))
     const i0 = (ivec3(floor(c)) as any).min(ivec3(nx - 2, ny - 2, nz - 2))
     const f = c.sub(vec3(i0))
-    const at = (dx: number, dy: number, dz: number) => buffer.element(i0.z.add(dz).mul(nx * ny).add(i0.y.add(dy).mul(nx)).add(i0.x.add(dx)))
-    const x00 = mix(at(0, 0, 0), at(1, 0, 0), f.x), x10 = mix(at(0, 1, 0), at(1, 1, 0), f.x)
-    const x01 = mix(at(0, 0, 1), at(1, 0, 1), f.x), x11 = mix(at(0, 1, 1), at(1, 1, 1), f.x)
+    const at = (dx: number, dy: number, dz: number) =>
+      buffer.element(
+        i0.z
+          .add(dz)
+          .mul(nx * ny)
+          .add(i0.y.add(dy).mul(nx))
+          .add(i0.x.add(dx))
+      )
+    const x00 = mix(at(0, 0, 0), at(1, 0, 0), f.x),
+      x10 = mix(at(0, 1, 0), at(1, 1, 0), f.x)
+    const x01 = mix(at(0, 0, 1), at(1, 0, 1), f.x),
+      x11 = mix(at(0, 1, 1), at(1, 1, 1), f.x)
     return mix(mix(x00, x10, f.y), mix(x01, x11, f.y), f.z).mul(inside)
   }
 }

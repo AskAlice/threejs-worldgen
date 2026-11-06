@@ -39,10 +39,15 @@ export function hash3(a: number, b: number, c = 0): number {
 
 /** Recursive partial: nested objects become partial too, arrays are replaced whole. */
 export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends readonly unknown[] ? T[K] : T[K] extends object | null ? DeepPartial<NonNullable<T[K]>> | Extract<T[K], null> : T[K]
+  [K in keyof T]?: T[K] extends readonly unknown[]
+    ? T[K]
+    : T[K] extends object | null
+      ? DeepPartial<NonNullable<T[K]>> | Extract<T[K], null>
+      : T[K]
 }
 
-const isPlain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype
+const isPlain = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype
 
 /** Deep-merges plain-data `input` into `target` (mutating it): objects merge, arrays and values replace, `undefined` is skipped. */
 export function merge<T>(target: T, input: unknown): T {
@@ -71,19 +76,27 @@ export const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 export const length = (a: Vec3) => Math.hypot(a[0], a[1], a[2])
 /** Cross product into `out`. */
 export function cross(a: Vec3, b: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
-  const x = a[1] * b[2] - a[2] * b[1], y = a[2] * b[0] - a[0] * b[2], z = a[0] * b[1] - a[1] * b[0]
-  out[0] = x; out[1] = y; out[2] = z
+  const x = a[1] * b[2] - a[2] * b[1],
+    y = a[2] * b[0] - a[0] * b[2],
+    z = a[0] * b[1] - a[1] * b[0]
+  out[0] = x
+  out[1] = y
+  out[2] = z
   return out
 }
 /** `a - b` into `out`. */
 export function sub(a: Vec3, b: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
-  out[0] = a[0] - b[0]; out[1] = a[1] - b[1]; out[2] = a[2] - b[2]
+  out[0] = a[0] - b[0]
+  out[1] = a[1] - b[1]
+  out[2] = a[2] - b[2]
   return out
 }
 /** Unit vector into `out` (zero stays zero). */
 export function normalize(a: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
   const l = length(a) || 1
-  out[0] = a[0] / l; out[1] = a[1] / l; out[2] = a[2] / l
+  out[0] = a[0] / l
+  out[1] = a[1] / l
+  out[2] = a[2] / l
   return out
 }
 
@@ -91,12 +104,14 @@ export function normalize(a: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
 export const identity = (): Mat3 => [1, 0, 0, 0, 1, 0, 0, 0, 1]
 /** Rotation about +X by `a` radians. */
 export const rotationX = (a: number): Mat3 => {
-  const c = Math.cos(a), s = Math.sin(a)
+  const c = Math.cos(a),
+    s = Math.sin(a)
   return [1, 0, 0, 0, c, s, 0, -s, c]
 }
 /** Rotation about +Y by `a` radians (turns +Z towards +X). */
 export const rotationY = (a: number): Mat3 => {
-  const c = Math.cos(a), s = Math.sin(a)
+  const c = Math.cos(a),
+    s = Math.sin(a)
   return [c, 0, -s, 0, 1, 0, s, 0, c]
 }
 /** Matrix whose columns are `x`, `y`, `z`. */
@@ -104,7 +119,8 @@ export const fromColumns = (x: Vec3, y: Vec3, z: Vec3): Mat3 => [x[0], x[1], x[2
 /** `a · b`. */
 export function mulMat(a: Mat3, b: Mat3): Mat3 {
   const o = new Array(9) as Mat3
-  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) o[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]
+  for (let c = 0; c < 3; c++)
+    for (let r = 0; r < 3; r++) o[c * 3 + r] = a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]
   return o
 }
 /** Transpose (the inverse of a rotation). */
@@ -114,7 +130,9 @@ export function mulVec(m: Mat3, v: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
   const x = m[0] * v[0] + m[3] * v[1] + m[6] * v[2]
   const y = m[1] * v[0] + m[4] * v[1] + m[7] * v[2]
   const z = m[2] * v[0] + m[5] * v[1] + m[8] * v[2]
-  out[0] = x; out[1] = y; out[2] = z
+  out[0] = x
+  out[1] = y
+  out[2] = z
   return out
 }
 /** `mᵀ · v` into `out` (inverse rotation). */
@@ -122,7 +140,9 @@ export function mulVecT(m: Mat3, v: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
   const x = m[0] * v[0] + m[1] * v[1] + m[2] * v[2]
   const y = m[3] * v[0] + m[4] * v[1] + m[5] * v[2]
   const z = m[6] * v[0] + m[7] * v[1] + m[8] * v[2]
-  out[0] = x; out[1] = y; out[2] = z
+  out[0] = x
+  out[1] = y
+  out[2] = z
   return out
 }
 
@@ -132,10 +152,10 @@ export function mulVecT(m: Mat3, v: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
  */
 export function kelvinToRgb(kelvin: number): Vec3 {
   const t = clamp(kelvin, 1000, 40000) / 100
-  const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592)
-  const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661 : 288.1221695283 * Math.pow(t - 60, -0.0755148492)
+  const r = t <= 66 ? 255 : 329.698727446 * (t - 60) ** -0.1332047592
+  const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661 : 288.1221695283 * (t - 60) ** -0.0755148492
   const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307
-  const lin = (c: number) => Math.pow(clamp(c, 0, 255) / 255, 2.2)
+  const lin = (c: number) => (clamp(c, 0, 255) / 255) ** 2.2
   const out: Vec3 = [lin(r), lin(g), lin(b)]
   const m = Math.max(...out)
   return [out[0] / m, out[1] / m, out[2] / m]
@@ -144,11 +164,15 @@ export function kelvinToRgb(kelvin: number): Vec3 {
 /** Parses `#rgb` / `#rrggbb` into linear RGB 0..1. */
 export function hexToLinear(hex: string): Vec3 {
   let h = hex.replace('#', '')
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('')
   const n = parseInt(h, 16)
   const lin = (c: number) => {
     const s = c / 255
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
   }
   return [lin((n >> 16) & 255), lin((n >> 8) & 255), lin(n & 255)]
 }

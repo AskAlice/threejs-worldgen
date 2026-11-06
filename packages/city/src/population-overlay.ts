@@ -1,4 +1,18 @@
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, Group, LineBasicNodeMaterial, LineSegments, Mesh, MeshBasicNodeMaterial, Sphere, SRGBColorSpace, Vector3, type Camera } from 'three/webgpu'
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  DoubleSide,
+  Group,
+  LineBasicNodeMaterial,
+  LineSegments,
+  Mesh,
+  MeshBasicNodeMaterial,
+  Sphere,
+  SRGBColorSpace,
+  Vector3,
+  type Camera
+} from 'three/webgpu'
 import type { Vec3 } from 'threejs-biomes'
 import { aggregatePopulation } from './population-model.ts'
 import { cellColor, DEFAULT_STYLE, densityT, type PopulationMode, type PopulationStyle } from './population-map.ts'
@@ -42,8 +56,19 @@ export type OverlayInput = Partial<Omit<OverlayOptions, 'style'>> & {
 
 /** Default overlay: density, auto resolution, 60 % opaque, extruded up to 400 m, with networks. */
 export const DEFAULT_OVERLAY: OverlayOptions = {
-  mode: 'density', resolution: 'auto', coarsest: 3, autoDistance: 40, extrude: 400, offset: 4, opacity: 0.6, gap: 0.06,
-  networks: true, networkOffset: 3, origin: [0, 0, 0], visible: true, style: structuredClone(DEFAULT_STYLE),
+  mode: 'density',
+  resolution: 'auto',
+  coarsest: 3,
+  autoDistance: 40,
+  extrude: 400,
+  offset: 4,
+  opacity: 0.6,
+  gap: 0.06,
+  networks: true,
+  networkOffset: 3,
+  origin: [0, 0, 0],
+  visible: true,
+  style: structuredClone(DEFAULT_STYLE)
 }
 
 /** Options for the {@link PopulationOverlay} constructor. */
@@ -122,7 +147,8 @@ export class PopulationOverlay {
       if (!mesh.parent) this.object.add(mesh)
     }
     const a = this.anchor()
-    for (const child of this.object.children) child.position.set(a[0] - o.origin[0], a[1] - o.origin[1], a[2] - o.origin[2])
+    for (const child of this.object.children)
+      child.position.set(a[0] - o.origin[0], a[1] - o.origin[1], a[2] - o.origin[2])
   }
 
   /** Frees GPU resources and stops following the population. */
@@ -135,9 +161,16 @@ export class PopulationOverlay {
   }
 
   private clear() {
-    for (const m of this.meshes.values()) { m.geometry.dispose(); m.removeFromParent() }
+    for (const m of this.meshes.values()) {
+      m.geometry.dispose()
+      m.removeFromParent()
+    }
     this.meshes.clear()
-    if (this.lines) { this.lines.geometry.dispose(); this.lines.removeFromParent(); this.lines = null }
+    if (this.lines) {
+      this.lines.geometry.dispose()
+      this.lines.removeFromParent()
+      this.lines = null
+    }
     this.resolution = -1
   }
 
@@ -157,7 +190,9 @@ export class PopulationOverlay {
     if (!this.camera) return data.resolution
     const f = data.grid.frame
     const p = this.camera.position
-    const qx = p.x + o.origin[0] - f.origin[0], qy = p.y + o.origin[1] - f.origin[1], qz = p.z + o.origin[2] - f.origin[2]
+    const qx = p.x + o.origin[0] - f.origin[0],
+      qy = p.y + o.origin[1] - f.origin[1],
+      qz = p.z + o.origin[2] - f.origin[2]
     const x = qx * f.east[0] + qy * f.east[1] + qz * f.east[2]
     const y = qx * f.up[0] + qy * f.up[1] + qz * f.up[2]
     const z = -(qx * f.north[0] + qy * f.north[1] + qz * f.north[2])
@@ -180,13 +215,22 @@ export class PopulationOverlay {
     const a = this.anchor()
     // H3 cells differ in shape (projection, rotation, pentagons), so all cells share one merged, non-indexed
     // geometry rather than instances of one hexagon. Pass 1 gathers rings and heights, pass 2 fills typed arrays.
-    const prisms: { cx: number; cz: number; ring: [number, number][]; base: number; top: number; rgb: [number, number, number] }[] = []
+    const prisms: {
+      cx: number
+      cz: number
+      ring: [number, number][]
+      base: number
+      top: number
+      rgb: [number, number, number]
+    }[] = []
     let count = 0
     for (const cell of aggregatePopulation(data, res).values()) {
       if (cell.landUse === 'water' && o.mode !== 'landUse') continue
       if (cell.population <= 0 && (o.mode === 'density' || o.mode === 'lights')) continue
       const [cx, cz] = data.grid.centerLocal(cell.cell)
-      const ring = data.grid.boundaryLocal(cell.cell).map(([x, z]): [number, number] => [x + (cx - x) * o.gap, z + (cz - z) * o.gap])
+      const ring = data.grid
+        .boundaryLocal(cell.cell)
+        .map(([x, z]): [number, number] => [x + (cx - x) * o.gap, z + (cz - z) * o.gap])
       let ground = f.height(cx, cz)
       for (const [x, z] of ring) ground = Math.max(ground, f.height(x, z))
       const base = ground + o.offset
@@ -195,15 +239,23 @@ export class PopulationOverlay {
       prisms.push({ cx, cz, ring, base, top, rgb: cellColor(cell, o.mode, o.style) })
       count += ring.length * (top > base + 1e-3 ? 9 : 3)
     }
-    const pos = new Float32Array(count * 3), col = new Float32Array(count * 3)
+    const pos = new Float32Array(count * 3),
+      col = new Float32Array(count * 3)
     const w: Vec3 = [0, 0, 0]
     const c = new Color()
-    let v = 0, r2 = 0
+    let v = 0,
+      r2 = 0
     const push = (x: number, y: number, z: number, k: number) => {
       f.toWorld(x, y, z, w)
-      const px = w[0] - a[0], py = w[1] - a[1], pz = w[2] - a[2]
-      pos[v * 3] = px; pos[v * 3 + 1] = py; pos[v * 3 + 2] = pz
-      col[v * 3] = c.r * k; col[v * 3 + 1] = c.g * k; col[v * 3 + 2] = c.b * k
+      const px = w[0] - a[0],
+        py = w[1] - a[1],
+        pz = w[2] - a[2]
+      pos[v * 3] = px
+      pos[v * 3 + 1] = py
+      pos[v * 3 + 2] = pz
+      col[v * 3] = c.r * k
+      col[v * 3 + 1] = c.g * k
+      col[v * 3 + 2] = c.b * k
       r2 = Math.max(r2, px * px + py * py + pz * pz)
       v++
     }
@@ -211,11 +263,18 @@ export class PopulationOverlay {
       c.setRGB(p.rgb[0], p.rgb[1], p.rgb[2], SRGBColorSpace)
       const { ring, base, top } = p
       for (let i = 0; i < ring.length; i++) {
-        const [x0, z0] = ring[i], [x1, z1] = ring[(i + 1) % ring.length]
-        push(p.cx, top, p.cz, 1); push(x0, top, z0, 1); push(x1, top, z1, 1)
+        const [x0, z0] = ring[i],
+          [x1, z1] = ring[(i + 1) % ring.length]
+        push(p.cx, top, p.cz, 1)
+        push(x0, top, z0, 1)
+        push(x1, top, z1, 1)
         if (top > base + 1e-3) {
-          push(x0, base, z0, 0.7); push(x1, base, z1, 0.7); push(x1, top, z1, 0.7)
-          push(x0, base, z0, 0.7); push(x1, top, z1, 0.7); push(x0, top, z0, 0.7)
+          push(x0, base, z0, 0.7)
+          push(x1, base, z1, 0.7)
+          push(x1, top, z1, 0.7)
+          push(x0, base, z0, 0.7)
+          push(x1, top, z1, 0.7)
+          push(x0, top, z0, 0.7)
         }
       }
     }
@@ -234,25 +293,36 @@ export class PopulationOverlay {
     const f = data.grid.frame
     const a = this.anchor()
     // Power lines are straight spans: resample them so they follow the ground between pylons.
-    const spans = network.edges.map((e) => e.type === 'powerline' ? resample(e.points, data.cellEdge) : e.points)
+    const spans = network.edges.map((e) => (e.type === 'powerline' ? resample(e.points, data.cellEdge) : e.points))
     let segments = 0
     for (const pts of spans) segments += Math.max(0, pts.length - 1)
-    const pos = new Float32Array(segments * 6), col = new Float32Array(segments * 6)
+    const pos = new Float32Array(segments * 6),
+      col = new Float32Array(segments * 6)
     const c = new Color()
     const w: Vec3 = [0, 0, 0]
-    let v = 0, r2 = 0
+    let v = 0,
+      r2 = 0
     const at = (x: number, z: number) => {
       f.toWorld(x, f.height(x, z) + o.networkOffset, z, w)
-      const px = w[0] - a[0], py = w[1] - a[1], pz = w[2] - a[2]
-      pos[v * 3] = px; pos[v * 3 + 1] = py; pos[v * 3 + 2] = pz
-      col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b
+      const px = w[0] - a[0],
+        py = w[1] - a[1],
+        pz = w[2] - a[2]
+      pos[v * 3] = px
+      pos[v * 3 + 1] = py
+      pos[v * 3 + 2] = pz
+      col[v * 3] = c.r
+      col[v * 3 + 1] = c.g
+      col[v * 3 + 2] = c.b
       r2 = Math.max(r2, px * px + py * py + pz * pz)
       v++
     }
     network.edges.forEach((e, k) => {
       c.set(o.style.networks[e.type]).convertSRGBToLinear()
       const pts = spans[k]
-      for (let i = 1; i < pts.length; i++) { at(pts[i - 1][0], pts[i - 1][1]); at(pts[i][0], pts[i][1]) }
+      for (let i = 1; i < pts.length; i++) {
+        at(pts[i - 1][0], pts[i - 1][1])
+        at(pts[i][0], pts[i][1])
+      }
     })
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', new BufferAttribute(pos, 3))
@@ -267,7 +337,8 @@ export class PopulationOverlay {
 function resample(points: [number, number][], step: number): [number, number][] {
   const out: [number, number][] = [points[0]]
   for (let i = 1; i < points.length; i++) {
-    const [ax, az] = points[i - 1], [bx, bz] = points[i]
+    const [ax, az] = points[i - 1],
+      [bx, bz] = points[i]
     const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / step))
     for (let k = 1; k <= n; k++) out.push([ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n])
   }

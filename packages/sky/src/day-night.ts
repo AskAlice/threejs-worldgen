@@ -4,7 +4,18 @@
  * moon's phase, image-based lighting re-rendered from the sky (time-sliced) when the sun moves, fog
  * colour, an exposure suggestion, and a `night` value 0..1 for other packages (lit windows, lamps).
  */
-import { CubeCamera, CubeRenderTarget, DirectionalLight, FogExp2, HalfFloatType, HemisphereLight, Scene, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu'
+import {
+  CubeCamera,
+  CubeRenderTarget,
+  DirectionalLight,
+  FogExp2,
+  HalfFloatType,
+  HemisphereLight,
+  Scene,
+  Vector3,
+  type Object3D,
+  type WebGPURenderer
+} from 'three/webgpu'
 import { createSkyDome, type SkyUniforms } from './atmosphere.ts'
 import type { SkyState } from './observer.ts'
 import { luminance, skyRadiance, transmittance, type AtmosphereOptions } from './scattering.ts'
@@ -81,7 +92,7 @@ export const DEFAULT_LIGHTING: LightingOptions = {
   autoExposure: false,
   exposureKey: 0.35,
   exposureRange: [0.25, 8],
-  exposureSpeed: 1.5,
+  exposureSpeed: 1.5
 }
 
 /** Lighting derived from a sky state. All colours are linear RGB normalised to a max of 1. */
@@ -122,8 +133,14 @@ const norm = (c: Vec3): [Vec3, number] => {
 }
 
 /** Computes light colours, fog colour, sky brightness, `night` and an exposure suggestion. Pure. */
-export function computeLighting(state: SkyState, atmosphere: AtmosphereOptions, options: LightingOptions, ctx: LightingContext): Lighting {
-  const R = state.planetRadius, o = state.cameraToPlanet
+export function computeLighting(
+  state: SkyState,
+  atmosphere: AtmosphereOptions,
+  options: LightingOptions,
+  ctx: LightingContext
+): Lighting {
+  const R = state.planetRadius,
+    o = state.cameraToPlanet
   const star = kelvinToRgb(ctx.starTemperature)
   // Sunlight: black-body colour × transmittance, faded as the disc sinks below the horizon.
   const Ts = transmittance(atmosphere, R, o, state.sunDirection)
@@ -132,28 +149,51 @@ export function computeLighting(state: SkyState, atmosphere: AtmosphereOptions, 
   const disc = smoothstep(-sunR, sunR, state.sunElevation + dip)
   const [sunColor, sunK] = norm([star[0] * Ts[0], star[1] * Ts[1], star[2] * Ts[2]])
   // Moonlight: phase × transmittance, tinted.
-  const Tm = state.moonAngularRadius > 0 ? transmittance(atmosphere, R, o, state.moonDirection) : [0, 0, 0] as Vec3
+  const Tm = state.moonAngularRadius > 0 ? transmittance(atmosphere, R, o, state.moonDirection) : ([0, 0, 0] as Vec3)
   const tint = hexToLinear(options.moonColor)
-  const [moonColor, moonK] = norm([tint[0] * (0.4 + 0.6 * Tm[0]), tint[1] * (0.4 + 0.6 * Tm[1]), tint[2] * (0.4 + 0.6 * Tm[2])])
+  const [moonColor, moonK] = norm([
+    tint[0] * (0.4 + 0.6 * Tm[0]),
+    tint[1] * (0.4 + 0.6 * Tm[1]),
+    tint[2] * (0.4 + 0.6 * Tm[2])
+  ])
   const moonUp = smoothstep(-0.5, 2, state.moonElevation)
   // Sky brightness: zenith and the horizon all round, from the sun, the moon and airglow.
-  const moonI = atmosphere.sunIntensity * ctx.moonSkyIntensity * state.moonIllumination * (state.moonAngularRadius > 0 ? 1 : 0)
+  const moonI =
+    atmosphere.sunIntensity * ctx.moonSkyIntensity * state.moonIllumination * (state.moonAngularRadius > 0 ? 1 : 0)
   const sky = (d: Vec3): Vec3 => {
     const a = skyRadiance(atmosphere, R, o, d, state.sunDirection)
     const b = moonI > 0 ? skyRadiance(atmosphere, R, o, d, state.moonDirection, moonI) : [0, 0, 0]
-    return [a[0] + b[0] + atmosphere.airglow[0], a[1] + b[1] + atmosphere.airglow[1], a[2] + b[2] + atmosphere.airglow[2]]
+    return [
+      a[0] + b[0] + atmosphere.airglow[0],
+      a[1] + b[1] + atmosphere.airglow[1],
+      a[2] + b[2] + atmosphere.airglow[2]
+    ]
   }
   const zenith = sky(state.up)
   const fog: Vec3 = [0, 0, 0]
   const e = 3 * DEG
   for (let k = 0; k < 4; k++) {
-    const a = (k * Math.PI) / 2, c = Math.cos(a) * Math.cos(e), s = Math.sin(a) * Math.cos(e), z = Math.sin(e)
-    const h = sky([state.east[0] * c + state.north[0] * s + state.up[0] * z, state.east[1] * c + state.north[1] * s + state.up[1] * z, state.east[2] * c + state.north[2] * s + state.up[2] * z])
-    fog[0] += h[0] / 4; fog[1] += h[1] / 4; fog[2] += h[2] / 4
+    const a = (k * Math.PI) / 2,
+      c = Math.cos(a) * Math.cos(e),
+      s = Math.sin(a) * Math.cos(e),
+      z = Math.sin(e)
+    const h = sky([
+      state.east[0] * c + state.north[0] * s + state.up[0] * z,
+      state.east[1] * c + state.north[1] * s + state.up[1] * z,
+      state.east[2] * c + state.north[2] * s + state.up[2] * z
+    ])
+    fog[0] += h[0] / 4
+    fog[1] += h[1] / 4
+    fog[2] += h[2] / 4
   }
   // From high up, the sunlit planet below dominates the view, not the (black) sky.
-  const below = 0.3 * (atmosphere.sunIntensity / Math.PI) * Math.max(0, Math.sin(state.sunElevation * DEG)) + luminance(atmosphere.airglow)
-  const avg = 0.5 * luminance(zenith) + 0.5 * luminance(fog) + below * smoothstep(atmosphere.layers.troposphere, atmosphere.layers.karman, state.altitude)
+  const below =
+    0.3 * (atmosphere.sunIntensity / Math.PI) * Math.max(0, Math.sin(state.sunElevation * DEG)) +
+    luminance(atmosphere.airglow)
+  const avg =
+    0.5 * luminance(zenith) +
+    0.5 * luminance(fog) +
+    below * smoothstep(atmosphere.layers.troposphere, atmosphere.layers.karman, state.altitude)
   const [lo, hi] = options.exposureRange
   return {
     sunColor,
@@ -165,7 +205,7 @@ export function computeLighting(state: SkyState, atmosphere: AtmosphereOptions, 
     night: smoothstep(options.twilight[0], options.twilight[1], state.sunElevation),
     exposure: Math.min(hi, Math.max(lo, options.exposureKey / Math.max(avg, 1e-7))),
     ambientIntensity: options.nightAmbient * smoothstep(options.twilight[0], options.twilight[1], state.sunElevation),
-    hazeFade: 1 - smoothstep(atmosphere.layers.troposphere, atmosphere.layers.karman, state.altitude),
+    hazeFade: 1 - smoothstep(atmosphere.layers.troposphere, atmosphere.layers.karman, state.altitude)
   }
 }
 
@@ -262,7 +302,11 @@ export class DayNight {
       const cam = light.shadow.camera
       const texel = (cam.right - cam.left) / light.shadow.mapSize.x || 1
       const t = this.target
-      light.target.position.set(Math.round(t.x / texel) * texel, Math.round(t.y / texel) * texel, Math.round(t.z / texel) * texel)
+      light.target.position.set(
+        Math.round(t.x / texel) * texel,
+        Math.round(t.y / texel) * texel,
+        Math.round(t.z / texel) * texel
+      )
       light.position.copy(light.target.position).addScaledVector(new Vector3(...dir), s.lightDistance)
       light.target.updateMatrixWorld()
     }
@@ -275,7 +319,9 @@ export class DayNight {
     this.fill.position.set(...state.up) // HemisphereLight's up is its position direction
 
     const k = 1 - Math.exp(-s.exposureSpeed * Math.max(dt, 0))
-    this.exposure = Math.exp(Math.log(this.exposure) + (Math.log(lighting.exposure) - Math.log(this.exposure)) * (this.adapted ? k : 1))
+    this.exposure = Math.exp(
+      Math.log(this.exposure) + (Math.log(lighting.exposure) - Math.log(this.exposure)) * (this.adapted ? k : 1)
+    )
     this.adapted = true
     if (s.autoExposure && this.renderer) this.renderer.toneMappingExposure = this.exposure
 
@@ -292,13 +338,18 @@ export class DayNight {
   }
 
   private updateEnvironment(state: SkyState, lighting: Lighting) {
-    const s = this.settings, scene = this.scene!, renderer = this.renderer!
+    const s = this.settings,
+      scene = this.scene!,
+      renderer = this.renderer!
     scene.environmentIntensity = s.environmentIntensity
     if (this.face < 0) {
-      const sun = new Vector3(...state.sunDirection), moon = new Vector3(...state.moonDirection)
+      const sun = new Vector3(...state.sunDirection),
+        moon = new Vector3(...state.moonDirection)
       const moved = Math.max(sun.angleTo(this.lastSun), moon.angleTo(this.lastMoon)) / DEG > s.environmentThreshold
       if (!(this.forceEnv || moved || Math.abs(lighting.night - this.lastNight) > 0.05)) return
-      this.lastSun.copy(sun); this.lastMoon.copy(moon); this.lastNight = lighting.night
+      this.lastSun.copy(sun)
+      this.lastMoon.copy(moon)
+      this.lastNight = lighting.night
       this.face = 0
     }
     if (this.targets.length === 0) {
@@ -313,7 +364,9 @@ export class DayNight {
       cube.coordinateSystem = renderer.coordinateSystem
       cube.updateCoordinateSystem()
     }
-    const prevTarget = renderer.getRenderTarget(), prevFace = renderer.getActiveCubeFace(), prevLevel = renderer.getActiveMipmapLevel()
+    const prevTarget = renderer.getRenderTarget(),
+      prevFace = renderer.getActiveCubeFace(),
+      prevLevel = renderer.getActiveMipmapLevel()
     const faces = first ? 6 : Math.max(1, Math.round(s.environmentFacesPerFrame))
     for (let n = 0; n < faces && this.face < 6; n++, this.face++) {
       renderer.setRenderTarget(target, this.face)
@@ -342,6 +395,9 @@ export class DayNight {
     this.sun.dispose()
     this.moon.dispose()
     this.fill.dispose()
-    this.envScene.traverse((o: any) => { o.geometry?.dispose(); o.material?.dispose() })
+    this.envScene.traverse((o: any) => {
+      o.geometry?.dispose()
+      o.material?.dispose()
+    })
   }
 }

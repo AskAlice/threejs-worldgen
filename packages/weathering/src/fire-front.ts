@@ -46,8 +46,17 @@ export interface FireSources {
 /** Empty buffers for a sim of `cells` cells. */
 export function createFireSources(cells: number): FireSources {
   return {
-    flames: new Float32Array(cells * SOURCE_STRIDE), flameCount: 0, smoke: new Float32Array(cells * 2 * SOURCE_STRIDE), smokeCount: 0,
-    embers: new Float32Array(cells * SOURCE_STRIDE), emberCount: 0, texture: new Uint8Array(cells * 4), front: 0, center: [0, 0, 0], wind: [0, 0], smokeTotal: 0,
+    flames: new Float32Array(cells * SOURCE_STRIDE),
+    flameCount: 0,
+    smoke: new Float32Array(cells * 2 * SOURCE_STRIDE),
+    smokeCount: 0,
+    embers: new Float32Array(cells * SOURCE_STRIDE),
+    emberCount: 0,
+    texture: new Uint8Array(cells * 4),
+    front: 0,
+    center: [0, 0, 0],
+    wind: [0, 0],
+    smokeTotal: 0
   }
 }
 
@@ -75,23 +84,53 @@ export function collectFireSources(sim: FireSim, look: FireFrontLook, out: FireS
   const n = sim.cols * sim.rows
   const S = SOURCE_STRIDE
   if (out.texture.length !== n * 4) Object.assign(out, createFireSources(n))
-  let nf = 0, ns = 0, ne = 0, front = 0, smokeTotal = 0, cx = 0, cy = 0, cz = 0, wx = 0, wz = 0
+  let nf = 0,
+    ns = 0,
+    ne = 0,
+    front = 0,
+    smokeTotal = 0,
+    cx = 0,
+    cy = 0,
+    cz = 0,
+    wx = 0,
+    wz = 0
   const tex = out.texture
   const ext = sim.options.moistureOfExtinction
-  const put = (arr: Float32Array, k: number, x: number, y: number, z: number, w: number, a: number, b: number, c: number, d: number) => {
+  const put = (
+    arr: Float32Array,
+    k: number,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    a: number,
+    b: number,
+    c: number,
+    d: number
+  ) => {
     const o = k * S
-    arr[o] = x; arr[o + 1] = y; arr[o + 2] = z; arr[o + 3] = w; arr[o + 4] = a; arr[o + 5] = b; arr[o + 6] = c; arr[o + 7] = d
+    arr[o] = x
+    arr[o + 1] = y
+    arr[o + 2] = z
+    arr[o + 3] = w
+    arr[o + 4] = a
+    arr[o + 5] = b
+    arr[o + 6] = c
+    arr[o + 7] = d
   }
   for (let i = 0; i < n; i++) {
     const state = sim.state[i]
-    const g = sim.capacity[i * 3], s = sim.capacity[i * 3 + 1], t = sim.capacity[i * 3 + 2]
+    const g = sim.capacity[i * 3],
+      s = sim.capacity[i * 3 + 1],
+      t = sim.capacity[i * 3 + 2]
     const load = g + s + t
     const woody = load > 0 ? (s + t) / load : 0
     const tree = load > 0 ? t / load : 0
     const fuelLeft = sim.fuel[i * 3] + sim.fuel[i * 3 + 1] + sim.fuel[i * 3 + 2]
     // Heavy fuel burnt right through leaves white-grey ash; light or wet fuel leaves black char.
     const ash = state === FIRE_STATE.unburnt ? 0 : smooth(0.4, 3, load - fuelLeft)
-    let glow = 0, f = 0
+    let glow = 0,
+      f = 0
     if (state === FIRE_STATE.burning) {
       const age = sim.burningFor(i)
       f = frontIntensity(age, load, look.flaming)
@@ -100,19 +139,46 @@ export function collectFireSources(sim: FireSim, look: FireFrontLook, out: FireS
       const spot = cellHash(i, sim.cols) < 0.18 ? 0.5 + cellHash(i + 7919, sim.cols) : 0
       glow = Math.min(1, f * look.frontGlow + smoulder * spot * look.smoulderGlow)
       const [x0, z0] = sim.center(i)
-      const lx = x0 - sim.minX, lz = z0 - sim.minZ, y = sim.elevation[i]
+      const lx = x0 - sim.minX,
+        lz = z0 - sim.minZ,
+        y = sim.elevation[i]
       const wet = Math.min(1, sim.moisture[i] / Math.max(1e-3, ext))
       if (f > 0.05) {
         const scale = 1 + 0.8 * (woody - tree) + 2.6 * tree
-        put(out.flames, nf++, lx, y, lz, f * (0.6 + 0.4 * Math.min(1, load)), scale, tree * look.crownHeight, 0, 0.92 + 0.12 * f)
+        put(
+          out.flames,
+          nf++,
+          lx,
+          y,
+          lz,
+          f * (0.6 + 0.4 * Math.min(1, load)),
+          scale,
+          tree * look.crownHeight,
+          0,
+          0.92 + 0.12 * f
+        )
         put(out.embers, ne++, lx, y, lz, f * (0.15 + 0.6 * woody + 1.2 * tree), 1, tree * look.crownHeight, 0, 1)
         const w = f * (0.4 + 0.3 * Math.min(4, load))
-        put(out.smoke, ns++, lx, y + 1 + tree * look.crownHeight * 0.5, lz, w, 1 + tree, 0, Math.min(1, woody * 0.9 + 0.1) * (1 - 0.6 * wet), 0.9 + 0.2 * f)
+        put(
+          out.smoke,
+          ns++,
+          lx,
+          y + 1 + tree * look.crownHeight * 0.5,
+          lz,
+          w,
+          1 + tree,
+          0,
+          Math.min(1, woody * 0.9 + 0.1) * (1 - 0.6 * wet),
+          0.9 + 0.2 * f
+        )
         smokeTotal += w
         front += f
-        cx += lx * f; cy += y * f; cz += lz * f
+        cx += lx * f
+        cy += y * f
+        cz += lz * f
         const [vx, vz] = sim.windAt(i)
-        wx += vx * f; wz += vz * f
+        wx += vx * f
+        wz += vz * f
       } else if (smoulder > 0.02) {
         put(out.smoke, ns++, lx, y + 0.5, lz, 0.02 * smoulder, 1.1, 0, 0.35, 0.75)
         smokeTotal += 0.02 * smoulder
@@ -131,9 +197,15 @@ export function collectFireSources(sim: FireSim, look: FireFrontLook, out: FireS
     tex[i * 4 + 2] = Math.round(ash * 255)
     tex[i * 4 + 3] = Math.round(Math.min(1, f) * 255)
   }
-  out.flameCount = nf; out.smokeCount = ns; out.emberCount = ne
-  out.front = front; out.smokeTotal = smokeTotal
-  if (front > 0) { out.center = [cx / front, cy / front, cz / front]; out.wind = [wx / front, wz / front] }
+  out.flameCount = nf
+  out.smokeCount = ns
+  out.emberCount = ne
+  out.front = front
+  out.smokeTotal = smokeTotal
+  if (front > 0) {
+    out.center = [cx / front, cy / front, cz / front]
+    out.wind = [wx / front, wz / front]
+  }
   return out
 }
 
@@ -142,25 +214,39 @@ export function collectFireSources(sim: FireSim, look: FireFrontLook, out: FireS
  * `strength` (sum of smoke weights) at (`sx`, `sz`), carried by wind (`wx`, `wz`), widening downwind.
  * Exposed as {@link Wildfire.smokeOcclusionAt}; cheap enough to call per frame.
  */
-export function plumeOcclusion(x: number, z: number, sx: number, sz: number, wx: number, wz: number, strength: number, extinction = 0.0015): number {
+export function plumeOcclusion(
+  x: number,
+  z: number,
+  sx: number,
+  sz: number,
+  wx: number,
+  wz: number,
+  strength: number,
+  extinction = 0.0015
+): number {
   if (!(strength > 0)) return 0
   const u = Math.max(1, Math.hypot(wx, wz))
-  const dx = wx / u, dz = wz / u
-  const px = x - sx, pz = z - sz
+  const dx = wx / u,
+    dz = wz / u
+  const px = x - sx,
+    pz = z - sz
   const along = px * dx + pz * dz
   const across = -px * dz + pz * dx
   const down = Math.max(0, along)
   const sigma = 40 + 0.22 * down
   // Upwind of the source the column is only as wide as the fire.
   const upwind = along < 0 ? Math.exp(-(along * along) / (2 * 60 * 60)) : 1
-  const column = (strength / (u * sigma)) * Math.exp(-(across * across) / (2 * sigma * sigma)) * Math.exp(-down / 6000) * upwind
+  const column =
+    (strength / (u * sigma)) * Math.exp(-(across * across) / (2 * sigma * sigma)) * Math.exp(-down / 6000) * upwind
   return 1 - Math.exp(-extinction * column * 100)
 }
 
 /** Sunlight transmittance through smoke of occlusion `o` per channel (blue lost first: the sun reddens). */
 export function smokeTransmittance(o: number, out: [number, number, number] = [1, 1, 1]): [number, number, number] {
   const tau = -Math.log(Math.max(1e-4, 1 - Math.min(0.9999, Math.max(0, o))))
-  out[0] = Math.exp(-tau * 0.75); out[1] = Math.exp(-tau * 1.0); out[2] = Math.exp(-tau * 1.45)
+  out[0] = Math.exp(-tau * 0.75)
+  out[1] = Math.exp(-tau * 1.0)
+  out[2] = Math.exp(-tau * 1.45)
   return out
 }
 

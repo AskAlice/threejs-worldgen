@@ -1,4 +1,4 @@
-import { type Group, type Vector3 } from 'three/webgpu'
+import type { Group, Vector3 } from 'three/webgpu'
 import { slopeAt, type HeightFn } from 'threejs-heightfield'
 import { hash2, mulberry32, valueNoise } from './random.ts'
 import { BILLBOARD_DENSITY_RATIO, type GrassSettings } from './grass-settings.ts'
@@ -255,7 +255,7 @@ export class TileStream {
       count: 0,
       offsets: new Float32Array(0),
       params: new Float32Array(0),
-      patches: new Float32Array(0),
+      patches: new Float32Array(0)
     }
     for (let k = 0; k < clumps; k++) {
       cell.clumpX[k] = a * cs + clumpRand() * cs

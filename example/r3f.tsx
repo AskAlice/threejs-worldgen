@@ -5,7 +5,15 @@ import { Canvas, extend, useFrame, useThree, type ThreeToJSXElements } from '@re
 import { OrbitControls } from '@react-three/drei'
 import { button, folder, useControls } from 'leva'
 import { Grass, GrassMap, presets, type GrassImpl, type GrassLOD, type PresetName } from 'threejs-grass/react'
-import { createEnvironment, createGroundMaterial, createMinimap, hills, hillsGeometry, keepAboveGround, paintPath } from './shared'
+import {
+  createEnvironment,
+  createGroundMaterial,
+  createMinimap,
+  hills,
+  hillsGeometry,
+  keepAboveGround,
+  paintPath
+} from './shared'
 
 declare module '@react-three/fiber' {
   interface ThreeElements extends ThreeToJSXElements<typeof THREE> {}
@@ -25,7 +33,7 @@ function Environment() {
     elevation: { value: 28, min: 2, max: 89 },
     azimuth: { value: 50, min: 0, max: 360 },
     exposure: { value: 0.6, min: 0.2, max: 1.5 },
-    bloom: { value: 0.1, min: 0, max: 1 },
+    bloom: { value: 0.1, min: 0, max: 1 }
   })
   useEffect(() => env.setSun(light.elevation, light.azimuth), [env, light.elevation, light.azimuth])
   useEffect(() => {
@@ -69,7 +77,7 @@ function Scene() {
     preset: { value: 'kentuckyBluegrass' as string, options: Object.keys(presets) },
     type: { value: 'blades', options: ['blades', 'billboards'] },
     maxDistance: { value: 200, min: 50, max: 400, step: 10 },
-    interaction: { value: 1, min: 0, max: 3 },
+    interaction: { value: 1, min: 0, max: 3 }
   })
   // The Style panel overrides the preset, so load the preset's values into it whenever it changes.
   const [style, setStyle] = useControls('Style', () => styleSchema('kentuckyBluegrass'))
@@ -81,14 +89,30 @@ function Scene() {
     strength: { value: 0.45, min: 0, max: 1.5 },
     speed: { value: 0.8, min: 0, max: 3 },
     scale: { value: 0.045, min: 0.005, max: 0.3 },
-    angle: { value: 20, min: 0, max: 360 },
+    angle: { value: 20, min: 0, max: 360 }
   })
   const lod = useControls('Levels of detail', {
     debugLods: { value: false, label: 'show LODs' },
-    'LOD 0': folder({ d0: { value: 8, min: 0, max: 50, label: 'distance' }, n0: { value: 1, min: 0, max: 1, label: 'density' }, s0: { value: 5, min: 1, max: 8, step: 1, label: 'segments' } }),
-    'LOD 1': folder({ d1: { value: 25, min: 1, max: 100, label: 'distance' }, n1: { value: 0.25, min: 0, max: 1, label: 'density' }, s1: { value: 3, min: 1, max: 8, step: 1, label: 'segments' } }),
-    'LOD 2': folder({ d2: { value: 60, min: 1, max: 200, label: 'distance' }, n2: { value: 0.06, min: 0, max: 1, label: 'density' }, s2: { value: 2, min: 1, max: 8, step: 1, label: 'segments' } }),
-    'LOD 3': folder({ d3: { value: 120, min: 1, max: 400, label: 'distance' }, n3: { value: 0.03, min: 0, max: 1, label: 'density' }, s3: { value: 1, min: 1, max: 8, step: 1, label: 'segments' } }),
+    'LOD 0': folder({
+      d0: { value: 8, min: 0, max: 50, label: 'distance' },
+      n0: { value: 1, min: 0, max: 1, label: 'density' },
+      s0: { value: 5, min: 1, max: 8, step: 1, label: 'segments' }
+    }),
+    'LOD 1': folder({
+      d1: { value: 25, min: 1, max: 100, label: 'distance' },
+      n1: { value: 0.25, min: 0, max: 1, label: 'density' },
+      s1: { value: 3, min: 1, max: 8, step: 1, label: 'segments' }
+    }),
+    'LOD 2': folder({
+      d2: { value: 60, min: 1, max: 200, label: 'distance' },
+      n2: { value: 0.06, min: 0, max: 1, label: 'density' },
+      s2: { value: 2, min: 1, max: 8, step: 1, label: 'segments' }
+    }),
+    'LOD 3': folder({
+      d3: { value: 120, min: 1, max: 400, label: 'distance' },
+      n3: { value: 0.03, min: 0, max: 1, label: 'density' },
+      s3: { value: 1, min: 1, max: 8, step: 1, label: 'segments' }
+    })
   })
   const brush = useControls('Terrain Painter', {
     paint: { value: false, label: 'paint (orbit off)' },
@@ -98,15 +122,17 @@ function Scene() {
     'clear all': button(() => grassMap.fill(0)),
     'fill all': button(() => grassMap.fill(1)),
     'reset path': button(() => (grassMap.fill(1), paintPath(grassMap))),
-    'save map': button(() => Object.assign(document.createElement('a'), { href: grassMap.toDataURL(), download: 'grass-map.png' }).click()),
-    'load map': button(() => loadMap(grassMap)),
+    'save map': button(() =>
+      Object.assign(document.createElement('a'), { href: grassMap.toDataURL(), download: 'grass-map.png' }).click()
+    ),
+    'load map': button(() => loadMap(grassMap))
   })
 
   const lods: GrassLOD[] = [
     { distance: lod.d0, density: lod.n0, segments: lod.s0 },
     { distance: lod.d1, density: lod.n1, segments: lod.s1 },
     { distance: lod.d2, density: lod.n2, segments: lod.s2 },
-    { distance: lod.d3, density: lod.n3, segments: lod.s3 },
+    { distance: lod.d3, density: lod.n3, segments: lod.s3 }
   ]
 
   // Terrain shading reads the grass map (dirt where grass is erased), so it needs the Grass instance.
@@ -122,7 +148,8 @@ function Scene() {
     let raf = 0
     const tick = () => {
       minimap.update((window as any).__camera?.position)
-      if (grass) hud.innerHTML = `${grass.stats.tiles} tiles · ${grass.stats.instances.toLocaleString()} blades · <a href="./">three.js demo →</a>`
+      if (grass)
+        hud.innerHTML = `${grass.stats.tiles} tiles · ${grass.stats.instances.toLocaleString()} blades · <a href="./">three.js demo →</a>`
       raf = requestAnimationFrame(tick)
     }
     tick()
@@ -151,7 +178,12 @@ function Scene() {
         maxDistance={look.maxDistance}
         lods={lods}
         debugLods={lod.debugLods}
-        wind={{ direction: [Math.cos(rad), Math.sin(rad)], strength: wind.strength, speed: wind.speed, scale: wind.scale }}
+        wind={{
+          direction: [Math.cos(rad), Math.sin(rad)],
+          strength: wind.strength,
+          speed: wind.speed,
+          scale: wind.scale
+        }}
         grassMap={grassMap}
         paint={brush.paint && { mode: brush.mode as any, radius: brush.radius, strength: brush.strength }}
         interactors={balls.map((object) => ({ object, radius: 1.1 }))}
@@ -175,7 +207,7 @@ function styleSchema(name: PresetName) {
     baseColor: { value: p.baseColor, label: 'base' },
     tipColor: { value: p.tipColor, label: 'tip' },
     patchiness: { value: p.patchiness, min: 0, max: 1 },
-    translucency: { value: p.translucency, min: 0, max: 1.5 },
+    translucency: { value: p.translucency, min: 0, max: 1.5 }
   }
 }
 
@@ -195,11 +227,15 @@ createRoot(document.getElementById('root')!).render(
     camera={{ position: [-4, hills(-4, 10) + 1.7, 10], fov: 50, near: 0.1, far: 5000 }}
     onCreated={({ camera }) => Object.assign(window, { __camera: camera })}
     gl={async (props) => {
-      const renderer = new THREE.WebGPURenderer({ ...(props as any), antialias: true, forceWebGL: location.search.includes('webgl') })
+      const renderer = new THREE.WebGPURenderer({
+        ...(props as any),
+        antialias: true,
+        forceWebGL: location.search.includes('webgl')
+      })
       await renderer.init()
       return renderer
     }}
   >
     <Scene />
-  </Canvas>,
+  </Canvas>
 )

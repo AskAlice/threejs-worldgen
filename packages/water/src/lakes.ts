@@ -1,8 +1,26 @@
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Camera, type MeshBasicNodeMaterial, type Object3D } from 'three/webgpu'
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  Group,
+  Mesh,
+  type Camera,
+  type MeshBasicNodeMaterial,
+  type Object3D
+} from 'three/webgpu'
 import type { LocalFrame } from 'threejs-biomes'
 import { Clock, hookScene, mergeInput, placeInFrame, prepareRenderer, type WaterRenderer } from './common.ts'
 import type { HydrologyResult } from './hydrology.ts'
-import { DEFAULT_APPEARANCE, applyAppearance, applyWaves, createWaterMaterial, createWaterUniforms, setWavePhases, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
+import {
+  DEFAULT_APPEARANCE,
+  applyAppearance,
+  applyWaves,
+  createWaterMaterial,
+  createWaterUniforms,
+  setWavePhases,
+  updateSun,
+  type WaterAppearance,
+  type WaterUniforms
+} from './material.ts'
 import type { RiverFlowOptions } from './rivers.ts'
 import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, createWaves, type Wave, type WaveOptions } from './waves.ts'
@@ -59,7 +77,16 @@ export const DEFAULT_LAKES: LakesSettings = {
   detail: 0.3,
   detailScale: 0.8,
   origin: [0, 0, 0],
-  waves: { count: 6, seed: 7, amplitude: 0.03, wavelength: [0.3, 3], direction: [1, 0.35], spread: 0.7, choppiness: 0.4, speed: 1 },
+  waves: {
+    count: 6,
+    seed: 7,
+    amplitude: 0.03,
+    wavelength: [0.3, 3],
+    direction: [1, 0.35],
+    spread: 0.7,
+    choppiness: 0.4,
+    speed: 1
+  },
   whitecaps: 0,
   expand: 1,
   rivers: true,
@@ -67,7 +94,7 @@ export const DEFAULT_LAKES: LakesSettings = {
   rapids: 2.5,
   flowSpeed: 1,
   minFlowSpeed: 0.15,
-  maxFlowSpeed: 4,
+  maxFlowSpeed: 4
 }
 
 /**
@@ -127,7 +154,15 @@ export class Lakes {
   }
 
   /** Prefer {@link Lakes.create}. */
-  constructor({ hydrology, frame = null, camera = null, scene, renderer: _renderer, prepass = null, ...input }: LakesOptions) {
+  constructor({
+    hydrology,
+    frame = null,
+    camera = null,
+    scene,
+    renderer: _renderer,
+    prepass = null,
+    ...input
+  }: LakesOptions) {
     this.hydrology = hydrology
     this.frame = frame
     this.camera = camera
@@ -229,7 +264,11 @@ export class Lakes {
   }
 
   private rebuild() {
-    for (const m of [this.lakeMesh, this.riverMesh]) if (m) { m.removeFromParent(); m.geometry.dispose() }
+    for (const m of [this.lakeMesh, this.riverMesh])
+      if (m) {
+        m.removeFromParent()
+        m.geometry.dispose()
+      }
     this.lakeMesh = this.riverMesh = null
     const { x0, z0 } = this.hydrology.grid
     const lakes = buildLakeGeometry(this.hydrology, this.settings.expand)
@@ -271,18 +310,25 @@ function buildLakeGeometry(h: HydrologyResult, expand: number): BufferGeometry |
   for (const lake of h.lakes) {
     const [c0, r0, bw, bh] = lake.bounds
     // Dilated mask over the box grown by `e`.
-    const w = bw + 2 * e, hgt = bh + 2 * e
+    const w = bw + 2 * e,
+      hgt = bh + 2 * e
     const mask = new Uint8Array(w * hgt)
     for (let r = 0; r < bh; r++) for (let c = 0; c < bw; c++) mask[(r + e) * w + c + e] = lake.mask[r * bw + c]
     for (let k = 0; k < e; k++) {
       const prev = mask.slice()
-      for (let r = 0; r < hgt; r++) for (let c = 0; c < w; c++) {
-        if (prev[r * w + c]) continue
-        for (let dr = -1; dr <= 1 && !mask[r * w + c]; dr++) for (let dc = -1; dc <= 1; dc++) {
-          const rr = r + dr, cc = c + dc
-          if (rr >= 0 && cc >= 0 && rr < hgt && cc < w && prev[rr * w + cc]) { mask[r * w + c] = 1; break }
+      for (let r = 0; r < hgt; r++)
+        for (let c = 0; c < w; c++) {
+          if (prev[r * w + c]) continue
+          for (let dr = -1; dr <= 1 && !mask[r * w + c]; dr++)
+            for (let dc = -1; dc <= 1; dc++) {
+              const rr = r + dr,
+                cc = c + dc
+              if (rr >= 0 && cc >= 0 && rr < hgt && cc < w && prev[rr * w + cc]) {
+                mask[r * w + c] = 1
+                break
+              }
+            }
         }
-      }
     }
     // Shared corner vertices.
     const corner = new Int32Array((w + 1) * (hgt + 1)).fill(-1)
@@ -294,12 +340,17 @@ function buildLakeGeometry(h: HydrologyResult, expand: number): BufferGeometry |
       }
       return corner[k]
     }
-    for (let r = 0; r < hgt; r++) for (let c = 0; c < w; c++) {
-      const gc = c0 - e + c, gr = r0 - e + r
-      if (!mask[r * w + c] || gc < 0 || gr < 0 || gc >= cols || gr >= rows) continue
-      const a = vertex(c, r), b = vertex(c + 1, r), d = vertex(c, r + 1), f = vertex(c + 1, r + 1)
-      index.push(a, d, b, b, d, f)
-    }
+    for (let r = 0; r < hgt; r++)
+      for (let c = 0; c < w; c++) {
+        const gc = c0 - e + c,
+          gr = r0 - e + r
+        if (!mask[r * w + c] || gc < 0 || gr < 0 || gc >= cols || gr >= rows) continue
+        const a = vertex(c, r),
+          b = vertex(c + 1, r),
+          d = vertex(c, r + 1),
+          f = vertex(c + 1, r + 1)
+        index.push(a, d, b, b, d, f)
+      }
   }
   if (!index.length) return null
   const g = new BufferGeometry()
@@ -311,9 +362,13 @@ function buildLakeGeometry(h: HydrologyResult, expand: number): BufferGeometry |
 /** One mesh for all rivers: a ribbon per polyline at its water surface, wide enough to reach under the carved banks. */
 function buildRiverGeometry(h: HydrologyResult, o: LakesSettings): BufferGeometry | null {
   const { x0, z0, cellSize: cs, cols, rows } = h.grid
-  const pos: number[] = [], flow: number[] = [], local: number[] = [], index: number[] = []
+  const pos: number[] = [],
+    flow: number[] = [],
+    local: number[] = [],
+    index: number[] = []
   const inLake = (x: number, z: number) => {
-    const c = Math.round((x - x0) / cs), r = Math.round((z - z0) / cs)
+    const c = Math.round((x - x0) / cs),
+      r = Math.round((z - z0) / cs)
     return c >= 0 && r >= 0 && c < cols && r < rows && h.lakeIndex[r * cols + c] >= 0
   }
   for (const river of h.rivers) {
@@ -323,10 +378,13 @@ function buildRiverGeometry(h: HydrologyResult, o: LakesSettings): BufferGeometr
     for (const [from, to] of runs(p, inLake)) {
       const base = pos.length / 3
       for (let i = from; i < to; i++) {
-        const a = p[Math.max(from, i - 1)], b = p[Math.min(to - 1, i + 1)]
-        let tx = b[0] - a[0], tz = b[1] - a[1]
+        const a = p[Math.max(from, i - 1)],
+          b = p[Math.min(to - 1, i + 1)]
+        let tx = b[0] - a[0],
+          tz = b[1] - a[1]
         const len = Math.hypot(tx, tz) || 1
-        tx /= len; tz /= len
+        tx /= len
+        tz /= len
         const halfChannel = river.width[i] / 2
         const half = halfChannel + Math.max(cs, halfChannel * h.options.bankFalloff) * 0.8
         // Speed from the surface slope along the river.
@@ -334,7 +392,8 @@ function buildRiverGeometry(h: HydrologyResult, o: LakesSettings): BufferGeometr
         const slope = Math.max(0, drop) / len
         const speed = Math.min(o.maxFlowSpeed, Math.max(o.minFlowSpeed, o.flowSpeed * Math.sqrt(slope / 0.01)))
         for (const side of [-1, 1]) {
-          const x = p[i][0] - tz * half * side, z = p[i][1] + tx * half * side
+          const x = p[i][0] - tz * half * side,
+            z = p[i][1] + tx * half * side
           pos.push(x - x0, river.surface[i], z - z0)
           flow.push(tx * speed, tz * speed)
           local.push(x, z)
@@ -361,7 +420,10 @@ function runs(points: [number, number][], inLake: (x: number, z: number) => bool
   let from = -1
   for (let i = 0; i <= points.length; i++) {
     const wet = i < points.length && !inLake(points[i][0], points[i][1])
-    if (wet) { if (from < 0) from = i; continue }
+    if (wet) {
+      if (from < 0) from = i
+      continue
+    }
     if (from >= 0 && i - from >= 2) out.push([from, i])
     from = -1
   }

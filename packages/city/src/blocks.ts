@@ -36,7 +36,10 @@ export function extractBlocks(graph: RoadGraph, options: BlockOptions = DEFAULT_
   // Prune dead ends (repeatedly), so every remaining edge borders two real faces.
   const alive = new Uint8Array(edges.length).fill(1)
   const degree = new Int32Array(nodes.length)
-  for (const e of edges) { degree[e.a]++; degree[e.b]++ }
+  for (const e of edges) {
+    degree[e.a]++
+    degree[e.b]++
+  }
   const stack: number[] = []
   for (let i = 0; i < nodes.length; i++) if (degree[i] === 1) stack.push(i)
   while (stack.length) {
@@ -53,7 +56,10 @@ export function extractBlocks(graph: RoadGraph, options: BlockOptions = DEFAULT_
   // Edges around each node, sorted counter-clockwise by angle.
   const around: number[][] = nodes.map((node) => {
     const list = node.edges.filter((e) => alive[e])
-    const ang = (e: number) => { const m = nodes[graph.other(e, node.id)]; return Math.atan2(m.z - node.z, m.x - node.x) }
+    const ang = (e: number) => {
+      const m = nodes[graph.other(e, node.id)]
+      return Math.atan2(m.z - node.z, m.x - node.x)
+    }
     return list.sort((p, q) => ang(p) - ang(q))
   })
 

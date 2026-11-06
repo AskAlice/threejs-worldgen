@@ -2,7 +2,7 @@
 // it) and a glasshouse (windscreen, side and rear glass with roof and pillars painted onto it), both
 // lofted through superellipse cross-sections along the length and smooth-shaded, plus helpers that put
 // lamps, grilles and trim onto the surface. Shared by the car lookalikes, pickups and truck cabs.
-import { type MeshBuilder, type Paint, type Vec3 } from './mesh.ts'
+import type { MeshBuilder, Paint, Vec3 } from './mesh.ts'
 import { BODY, DARK, GLASS, PLASTIC, curve } from './kit.ts'
 
 /** A lofted body, in metres; profile keys are `[u, value]` with u = 0 at the rear bumper, 1 at the front. */
@@ -78,7 +78,18 @@ export interface Body {
 const RING = 32
 
 /** Points of a body cross-section ring at z (see {@link BodyProfile}). */
-function ring(z: number, w: number, top: number, low: number, mid: number, cut: number, eT: number, eB: number, tT: number, tB: number): Vec3[] {
+function ring(
+  z: number,
+  w: number,
+  top: number,
+  low: number,
+  mid: number,
+  cut: number,
+  eT: number,
+  eB: number,
+  tT: number,
+  tB: number
+): Vec3[] {
   const half = (y: number) => {
     const up = y >= mid
     const yn = Math.min(1, up ? (y - mid) / Math.max(1e-6, top - mid) : (mid - y) / Math.max(1e-6, mid - low))
@@ -87,8 +98,12 @@ function ring(z: number, w: number, top: number, low: number, mid: number, cut: 
   }
   const pts: Vec3[] = []
   for (let j = 0; j < RING; j++) {
-    const a = (j / RING) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a)
-    const up = s >= 0, e = up ? eT : eB, p = 2 / e
+    const a = (j / RING) * Math.PI * 2,
+      c = Math.cos(a),
+      s = Math.sin(a)
+    const up = s >= 0,
+      e = up ? eT : eB,
+      p = 2 / e
     const yn = Math.sign(s) * Math.abs(s) ** p
     let y = mid + yn * (up ? top - mid : mid - low)
     let x = w * Math.sign(c) * Math.abs(c) ** p * (1 - (up ? tT : tB) * yn * yn)
@@ -113,18 +128,30 @@ function stations(z0: number, z1: number, step: number, extra: number[]): number
 /** Lofts a {@link BodyProfile} into `m` and returns its profile functions. */
 export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
   const { L, W, r } = P
-  const belt = curve(P.belt), bottom = curve(P.bottom), plan = curve(P.plan)
+  const belt = curve(P.belt),
+    bottom = curve(P.bottom),
+    plan = curve(P.plan)
   const roofLine = P.roof ? curve(P.roof) : null
-  const eT = P.eTop ?? 3.2, eB = P.eBot ?? 6, [tT, tB] = P.tuck ?? [0.06, 0.12], split = P.split ?? 0.45
+  const eT = P.eTop ?? 3.2,
+    eB = P.eBot ?? 6,
+    [tT, tB] = P.tuck ?? [0.06, 0.12],
+    split = P.split ?? 0.45
   const [fr, ff] = P.fillet ?? [0.15, 0.15]
   const R = r * (P.arch ?? 1.14) + 0.02
   const uOf = (z: number) => z / L + 0.5
   const zOf = (u: number) => (u - 0.5) * L
   const shrink = (z: number) => {
-    const df = L / 2 - z, dr = z + L / 2
+    const df = L / 2 - z,
+      dr = z + L / 2
     let k = 0
-    if (df < ff) { const t = 1 - df / ff; k = Math.max(k, ff * (1 - Math.sqrt(Math.max(0, 1 - t * t)))) }
-    if (dr < fr) { const t = 1 - dr / fr; k = Math.max(k, fr * (1 - Math.sqrt(Math.max(0, 1 - t * t)))) }
+    if (df < ff) {
+      const t = 1 - df / ff
+      k = Math.max(k, ff * (1 - Math.sqrt(Math.max(0, 1 - t * t))))
+    }
+    if (dr < fr) {
+      const t = 1 - dr / fr
+      k = Math.max(k, fr * (1 - Math.sqrt(Math.max(0, 1 - t * t))))
+    }
     return k
   }
   const archAt = (z: number) => {
@@ -136,7 +163,8 @@ export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
     return y
   }
   const section = (z: number) => {
-    const u = uOf(z), k = shrink(z)
+    const u = uOf(z),
+      k = shrink(z)
     const w = Math.max(0.05, (W / 2) * plan(u) - k)
     const top = belt(u) - k * 0.3
     const sill = Math.min(top - 0.05, bottom(u) + k * 0.45)
@@ -151,7 +179,10 @@ export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
     const s = section(z)
     if (y > s.top || y < Math.max(s.low, s.cut)) return -1
     const up = y >= s.mid
-    const yn = Math.min(1, up ? (y - s.mid) / Math.max(1e-6, s.top - s.mid) : (s.mid - y) / Math.max(1e-6, s.mid - s.low))
+    const yn = Math.min(
+      1,
+      up ? (y - s.mid) / Math.max(1e-6, s.top - s.mid) : (s.mid - y) / Math.max(1e-6, s.mid - s.low)
+    )
     const e = up ? eT : eB
     return s.w * (1 - yn ** e) ** (1 / e) * (1 - (up ? tT : tB) * yn * yn)
   }
@@ -159,32 +190,42 @@ export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
   // Lower body: dense stations at the rounded ends, the arch edges and the pillars.
   const extra: number[] = []
   for (let k = 0; k <= 8; k++) {
-    const a = (k / 8) * Math.PI / 2
+    const a = ((k / 8) * Math.PI) / 2
     extra.push(L / 2 - ff + ff * Math.sin(a), -L / 2 + fr - fr * Math.sin(a))
   }
   // Arches: dense round the curve, and a clean step at each edge.
   for (const zc of P.axles) {
-    for (let k = -12; k <= 12; k++) extra.push(zc + R * Math.sin((k / 12) * Math.PI / 2))
+    for (let k = -12; k <= 12; k++) extra.push(zc + R * Math.sin(((k / 12) * Math.PI) / 2))
     for (const d of [-R - 0.002, -R + 0.002, R - 0.002, R + 0.002]) extra.push(zc + d)
   }
   const zs = stations(-L / 2, L / 2, 0.07, extra)
   const secs = zs.map(section)
-  const rows = zs.map((z, i) => { const s = secs[i]; return ring(z, s.w, s.top, s.low, s.mid, -Infinity, eT, eB, tT, tB) })
+  const rows = zs.map((z, i) => {
+    const s = secs[i]
+    return ring(z, s.w, s.top, s.low, s.mid, -Infinity, eT, eB, tT, tB)
+  })
   const paintBody = P.paint ?? BODY
   const cockpit = P.cockpit
-  m.surface(rows, (i, j) => {
-    const a = rows[i][j], b = rows[i + 1][(j + 1) % RING]
-    const z = (a[2] + b[2]) / 2, x = Math.abs(a[0] + b[0]) / 2
-    const sMid = Math.sin(((j + 0.5) / RING) * Math.PI * 2)
-    const sec = section(z)
-    if (sMid < -0.45 && (secs[i].cut > -Infinity || secs[i + 1].cut > -Infinity)) return PLASTIC // arch liner
-    if (sMid < -0.85) return DARK // underbody
-    if (cockpit && sMid > 0.3 && x < sec.w * 0.84) {
-      const u = uOf(z)
-      if (u > cockpit[0] && u < cockpit[1]) return P.interior ?? DARK
-    }
-    return paintBody
-  }, true, [paintBody, paintBody])
+  m.surface(
+    rows,
+    (i, j) => {
+      const a = rows[i][j],
+        b = rows[i + 1][(j + 1) % RING]
+      const z = (a[2] + b[2]) / 2,
+        x = Math.abs(a[0] + b[0]) / 2
+      const sMid = Math.sin(((j + 0.5) / RING) * Math.PI * 2)
+      const sec = section(z)
+      if (sMid < -0.45 && (secs[i].cut > -Infinity || secs[i + 1].cut > -Infinity)) return PLASTIC // arch liner
+      if (sMid < -0.85) return DARK // underbody
+      if (cockpit && sMid > 0.3 && x < sec.w * 0.84) {
+        const u = uOf(z)
+        if (u > cockpit[0] && u < cockpit[1]) return P.interior ?? DARK
+      }
+      return paintBody
+    },
+    true,
+    [paintBody, paintBody]
+  )
   // Wheel wells: the inner walls behind the arches, kept under the bonnet and boot lid.
   for (const zc of P.axles) {
     const top = Math.min(r + R, Math.min(section(zc - R).top, section(zc + R).top, section(zc).top) - 0.08)
@@ -193,35 +234,46 @@ export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
 
   // Glasshouse.
   if (P.roof && roofLine) {
-    const u0 = P.roof[0][0], u3 = P.roof[P.roof.length - 1][0]
+    const u0 = P.roof[0][0],
+      u3 = P.roof[P.roof.length - 1][0]
     const span = P.roofSpan ?? [u0, u3]
     const gx: number[] = [...span, ...(P.pillars ?? []).flatMap((u) => [u - 0.012, u + 0.012])]
     if (P.cPillar !== undefined) gx.push(P.cPillar)
     if (P.aPillar !== undefined) gx.push(P.aPillar)
     for (const [u] of P.roof) gx.push(u)
     const gz = stations(zOf(u0), zOf(u3), 0.045, gx.map(zOf))
-    const glassW = P.glassW ?? 0.92, topW = P.topW ?? 0.74, eG = P.eGlass ?? 2.6
+    const glassW = P.glassW ?? 0.92,
+      topW = P.topW ?? 0.74,
+      eG = P.eGlass ?? 2.6
     const grows = gz.map((z) => {
-      const u = uOf(z), s = section(z), w = (W / 2) * plan(u) * glassW
+      const u = uOf(z),
+        s = section(z),
+        w = (W / 2) * plan(u) * glassW
       // Sit the base below the shoulders under the glass's own edge, so no edge shows above the bonnet.
       const xn = Math.min(0.999, w / Math.max(1e-6, s.w))
       const shoulder = s.mid + (s.top - s.mid) * (1 - xn ** eT) ** (1 / eT)
       const base = Math.min(belt(u) - 0.07, shoulder - 0.03)
       return ring(z, w, Math.max(base + 0.002, roofLine(u)), base, base, -Infinity, eG, 8, 1 - topW, 0)
     })
-    const roofPaint = P.roofPaint ?? paintBody, pillar = P.pillarPaint ?? paintBody
-    m.surface(grows, (i, j) => {
-      const u = uOf((grows[i][0][2] + grows[i + 1][0][2]) / 2)
-      const s = Math.sin(((j + 0.5) / RING) * Math.PI * 2)
-      if (s < 0) return DARK
-      const inRoof = u > span[0] && u < span[1]
-      if (s >= 0.7) return inRoof ? roofPaint : GLASS
-      if (s >= 0.55) return inRoof || u < span[0] || P.cPillar !== undefined && u < P.cPillar ? roofPaint : pillar
-      if (P.cPillar !== undefined && u < P.cPillar) return roofPaint
-      if (P.aPillar !== undefined && u > P.aPillar) return roofPaint
-      if ((P.pillars ?? []).some((p) => Math.abs(u - p) < 0.012)) return pillar
-      return GLASS
-    }, true, [DARK, DARK])
+    const roofPaint = P.roofPaint ?? paintBody,
+      pillar = P.pillarPaint ?? paintBody
+    m.surface(
+      grows,
+      (i, j) => {
+        const u = uOf((grows[i][0][2] + grows[i + 1][0][2]) / 2)
+        const s = Math.sin(((j + 0.5) / RING) * Math.PI * 2)
+        if (s < 0) return DARK
+        const inRoof = u > span[0] && u < span[1]
+        if (s >= 0.7) return inRoof ? roofPaint : GLASS
+        if (s >= 0.55) return inRoof || u < span[0] || (P.cPillar !== undefined && u < P.cPillar) ? roofPaint : pillar
+        if (P.cPillar !== undefined && u < P.cPillar) return roofPaint
+        if (P.aPillar !== undefined && u > P.aPillar) return roofPaint
+        if ((P.pillars ?? []).some((p) => Math.abs(u - p) < 0.012)) return pillar
+        return GLASS
+      },
+      true,
+      [DARK, DARK]
+    )
   }
 
   const roofAt = (z: number) => {
@@ -233,11 +285,15 @@ export function loftBody(m: MeshBuilder, P: BodyProfile): Body {
     let found = NaN
     for (let k = 0; k <= 400; k++) {
       const z = dir * (L / 2 - (k / 400) * L * 0.4)
-      if (half(z, y) >= Math.abs(x)) { found = z; break }
+      if (half(z, y) >= Math.abs(x)) {
+        found = z
+        break
+      }
     }
     if (found !== found) return null
     const d = 0.03
-    const za = endZ(Math.abs(x) - d), zb = endZ(Math.abs(x) + d)
+    const za = endZ(Math.abs(x) - d),
+      zb = endZ(Math.abs(x) + d)
     const slope = za !== null && zb !== null ? (zb - za) / (2 * d) : 0
     // Outward normal in (x, z): front (−f′·sx, 1), rear (f′·sx, −1) with f′ the slope of z over |x|.
     const sx = Math.sign(x) || 1
@@ -265,25 +321,48 @@ export function faceY(b: Body, dir: 1 | -1, f: number, depth = 0.12): number {
  * A lamp, grille or badge-free panel on the body's front (`dir` 1) or rear (−1) at (x, y): a smooth
  * rounded box `size` (width, height, depth) facing out of the surface, sunk to `sink` of its depth.
  */
-export function onEnd(m: MeshBuilder, b: Body, x: number, y: number, dir: 1 | -1, size: Vec3, s: Paint, sink = 0.55, e = 5): boolean {
+export function onEnd(
+  m: MeshBuilder,
+  b: Body,
+  x: number,
+  y: number,
+  dir: 1 | -1,
+  size: Vec3,
+  s: Paint,
+  sink = 0.55,
+  e = 5
+): boolean {
   // Above the nose or tail the search would land on the bonnet or boot lid: step down onto the end face.
   let at = b.end(x, y, dir)
   for (let k = 0; k < 20 && at && Math.abs(at.z - b.z(dir > 0 ? 1 : 0)) > 0.45; k++) at = b.end(x, (y -= 0.02), dir)
   if (!at) return false
-  const nx = Math.sin(at.yaw), nz = Math.cos(at.yaw)
+  const nx = Math.sin(at.yaw),
+    nz = Math.cos(at.yaw)
   const d = size[2] * (0.5 - sink)
   m.group([x + nx * d, y, at.z + nz * d], [0, at.yaw, 0], () => m.rounded([0, 0, 0], size, s, e, 14, 6))
   return true
 }
 
 /** A panel on the flank at (z, y) on side `side` (±1): door handles, side markers, trim strips. */
-export function onSide(m: MeshBuilder, b: Body, z: number, y: number, side: number, size: Vec3, s: Paint, sink = 0.6, e = 5): void {
+export function onSide(
+  m: MeshBuilder,
+  b: Body,
+  z: number,
+  y: number,
+  side: number,
+  size: Vec3,
+  s: Paint,
+  sink = 0.6,
+  e = 5
+): void {
   const x = b.half(z, y)
   if (x <= 0) return
   const d = 0.04
   const slope = (b.half(z + d, y) - b.half(z - d, y)) / (2 * d)
   // size = (depth out of the flank, height, length); turned to follow the flank's plan curve.
-  m.group([side * (x + size[0] * (0.5 - sink)), y, z], [0, Math.atan2(slope * side, 1), 0], () => m.rounded([0, 0, 0], size, s, e, 12, 6))
+  m.group([side * (x + size[0] * (0.5 - sink)), y, z], [0, Math.atan2(slope * side, 1), 0], () =>
+    m.rounded([0, 0, 0], size, s, e, 12, 6)
+  )
 }
 
 /** Side mirrors at the windscreen base. */

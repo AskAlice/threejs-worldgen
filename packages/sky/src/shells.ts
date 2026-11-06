@@ -6,12 +6,42 @@
  * shell's limb from outside, or near the horizon from inside.
  */
 import {
-  AdditiveBlending, CanvasTexture, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, NodeMaterial, PlaneGeometry,
-  SRGBColorSpace, Sphere, SphereGeometry, Vector3, type BufferGeometry, type Camera,
+  AdditiveBlending,
+  CanvasTexture,
+  Group,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
+  NodeMaterial,
+  PlaneGeometry,
+  SRGBColorSpace,
+  Sphere,
+  SphereGeometry,
+  Vector3,
+  type BufferGeometry,
+  type Camera
 } from 'three/webgpu'
 import {
-  abs, attribute, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, dot, float, length, max, normalize, positionLocal, pow,
-  select, sqrt, texture, uniform, uv, varying, vec2, vec4,
+  abs,
+  attribute,
+  cameraPosition,
+  cameraProjectionMatrix,
+  cameraViewMatrix,
+  dot,
+  float,
+  length,
+  max,
+  normalize,
+  positionLocal,
+  pow,
+  select,
+  sqrt,
+  texture,
+  uniform,
+  uv,
+  varying,
+  vec2,
+  vec4
 } from 'three/tsl'
 import type { StarSystem } from './bodies.ts'
 import type { AtmosphereLayers } from './layers.ts'
@@ -54,11 +84,11 @@ export const DEFAULT_SHELLS: ShellsOptions = {
     { label: 'Troposphere', altitude: 'troposphere', color: '#7fd1ff' },
     { label: 'Kármán line', altitude: 'karman', color: '#ffffff' },
     { label: 'Ionosphere', altitude: 300_000, color: '#c08cff' },
-    { label: 'Apogee', altitude: 'apogee', color: '#ffb35e' },
+    { label: 'Apogee', altitude: 'apogee', color: '#ffb35e' }
   ],
   opacity: 0.3,
   labels: true,
-  labelSize: 0.035,
+  labelSize: 0.035
 }
 
 /** Partial {@link ShellsOptions}. */
@@ -79,7 +109,12 @@ export interface ResolvedShell {
  * numbers scaled by `scale` (R / Earth's radius with `scaleWithRadius`), perigee/apogee from the moon's
  * orbit. Shells that can't be resolved (no moon) are left out. Pure.
  */
-export function resolveShells(shells: AltitudeShell[], layers: AtmosphereLayers, system: StarSystem, scale = 1): ResolvedShell[] {
+export function resolveShells(
+  shells: AltitudeShell[],
+  layers: AtmosphereLayers,
+  system: StarSystem,
+  scale = 1
+): ResolvedShell[] {
   const out: ResolvedShell[] = []
   for (const s of shells) {
     let altitude: number
@@ -102,20 +137,28 @@ export function formatAltitude(m: number): string {
   return `${km < 100 ? km.toFixed(km < 10 ? 1 : 0) : Math.round(km).toLocaleString('en').replace(/,/g, ' ')} km`
 }
 
-const ROW = 64, ATLAS_W = 512, ASPECT = ATLAS_W / ROW
+const ROW = 64,
+  ATLAS_W = 512,
+  ASPECT = ATLAS_W / ROW
 
 /** Builds the label atlas (one row per label), or null without a canvas (Node). */
 function labelAtlas(shells: ResolvedShell[]): CanvasTexture | null {
   const canvas: HTMLCanvasElement | OffscreenCanvas | null =
-    typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(ATLAS_W, ROW * shells.length)
-      : typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: ATLAS_W, height: ROW * shells.length })
+    typeof OffscreenCanvas !== 'undefined'
+      ? new OffscreenCanvas(ATLAS_W, ROW * shells.length)
+      : typeof document !== 'undefined'
+        ? Object.assign(document.createElement('canvas'), { width: ATLAS_W, height: ROW * shells.length })
         : null
-  const ctx = canvas?.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined
+  const ctx = canvas?.getContext('2d') as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null
+    | undefined
   if (!canvas || !ctx) return null
   ctx.textBaseline = 'middle'
   shells.forEach((s, i) => {
     const y = i * ROW + ROW / 2
-    const [r, g, b] = s.color.map((c) => Math.round(Math.pow(Math.min(1, c), 1 / 2.2) * 255))
+    const [r, g, b] = s.color.map((c) => Math.round(Math.min(1, c) ** (1 / 2.2) * 255))
     ctx.fillStyle = `rgb(${r},${g},${b})`
     ctx.fillRect(4, y - 2, 18, 4)
     ctx.font = '600 30px system-ui, sans-serif'
@@ -154,7 +197,7 @@ export class AltitudeShells {
     opacity: uniform(0.8),
     right: uniform(new Vector3(1, 0, 0)),
     up: uniform(new Vector3(0, 1, 0)),
-    size: uniform(0.035),
+    size: uniform(0.035)
   }
   private shellMesh: Mesh<InstancedBufferGeometry, NodeMaterial> | null = null
   private labelMesh: Mesh<InstancedBufferGeometry, NodeMaterial> | null = null
@@ -197,14 +240,20 @@ export class AltitudeShells {
     // Shells: one instanced sphere; a rim that brightens where the view grazes it, hidden by the planet.
     const sphere = new SphereGeometry(1, 128, 64)
     const g = instancedFrom(sphere, n)
-    const aR = new InstancedBufferAttribute(new Float32Array(n), 1), aC = new InstancedBufferAttribute(new Float32Array(n * 3), 3)
-    shells.forEach((s, i) => { aC.array.set(s.color, i * 3) })
-    g.setAttribute('aRadius', aR); g.setAttribute('aColor', aC)
+    const aR = new InstancedBufferAttribute(new Float32Array(n), 1),
+      aC = new InstancedBufferAttribute(new Float32Array(n * 3), 3)
+    shells.forEach((s, i) => {
+      aC.array.set(s.color, i * 3)
+    })
+    g.setAttribute('aRadius', aR)
+    g.setAttribute('aColor', aC)
     const nrm = normalize(positionLocal)
     const world = u.center.add(nrm.mul(attribute('aRadius', 'float')))
-    const vWorld: any = varying(world), vN: any = varying(nrm)
+    const vWorld: any = varying(world),
+      vN: any = varying(nrm)
     const toFrag = vWorld.sub(cameraPosition)
-    const dist = length(toFrag), dir = toFrag.div(dist)
+    const dist = length(toFrag),
+      dir = toFrag.div(dist)
     const rim = pow(float(1).sub(abs(dot(vN, dir))), 8)
     // Planet occlusion, closest-approach form (stable from far away).
     const o = cameraPosition.sub(u.center)
@@ -213,7 +262,10 @@ export class AltitudeShells {
     const hit = b.negate().sub(sqrt(max(u.radius.mul(u.radius).sub(closest.mul(closest)), 0)))
     const hidden = closest.lessThan(u.radius).and(hit.greaterThan(0)).and(hit.lessThan(dist))
     const m = new NodeMaterial()
-    m.transparent = true; m.depthWrite = false; m.blending = AdditiveBlending; m.fog = false
+    m.transparent = true
+    m.depthWrite = false
+    m.blending = AdditiveBlending
+    m.fog = false
     m.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1))
     m.colorNode = vec4(attribute('aColor', 'vec3').mul(rim.mul(u.opacity).mul(select(hidden, 0, 1))), 1)
     this.shellMesh = new Mesh(g, m)
@@ -233,7 +285,10 @@ export class AltitudeShells {
       const size = length(anchor.sub(cameraPosition)).mul(u.size)
       const offset = u.right.mul(positionLocal.x.add(0.5).mul(ASPECT)).add(u.up.mul(positionLocal.y))
       const lm = new NodeMaterial()
-      lm.transparent = true; lm.depthWrite = false; lm.depthTest = false; lm.fog = false
+      lm.transparent = true
+      lm.depthWrite = false
+      lm.depthTest = false
+      lm.fog = false
       lm.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(anchor.add(offset.mul(size)), 1))
       const v = float(1).sub(attribute('aRow', 'float').add(float(1).sub(uv().y)).div(n))
       const texel = texture(this.atlas, vec2(uv().x, v))
@@ -243,7 +298,11 @@ export class AltitudeShells {
       this.labelMesh.visible = this.settings.labels
       quad.dispose()
     }
-    for (const mesh of [this.shellMesh, this.labelMesh]) if (mesh) { mesh.frustumCulled = false; this.object.add(mesh) }
+    for (const mesh of [this.shellMesh, this.labelMesh])
+      if (mesh) {
+        mesh.frustumCulled = false
+        this.object.add(mesh)
+      }
   }
 
   /**
@@ -266,23 +325,29 @@ export class AltitudeShells {
     u.radius.value = radius
     if (!this.shellMesh) return
     const radii = this.shellMesh.geometry.getAttribute('aRadius') as InstancedBufferAttribute
-    shells.forEach((s, i) => { radii.array[i] = radius + s.altitude * scale })
+    shells.forEach((s, i) => {
+      radii.array[i] = radius + s.altitude * scale
+    })
     radii.needsUpdate = true
     if (!this.labelMesh) return
 
     camera.updateMatrixWorld()
     const e = camera.matrixWorld.elements
     const P = new Vector3(e[12], e[13], e[14])
-    const right = new Vector3(e[0], e[1], e[2]).normalize(), camUp = new Vector3(e[4], e[5], e[6]).normalize()
+    const right = new Vector3(e[0], e[1], e[2]).normalize(),
+      camUp = new Vector3(e[4], e[5], e[6]).normalize()
     const forward = new Vector3(-e[8], -e[9], -e[10]).normalize()
-    u.right.value.copy(right); u.up.value.copy(camUp)
+    u.right.value.copy(right)
+    u.up.value.copy(camUp)
     const C = new Vector3(...center)
     const far = (camera as { far?: number }).far ?? 1e9
     const anchors = this.labelMesh.geometry.getAttribute('aAnchor') as InstancedBufferAttribute
     const alphas = this.labelMesh.geometry.getAttribute('aAlpha') as InstancedBufferAttribute
-    const toCam = P.clone().sub(C), d = toCam.length()
+    const toCam = P.clone().sub(C),
+      d = toCam.length()
     const localUp = toCam.clone().divideScalar(d)
-    const v = new Vector3(), a = new Vector3()
+    const v = new Vector3(),
+      a = new Vector3()
     shells.forEach((s, i) => {
       const r = radius + s.altitude * scale
       // From outside, hide the label while the shell is smaller on screen than the label is long.
@@ -293,7 +358,9 @@ export class AltitudeShells {
         const w = camUp.clone().multiplyScalar(Math.cos(ang)).addScaledVector(right, Math.sin(ang))
         const n = C.clone().sub(P).normalize()
         w.addScaledVector(n, -w.dot(n)).normalize()
-        a.copy(C).addScaledVector(localUp, (r * r) / d).addScaledVector(w, r * Math.sqrt(Math.max(0, 1 - (r * r) / (d * d))))
+        a.copy(C)
+          .addScaledVector(localUp, (r * r) / d)
+          .addScaledVector(w, r * Math.sqrt(Math.max(0, 1 - (r * r) / (d * d))))
       } else {
         // Inside: where a ray towards the horizon ahead meets the shell, a little higher for each label.
         v.copy(forward).addScaledVector(localUp, -forward.dot(localUp))
@@ -301,13 +368,15 @@ export class AltitudeShells {
         v.normalize()
         const el = (4 + i * 5) * DEG
         v.multiplyScalar(Math.cos(el)).addScaledVector(localUp, Math.sin(el))
-        const b = toCam.dot(v), c = d * d - r * r
+        const b = toCam.dot(v),
+          c = d * d - r * r
         const t = -b + Math.sqrt(Math.max(0, b * b - c))
         a.copy(P).addScaledVector(v, t)
       }
       // Size is relative to distance, so pull far anchors in to stay inside the far plane.
       v.copy(a).sub(P)
-      const dist = v.length(), max = far * 0.5
+      const dist = v.length(),
+        max = far * 0.5
       if (dist > max) a.copy(P).addScaledVector(v, max / dist)
       anchors.array.set([a.x, a.y, a.z], i * 3)
     })

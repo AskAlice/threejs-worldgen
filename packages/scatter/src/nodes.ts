@@ -7,5 +7,7 @@ import type { Node } from 'three/webgpu'
  * neutral `vec4(0, 1, 0.5, 0)`, so materials can use it unconditionally.
  */
 export function scatterParamsNode(): Node<'vec4'> {
-  return Fn((builder: any) => (builder.geometry?.hasAttribute('scatterParams') ? attribute('scatterParams', 'vec4') : vec4(0, 1, 0.5, 0)))() as any
+  return Fn((builder: any) =>
+    builder.geometry?.hasAttribute('scatterParams') ? attribute('scatterParams', 'vec4') : vec4(0, 1, 0.5, 0)
+  )() as any
 }

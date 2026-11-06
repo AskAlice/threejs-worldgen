@@ -5,10 +5,16 @@ import { moonPhase, observe, sunTimes, type ObserverOptions } from '../src/obser
 import { DEFAULT_ATMOSPHERE, skyRadiance, transmittance } from '../src/scattering.ts'
 import { toSimTime } from '../src/time.ts'
 
-const at = (latitude: number, longitude: number): ObserverOptions => ({ frame: 'local', latitude, longitude, planetCenter: [0, 0, 0] })
+const at = (latitude: number, longitude: number): ObserverOptions => ({
+  frame: 'local',
+  latitude,
+  longitude,
+  planetCenter: [0, 0, 0]
+})
 
 test('moon phase: new, full and quarter geometry', () => {
-  const sun: [number, number, number] = [1.5e11, 0, 0], obs: [number, number, number] = [0, 0, 0]
+  const sun: [number, number, number] = [1.5e11, 0, 0],
+    obs: [number, number, number] = [0, 0, 0]
   const fresh = moonPhase(sun, [3.8e8, 0, 0], obs)
   assert.ok(fresh.illumination < 1e-9 && Math.abs(fresh.phaseAngle - 180) < 1e-6)
   assert.ok(fresh.cycle < 1e-9 || fresh.cycle > 1 - 1e-9)
@@ -44,7 +50,7 @@ test('sunrise and sunset: 12 h + refraction at the equator of an untilted planet
   assert.ok(sunrise !== null && sunset !== null)
   let len = (sunset! - sunrise!) % day
   if (len < 0) len += day
-  const expected = day / 2 + (2 * 0.833 / 360) * day
+  const expected = day / 2 + ((2 * 0.833) / 360) * day
   assert.ok(Math.abs(len - expected) < 2, `day length ${len} vs ${expected}`)
 })
 
@@ -56,7 +62,8 @@ test('sunrise and sunset: about 15 h 37 min of daylight at 45° N on the June so
 })
 
 test('scattering: blue zenith, red low sun, nothing through the planet', () => {
-  const a = DEFAULT_ATMOSPHERE, R = 6.371e6
+  const a = DEFAULT_ATMOSPHERE,
+    R = 6.371e6
   const o: [number, number, number] = [0, R + 2, 0]
   const zenith = skyRadiance(a, R, o, [0, 1, 0], [0.5, Math.sqrt(0.75), 0])
   assert.ok(zenith[2] > zenith[1] && zenith[1] > zenith[0], `zenith ${zenith}`)

@@ -34,11 +34,23 @@ async function sandbox() {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 30000)
   // Ground: the biomes terrain (its LOD reaches centimetres at the camera, on the same heights the solver collides with).
-  const terrain = await WorldTerrain.create({ world, camera, scene, createWorker: () => new TerrainWorker(), castShadow: true })
+  const terrain = await WorldTerrain.create({
+    world,
+    camera,
+    scene,
+    createWorker: () => new TerrainWorker(),
+    castShadow: true
+  })
   // Sky over Kīlauea: atmosphere, sun or moon light with shadows, environment light and exposure.
-  const sky = await Sky.create({ renderer, scene, camera, observer: { latitude: 19.4, longitude: -155.3 }, clock: { date: '2026-03-04T12:00:00Z', paused: true }, // a day after full moon: a moonlit night
+  const sky = await Sky.create({
+    renderer,
+    scene,
+    camera,
+    observer: { latitude: 19.4, longitude: -155.3 },
+    clock: { date: '2026-03-04T12:00:00Z', paused: true }, // a day after full moon: a moonlit night
     // Exposure capped like a camera at an eruption: at night it exposes for the lava, not for the dark land around it.
-    lighting: { autoExposure: true, exposureRange: [0.25, 0.7] } })
+    lighting: { autoExposure: true, exposureRange: [0.25, 0.7] }
+  })
   // The lava as a light source: a few point lights over the brightest clusters of glowing surface (from the read-back).
   const glows = Array.from({ length: 4 }, () => new THREE.PointLight('#ff8a3c', 0, 0, 2))
   scene.add(...glows)
@@ -57,9 +69,19 @@ async function sandbox() {
   scene.add(haze.object, sparks.object)
 
   // The vent: near the uphill edge of the domain, pouring downhill.
-  const view = { night: params.has('night'), preset: presetName, vent: true, ventSpeed: 0.5, ventRadius: 0.6, follow: false }
+  const view = {
+    night: params.has('night'),
+    preset: presetName,
+    vent: true,
+    ventSpeed: 0.5,
+    ventRadius: 0.6,
+    follow: false
+  }
   let layerClock = 0
-  const reset = () => { mpm.clear(); layerClock = 0 }
+  const reset = () => {
+    mpm.clear()
+    layerClock = 0
+  }
 
   camera.position.set(...view0.position)
   const controls = new OrbitControls(camera, renderer.domElement)
@@ -72,22 +94,33 @@ async function sandbox() {
   controls.enableDamping = true
 
   // Day: late morning; night: a moonless hour before midnight (the lava is the light).
-  const setDayNight = () => { sky.setTimeOfDay(view.night ? 22.5 : 10.5) }
+  const setDayNight = () => {
+    sky.setTimeOfDay(view.night ? 22.5 : 10.5)
+  }
   sky.update(0)
   setDayNight()
   sky.follow(controls.target)
 
-  const gui = createPanel([{
-    name: 'threejs-particles', classes: [
-      classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
-      classOf('MPMLava', lava, lava.options, specOptions(panels['threejs-particles'].MPMLava)),
+  const gui = createPanel(
+    [
+      {
+        name: 'threejs-particles',
+        classes: [
+          classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
+          classOf('MPMLava', lava, lava.options, specOptions(panels['threejs-particles'].MPMLava))
+        ]
+      }
     ],
-  }], { title: 'threejs-particles · MPM lava' })
+    { title: 'threejs-particles · MPM lava' }
+  )
   const demo = gui.addFolder('demo')
-  demo.add(view, 'preset', ['pahoehoe', 'aa']).name('preset (pāhoehoe / ʻaʻā)').onChange((k: keyof typeof LAVA_PRESETS) => {
-    mpm.set({ materials: { lava: LAVA_PRESETS[k].material } })
-    lava.set(LAVA_PRESETS[k].lava)
-  })
+  demo
+    .add(view, 'preset', ['pahoehoe', 'aa'])
+    .name('preset (pāhoehoe / ʻaʻā)')
+    .onChange((k: keyof typeof LAVA_PRESETS) => {
+      mpm.set({ materials: { lava: LAVA_PRESETS[k].material } })
+      lava.set(LAVA_PRESETS[k].lava)
+    })
   demo.add(view, 'night').name('night').onChange(setDayNight)
   demo.add(view, 'vent').name('vent erupting')
   demo.add(view, 'ventSpeed', 0.1, 2, 0.05).name('vent speed (m/s)')
@@ -103,10 +136,26 @@ async function sandbox() {
 
   // Read-back every 1.5 s: haze/spark sources, the lava light, and flow statistics for the HUD.
   const { stats, measure, hud: status } = lavaStats(renderer, mpm, lava, haze, sparks, glows, v)
-  let reading = false, lastRead = performance.now()
-  Object.assign(window, { mpm, lava, world, camera, controls, renderer, scene, sky, terrain, lavaStats: stats, view, setDayNight, vent: v })
+  let reading = false,
+    lastRead = performance.now()
+  Object.assign(window, {
+    mpm,
+    lava,
+    world,
+    camera,
+    controls,
+    renderer,
+    scene,
+    sky,
+    terrain,
+    lavaStats: stats,
+    view,
+    setDayNight,
+    vent: v
+  })
 
-  let last = performance.now(), fps = 60
+  let last = performance.now(),
+    fps = 60
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.1, (now - last) / 1000)
@@ -117,7 +166,10 @@ async function sandbox() {
     const step = 1 / 60 // fixed step: deterministic, and slow motion rather than instability when frames drop
     if (view.vent && mpm.count + 200 < mpm.capacity) {
       layerClock += step * view.ventSpeed
-      while (layerClock >= DX / 2) { emitLayer(lava, world, v, view.ventRadius, view.ventSpeed); layerClock -= DX / 2 } // one particle layer per spacing of outflow
+      while (layerClock >= DX / 2) {
+        emitLayer(lava, world, v, view.ventRadius, view.ventSpeed)
+        layerClock -= DX / 2
+      } // one particle layer per spacing of outflow
     }
     sky.update()
     // The terrain's aerial perspective (when its material has one) follows the sky's sun and horizon colour.
@@ -128,10 +180,18 @@ async function sandbox() {
     lava.setEnvironment(scene.environment)
     lighting.fromScene(scene)
     lava.uniforms.environmentIntensity.value = scene.environmentIntensity
-    renderer.compute([...lava.prepare(step), ...haze.prepare(renderer, step, camera), ...sparks.prepare(renderer, step, camera)])
+    renderer.compute([
+      ...lava.prepare(step),
+      ...haze.prepare(renderer, step, camera),
+      ...sparks.prepare(renderer, step, camera)
+    ])
     lava.render(renderer, camera)
     pipeline.render()
-    if (!reading && mpm.time > 0.5 && now - lastRead > 1500) { lastRead = now; reading = true; void measure().finally(() => (reading = false)) }
+    if (!reading && mpm.time > 0.5 && now - lastRead > 1500) {
+      lastRead = now
+      reading = true
+      void measure().finally(() => (reading = false))
+    }
     hud.textContent = status(fps, `${view.preset}${view.night ? ' · night' : ''}`)
   })
 }

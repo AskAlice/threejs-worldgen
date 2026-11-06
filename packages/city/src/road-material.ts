@@ -21,7 +21,7 @@ export interface RoadMarkings {
 export const ROAD_MARKINGS: Record<RoadType, RoadMarkings> = {
   primary: { lanes: 2, centreLine: 'double', laneLines: true, edgeLines: true },
   secondary: { lanes: 1, centreLine: 'dashed', laneLines: false, edgeLines: true },
-  minor: { lanes: 1, centreLine: 'none', laneLines: false, edgeLines: false },
+  minor: { lanes: 1, centreLine: 'none', laneLines: false, edgeLines: false }
 }
 
 /** The city's {@link RoadLookOptions} as a threejs-props {@link RoadSurface} look. Marking styles come per road class. */
@@ -38,8 +38,8 @@ export function roadSurfaceLook(look: RoadLookOptions): RoadSurfaceInput {
       curb: look.kerb,
       concrete: look.concrete,
       marking: look.marking,
-      centreLine: look.centerLine,
-    },
+      centreLine: look.centerLine
+    }
   }
 }
 
@@ -70,6 +70,6 @@ export function createRoadMaterial(u: CityUniforms, look: RoadLookOptions): Road
     centreLine: perClass(r.y, (m) => CENTRE_LINES.indexOf(m.centreLine)),
     laneLines: perClass(r.y, (m) => (m.laneLines ? 1 : 0)),
     edgeLines: perClass(r.y, (m) => (m.edgeLines ? 1 : 0)),
-    states: { wetness: w.x, snow: w.y, burn: w.z, damage: w.w },
+    states: { wetness: w.x, snow: w.y, burn: w.z, damage: w.w }
   })
 }

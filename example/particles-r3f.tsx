@@ -2,7 +2,14 @@ import * as THREE from 'three/webgpu'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { ParticleGrid, ParticleLighting, Particles, merge, type ParticleGridImpl, type ParticleSystemImpl } from 'threejs-particles/react'
+import {
+  ParticleGrid,
+  ParticleLighting,
+  Particles,
+  merge,
+  type ParticleGridImpl,
+  type ParticleSystemImpl
+} from 'threejs-particles/react'
 import { panels } from './particles.panel'
 import { Backdrop, Post, View, mount, useHud, useSpec } from './r3f-shared'
 
@@ -19,26 +26,51 @@ type Ref<T> = { current: T | null }
  * The fire's splats into the grid (P2G): heat from the flames, density from the smoke. Inside `<ParticleGrid>` after
  * the systems, so it runs after they update and before the grid resolves (`splat` builds each pass once).
  */
-function Splats({ flames, smoke, grid }: { flames: Ref<ParticleSystemImpl>; smoke: Ref<ParticleSystemImpl>; grid: Ref<ParticleGridImpl> }) {
+function Splats({
+  flames,
+  smoke,
+  grid
+}: {
+  flames: Ref<ParticleSystemImpl>
+  smoke: Ref<ParticleSystemImpl>
+  grid: Ref<ParticleGridImpl>
+}) {
   const gl = useThree((s) => s.gl) as unknown as THREE.WebGPURenderer
   useFrame(() => {
-    const f = flames.current, s = smoke.current, g = grid.current
+    const f = flames.current,
+      s = smoke.current,
+      g = grid.current
     if (!f || !s || !g) return
     const cell = g.cellSize()
     gl.compute([
       g.splat(f, 0, (p) => p.temperature.sub(400).max(0).div(1200).mul(0.02)), // heat per second
-      g.splat(s, 1, (p) => p.size.mul(p.size).mul(p.size).mul(0.2 / (cell.x * cell.y * cell.z)).mul(p.t.oneMinus())),
+      g.splat(s, 1, (p) =>
+        p.size
+          .mul(p.size)
+          .mul(p.size)
+          .mul(0.2 / (cell.x * cell.y * cell.z))
+          .mul(p.t.oneMinus())
+      )
     ])
   })
   return null
 }
 
 function Fire() {
-  const options = { flames: useSpec('flames', spec.flames), smoke: useSpec('smoke', spec.smoke), sparks: useSpec('sparks', spec.sparks) }
+  const options = {
+    flames: useSpec('flames', spec.flames),
+    smoke: useSpec('smoke', spec.smoke),
+    sparks: useSpec('sparks', spec.sparks)
+  }
   const grid = useSpec('grid', spec.grid)
   // The panel leaves the structural settings out: they come from the manifest's starting values.
   const props = (name: keyof typeof options) => merge(structuredClone(spec[name].target) as any, options[name])
-  const refs = { flames: useRef<ParticleSystemImpl>(null), smoke: useRef<ParticleSystemImpl>(null), sparks: useRef<ParticleSystemImpl>(null), grid: useRef<ParticleGridImpl>(null) }
+  const refs = {
+    flames: useRef<ParticleSystemImpl>(null),
+    smoke: useRef<ParticleSystemImpl>(null),
+    sparks: useRef<ParticleSystemImpl>(null),
+    grid: useRef<ParticleGridImpl>(null)
+  }
   const ref = (name: keyof typeof options, renderOrder: number) => (impl: ParticleSystemImpl | null) => {
     if (impl) impl.object.renderOrder = renderOrder
     refs[name].current = impl
@@ -51,7 +83,10 @@ function Fire() {
     fps.current = fps.current * 0.95 + (1 / Math.max(1e-3, dt)) * 0.05
   })
   useEffect(() => void Object.assign(window, refs), []) // for the console (flames.current, …)
-  useHud(() => `threejs-particles · <Particles> × 3 + <ParticleGrid>\n${fps.current.toFixed(0)} fps · ${[refs.flames, refs.smoke, refs.sparks].reduce((n, r) => n + (r.current?.capacity ?? 0), 0)} particle slots`)
+  useHud(
+    () =>
+      `threejs-particles · <Particles> × 3 + <ParticleGrid>\n${fps.current.toFixed(0)} fps · ${[refs.flames, refs.smoke, refs.sparks].reduce((n, r) => n + (r.current?.capacity ?? 0), 0)} particle slots`
+  )
   return (
     <>
       <Particles ref={ref('flames', 2)} {...props('flames')} lighting={lighting} />

@@ -86,7 +86,7 @@ export const DEFAULT_HYDROLOGY: HydrologyOptions = {
   bankFalloff: 1.5,
   minLakeArea: 400,
   minLakeDepth: 0.3,
-  smoothing: 2,
+  smoothing: 2
 }
 
 /** A river polyline, from source (or confluence, or lake outlet) downstream to a confluence, lake, sea or map edge. */
@@ -143,7 +143,8 @@ export function sampleGrid(height: (x: number, z: number) => number, region: Hyd
   const cols = Math.max(2, Math.floor(region.width / cs) + 1)
   const rows = Math.max(2, Math.floor(region.depth / cs) + 1)
   const heights = new Float64Array(cols * rows)
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) heights[r * cols + c] = height(region.x + c * cs, region.z + r * cs)
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) heights[r * cols + c] = height(region.x + c * cs, region.z + r * cs)
   return { cols, rows, cellSize: cs, x0: region.x, z0: region.z, heights }
 }
 
@@ -157,15 +158,23 @@ const DIST = [1, Math.SQRT2, 1, Math.SQRT2, 1, Math.SQRT2, 1, Math.SQRT2]
  * `epsilon > 0` filled flats also get a tiny gradient (Priority-Flood+ε), so every cell has a strictly
  * lower neighbour and flow routing never gets stuck.
  */
-export function fillDepressions(heights: ArrayLike<number>, cols: number, rows: number, epsilon = 0, seaLevel = -Infinity): Float64Array {
+export function fillDepressions(
+  heights: ArrayLike<number>,
+  cols: number,
+  rows: number,
+  epsilon = 0,
+  seaLevel = -Infinity
+): Float64Array {
   const n = cols * rows
   const filled = Float64Array.from(heights)
   const closed = new Uint8Array(n)
   const open = new MinHeap(n)
   const pit = new Int32Array(n)
-  let pitHead = 0, pitTail = 0
+  let pitHead = 0,
+    pitTail = 0
   for (let i = 0; i < n; i++) {
-    const c = i % cols, r = (i / cols) | 0
+    const c = i % cols,
+      r = (i / cols) | 0
     if (c === 0 || r === 0 || c === cols - 1 || r === rows - 1 || filled[i] <= seaLevel) {
       closed[i] = 1
       open.push(filled[i], i)
@@ -173,9 +182,11 @@ export function fillDepressions(heights: ArrayLike<number>, cols: number, rows: 
   }
   while (pitHead < pitTail || open.size) {
     const i = pitHead < pitTail ? pit[pitHead++] : open.pop()
-    const c = i % cols, r = (i / cols) | 0
+    const c = i % cols,
+      r = (i / cols) | 0
     for (let d = 0; d < 8; d++) {
-      const nc = c + DC[d], nr = r + DR[d]
+      const nc = c + DC[d],
+        nr = r + DR[d]
       if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
       const j = nr * cols + nc
       if (closed[j]) continue
@@ -195,19 +206,30 @@ export function fillDepressions(heights: ArrayLike<number>, cols: number, rows: 
  * D8 flow routing: each cell drains to its steepest strictly-lower neighbour, or is an outlet (−1).
  * Sea cells (at or below `seaLevel` in the unfilled `heights`) are always outlets.
  */
-export function flowReceivers(filled: ArrayLike<number>, cols: number, rows: number, heights: ArrayLike<number> = filled, seaLevel = -Infinity): Int32Array {
+export function flowReceivers(
+  filled: ArrayLike<number>,
+  cols: number,
+  rows: number,
+  heights: ArrayLike<number> = filled,
+  seaLevel = -Infinity
+): Int32Array {
   const receivers = new Int32Array(cols * rows).fill(-1)
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c
       if (heights[i] <= seaLevel) continue
-      let best = -1, steepest = 0
+      let best = -1,
+        steepest = 0
       for (let d = 0; d < 8; d++) {
-        const nc = c + DC[d], nr = r + DR[d]
+        const nc = c + DC[d],
+          nr = r + DR[d]
         if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
         const j = nr * cols + nc
         const slope = (filled[i] - filled[j]) / DIST[d]
-        if (slope > steepest) { steepest = slope; best = j }
+        if (slope > steepest) {
+          steepest = slope
+          best = j
+        }
       }
       receivers[i] = best
     }
@@ -219,12 +241,16 @@ export function flowReceivers(filled: ArrayLike<number>, cols: number, rows: num
  * Flow accumulation: each cell's own `cellArea` plus everything upstream of it. Also returns the
  * cells in upstream-to-downstream order (a topological order of the drainage tree).
  */
-export function flowAccumulation(receivers: Int32Array, cellArea = 1): { accumulation: Float64Array; order: Int32Array } {
+export function flowAccumulation(
+  receivers: Int32Array,
+  cellArea = 1
+): { accumulation: Float64Array; order: Int32Array } {
   const n = receivers.length
   const inflow = new Int32Array(n)
   for (let i = 0; i < n; i++) if (receivers[i] >= 0) inflow[receivers[i]]++
   const order = new Int32Array(n)
-  let head = 0, tail = 0
+  let head = 0,
+    tail = 0
   for (let i = 0; i < n; i++) if (inflow[i] === 0) order[tail++] = i
   const acc = new Float64Array(n).fill(cellArea)
   while (head < tail) {
@@ -260,27 +286,40 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
     members.length = 0
     stack.push(s)
     lakeIndex[s] = -2
-    let maxDepth = 0, top = -Infinity
-    let c0 = cols, r0 = rows, c1 = 0, r1 = 0
+    let maxDepth = 0,
+      top = -Infinity
+    let c0 = cols,
+      r0 = rows,
+      c1 = 0,
+      r1 = 0
     while (stack.length) {
       const i = stack.pop()!
       members.push(i)
-      const c = i % cols, r = (i / cols) | 0
+      const c = i % cols,
+        r = (i / cols) | 0
       maxDepth = Math.max(maxDepth, level[i] - heights[i])
       top = Math.max(top, level[i])
-      c0 = Math.min(c0, c); r0 = Math.min(r0, r); c1 = Math.max(c1, c); r1 = Math.max(r1, r)
+      c0 = Math.min(c0, c)
+      r0 = Math.min(r0, r)
+      c1 = Math.max(c1, c)
+      r1 = Math.max(r1, r)
       for (let d = 0; d < 8; d++) {
-        const nc = c + DC[d], nr = r + DR[d]
+        const nc = c + DC[d],
+          nr = r + DR[d]
         if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
         const j = nr * cols + nc
-        if (lakeIndex[j] === -1 && level[j] - heights[j] > tol) { lakeIndex[j] = -2; stack.push(j) }
+        if (lakeIndex[j] === -1 && level[j] - heights[j] > tol) {
+          lakeIndex[j] = -2
+          stack.push(j)
+        }
       }
     }
     const keep = members.length * cellArea >= o.minLakeArea && maxDepth >= o.minLakeDepth
     const id = keep ? lakes.length : -3 // -3: visited, too small
     for (const i of members) lakeIndex[i] = id
     if (!keep) continue
-    const bw = c1 - c0 + 1, bh = r1 - r0 + 1
+    const bw = c1 - c0 + 1,
+      bh = r1 - r0 + 1
     const mask = new Uint8Array(bw * bh)
     for (const i of members) mask[(((i / cols) | 0) - r0) * bw + (i % cols) - c0] = 1
     lakes.push({ level: top, area: members.length * cellArea, maxDepth, bounds: [c0, r0, bw, bh], mask })
@@ -295,7 +334,7 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   for (let i = 0; i < n; i++) {
     if (accumulation[i] < o.riverArea || lakeIndex[i] >= 0 || heights[i] <= o.seaLevel) continue
     isRiver[i] = 1
-    const w = Math.min(o.maxWidth, Math.max(o.minWidth, o.widthFactor * Math.pow(accumulation[i] / 1e6, o.widthExponent)))
+    const w = Math.min(o.maxWidth, Math.max(o.minWidth, o.widthFactor * (accumulation[i] / 1e6) ** o.widthExponent))
     const depth = Math.max(o.minDepth, w * o.depthFactor)
     width[i] = w
     bed[i] = filled[i] - depth
@@ -304,7 +343,8 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   // Each river cell continues the upstream branch that drains the most; other branches end there (confluences).
   const mainParent = new Int32Array(n).fill(-1)
   for (let k = 0; k < n; k++) {
-    const i = order[k], j = receivers[i]
+    const i = order[k],
+      j = receivers[i]
     if (!isRiver[i] || j < 0 || !isRiver[j]) continue
     if (mainParent[j] < 0 || accumulation[i] > accumulation[mainParent[j]]) mainParent[j] = i
     bed[j] = Math.min(bed[j], bed[i])
@@ -314,7 +354,10 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   const rivers: RiverPath[] = []
   const point = (path: RiverPath, i: number, s: number, b: number, w: number) => {
     path.points.push([grid.x0 + (i % cols) * cs, grid.z0 + ((i / cols) | 0) * cs])
-    path.surface.push(s); path.bed.push(b); path.width.push(w); path.area.push(accumulation[i])
+    path.surface.push(s)
+    path.bed.push(b)
+    path.width.push(w)
+    path.area.push(accumulation[i])
   }
   // Walk down from every head (a river cell no river flows into) until a confluence, lake, the sea or an outlet.
   for (let i0 = 0; i0 < n; i0++) {
@@ -326,7 +369,10 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
       const j = receivers[i]
       if (j < 0) break
       if (isRiver[j]) {
-        if (mainParent[j] === i) { i = j; continue }
+        if (mainParent[j] === i) {
+          i = j
+          continue
+        }
         point(path, j, surface[j], bed[j], width[j]) // joins a bigger river
         break
       }
@@ -339,7 +385,11 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
 }
 
 /** Samples `height` over `region` and analyses it: the one-call version of {@link sampleGrid} + {@link analyzeHydrology}. */
-export function computeHydrology(height: (x: number, z: number) => number, region: HydrologyRegion, options: Partial<HydrologyOptions> = {}): HydrologyResult {
+export function computeHydrology(
+  height: (x: number, z: number) => number,
+  region: HydrologyRegion,
+  options: Partial<HydrologyOptions> = {}
+): HydrologyResult {
   return analyzeHydrology(sampleGrid(height, region), options)
 }
 
@@ -377,7 +427,12 @@ export function riverModifiers(result: HydrologyResult, frame?: ModifierFrame, c
 
 const _p: [number, number, number] = [0, 0, 0]
 /** Frame-local (x, z) and local height → modifier point [x, y, z, elevation] on the world's base surface. */
-function toModifierPoint(frame: ModifierFrame | undefined, x: number, z: number, y: number): [number, number, number, number] {
+function toModifierPoint(
+  frame: ModifierFrame | undefined,
+  x: number,
+  z: number,
+  y: number
+): [number, number, number, number] {
   const o = frame?.origin
   const R = o ? Math.hypot(o[0], o[1], o[2]) : 0
   if (!frame || R === 0) return [x, 0, z, y]
@@ -414,32 +469,50 @@ export function createWaterSample(): WaterSample {
  * Water at frame position (x, z) according to a hydrology result (nearest cell): lake level, or
  * river surface with a flow velocity downstream. Speeds follow `√slope` (1 m/s at a 1% slope).
  */
-export function hydrologyWaterAt(result: HydrologyResult, x: number, z: number, out: WaterSample = createWaterSample()): WaterSample {
+export function hydrologyWaterAt(
+  result: HydrologyResult,
+  x: number,
+  z: number,
+  out: WaterSample = createWaterSample()
+): WaterSample {
   const { cols, rows, cellSize: cs, x0, z0, heights } = result.grid
-  out.kind = 'none'; out.level = NaN; out.depth = 0; out.flowX = 0; out.flowZ = 0
-  const c = Math.round((x - x0) / cs), r = Math.round((z - z0) / cs)
+  out.kind = 'none'
+  out.level = NaN
+  out.depth = 0
+  out.flowX = 0
+  out.flowZ = 0
+  const c = Math.round((x - x0) / cs),
+    r = Math.round((z - z0) / cs)
   if (c < 0 || r < 0 || c >= cols || r >= rows) return out
   const i = r * cols + c
   const o = result.options
   const lake = result.lakeIndex[i]
   if (lake >= 0) {
     const l = result.lakes[lake].level
-    out.kind = 'lake'; out.level = l; out.depth = Math.max(0, l - heights[i])
+    out.kind = 'lake'
+    out.level = l
+    out.depth = Math.max(0, l - heights[i])
     return out
   }
   if (heights[i] <= o.seaLevel) {
-    out.kind = 'sea'; out.level = o.seaLevel; out.depth = o.seaLevel - heights[i]
+    out.kind = 'sea'
+    out.level = o.seaLevel
+    out.depth = o.seaLevel - heights[i]
     return out
   }
   if (result.accumulation[i] < o.riverArea) return out
-  const w = Math.min(o.maxWidth, Math.max(o.minWidth, o.widthFactor * Math.pow(result.accumulation[i] / 1e6, o.widthExponent)))
+  const w = Math.min(
+    o.maxWidth,
+    Math.max(o.minWidth, o.widthFactor * (result.accumulation[i] / 1e6) ** o.widthExponent)
+  )
   const depth = Math.max(o.minDepth, w * o.depthFactor)
   out.kind = 'river'
   out.level = result.filled[i] - depth * (1 - o.fill)
   out.depth = depth * o.fill
   const j = result.receivers[i]
   if (j >= 0) {
-    const dx = ((j % cols) - c) * cs, dz = (((j / cols) | 0) - r) * cs
+    const dx = ((j % cols) - c) * cs,
+      dz = (((j / cols) | 0) - r) * cs
     const dist = Math.hypot(dx, dz)
     const speed = Math.min(4, Math.max(0.1, Math.sqrt(Math.max(0, result.filled[i] - result.filled[j]) / dist / 0.01)))
     out.flowX = (dx / dist) * speed
@@ -458,7 +531,8 @@ function smoothPath(path: RiverPath, passes: number): RiverPath {
       const sx = prev[0] * 0.25 + cur[0] * 0.5 + next[0] * 0.25
       const sz = prev[1] * 0.25 + cur[1] * 0.5 + next[1] * 0.25
       prev = [cur[0], cur[1]]
-      cur[0] = sx; cur[1] = sz
+      cur[0] = sx
+      cur[1] = sz
     }
   }
   return path
@@ -479,30 +553,37 @@ class MinHeap {
   }
   push(key: number, item: number) {
     let i = this.size++
-    const k = this.keys, it = this.items
+    const k = this.keys,
+      it = this.items
     while (i > 0) {
       const parent = (i - 1) >> 1
       if (k[parent] <= key) break
-      k[i] = k[parent]; it[i] = it[parent]
+      k[i] = k[parent]
+      it[i] = it[parent]
       i = parent
     }
-    k[i] = key; it[i] = item
+    k[i] = key
+    it[i] = item
   }
   pop(): number {
-    const k = this.keys, it = this.items
+    const k = this.keys,
+      it = this.items
     const top = it[0]
     const n = --this.size
-    const key = k[n], item = it[n]
+    const key = k[n],
+      item = it[n]
     let i = 0
     while (true) {
       let c = 2 * i + 1
       if (c >= n) break
       if (c + 1 < n && k[c + 1] < k[c]) c++
       if (k[c] >= key) break
-      k[i] = k[c]; it[i] = it[c]
+      k[i] = k[c]
+      it[i] = it[c]
       i = c
     }
-    k[i] = key; it[i] = item
+    k[i] = key
+    it[i] = item
     return top
   }
 }

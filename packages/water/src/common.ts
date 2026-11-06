@@ -25,7 +25,10 @@ const _z = new Vector3()
  * All arithmetic is float64, so the float32 GPU only ever sees small numbers.
  */
 export function placeInFrame(object: Object3D, frame: LocalFrame, origin: readonly number[]): void {
-  const o = frame.origin, e = frame.east, u = frame.up, n = frame.north
+  const o = frame.origin,
+    e = frame.east,
+    u = frame.up,
+    n = frame.north
   object.position.set(o[0] - origin[0], o[1] - origin[1], o[2] - origin[2])
   _m.makeBasis(_x.set(e[0], e[1], e[2]), _y.set(u[0], u[1], u[2]), _z.set(-n[0], -n[1], -n[2]))
   object.quaternion.setFromRotationMatrix(_m)
@@ -33,9 +36,20 @@ export function placeInFrame(object: Object3D, frame: LocalFrame, origin: readon
 }
 
 /** World (planet-centred or flat-world) position → frame-local [x, y, z]. */
-export function worldToFrame(frame: LocalFrame, x: number, y: number, z: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
-  const o = frame.origin, e = frame.east, u = frame.up, n = frame.north
-  const dx = x - o[0], dy = y - o[1], dz = z - o[2]
+export function worldToFrame(
+  frame: LocalFrame,
+  x: number,
+  y: number,
+  z: number,
+  out: [number, number, number] = [0, 0, 0]
+): [number, number, number] {
+  const o = frame.origin,
+    e = frame.east,
+    u = frame.up,
+    n = frame.north
+  const dx = x - o[0],
+    dy = y - o[1],
+    dz = z - o[2]
   out[0] = dx * e[0] + dy * e[1] + dz * e[2]
   out[1] = dx * u[0] + dy * u[1] + dz * u[2]
   out[2] = -(dx * n[0] + dy * n[1] + dz * n[2])
@@ -67,7 +81,9 @@ export function hookScene(scene: Object3D, update: () => void): () => void {
     previous.apply(scene, args)
     update()
   }
-  return () => { scene.onBeforeRender = previous }
+  return () => {
+    scene.onBeforeRender = previous
+  }
 }
 
 /** Seconds since the previous call, clamped so a background tab doesn't jump the waves. */

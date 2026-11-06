@@ -24,7 +24,7 @@ const BRUSH: Record<BrushMode, { channel: 0 | 1; sign: 1 | -1 }> = {
   add: { channel: 0, sign: 1 },
   erase: { channel: 0, sign: -1 },
   raise: { channel: 1, sign: 1 },
-  lower: { channel: 1, sign: -1 },
+  lower: { channel: 1, sign: -1 }
 }
 
 /** A soft round brush used by {@link GrassMap.paint} and {@link TerrainPainter}. */
@@ -79,7 +79,10 @@ export class GrassMap {
    * Creates a map from an image (red = coverage, green = height, mid-grey = 1x), read as a top-down
    * view with its top edge towards −Z. Round-trips with {@link GrassMap.toDataURL}.
    */
-  static fromImage(image: CanvasImageSource & { width: number; height: number }, options: Omit<GrassMapOptions, 'coverage' | 'height'> = {}): GrassMap {
+  static fromImage(
+    image: CanvasImageSource & { width: number; height: number },
+    options: Omit<GrassMapOptions, 'coverage' | 'height'> = {}
+  ): GrassMap {
     return new GrassMap(options).load(image)
   }
 
@@ -141,7 +144,9 @@ export class GrassMap {
   toCanvas(): HTMLCanvasElement {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = this.resolution
-    canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(this.data), this.resolution, this.resolution), 0, 0)
+    canvas
+      .getContext('2d')!
+      .putImageData(new ImageData(new Uint8ClampedArray(this.data), this.resolution, this.resolution), 0, 0)
     return canvas
   }
 
@@ -197,7 +202,7 @@ export class TerrainPainter {
     this.brush = { mode: 'erase', radius: 3, strength: 0.25, ...brush }
     this.cursor = new Mesh(
       new RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
-      new MeshBasicNodeMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false }),
+      new MeshBasicNodeMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false })
     )
     this.cursor.renderOrder = 999
     this.cursor.visible = false

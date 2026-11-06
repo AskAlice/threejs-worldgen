@@ -70,7 +70,13 @@ export function frameDirection(i: number, j: number, frames: number, hemisphere:
 }
 
 /** The frame `(i, j)` whose baked direction is closest to `(x, y, z)` in octahedral space. */
-export function directionToFrame(x: number, y: number, z: number, frames: number, hemisphere: boolean): [i: number, j: number] {
+export function directionToFrame(
+  x: number,
+  y: number,
+  z: number,
+  frames: number,
+  hemisphere: boolean
+): [i: number, j: number] {
   const n = Math.max(2, frames) - 1
   const [u, v] = octEncode(x, y, z, hemisphere)
   const clamp = (t: number) => Math.min(n, Math.max(0, Math.round(t * n)))

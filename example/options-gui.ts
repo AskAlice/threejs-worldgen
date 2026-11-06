@@ -1,4 +1,4 @@
-import GUI from 'three/addons/libs/lil-gui.module.min.js'
+import type GUI from 'three/addons/libs/lil-gui.module.min.js'
 
 /** Slider ranges by option name (anything else gets a range from its default value). */
 export type Ranges = Record<string, [min: number, max: number, step?: number]>
@@ -12,13 +12,26 @@ export type Choices = Record<string, readonly string[]>
  * names (skipped at any depth) or dotted paths. With `arrays`, non-empty arrays become folders too (their elements
  * use the array's name for ranges and choices), and a change inside one reports the array's path and a copy of it.
  */
-export function addOptions(gui: GUI, target: Record<string, any>, onChange: (path: string[], value: unknown) => void, opts: { ranges?: Ranges; choices?: Choices; skip?: string[]; path?: string[]; closed?: boolean; arrays?: boolean; name?: string } = {}) {
+export function addOptions(
+  gui: GUI,
+  target: Record<string, any>,
+  onChange: (path: string[], value: unknown) => void,
+  opts: {
+    ranges?: Ranges
+    choices?: Choices
+    skip?: string[]
+    path?: string[]
+    closed?: boolean
+    arrays?: boolean
+    name?: string
+  } = {}
+) {
   const { ranges = {}, choices = {}, skip = [], path = [] } = opts
   for (const [key, value] of Object.entries(target)) {
     const p = [...path, key]
     if (skip.includes(key) || skip.includes(p.join('.'))) continue
     const notify = (v: unknown) => onChange(p, v)
-    const name = Array.isArray(target) ? opts.name ?? key : key
+    const name = Array.isArray(target) ? (opts.name ?? key) : key
     if (value && typeof value === 'object' && (!Array.isArray(value) || (opts.arrays && value.length > 0))) {
       const folder = gui.addFolder(key)
       const sub = Array.isArray(value) ? () => onChange(p, structuredClone(value)) : onChange

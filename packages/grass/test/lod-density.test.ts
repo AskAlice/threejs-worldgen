@@ -23,7 +23,7 @@ test('lod density: CPU densityAt matches the shader curve at every LOD distance 
     { distance: 5, density: 0.9, segments: 5 },
     { distance: 18, density: 0.4, segments: 3 },
     { distance: 41, density: 0.12, segments: 2 },
-    { distance: 90, density: 0.02, segments: 1 },
+    { distance: 90, density: 0.02, segments: 1 }
   ]
   const d: Vec4 = [5, 18, 41, 90]
   const k: Vec4 = [0.9, 0.4, 0.12, 0.02]
@@ -59,9 +59,11 @@ test('lod density: documented default LODs also follow the formula (the preset v
 test('lod density: material.ts still implements the pinned four-level curve', () => {
   // A text pin: the CPU values alone cannot catch the shader drifting away from this formula.
   // shortcut: pins source text, not evaluated behaviour; upgrade if the shader becomes runnable headless.
-  const src = readFileSync(new URL('../src/material.ts', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  const squash = (s: string) => s.replace(/\s+/g, '')
+  const src = squash(readFileSync(new URL('../src/material.ts', import.meta.url), 'utf8'))
   for (const line of [
     'const seg = (a: any, b: any) => dist.sub(a).div(max(b.sub(a), 1e-3)).clamp(0, 1)',
-    'const density = mix(mix(mix(k.x, k.y, seg(d.x, d.y)), k.z, seg(d.y, d.z)), k.w, seg(d.z, d.w))',
-  ]) assert.ok(src.includes(line.replace(/\s+/g, ' ')), `material.ts lost: ${line}`)
+    'const density = mix(mix(mix(k.x, k.y, seg(d.x, d.y)), k.z, seg(d.y, d.z)), k.w, seg(d.z, d.w))'
+  ])
+    assert.ok(src.includes(squash(line)), `material.ts lost: ${line}`)
 })

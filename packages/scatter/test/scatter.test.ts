@@ -1,8 +1,27 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BoxGeometry, InstancedMesh, Mesh, MeshBasicNodeMaterial, MeshStandardNodeMaterial, PerspectiveCamera, type InstancedBufferGeometry, type Renderer } from 'three/webgpu'
 import {
-  INSTANCE_STRIDE, Scatter, bakeImpostor, directionToFrame, frameDirection, octDecode, octEncode, placeTile, poissonDisk, resolveLayer, selectLod,
+  BoxGeometry,
+  type InstancedMesh,
+  Mesh,
+  MeshBasicNodeMaterial,
+  MeshStandardNodeMaterial,
+  PerspectiveCamera,
+  type InstancedBufferGeometry,
+  type Renderer
+} from 'three/webgpu'
+import {
+  INSTANCE_STRIDE,
+  Scatter,
+  bakeImpostor,
+  directionToFrame,
+  frameDirection,
+  octDecode,
+  octEncode,
+  placeTile,
+  poissonDisk,
+  resolveLayer,
+  selectLod
 } from '../src/index.ts'
 
 function minDistance(points: Float32Array | number[], stride = 3) {
@@ -25,7 +44,12 @@ function triples(points: Float32Array) {
 test('poisson disk: spacing holds within and across tiles, and tiles stitch exactly', () => {
   const spacing = 3
   const size = 20
-  const tiles = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => poissonDisk(i * size, j * size, size, spacing, 42))
+  const tiles = [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1]
+  ].map(([i, j]) => poissonDisk(i * size, j * size, size, spacing, 42))
   const union = tiles.flatMap((t) => [...t])
   assert.ok(union.length / 3 > 50, 'enough points')
   assert.ok(minDistance(union) >= spacing - 1e-3, `min distance ${minDistance(union)}`)
@@ -86,7 +110,14 @@ test('placement: scale range, sink, clustering and alignment', () => {
     assert.ok(Math.abs(d[o + 13] - 9.5) < 1e-5)
   }
   const even = placeTile([layer('c')], 0, 0, 200, 1, flat)[0].length
-  const clumped = placeTile([layer('c', { cluster: { scale: 40, threshold: 0.5, strength: 1 } })], 0, 0, 200, 1, flat)[0].length
+  const clumped = placeTile(
+    [layer('c', { cluster: { scale: 40, threshold: 0.5, strength: 1 } })],
+    0,
+    0,
+    200,
+    1,
+    flat
+  )[0].length
   assert.ok(clumped < even * 0.75 && clumped > even * 0.2, `clumped ${clumped / even}`)
 
   // align = 1 on a 45° slope tilts the instance's up axis onto the terrain normal.
@@ -121,7 +152,7 @@ test('octahedral mapping: round trips and frame lookup', () => {
   for (const hemisphere of [true, false]) {
     for (let k = 0; k < 200; k++) {
       const theta = (k * 2.399) % (Math.PI * 2)
-      const y = hemisphere ? (k % 50) / 50 : ((k % 50) / 25) - 1
+      const y = hemisphere ? (k % 50) / 50 : (k % 50) / 25 - 1
       const r = Math.sqrt(1 - y * y)
       const dir = [Math.cos(theta) * r, y, Math.sin(theta) * r]
       const [u, v] = octEncode(dir[0], dir[1], dir[2], hemisphere)
@@ -141,7 +172,11 @@ test('octahedral mapping: round trips and frame lookup', () => {
       }
     }
   }
-  assert.deepEqual(octDecode(0.5, 0.5, true).map((v) => Math.round(v * 1e9) / 1e9), [0, 1, 0], 'centre of the hemi map looks straight down')
+  assert.deepEqual(
+    octDecode(0.5, 0.5, true).map((v) => Math.round(v * 1e9) / 1e9),
+    [0, 1, 0],
+    'centre of the hemi map looks straight down'
+  )
   assert.ok(Math.abs(frameDirection(0, 0, 8, true)[1]) < 1e-9, 'corner frames sit on the horizon')
 })
 
@@ -154,7 +189,17 @@ test('Scatter streams tiles around the camera, pools by LOD and answers queries'
   const scatter = Scatter.create({
     camera,
     tileSize: 20,
-    layers: [{ name: 'box', spacing: 4, lods: [{ distance: 20, geometry, material }, { distance: 60, geometry, material }], colorVariation: 0.2 }],
+    layers: [
+      {
+        name: 'box',
+        spacing: 4,
+        lods: [
+          { distance: 20, geometry, material },
+          { distance: 60, geometry, material }
+        ],
+        colorVariation: 0.2
+      }
+    ]
   })
   assert.ok(scatter.stats.tiles > 0)
   assert.ok(scatter.stats.visible > 0 && scatter.stats.visible <= scatter.stats.instances)
@@ -167,14 +212,25 @@ test('Scatter streams tiles around the camera, pools by LOD and answers queries'
   const tints = Array.from({ length: meshes[0].count }, (_, n) => params[n * 4 + 1])
   assert.ok(tints.every((t) => t >= 0.8 && t <= 1.2) && new Set(tints).size > 1, 'per-instance tint reaches the GPU')
   for (const mesh of meshes) assert.equal(mesh.instanceColor, null, 'no instanceColor')
-  assert.equal(meshes[0].geometry.getAttribute('position'), geometry.getAttribute('position'), 'pools share the level geometry buffers')
+  assert.equal(
+    meshes[0].geometry.getAttribute('position'),
+    geometry.getAttribute('position'),
+    'pools share the level geometry buffers'
+  )
   assert.ok(meshes[0].count > 0 && meshes[1].count > meshes[0].count)
 
   const near = scatter.query(0, 0, 30)
   assert.ok(near.length > 0 && near.every((i) => Math.hypot(i.x, i.z) <= 30 && i.layer === 'box'))
   // Far away (not streamed in) gives the same answer as a fresh scatter would.
   const far = scatter.query(5000, 5000, 15)
-  assert.deepEqual(far, Scatter.create({ camera, tileSize: 20, layers: [{ name: 'box', spacing: 4, lods: [{ distance: 60, geometry, material }] }] }).query(5000, 5000, 15))
+  assert.deepEqual(
+    far,
+    Scatter.create({
+      camera,
+      tileSize: 20,
+      layers: [{ name: 'box', spacing: 4, lods: [{ distance: 60, geometry, material }] }]
+    }).query(5000, 5000, 15)
+  )
 
   camera.position.set(1000, 2, 0)
   camera.updateMatrixWorld()
@@ -195,19 +251,27 @@ test('impostor far level: one pooled mesh with the baked geometry, per-instance 
   camera.updateMatrixWorld()
   const far = new MeshBasicNodeMaterial()
   const scatter = Scatter.create({
-    camera, tileSize: 20,
-    layers: [{
-      name: 'box', spacing: 4, colorVariation: 0.2,
-      lods: [{ distance: 20, geometry: new BoxGeometry(), material: new MeshBasicNodeMaterial() }],
-      // What `bakeImpostor` returns: its quad, its baked material and its draw distance.
-      impostor: { distance: 60, geometry: new BoxGeometry(), material: far, castShadow: false },
-    }],
+    camera,
+    tileSize: 20,
+    layers: [
+      {
+        name: 'box',
+        spacing: 4,
+        colorVariation: 0.2,
+        lods: [{ distance: 20, geometry: new BoxGeometry(), material: new MeshBasicNodeMaterial() }],
+        // What `bakeImpostor` returns: its quad, its baked material and its draw distance.
+        impostor: { distance: 60, geometry: new BoxGeometry(), material: far, castShadow: false }
+      }
+    ]
   })
   const meshes = scatter.object.children as Mesh[]
   assert.equal(meshes.length, 2, 'one pooled mesh per level, impostor included: no draw call per instance')
   const impostor = meshes.find((m) => m.name === 'box:impostor')!
   assert.ok(impostor, 'the far level is drawn')
-  assert.ok(!(impostor as unknown as InstancedMesh).isInstancedMesh, 'one mesh over an InstancedBufferGeometry, not one per instance')
+  assert.ok(
+    !(impostor as unknown as InstancedMesh).isInstancedMesh,
+    'one mesh over an InstancedBufferGeometry, not one per instance'
+  )
   assert.equal(impostor.material, far, 'draws with the material weather is re-shaded onto')
   assert.equal(impostor.castShadow, false)
 
@@ -218,10 +282,16 @@ test('impostor far level: one pooled mesh with the baked geometry, per-instance 
   const pos = geometry.getAttribute('scatterPosition').array
   const par = geometry.getAttribute('scatterParams').array
   const range = (a: ArrayLike<number>, c: number, k: number) => Array.from({ length: c }, (_, n) => a[n * 4 + k])
-  assert.ok(range(pos, count, 3).every((s) => s > 0), 'scale in scatterPosition.w (baked bounds are unit)')
+  assert.ok(
+    range(pos, count, 3).every((s) => s > 0),
+    'scale in scatterPosition.w (baked bounds are unit)'
+  )
   const tints = range(par, count, 1)
   assert.ok(tints.every((t) => t >= 0.8 && t <= 1.2) && new Set(tints).size > 1, 'per-instance tint in scatterParams.y')
-  assert.ok(range(par, count, 2).every((r) => r > 0 && r < 1), 'per-instance random in scatterParams.z (weather variation)')
+  assert.ok(
+    range(par, count, 2).every((r) => r > 0 && r < 1),
+    'per-instance random in scatterParams.z (weather variation)'
+  )
   scatter.dispose()
 })
 
@@ -231,7 +301,11 @@ test('multi-material levels pool as single-material meshes sharing instance buff
   camera.updateMatrixWorld()
   const geometry = new BoxGeometry() // 6 groups, material indices 0..5
   const materials = Array.from({ length: 6 }, () => new MeshBasicNodeMaterial())
-  const scatter = Scatter.create({ camera, tileSize: 20, layers: [{ name: 'box', spacing: 4, lods: [{ distance: 40, geometry, material: materials }], colorVariation: 0.2 }] })
+  const scatter = Scatter.create({
+    camera,
+    tileSize: 20,
+    layers: [{ name: 'box', spacing: 4, lods: [{ distance: 40, geometry, material: materials }], colorVariation: 0.2 }]
+  })
   const meshes = scatter.object.children as InstancedMesh[]
   assert.equal(meshes.length, 6, 'one mesh per material group')
   assert.equal(scatter.stats.meshes, 6)
@@ -239,10 +313,17 @@ test('multi-material levels pool as single-material meshes sharing instance buff
     assert.ok(!Array.isArray(mesh.material), 'never a material array')
     assert.equal(mesh.material, materials[geometry.groups[k].materialIndex!])
     assert.equal(mesh.geometry.groups.length, 0)
-    assert.deepEqual([mesh.geometry.drawRange.start, mesh.geometry.drawRange.count], [geometry.groups[k].start, geometry.groups[k].count])
+    assert.deepEqual(
+      [mesh.geometry.drawRange.start, mesh.geometry.drawRange.count],
+      [geometry.groups[k].start, geometry.groups[k].count]
+    )
     assert.equal(mesh.instanceMatrix, meshes[0].instanceMatrix, 'matrices shared')
     assert.equal(mesh.instanceColor, null, 'tint in the shared scatterParams, not instanceColor')
-    assert.equal(mesh.geometry.getAttribute('scatterParams'), meshes[0].geometry.getAttribute('scatterParams'), 'params shared')
+    assert.equal(
+      mesh.geometry.getAttribute('scatterParams'),
+      meshes[0].geometry.getAttribute('scatterParams'),
+      'params shared'
+    )
     assert.ok(mesh.count > 0 && mesh.count === meshes[0].count)
   }
   scatter.dispose()
@@ -259,11 +340,12 @@ test('bakeImpostor: the surface carries normal, roughness and mask, and the mate
     setClearColor() {},
     clear() {},
     compileAsync: async () => {},
-    render() {},
+    render() {}
   } as unknown as Renderer
   const source = new MeshStandardNodeMaterial({ roughness: 0.4 })
   const impostor = await bakeImpostor(renderer, new Mesh(new BoxGeometry(), source), { size: 64, frames: 4 })
-  for (const k of ['color', 'alpha', 'normal', 'roughness', 'mask'] as const) assert.ok(impostor.surface[k], `surface.${k}`)
+  for (const k of ['color', 'alpha', 'normal', 'roughness', 'mask'] as const)
+    assert.ok(impostor.surface[k], `surface.${k}`)
   // The baked roughness (the source material's) lights the impostor, instead of one constant for every material.
   assert.equal(impostor.material.roughnessNode, impostor.surface.roughness)
   impostor.dispose()

@@ -11,9 +11,21 @@ export const panels: PanelSpec = {
     Population: {
       defaults: DEFAULT_POPULATION,
       arrays: true,
-      skip: { location: 'null = the world\'s own frame (this is a flat world); planets take a [lat, lon]' },
+      skip: { location: "null = the world's own frame (this is a flat world); planets take a [lat, lon]" },
       choices: { avoid: Object.keys(DEFAULT_POPULATION.habitability.fertility) },
-      ranges: { seed: [0, 1000, 1], ruralShare: unit, zipf: [0.5, 2, 0.01], levels: [1, 4, 1], jitter: unit, hamletChance: unit, farmsteadChance: unit, water: unit, center: [-20000, 20000, 1], neighbours: [1, 12, 1], smoothing: [0, 8, 1] },
+      ranges: {
+        seed: [0, 1000, 1],
+        ruralShare: unit,
+        zipf: [0.5, 2, 0.01],
+        levels: [1, 4, 1],
+        jitter: unit,
+        hamletChance: unit,
+        farmsteadChance: unit,
+        water: unit,
+        center: [-20000, 20000, 1],
+        neighbours: [1, 12, 1],
+        smoothing: [0, 8, 1]
+      }
     },
     PopulationOverlay: {
       defaults: DEFAULT_OVERLAY,
@@ -22,21 +34,29 @@ export const panels: PanelSpec = {
       target: { ...DEFAULT_OVERLAY, resolution: -1 },
       skip: { origin: 'floating origin; this sandbox renders at world zero' },
       choices: { mode: modes },
-      ranges: { resolution: [-1, 10, 1], coarsest: [0, 6, 1], opacity: unit, gap: [0, 0.5, 0.01], densityRamp: unit, lightRamp: unit, habitabilityRamp: unit },
+      ranges: {
+        resolution: [-1, 10, 1],
+        coarsest: [0, 6, 1],
+        opacity: unit,
+        gap: [0, 0.5, 0.01],
+        densityRamp: unit,
+        lightRamp: unit,
+        habitabilityRamp: unit
+      }
     },
     renderPopulationMap: {
       defaults: DEFAULT_POPULATION_MAP,
       // hexResolution: −1 = the data's own.
       target: { mode: 'density', hexResolution: -1, settlements: true, networks: true },
       skip: {
-        center: 'the map shows the population\'s whole region, over a world map of the same area',
-        size: 'the map shows the population\'s whole region, over a world map of the same area',
-        resolution: 'fixed by the 256 px map canvas',
+        center: "the map shows the population's whole region, over a world map of the same area",
+        size: "the map shows the population's whole region, over a world map of the same area",
+        resolution: 'fixed by the 256 px map canvas'
       },
       choices: { mode: modes },
-      ranges: { hexResolution: [-1, 10, 1] },
-    },
-  },
+      ranges: { hexResolution: [-1, 10, 1] }
+    }
+  }
 }
 
 /** The classes population-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */

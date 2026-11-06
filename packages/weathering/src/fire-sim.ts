@@ -1,5 +1,19 @@
-import { createSample, hash01, seedOf, type DeepPartial, type LocalFrame, type World, type WorldSample } from 'threejs-biomes'
-import { createWeatherSample, type ClimatePoint, type SurfaceSample, type Weather, type WeatherSample } from './weather.ts'
+import {
+  createSample,
+  hash01,
+  seedOf,
+  type DeepPartial,
+  type LocalFrame,
+  type World,
+  type WorldSample
+} from 'threejs-biomes'
+import {
+  createWeatherSample,
+  type ClimatePoint,
+  type SurfaceSample,
+  type Weather,
+  type WeatherSample
+} from './weather.ts'
 import { merge, resolve } from 'threejs-heightfield'
 
 /** Fuel classes. Each burns, spreads and regrows at its own pace. */
@@ -15,16 +29,33 @@ export interface FuelModel {
 
 /** Fuel per species name of the biome scatter tables (`threejs-biomes` `ScatterEntry.species`). */
 export const DEFAULT_FUEL_MODELS: Record<string, FuelModel> = {
-  oak: { kind: 'tree', biomass: 180 }, beech: { kind: 'tree', biomass: 160 }, maple: { kind: 'tree', biomass: 150 },
-  redwood: { kind: 'tree', biomass: 400 }, fir: { kind: 'tree', biomass: 220 }, spruce: { kind: 'tree', biomass: 200 },
-  pine: { kind: 'tree', biomass: 220 }, birch: { kind: 'tree', biomass: 100 }, palm: { kind: 'tree', biomass: 80 },
-  acacia: { kind: 'tree', biomass: 90 }, baobab: { kind: 'tree', biomass: 300 }, jungleEmergent: { kind: 'tree', biomass: 350 },
-  olive: { kind: 'tree', biomass: 70 }, cypress: { kind: 'tree', biomass: 120 }, mangrove: { kind: 'tree', biomass: 90 },
+  oak: { kind: 'tree', biomass: 180 },
+  beech: { kind: 'tree', biomass: 160 },
+  maple: { kind: 'tree', biomass: 150 },
+  redwood: { kind: 'tree', biomass: 400 },
+  fir: { kind: 'tree', biomass: 220 },
+  spruce: { kind: 'tree', biomass: 200 },
+  pine: { kind: 'tree', biomass: 220 },
+  birch: { kind: 'tree', biomass: 100 },
+  palm: { kind: 'tree', biomass: 80 },
+  acacia: { kind: 'tree', biomass: 90 },
+  baobab: { kind: 'tree', biomass: 300 },
+  jungleEmergent: { kind: 'tree', biomass: 350 },
+  olive: { kind: 'tree', biomass: 70 },
+  cypress: { kind: 'tree', biomass: 120 },
+  mangrove: { kind: 'tree', biomass: 90 },
   deadSnag: { kind: 'tree', biomass: 60 },
-  shrub: { kind: 'shrub', biomass: 12 }, dwarfShrub: { kind: 'shrub', biomass: 3 }, thornShrub: { kind: 'shrub', biomass: 10 },
-  fern: { kind: 'shrub', biomass: 1.5 }, reed: { kind: 'shrub', biomass: 1 }, cactus: { kind: 'shrub', biomass: 4 },
-  rock: { kind: 'none', biomass: 0 }, boulder: { kind: 'none', biomass: 0 }, pebble: { kind: 'none', biomass: 0 },
-  cliffChunk: { kind: 'none', biomass: 0 }, scree: { kind: 'none', biomass: 0 },
+  shrub: { kind: 'shrub', biomass: 12 },
+  dwarfShrub: { kind: 'shrub', biomass: 3 },
+  thornShrub: { kind: 'shrub', biomass: 10 },
+  fern: { kind: 'shrub', biomass: 1.5 },
+  reed: { kind: 'shrub', biomass: 1 },
+  cactus: { kind: 'shrub', biomass: 4 },
+  rock: { kind: 'none', biomass: 0 },
+  boulder: { kind: 'none', biomass: 0 },
+  pebble: { kind: 'none', biomass: 0 },
+  cliffChunk: { kind: 'none', biomass: 0 },
+  scree: { kind: 'none', biomass: 0 }
 }
 
 /** Cell states. Regrowing cells can burn again once enough fuel is back. */
@@ -36,7 +67,7 @@ export const FIRE_STATE = {
   /** Burnt out; nothing has regrown yet. */
   burnt: 2,
   /** Grass, then shrubs, then trees are coming back. */
-  regrowing: 3,
+  regrowing: 3
 } as const
 
 /** A cell state value (see {@link FIRE_STATE}). */
@@ -184,16 +215,23 @@ export const DEFAULT_FIRE: FireOptions = {
   jitter: 0.5,
   fuel: {
     grassLoad: 0.4,
-    grassPresets: { goldenSavanna: 1.4, autumnHaze: 1.2, buffaloGrass: 1.1, frostbite: 0.5, stAugustineGrass: 0.8, perennialRyegrass: 0.8 },
+    grassPresets: {
+      goldenSavanna: 1.4,
+      autumnHaze: 1.2,
+      buffaloGrass: 1.1,
+      frostbite: 0.5,
+      stAugustineGrass: 0.8,
+      perennialRyegrass: 0.8
+    },
     species: DEFAULT_FUEL_MODELS,
-    unknownBiomass: 8,
+    unknownBiomass: 8
   },
   firebreaks: { water: true, rockSlope: 1.1, bareGround: 0.6, roads: true, lines: [] },
   regrowth: { grassDays: 30, shrubDays: 700, treeDays: 7300 },
   lightning: { enabled: true, chance: 0.4 },
   weatherInterval: 60,
   fallback: { wind: [3, 0], moisture: 0.08 },
-  ignitions: [],
+  ignitions: []
 }
 
 /** What one cell of land offers a fire (see {@link FireLandscape}). */
@@ -254,7 +292,9 @@ export interface FireStats {
   regrown: number
 }
 
-const GRASS = 0, SHRUB = 1, TREE = 2
+const GRASS = 0,
+  SHRUB = 1,
+  TREE = 2
 const NDI = [1, -1, 0, 0, 1, 1, -1, -1]
 const NDJ = [0, 0, 1, -1, 1, -1, 1, -1]
 const NLEN = NDI.map((di, k) => Math.hypot(di, NDJ[k]))
@@ -369,7 +409,8 @@ export class FireSim {
 
   /** Cell index at (x, z), or −1 outside the grid. */
   index(x: number, z: number): number {
-    const i = Math.floor((x - this.minX) / this.options.cellSize), j = Math.floor((z - this.minZ) / this.options.cellSize)
+    const i = Math.floor((x - this.minX) / this.options.cellSize),
+      j = Math.floor((z - this.minZ) / this.options.cellSize)
     return i < 0 || j < 0 || i >= this.cols || j >= this.rows ? -1 : j * this.cols + i
   }
 
@@ -398,7 +439,8 @@ export class FireSim {
     if (s === FIRE_STATE.burning) return Math.min(1, (1 - this.burnLeft[index] / this.burnTotal[index]) * 1.2)
     if (s === FIRE_STATE.unburnt) return 0
     const g = this.growth(index)
-    const capS = this.capacity[index * 3 + 1], capT = this.capacity[index * 3 + 2]
+    const capS = this.capacity[index * 3 + 1],
+      capT = this.capacity[index * 3 + 2]
     const woody = capS + capT > 0 ? (g[SHRUB] * capS + g[TREE] * capT) / (capS + capT) : g[GRASS]
     return Math.max(0, 1 - (0.6 * g[GRASS] + 0.4 * woody))
   }
@@ -406,7 +448,9 @@ export class FireSim {
   /** Seconds since cell `index` burnt out, or `Infinity` if it is not burnt or regrowing. */
   burntAge(index: number): number {
     const s = this.state[index]
-    return s === FIRE_STATE.burnt || s === FIRE_STATE.regrowing ? (this.tickIndex - this.burntTick[index]) * this.options.tick : Infinity
+    return s === FIRE_STATE.burnt || s === FIRE_STATE.regrowing
+      ? (this.tickIndex - this.burntTick[index]) * this.options.tick
+      : Infinity
   }
 
   /** Seconds since cell `index` caught fire, or `Infinity` if it is not burning. */
@@ -422,17 +466,28 @@ export class FireSim {
   /** Ground height at (x, z), bilinear between cell centres. */
   elevationAt(x: number, z: number): number {
     const c = this.options.cellSize
-    const fi = Math.min(this.cols - 1, Math.max(0, (x - this.minX) / c - 0.5)), fj = Math.min(this.rows - 1, Math.max(0, (z - this.minZ) / c - 0.5))
-    const i0 = Math.floor(fi), j0 = Math.floor(fj), i1 = Math.min(this.cols - 1, i0 + 1), j1 = Math.min(this.rows - 1, j0 + 1)
-    const tx = fi - i0, tz = fj - j0, e = this.elevation, n = this.cols
-    return (e[j0 * n + i0] * (1 - tx) + e[j0 * n + i1] * tx) * (1 - tz) + (e[j1 * n + i0] * (1 - tx) + e[j1 * n + i1] * tx) * tz
+    const fi = Math.min(this.cols - 1, Math.max(0, (x - this.minX) / c - 0.5)),
+      fj = Math.min(this.rows - 1, Math.max(0, (z - this.minZ) / c - 0.5))
+    const i0 = Math.floor(fi),
+      j0 = Math.floor(fj),
+      i1 = Math.min(this.cols - 1, i0 + 1),
+      j1 = Math.min(this.rows - 1, j0 + 1)
+    const tx = fi - i0,
+      tz = fj - j0,
+      e = this.elevation,
+      n = this.cols
+    return (
+      (e[j0 * n + i0] * (1 - tx) + e[j0 * n + i1] * tx) * (1 - tz) +
+      (e[j1 * n + i0] * (1 - tx) + e[j1 * n + i1] * tx) * tz
+    )
   }
 
   /** Share (0…1) of each class's full fuel that has grown back at (x, z): 1 where never burnt. */
   regrowthAt(x: number, z: number): Regrowth {
     const i = this.index(x, z)
     if (i < 0) return { grass: 1, shrub: 1, tree: 1 }
-    const f = (c: number) => (this.capacity[i * 3 + c] > 0 ? Math.min(1, this.fuel[i * 3 + c] / this.capacity[i * 3 + c]) : 1)
+    const f = (c: number) =>
+      this.capacity[i * 3 + c] > 0 ? Math.min(1, this.fuel[i * 3 + c] / this.capacity[i * 3 + c]) : 1
     return { grass: f(GRASS), shrub: f(SHRUB), tree: f(TREE) }
   }
 
@@ -496,7 +551,8 @@ export class FireSim {
     const o = this.options
     const n = this.cols * this.rows
     const dt = o.tick
-    const t0 = this.time, t1 = t0 + dt
+    const t0 = this.time,
+      t1 = t0 + dt
     this.refreshWeather()
 
     // Ignitions: scheduled, then lightning.
@@ -505,11 +561,22 @@ export class FireSim {
       if (time >= t0) this.igniteArea(x, z, radius)
     }
     if (o.lightning.enabled && this.env.weather) {
-      const strikes = this.env.weather.strikes(this.minX, this.minZ, this.minX + this.cols * o.cellSize, this.minZ + this.rows * o.cellSize, t0, t1)
+      const strikes = this.env.weather.strikes(
+        this.minX,
+        this.minZ,
+        this.minX + this.cols * o.cellSize,
+        this.minZ + this.rows * o.cellSize,
+        t0,
+        t1
+      )
       for (const s of strikes) {
         const i = this.index(s.x, s.z)
         if (i < 0 || !this.canBurn(i)) continue
-        if (hash01(s.seed | 0, this.seed, 91, 0) < o.lightning.chance * moistureDamping(this.moisture[i] / o.moistureOfExtinction)) this.startBurning(i)
+        if (
+          hash01(s.seed | 0, this.seed, 91, 0) <
+          o.lightning.chance * moistureDamping(this.moisture[i] / o.moistureOfExtinction)
+        )
+          this.startBurning(i)
       }
     }
 
@@ -521,14 +588,18 @@ export class FireSim {
     const c = o.cellSize
     for (let b = 0; b < count; b++) {
       const i = burning[b]
-      const ci = i % this.cols, cj = (i - ci) / this.cols
-      const wx = this.windX[i], wz = this.windZ[i]
+      const ci = i % this.cols,
+        cj = (i - ci) / this.cols
+      const wx = this.windX[i],
+        wz = this.windZ[i]
       const speed = Math.hypot(wx, wz)
       const head = Math.min(20, Math.exp(o.windCoefficient * speed))
       const e = ellipseEccentricity(speed * o.midflame, o.maxLengthToBreadth)
       for (let q = 0; q < 8; q++) {
-        const di = NDI[q], dj = NDJ[q]
-        const ni = ci + di, nj = cj + dj
+        const di = NDI[q],
+          dj = NDJ[q]
+        const ni = ci + di,
+          nj = cj + dj
         if (ni < 0 || nj < 0 || ni >= this.cols || nj >= this.rows) continue
         const k = nj * this.cols + ni
         if (!this.canBurn(k)) continue
@@ -581,16 +652,30 @@ export class FireSim {
     let next = target
     for (const ig of o.ignitions) {
       const k = Math.floor((ig[2] - o.startTime) / o.tick + 1e-9)
-      if (k >= this.tickIndex) { next = Math.min(next, k); break }
+      if (k >= this.tickIndex) {
+        next = Math.min(next, k)
+        break
+      }
     }
     const weather = this.env.weather
     if (!o.lightning.enabled || !weather) return next
     const span = 86400 // query long quiet stretches a day at a time
     for (let t = this.time, end = o.startTime + next * o.tick; t < end; t += span) {
-      const strikes = weather.strikes(this.minX, this.minZ, this.minX + this.cols * o.cellSize, this.minZ + this.rows * o.cellSize, t, Math.min(end, t + span))
+      const strikes = weather.strikes(
+        this.minX,
+        this.minZ,
+        this.minX + this.cols * o.cellSize,
+        this.minZ + this.rows * o.cellSize,
+        t,
+        Math.min(end, t + span)
+      )
       for (const s of strikes) {
         const i = this.index(s.x, s.z)
-        if (i >= 0 && !this.firebreak[i] && this.capacity[i * 3] + this.capacity[i * 3 + 1] + this.capacity[i * 3 + 2] >= o.minFuel) {
+        if (
+          i >= 0 &&
+          !this.firebreak[i] &&
+          this.capacity[i * 3] + this.capacity[i * 3 + 1] + this.capacity[i * 3 + 2] >= o.minFuel
+        ) {
           return Math.min(next, Math.max(this.tickIndex, Math.floor((s.time - o.startTime) / o.tick + 1e-9)))
         }
       }
@@ -600,7 +685,12 @@ export class FireSim {
 
   private canBurn(i: number): boolean {
     const s = this.state[i]
-    return !this.firebreak[i] && (s === FIRE_STATE.unburnt || s === FIRE_STATE.regrowing) && this.fuelAt(i) >= this.options.minFuel && this.moisture[i] < this.options.moistureOfExtinction
+    return (
+      !this.firebreak[i] &&
+      (s === FIRE_STATE.unburnt || s === FIRE_STATE.regrowing) &&
+      this.fuelAt(i) >= this.options.minFuel &&
+      this.moisture[i] < this.options.moistureOfExtinction
+    )
   }
 
   private startBurning(i: number) {
@@ -617,11 +707,12 @@ export class FireSim {
   private igniteArea(x: number, z: number, radius: number) {
     const c = this.options.cellSize
     const r = Math.max(radius, c * 0.5)
-    for (let zz = z - r; zz <= z + r + 1e-9; zz += c) for (let xx = x - r; xx <= x + r + 1e-9; xx += c) {
-      if (Math.hypot(xx - x, zz - z) > r + 1e-9) continue
-      const i = this.index(xx, zz)
-      if (i >= 0 && this.canBurn(i)) this.startBurning(i)
-    }
+    for (let zz = z - r; zz <= z + r + 1e-9; zz += c)
+      for (let xx = x - r; xx <= x + r + 1e-9; xx += c) {
+        if (Math.hypot(xx - x, zz - z) > r + 1e-9) continue
+        const i = this.index(xx, zz)
+        if (i >= 0 && this.canBurn(i)) this.startBurning(i)
+      }
     const i = this.index(x, z)
     if (i >= 0 && this.canBurn(i)) this.startBurning(i)
   }
@@ -629,7 +720,9 @@ export class FireSim {
   /** Rate of spread into cell `k` on flat, calm ground at its moisture, m/s. */
   private rateOfSpread(k: number): number {
     const o = this.options.spread
-    const g = this.fuel[k * 3], s = this.fuel[k * 3 + 1], t = this.fuel[k * 3 + 2]
+    const g = this.fuel[k * 3],
+      s = this.fuel[k * 3 + 1],
+      t = this.fuel[k * 3 + 2]
     const total = g + s + t
     if (total <= 0) return 0
     const base = (g * o.grass + s * o.shrub + t * o.tree) / total
@@ -655,11 +748,16 @@ export class FireSim {
       const s = this.state[i]
       if (s !== FIRE_STATE.burnt && s !== FIRE_STATE.regrowing) continue
       // Nothing grows for the first tenth of grassDays: fuel stays at the residual set at burnout.
-      if (s === FIRE_STATE.burnt && (this.tickIndex - this.burntTick[i]) * this.options.tick < this.options.regrowth.grassDays * 0.1 * DAY) continue
+      if (
+        s === FIRE_STATE.burnt &&
+        (this.tickIndex - this.burntTick[i]) * this.options.tick < this.options.regrowth.grassDays * 0.1 * DAY
+      )
+        continue
       const g = this.growth(i)
       let full = true
       for (let f = 0; f < 3; f++) {
-        const cap = this.capacity[i * 3 + f], res = Math.min(cap, this.residual[i * 3 + f])
+        const cap = this.capacity[i * 3 + f],
+          res = Math.min(cap, this.residual[i * 3 + f])
         const next = res + (cap - res) * g[f]
         this.stats.regrown += (next - this.fuel[i * 3 + f]) * area
         this.stats.fuel += (next - this.fuel[i * 3 + f]) * area
@@ -706,22 +804,33 @@ export class FireSim {
     const w: WeatherSample = createWeatherSample()
     const surf: SurfaceSample = { wetness: 0, snow: 0, snowDepth: 0, water: 0 }
     const grid = new Float32Array(g * g * 3)
-    for (let b = 0; b < g; b++) for (let a = 0; a < g; a++) {
-      const x = this.minX + a * step, z = this.minZ + b * step
-      const climate = (this.coarseClimate[b * g + a] ??= weather.climateAt(x, z))
-      weather.at(x, z, time, w, climate)
-      weather.surfaceAt(x, z, time, surf, climate)
-      const k = (b * g + a) * 3
-      grid[k] = w.windX
-      grid[k + 1] = w.windZ
-      grid[k + 2] = surf.snow > 0.2 ? 1 : 0.03 + 0.22 * w.humidity * w.humidity + 0.5 * surf.wetness + (w.precipitation > 0.2 ? 0.3 : 0)
-    }
+    for (let b = 0; b < g; b++)
+      for (let a = 0; a < g; a++) {
+        const x = this.minX + a * step,
+          z = this.minZ + b * step
+        const climate = (this.coarseClimate[b * g + a] ??= weather.climateAt(x, z))
+        weather.at(x, z, time, w, climate)
+        weather.surfaceAt(x, z, time, surf, climate)
+        const k = (b * g + a) * 3
+        grid[k] = w.windX
+        grid[k + 1] = w.windZ
+        grid[k + 2] =
+          surf.snow > 0.2
+            ? 1
+            : 0.03 + 0.22 * w.humidity * w.humidity + 0.5 * surf.wetness + (w.precipitation > 0.2 ? 0.3 : 0)
+      }
     for (let i = 0; i < n; i++) {
-      const fx = ((i % this.cols) + 0.5) * o.cellSize / step, fz = (Math.floor(i / this.cols) + 0.5) * o.cellSize / step
-      const a = Math.min(g - 2, Math.floor(fx)), b = Math.min(g - 2, Math.floor(fz))
-      const tx = fx - a, tz = fz - b
+      const fx = (((i % this.cols) + 0.5) * o.cellSize) / step,
+        fz = ((Math.floor(i / this.cols) + 0.5) * o.cellSize) / step
+      const a = Math.min(g - 2, Math.floor(fx)),
+        b = Math.min(g - 2, Math.floor(fz))
+      const tx = fx - a,
+        tz = fz - b
       const lerp4 = (c: number) => {
-        const p = grid[(b * g + a) * 3 + c], q = grid[(b * g + a + 1) * 3 + c], r = grid[((b + 1) * g + a) * 3 + c], s = grid[((b + 1) * g + a + 1) * 3 + c]
+        const p = grid[(b * g + a) * 3 + c],
+          q = grid[(b * g + a + 1) * 3 + c],
+          r = grid[((b + 1) * g + a) * 3 + c],
+          s = grid[((b + 1) * g + a + 1) * 3 + c]
         return (p + (q - p) * tx) * (1 - tz) + (r + (s - r) * tx) * tz
       }
       this.windX[i] = lerp4(0)
@@ -756,7 +865,9 @@ export class FireSim {
     this.coarseClimate = []
     o.ignitions.sort((a, b) => a[2] - b[2])
 
-    const landscape = this.env.landscape ?? (this.env.world ? new WorldLandscape(this.env.world, this.env.frame ?? this.env.world.frame, o) : null)
+    const landscape =
+      this.env.landscape ??
+      (this.env.world ? new WorldLandscape(this.env.world, this.env.frame ?? this.env.world.frame, o) : null)
     const info: FireCellInfo = { elevation: 0, firebreak: false, grass: 0, shrub: 0, tree: 0 }
     for (let i = 0; i < n; i++) {
       const [x, z] = this.center(i)
@@ -776,14 +887,20 @@ export class FireSim {
     // Steep ground is bare rock; firebreak lines and roads cut through.
     const c = o.cellSize
     for (let i = 0; i < n; i++) {
-      const ci = i % cols, cj = Math.floor(i / cols)
-      const dx = (this.elevation[cj * cols + Math.min(cols - 1, ci + 1)] - this.elevation[cj * cols + Math.max(0, ci - 1)]) / (2 * c)
-      const dz = (this.elevation[Math.min(cols - 1, cj + 1) * cols + ci] - this.elevation[Math.max(0, cj - 1) * cols + ci]) / (2 * c)
+      const ci = i % cols,
+        cj = Math.floor(i / cols)
+      const dx =
+        (this.elevation[cj * cols + Math.min(cols - 1, ci + 1)] - this.elevation[cj * cols + Math.max(0, ci - 1)]) /
+        (2 * c)
+      const dz =
+        (this.elevation[Math.min(cols - 1, cj + 1) * cols + ci] - this.elevation[Math.max(0, cj - 1) * cols + ci]) /
+        (2 * c)
       if (Math.hypot(dx, dz) > o.firebreaks.rockSlope) this.firebreak[i] = 1
     }
     const lines: Firebreak[] = [...o.firebreaks.lines]
     if (o.firebreaks.roads && this.env.world && this.env.world.options.surface === 'plane') {
-      for (const m of this.env.world.options.modifiers) if (m.type === 'path') lines.push({ points: m.points.map((p) => [p[0], p[2]]), width: m.width * 2 })
+      for (const m of this.env.world.options.modifiers)
+        if (m.type === 'path') lines.push({ points: m.points.map((p) => [p[0], p[2]]), width: m.width * 2 })
     }
     for (const line of lines) {
       for (let i = 0; i < n; i++) {
@@ -821,8 +938,11 @@ class WorldLandscape implements FireLandscape {
     if (water) return out
     const biomes = this.world.options.biomes
     for (let k = 0; k < s.count; k++) {
-      const b = biomes[s.biomes[k]], w = s.weights[k]
-      if (b.grass.preset) out.grass += w * b.grass.coverage * b.grass.height * o.fuel.grassLoad * (o.fuel.grassPresets[b.grass.preset] ?? 1)
+      const b = biomes[s.biomes[k]],
+        w = s.weights[k]
+      if (b.grass.preset)
+        out.grass +=
+          w * b.grass.coverage * b.grass.height * o.fuel.grassLoad * (o.fuel.grassPresets[b.grass.preset] ?? 1)
       for (const e of b.scatter) {
         const model = o.fuel.species[e.species] ?? { kind: 'shrub', biomass: o.fuel.unknownBiomass }
         if (model.kind === 'none') continue
@@ -846,7 +966,10 @@ export function moistureDamping(r: number): number {
 /** Length-to-breadth ratio of a wind-driven fire (Anderson 1983) for midflame wind `u` (m/s), capped at `max`. */
 export function lengthToBreadth(u: number, max = 8): number {
   const mph = Math.max(0, u) * 2.23694
-  return Math.min(Math.max(1, max), Math.max(1, 0.936 * Math.exp(0.2566 * mph) + 0.461 * Math.exp(-0.1548 * mph) - 0.397))
+  return Math.min(
+    Math.max(1, max),
+    Math.max(1, 0.936 * Math.exp(0.2566 * mph) + 0.461 * Math.exp(-0.1548 * mph) - 0.397)
+  )
 }
 
 /** Eccentricity of the spread ellipse for midflame wind `u` (m/s). */
@@ -858,10 +981,14 @@ function ellipseEccentricity(u: number, max: number): number {
 /** Seeded value noise in −1…1 (two octaves, smooth), patches about `scale` metres across. */
 function patchNoise(x: number, z: number, scale: number, seed: number, salt: number): number {
   const octave = (s: number, k: number) => {
-    const fx = x / s, fz = z / s
-    const i = Math.floor(fx), j = Math.floor(fz)
-    const tx = fx - i, tz = fz - j
-    const u = tx * tx * (3 - 2 * tx), w = tz * tz * (3 - 2 * tz)
+    const fx = x / s,
+      fz = z / s
+    const i = Math.floor(fx),
+      j = Math.floor(fz)
+    const tx = fx - i,
+      tz = fz - j
+    const u = tx * tx * (3 - 2 * tx),
+      w = tz * tz * (3 - 2 * tz)
     const h = (a: number, b: number) => hash01(a, b, seed, salt + k) * 2 - 1
     return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - w) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * w
   }
@@ -878,8 +1005,10 @@ function distanceToPolyline(x: number, z: number, pts: [number, number][]): numb
   if (pts.length === 1) return Math.hypot(x - pts[0][0], z - pts[0][1])
   let best = Infinity
   for (let i = 1; i < pts.length; i++) {
-    const [ax, az] = pts[i - 1], [bx, bz] = pts[i]
-    const abx = bx - ax, abz = bz - az
+    const [ax, az] = pts[i - 1],
+      [bx, bz] = pts[i]
+    const abx = bx - ax,
+      abz = bz - az
     const t = Math.min(1, Math.max(0, ((x - ax) * abx + (z - az) * abz) / (abx * abx + abz * abz || 1)))
     best = Math.min(best, Math.hypot(x - ax - abx * t, z - az - abz * t))
   }

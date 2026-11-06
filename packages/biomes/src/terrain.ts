@@ -1,7 +1,23 @@
-import { BufferAttribute, BufferGeometry, Group, Mesh, Sphere, Vector2, Vector3, type Camera, type MeshStandardNodeMaterial, type Object3D } from 'three/webgpu'
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Group,
+  Mesh,
+  Sphere,
+  Vector2,
+  Vector3,
+  type Camera,
+  type MeshStandardNodeMaterial,
+  type Object3D
+} from 'three/webgpu'
 import { buildChunk, chunkId, chunkIndex, type ChunkData, type ChunkKey, type ChunkSettings } from './chunk.ts'
 import { selectChunks, type ChunkBounds, type LodHistory, type LodSettings } from './lod.ts'
-import { createTerrainMaterial, DEFAULT_TERRAIN_MATERIAL, type TerrainMaterialOptions, type TerrainUniforms } from './terrain-material.ts'
+import {
+  createTerrainMaterial,
+  DEFAULT_TERRAIN_MATERIAL,
+  type TerrainMaterialOptions,
+  type TerrainUniforms
+} from './terrain-material.ts'
 import type { Vec3 } from './noise.ts'
 import type { World, WorldRegion } from './world.ts'
 
@@ -44,7 +60,7 @@ export const DEFAULT_TERRAIN: TerrainOptions = {
   castShadow: false,
   receiveShadow: true,
   origin: [0, 0, 0],
-  material: { ...DEFAULT_TERRAIN_MATERIAL },
+  material: { ...DEFAULT_TERRAIN_MATERIAL }
 }
 
 /** Options for {@link WorldTerrain.create}. */
@@ -175,7 +191,9 @@ export class WorldTerrain {
         previous.apply(scene, args)
         this.update()
       }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = () => {
+        scene.onBeforeRender = previous
+      }
     }
   }
 
@@ -203,14 +221,19 @@ export class WorldTerrain {
     this.uniforms.bump.value = m.bump
     this.uniforms.brightness.value = m.brightness
     this.uniforms.saturation.value = m.saturation
-    if (this.material.wireframe !== m.wireframe) { this.material.wireframe = m.wireframe; this.material.needsUpdate = true }
+    if (this.material.wireframe !== m.wireframe) {
+      this.material.wireframe = m.wireframe
+      this.material.needsUpdate = true
+    }
     if (before.resolution !== o.resolution || before.rootSize !== o.rootSize || before.skirt !== o.skirt) this.clear()
     if (before.origin.join() !== o.origin.join()) this.placeMeshes()
-    for (const e of this.entries.values()) if (e.mesh) {
-      e.mesh.castShadow = o.castShadow
-      e.mesh.receiveShadow = o.receiveShadow
-      if (e.data) (e.mesh.userData.morphRange as Vector2).set(...morphBand(o.lodFactor, o.lodMargin ?? 0.1, e.data.size))
-    }
+    for (const e of this.entries.values())
+      if (e.mesh) {
+        e.mesh.castShadow = o.castShadow
+        e.mesh.receiveShadow = o.receiveShadow
+        if (e.data)
+          (e.mesh.userData.morphRange as Vector2).set(...morphBand(o.lodFactor, o.lodMargin ?? 0.1, e.data.size))
+      }
     return this
   }
 
@@ -246,11 +269,15 @@ export class WorldTerrain {
 
     // Visibility.
     const shown = new Set(show.map(chunkId))
-    let triangles = 0, deepest = 0
+    let triangles = 0,
+      deepest = 0
     for (const [id, e] of this.entries) {
       const visible = shown.has(id)
       if (e.mesh) e.mesh.visible = visible
-      if (visible && e.data) { triangles += e.data.index.length / 3; deepest = Math.max(deepest, e.key.level) }
+      if (visible && e.data) {
+        triangles += e.data.index.length / 3
+        deepest = Math.max(deepest, e.key.level)
+      }
     }
 
     // Build.
@@ -321,12 +348,23 @@ export class WorldTerrain {
 
   private maxElevation(): number {
     const w = this.world.options
-    return w.mountains.height + w.volcanoes.height + w.hills.height + w.continents.curve.reduce((m, p) => Math.max(m, p[1]), 0)
+    return (
+      w.mountains.height +
+      w.volcanoes.height +
+      w.hills.height +
+      w.continents.curve.reduce((m, p) => Math.max(m, p[1]), 0)
+    )
   }
 
   private leastLoaded(): number {
-    let best = -1, load = this.options.jobsPerWorker
-    this.workerLoad.forEach((l, i) => { if (l < load) { load = l; best = i } })
+    let best = -1,
+      load = this.options.jobsPerWorker
+    this.workerLoad.forEach((l, i) => {
+      if (l < load) {
+        load = l
+        best = i
+      }
+    })
     return best
   }
 
@@ -337,7 +375,13 @@ export class WorldTerrain {
     this.jobs.set(id, e)
     this.workerLoad[worker]++
     const o = this.options
-    this.workers[worker].postMessage({ type: 'build', id, worker, key: e.key, settings: { resolution: o.resolution, rootSize: o.rootSize, skirt: o.skirt } })
+    this.workers[worker].postMessage({
+      type: 'build',
+      id,
+      worker,
+      key: e.key,
+      settings: { resolution: o.resolution, rootSize: o.rootSize, skirt: o.skirt }
+    })
   }
 
   private onWorkerMessage(msg: { type: string; id: number; worker: number; data: ChunkData }) {
@@ -356,7 +400,8 @@ export class WorldTerrain {
   // Region changes only stale what they touch; full changes stale everything (tracked via versions).
   private regionVersions: { version: number; region?: WorldRegion }[] = []
   private staleSince(e: Entry, version: number): boolean {
-    for (const c of this.regionVersions) if (c.version > version && (!c.region || this.touches(e, c.region))) return true
+    for (const c of this.regionVersions)
+      if (c.version > version && (!c.region || this.touches(e, c.region))) return true
     return false
   }
 
@@ -380,8 +425,14 @@ export class WorldTerrain {
     mesh.receiveShadow = this.options.receiveShadow
     mesh.matrixAutoUpdate = true
     mesh.userData.level = e.key.level
-    mesh.userData.detailOffset = new Vector3(mod(data.center[0], DETAIL_PERIOD), mod(data.center[1], DETAIL_PERIOD), mod(data.center[2], DETAIL_PERIOD))
-    mesh.userData.morphRange = new Vector2(...morphBand(this.options.lodFactor, this.options.lodMargin ?? 0.1, data.size))
+    mesh.userData.detailOffset = new Vector3(
+      mod(data.center[0], DETAIL_PERIOD),
+      mod(data.center[1], DETAIL_PERIOD),
+      mod(data.center[2], DETAIL_PERIOD)
+    )
+    mesh.userData.morphRange = new Vector2(
+      ...morphBand(this.options.lodFactor, this.options.lodMargin ?? 0.1, data.size)
+    )
     mesh.visible = old?.visible ?? false
     this.place(mesh, data)
     e.mesh = mesh
@@ -459,7 +510,11 @@ function morphBand(lodFactor: number, margin: number, size: number): [number, nu
 }
 
 function resolve(input: TerrainInput): TerrainOptions {
-  const o = { ...DEFAULT_TERRAIN, ...input, material: { ...DEFAULT_TERRAIN.material, ...input.material } } as TerrainOptions
+  const o = {
+    ...DEFAULT_TERRAIN,
+    ...input,
+    material: { ...DEFAULT_TERRAIN.material, ...input.material }
+  } as TerrainOptions
   for (const k of Object.keys(o) as (keyof TerrainOptions)[]) if (o[k] === undefined) (o as any)[k] = DEFAULT_TERRAIN[k]
   return o
 }

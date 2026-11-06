@@ -36,8 +36,12 @@ test('blade geometry: three vertices per row plus a tip, for any segment count',
     // No degenerate triangle anywhere.
     for (let t = 0; t < index.length; t += 3) {
       const [a, b, c] = [index[t], index[t + 1], index[t + 2]]
-      const ux = pos.getX(b) - pos.getX(a), uy = pos.getY(b) - pos.getY(a), uz = pos.getZ(b) - pos.getZ(a)
-      const vx = pos.getX(c) - pos.getX(a), vy = pos.getY(c) - pos.getY(a), vz = pos.getZ(c) - pos.getZ(a)
+      const ux = pos.getX(b) - pos.getX(a),
+        uy = pos.getY(b) - pos.getY(a),
+        uz = pos.getZ(b) - pos.getZ(a)
+      const vx = pos.getX(c) - pos.getX(a),
+        vy = pos.getY(c) - pos.getY(a),
+        vz = pos.getZ(c) - pos.getZ(a)
       const area = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx)
       assert.ok(area > 1e-9, `segments ${segments}: triangle ${t / 3} is degenerate`)
     }
@@ -62,7 +66,7 @@ function streamFor(grass: Grass) {
     height: () => grass.sampleHeight,
     densityAt: (dist) => grass.densityAt(dist),
     geometry: new TileGeometryStore({ object: grass.object, settings: () => grass.settings, material }, retirement),
-    retirement,
+    retirement
   })
 }
 
@@ -82,7 +86,8 @@ test('cells: generation is deterministic per cell coordinate and stays inside it
   const { cell, cs, n } = grow(stream, grass, { ix: 2, iz: -3 }, c, 40)
   assert.equal(cell.count, 40)
   assert.equal(cell.candidates, 40)
-  const cx = (c % n) * cs, cz = Math.floor(c / n) * cs
+  const cx = (c % n) * cs,
+    cz = Math.floor(c / n) * cs
   for (let i = 0; i < cell.count; i++) {
     const [x, y, z, yaw] = cell.offsets.subarray(i * 4, (i + 1) * 4)
     assert.ok(x >= cx && x <= cx + cs && z >= cz && z <= cz + cs, `blade ${i} at (${x}, ${z}) in cell`)
@@ -152,7 +157,11 @@ test('grass map: paint changes only the brush disc, one channel at a time', () =
       const o = (j * res + i) * 4
       const d = Math.hypot(i - cx, j - cz) / rr
       if (d >= 1) {
-        assert.deepEqual(Array.from(map.data.subarray(o, o + 4)), Array.from(before.subarray(o, o + 4)), `texel ${i},${j} outside the brush`)
+        assert.deepEqual(
+          Array.from(map.data.subarray(o, o + 4)),
+          Array.from(before.subarray(o, o + 4)),
+          `texel ${i},${j} outside the brush`
+        )
       } else if (d < 0.5) {
         inside++
         assert.ok(map.data[o] >= 140 && map.data[o] <= 180, `centre of the brush darkened`)
@@ -171,7 +180,10 @@ test('grass map: paint changes only the brush disc, one channel at a time', () =
     assert.equal(map.data[i], mid[i], 'raise leaves coverage alone')
     assert.equal(map.data[i + 3], 255)
   }
-  assert.ok(map.data.some((v, i) => i % 4 === 1 && v !== mid[i]), 'raise increased height')
+  assert.ok(
+    map.data.some((v, i) => i % 4 === 1 && v !== mid[i]),
+    'raise increased height'
+  )
 
   // A brush entirely off the map is a no-op.
   const away = map.data.slice()

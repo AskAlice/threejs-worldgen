@@ -1,6 +1,16 @@
 import {
-  BufferGeometry as BufferGeometryClass, Group, InstancedBufferAttribute, InstancedBufferGeometry, InstancedMesh, Mesh, Vector3,
-  type BufferGeometry, type Camera, type Material, type Object3D, type Texture,
+  BufferGeometry as BufferGeometryClass,
+  Group,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  InstancedMesh,
+  Mesh,
+  Vector3,
+  type BufferGeometry,
+  type Camera,
+  type Material,
+  type Object3D,
+  type Texture
 } from 'three/webgpu'
 import { createHeightSampler, type HeightFn, type Terrain } from 'threejs-heightfield'
 import { selectLod } from './lod.ts'
@@ -116,10 +126,16 @@ const DEFAULTS: Omit<ScatterSettings, 'layers'> = {
   maxDistance: 600,
   buildBudget: 4,
   lodHysteresis: 0.1,
-  refreshDistance: 1,
+  refreshDistance: 1
 }
 
-const LAYER_DEFAULTS: Omit<ScatterLayer, 'name'> = { ...DEFAULT_PLACEMENT, lods: [], impostor: null, castShadow: true, receiveShadow: true }
+const LAYER_DEFAULTS: Omit<ScatterLayer, 'name'> = {
+  ...DEFAULT_PLACEMENT,
+  lods: [],
+  impostor: null,
+  castShadow: true,
+  receiveShadow: true
+}
 
 /** Fills in defaults for a {@link ScatterLayerInput}. */
 export function resolveLayer(input: ScatterLayerInput): ScatterLayer {
@@ -217,7 +233,9 @@ export class Scatter {
         previous.apply(scene, args)
         this.update()
       }
-      this.unhook = () => { scene.onBeforeRender = previous }
+      this.unhook = () => {
+        scene.onBeforeRender = previous
+      }
     }
   }
 
@@ -271,7 +289,7 @@ export class Scatter {
       key,
       layers: idx,
       range: Math.min(s.maxDistance, Math.max(...idx.map((i) => lastDistance(layers[i])))),
-      placementKey: JSON.stringify(idx.map((i) => placementKey(layers[i]))),
+      placementKey: JSON.stringify(idx.map((i) => placementKey(layers[i])))
     }))
     for (const g of this.groups) {
       if (old.get(g.key) === g.placementKey) continue
@@ -314,7 +332,10 @@ export class Scatter {
 
     for (let i = ci - r; i <= ci + r; i++) {
       for (let j = cj - r; j <= cj + r; j++) {
-        const dist = Math.hypot(Math.max(i * ts - cam.x, 0, cam.x - (i + 1) * ts), Math.max(j * ts - cam.z, 0, cam.z - (j + 1) * ts))
+        const dist = Math.hypot(
+          Math.max(i * ts - cam.x, 0, cam.x - (i + 1) * ts),
+          Math.max(j * ts - cam.z, 0, cam.z - (j + 1) * ts)
+        )
         if (dist >= reach * h) continue
         const key = `${i},${j}`
         let tile = this.tiles.get(key)
@@ -372,7 +393,15 @@ export class Scatter {
               const dx = data[o + 12] - x
               const dz = data[o + 14] - z
               if (dx * dx + dz * dz > r2) continue
-              out.push({ layer: s.layers[li].name, x: data[o + 12], y: data[o + 13], z: data[o + 14], scale: data[o + 17], yaw: data[o + 16], random: data[o + 19] })
+              out.push({
+                layer: s.layers[li].name,
+                x: data[o + 12],
+                y: data[o + 13],
+                z: data[o + 14],
+                scale: data[o + 17],
+                yaw: data[o + 16],
+                random: data[o + 19]
+              })
             }
           })
         }
@@ -394,7 +423,14 @@ export class Scatter {
   private generate(ix: number, iz: number, group: LayerGroup): TileGroup {
     const s = this.settings
     const layers = group.layers.map((i) => s.layers[i])
-    const data = placeTile(layers, ix * s.tileSize, iz * s.tileSize, s.tileSize, groupSeed(s.seed, group.key), this.sampleHeight)
+    const data = placeTile(
+      layers,
+      ix * s.tileSize,
+      iz * s.tileSize,
+      s.tileSize,
+      groupSeed(s.seed, group.key),
+      this.sampleHeight
+    )
     return { data, lod: data.map((d) => new Int8Array(d.length / INSTANCE_STRIDE).fill(-1)) }
   }
 
@@ -438,7 +474,7 @@ export class Scatter {
         visible += n
         if (n) meshes += pool.meshes.length
         return writer(pool)
-      }),
+      })
     )
     for (const tile of this.tiles.values()) {
       for (const group of this.groups) {
@@ -489,7 +525,11 @@ export class Scatter {
       // override material in shadow passes, keyed by object, so the groups of a multi-material mesh would share one
       // shadow render object and rebuild it (and its binding buffers) for each group, every frame.
       const parts = Array.isArray(lod.material)
-        ? lod.geometry.groups.map((g) => ({ material: (lod.material as Material[])[g.materialIndex ?? 0], start: g.start, count: g.count }))
+        ? lod.geometry.groups.map((g) => ({
+            material: (lod.material as Material[])[g.materialIndex ?? 0],
+            start: g.start,
+            count: g.count
+          }))
         : [{ material: lod.material, start: 0, count: Infinity }]
       const matrices = new InstancedBufferAttribute(new Float32Array(capacity * 16), 16)
       for (const part of parts) {
@@ -607,8 +647,22 @@ function lastDistance(layer: ScatterLayer): number {
 }
 
 function placementKey(l: ScatterLayer): unknown[] {
-  return [l.name, l.spacing, typeof l.density === 'number' ? l.density : 'fn', l.minSlope, l.maxSlope, l.minHeight, l.maxHeight, l.cluster, l.scale, l.align, l.randomYaw, l.tilt, l.sink, l.colorVariation]
-    .map((v) => (v === Infinity ? 'inf' : v === -Infinity ? '-inf' : v))
+  return [
+    l.name,
+    l.spacing,
+    typeof l.density === 'number' ? l.density : 'fn',
+    l.minSlope,
+    l.maxSlope,
+    l.minHeight,
+    l.maxHeight,
+    l.cluster,
+    l.scale,
+    l.align,
+    l.randomYaw,
+    l.tilt,
+    l.sink,
+    l.colorVariation
+  ].map((v) => (v === Infinity ? 'inf' : v === -Infinity ? '-inf' : v))
 }
 
 const ids = new WeakMap<object, number>()
@@ -620,7 +674,12 @@ function idOf(o: object): number {
 }
 
 function renderKey(l: ScatterLayer): string {
-  const lod = (d: ScatterLOD) => [d.distance, idOf(d.geometry), (Array.isArray(d.material) ? d.material : [d.material]).map(idOf), d.castShadow]
+  const lod = (d: ScatterLOD) => [
+    d.distance,
+    idOf(d.geometry),
+    (Array.isArray(d.material) ? d.material : [d.material]).map(idOf),
+    d.castShadow
+  ]
   return JSON.stringify([l.lods.map(lod), l.impostor && lod(l.impostor), l.castShadow, l.receiveShadow])
 }
 

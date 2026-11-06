@@ -1,5 +1,19 @@
 import { BIOMES, GROUND_COLORS, GROUND_MATERIALS, type BiomeDef, type GroundMaterial } from './biomes.ts'
-import { cellular, clamp, curve, erodedFbm, fbm, lerp, ridged, seedOf, smoothstep, warp, type CellSample, type FractalOptions, type Vec3 } from './noise.ts'
+import {
+  cellular,
+  clamp,
+  curve,
+  erodedFbm,
+  fbm,
+  lerp,
+  ridged,
+  seedOf,
+  smoothstep,
+  warp,
+  type CellSample,
+  type FractalOptions,
+  type Vec3
+} from './noise.ts'
 
 /** A flat world (an infinite plane, y up) or a planet (a sphere centred on the origin). */
 export type SurfaceKind = 'plane' | 'sphere'
@@ -228,7 +242,9 @@ export interface WorldOptions {
 }
 
 /** Recursive partial, for {@link World.set}. Arrays are replaced, not merged. */
-export type DeepPartial<T> = { [K in keyof T]?: T[K] extends unknown[] ? T[K] : T[K] extends object ? DeepPartial<T[K]> : T[K] }
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends unknown[] ? T[K] : T[K] extends object ? DeepPartial<T[K]> : T[K]
+}
 
 /** Input accepted by the {@link World} constructor and {@link World.set}. */
 export type WorldInput = DeepPartial<WorldOptions>
@@ -241,28 +257,67 @@ export const DEFAULT_WORLD: WorldOptions = {
   origin: [20, 0],
   seaLevel: 0,
   continents: {
-    scale: 6000, octaves: 5, warp: 0.4, landBias: 0.12,
-    curve: [[-1, -140], [-0.45, -70], [-0.2, -12], [-0.06, -1], [0.02, 1.5], [0.15, 8], [0.45, 30], [1, 70]],
+    scale: 6000,
+    octaves: 5,
+    warp: 0.4,
+    landBias: 0.12,
+    curve: [
+      [-1, -140],
+      [-0.45, -70],
+      [-0.2, -12],
+      [-0.06, -1],
+      [0.02, 1.5],
+      [0.15, 8],
+      [0.45, 30],
+      [1, 70]
+    ]
   },
   erosion: { scale: 2600, octaves: 3 },
-  mountains: { height: 950, scale: 2400, octaves: 8, sharpness: 2, rangeScale: 7000, threshold: 0.5, erosionDamping: 0.75 },
+  mountains: {
+    height: 950,
+    scale: 2400,
+    octaves: 8,
+    sharpness: 2,
+    rangeScale: 7000,
+    threshold: 0.5,
+    erosionDamping: 0.75
+  },
   hills: { height: 55, scale: 900, octaves: 6, erosion: 1.5 },
   detail: { height: 1.6, scale: 48, octaves: 8 },
   micro: { height: 0.05, scale: 0.8, octaves: 7 },
   rivers: { enabled: true, scale: 3400, width: 0.018, valleyWidth: 0.11, depth: 3, valleyDepth: 0.7, maxHeight: 320 },
   climate: {
-    baseTemperature: 15, temperatureRange: 16, temperatureScale: 9000,
-    equatorTemperature: 28, poleTemperature: -18, latitudeGradient: 0, lapseRate: 6.5,
-    moistureScale: 5200, moistureBias: 0, rainShadow: 0.35, windDirection: [1, 0], coastalMoisture: 0.12, riverMoisture: 0.25,
+    baseTemperature: 15,
+    temperatureRange: 16,
+    temperatureScale: 9000,
+    equatorTemperature: 28,
+    poleTemperature: -18,
+    latitudeGradient: 0,
+    lapseRate: 6.5,
+    moistureScale: 5200,
+    moistureBias: 0,
+    rainShadow: 0.35,
+    windDirection: [1, 0],
+    coastalMoisture: 0.12,
+    riverMoisture: 0.25
   },
   rules: {
-    blend: 0.2, maxBiomes: 4, coastHeight: 1.6, deepWater: 6, treelineTemperature: 2, alpineMinHeight: 350,
-    peakShare: 0.42, glacierTemperature: -14, wetlandMoisture: 0.72, wetlandMaxHeight: 8, mangroveTemperature: 23,
+    blend: 0.2,
+    maxBiomes: 4,
+    coastHeight: 1.6,
+    deepWater: 6,
+    treelineTemperature: 2,
+    alpineMinHeight: 350,
+    peakShare: 0.42,
+    glacierTemperature: -14,
+    wetlandMoisture: 0.72,
+    wetlandMaxHeight: 8,
+    mangroveTemperature: 23
   },
   volcanoes: { chance: 0.05, regionSize: 14000, radius: 2200, height: 1100, crater: 0.14 },
   ground: { rockSlope: 0.85, snowTemperature: -3, sandBand: 1.2, colors: { ...GROUND_COLORS } },
   biomes: BIOMES.map((b) => structuredClone(b)),
-  modifiers: [],
+  modifiers: []
 }
 
 /** Everything known about one point of the world. Reuse one object across calls (pass it as `out`). */
@@ -296,8 +351,18 @@ export interface WorldSample {
 /** Creates an empty {@link WorldSample} sized for `maxBiomes`. */
 export function createSample(maxBiomes = 8): WorldSample {
   return {
-    elevation: 0, continentalness: 0, erosion: 0, mountain: 0, temperature: 0, moisture: 0, valley: 0, river: 0, waterLevel: NaN,
-    biomes: new Int32Array(maxBiomes), weights: new Float32Array(maxBiomes), count: 0,
+    elevation: 0,
+    continentalness: 0,
+    erosion: 0,
+    mountain: 0,
+    temperature: 0,
+    moisture: 0,
+    valley: 0,
+    river: 0,
+    waterLevel: NaN,
+    biomes: new Int32Array(maxBiomes),
+    weights: new Float32Array(maxBiomes),
+    count: 0
   }
 }
 
@@ -426,15 +491,25 @@ export class World {
    * Samples everything at a base-surface position (see the class docs for what that means).
    * @param minWavelength Skip noise detail smaller than this many metres (pass a LOD's vertex spacing ×2).
    */
-  sampleAt(px: number, py: number, pz: number, out: WorldSample = createSample(this.options.rules.maxBiomes), minWavelength = 0): WorldSample {
+  sampleAt(
+    px: number,
+    py: number,
+    pz: number,
+    out: WorldSample = createSample(this.options.rules.maxBiomes),
+    minWavelength = 0
+  ): WorldSample {
     const o = this.options
     const sphere = o.surface === 'sphere'
     // P: the noise-space point. On a planet it is the point on the sphere; on a plane, the y = PLANE_Y slice.
-    let x = px, y = PLANE_Y, z = pz
+    let x = px,
+      y = PLANE_Y,
+      z = pz
     let lat = 0
     if (sphere) {
       const len = Math.hypot(px, py, pz) || 1
-      x = (px / len) * o.radius; y = (py / len) * o.radius; z = (pz / len) * o.radius
+      x = (px / len) * o.radius
+      y = (py / len) * o.radius
+      z = (pz / len) * o.radius
       lat = Math.asin(clamp(py / len, -1, 1))
     }
     const seed = this.seed
@@ -443,7 +518,11 @@ export class World {
     // Continents (warped so coastlines don't follow the noise lattice).
     const c0 = o.continents
     const q = warp(seed + 101, x, y, z, 1 / (c0.scale * 1.7), c0.warp * c0.scale, this.w3)
-    const continental = clamp(fbm(seed + 1, q[0], q[1], q[2], frac(1 / c0.scale, c0.octaves)) * 1.25 + c0.landBias, -1, 1)
+    const continental = clamp(
+      fbm(seed + 1, q[0], q[1], q[2], frac(1 / c0.scale, c0.octaves)) * 1.25 + c0.landBias,
+      -1,
+      1
+    )
     const base = curve(c0.curve, continental)
     const land = smoothstep(-0.08, 0.1, continental)
 
@@ -452,13 +531,19 @@ export class World {
     // Mountains: ridged noise inside "range" regions, flattened where erosion is high.
     const m0 = o.mountains
     const rangeField = 0.5 + 0.5 * spread(fbm(seed + 3, x, y, z, frac(1 / m0.rangeScale, 3)))
-    const rangeMask = smoothstep(m0.threshold, m0.threshold + 0.25, rangeField) * (1 - erosion * m0.erosionDamping) * land
-    const ridge = rangeMask > 0.001 ? ridged(seed + 4, x, y, z, frac(1 / m0.scale, m0.octaves), m0.sharpness, minWavelength) : 0
+    const rangeMask =
+      smoothstep(m0.threshold, m0.threshold + 0.25, rangeField) * (1 - erosion * m0.erosionDamping) * land
+    const ridge =
+      rangeMask > 0.001 ? ridged(seed + 4, x, y, z, frac(1 / m0.scale, m0.octaves), m0.sharpness, minWavelength) : 0
     const mountainShare = ridge * rangeMask
     const mountains = m0.height * mountainShare
 
     const h0 = o.hills
-    const hills = h0.height * erodedFbm(seed + 5, x, y, z, frac(1 / h0.scale, h0.octaves), h0.erosion, minWavelength) * (0.35 + 0.65 * (1 - erosion)) * (0.25 + 0.75 * land)
+    const hills =
+      h0.height *
+      erodedFbm(seed + 5, x, y, z, frac(1 / h0.scale, h0.octaves), h0.erosion, minWavelength) *
+      (0.35 + 0.65 * (1 - erosion)) *
+      (0.25 + 0.75 * land)
 
     // Volcanoes: at most one per region, a cone with a crater.
     let volcano = 0
@@ -470,7 +555,7 @@ export class World {
         const d = cell.distance * v0.regionSize
         const t = smoothstep(v0.radius, 0, d)
         const crater = smoothstep(v0.radius * v0.crater, v0.radius * v0.crater * 0.4, d)
-        volcano = v0.height * (Math.pow(t, 1.6) - crater * 0.35) * land
+        volcano = v0.height * (t ** 1.6 - crater * 0.35) * land
         volcanic = smoothstep(v0.radius * 1.15, v0.radius * 0.7, d) * land
       }
     }
@@ -485,7 +570,10 @@ export class World {
     if (r0.enabled) {
       const rq = warp(seed + 201, x, y, z, 1 / (r0.scale * 0.8), r0.scale * 0.35, this.w3)
       const rn = Math.abs(fbm(seed + 7, rq[0], rq[1], rq[2], frac(1 / r0.scale, 3)))
-      const mask = smoothstep(sea + 0.5, sea + 4, base + hills * 0.5) * (1 - smoothstep(r0.maxHeight * 0.6, r0.maxHeight, h)) * (1 - volcanic)
+      const mask =
+        smoothstep(sea + 0.5, sea + 4, base + hills * 0.5) *
+        (1 - smoothstep(r0.maxHeight * 0.6, r0.maxHeight, h)) *
+        (1 - volcanic)
       valley = smoothstep(r0.valleyWidth, 0, rn) * mask
       river = smoothstep(r0.width, r0.width * 0.35, rn) * mask
       if (valley > 0) {
@@ -502,10 +590,15 @@ export class World {
     const above = Math.max(0, h - sea)
     let temperature: number
     if (sphere) {
-      const t = Math.pow(Math.abs(Math.sin(lat)), 1.3)
-      temperature = lerp(cl.equatorTemperature, cl.poleTemperature, t) + cl.temperatureRange * 0.5 * spread(fbm(seed + 8, x, y, z, frac(1 / cl.temperatureScale, 3)))
+      const t = Math.abs(Math.sin(lat)) ** 1.3
+      temperature =
+        lerp(cl.equatorTemperature, cl.poleTemperature, t) +
+        cl.temperatureRange * 0.5 * spread(fbm(seed + 8, x, y, z, frac(1 / cl.temperatureScale, 3)))
     } else {
-      temperature = cl.baseTemperature + cl.temperatureRange * spread(fbm(seed + 8, x, y, z, frac(1 / cl.temperatureScale, 3))) + (cl.latitudeGradient * pz) / 1000
+      temperature =
+        cl.baseTemperature +
+        cl.temperatureRange * spread(fbm(seed + 8, x, y, z, frac(1 / cl.temperatureScale, 3))) +
+        (cl.latitudeGradient * pz) / 1000
     }
     temperature -= (cl.lapseRate * above) / 1000
 
@@ -516,10 +609,16 @@ export class World {
       const [wx, wy, wz] = this.windAt(x, y, z, sphere)
       let upwind = 0
       for (const dist of [m0.scale * 0.6, m0.scale * 1.4]) {
-        const ux = x - wx * dist, uy = y - wy * dist, uz = z - wz * dist
+        const ux = x - wx * dist,
+          uy = y - wy * dist,
+          uz = z - wz * dist
         const rf = 0.5 + 0.5 * spread(fbm(seed + 3, ux, uy, uz, frac(1 / m0.rangeScale, 3)))
         const mask = smoothstep(m0.threshold, m0.threshold + 0.25, rf)
-        if (mask > 0.001) upwind = Math.max(upwind, m0.height * mask * ridged(seed + 4, ux, uy, uz, frac(1 / m0.scale, 3), m0.sharpness))
+        if (mask > 0.001)
+          upwind = Math.max(
+            upwind,
+            m0.height * mask * ridged(seed + 4, ux, uy, uz, frac(1 / m0.scale, 3), m0.sharpness)
+          )
       }
       moisture -= cl.rainShadow * clamp((upwind - mountains) / m0.height, 0, 1)
     }
@@ -545,7 +644,7 @@ export class World {
         case 'dunes': {
           const [wx, , wz] = sphere ? [1, 0, 0] : [cl.windDirection[0], 0, cl.windDirection[1]]
           const len = Math.hypot(wx, wz) || 1
-          const phase = ((x * wx + z * wz) / len) / 70 + 1.8 * fbm(seed + 10, x, y, z, frac(1 / 260, 3))
+          const phase = (x * wx + z * wz) / len / 70 + 1.8 * fbm(seed + 10, x, y, z, frac(1 / 260, 3))
           const crest = 1 - Math.abs(Math.sin(phase * Math.PI))
           h += w * a * (crest * crest * (0.6 + 0.4 * fbm(seed + 11, x, y, z, frac(1 / 500, 2))) - 0.3)
           break
@@ -574,9 +673,12 @@ export class World {
 
     // Ground detail and ant-scale micro relief (skipped below the LOD's resolution).
     const d0 = o.detail
-    if (d0.height > 0) h += d0.height * fbm(seed + 14, x, y, z, frac(1 / d0.scale, d0.octaves), minWavelength) * (0.5 + mountainShare * 2)
+    if (d0.height > 0)
+      h +=
+        d0.height * fbm(seed + 14, x, y, z, frac(1 / d0.scale, d0.octaves), minWavelength) * (0.5 + mountainShare * 2)
     const u0 = o.micro
-    if (u0.height > 0 && (minWavelength === 0 || minWavelength < u0.scale)) h += u0.height * fbm(seed + 15, x, y, z, frac(1 / u0.scale, u0.octaves), minWavelength)
+    if (u0.height > 0 && (minWavelength === 0 || minWavelength < u0.scale))
+      h += u0.height * fbm(seed + 15, x, y, z, frac(1 / u0.scale, u0.octaves), minWavelength)
 
     if (this.modifierIndex.length) h = this.applyModifiers(sphere ? x : px, sphere ? y : 0, sphere ? z : pz, h)
 
@@ -594,12 +696,23 @@ export class World {
       return [wx / l, 0, wz / l]
     }
     // Local east on the sphere: up × north-pole axis.
-    const ex = -z, ez = x
+    const ex = -z,
+      ez = x
     const l = Math.hypot(ex, ez) || 1
     return [ex / l, 0, ez / l]
   }
 
-  private weighBiomes(h: number, sea: number, continental: number, erosion: number, mountainShare: number, volcanic: number, temperature: number, moisture: number, out: WorldSample) {
+  private weighBiomes(
+    h: number,
+    sea: number,
+    continental: number,
+    erosion: number,
+    mountainShare: number,
+    volcanic: number,
+    temperature: number,
+    moisture: number,
+    out: WorldSample
+  ) {
     const o = this.options
     const r = o.rules
     const s = this.scratch
@@ -613,23 +726,43 @@ export class World {
       if (idx === undefined || remaining <= 1e-4) continue
       let strength = 0
       switch (kind) {
-        case 'volcanic': strength = volcanic; break
-        case 'ocean': strength = smoothstep(r.deepWater * 0.5, r.deepWater, depth); break
-        case 'glacier': strength = smoothstep(r.glacierTemperature + 3, r.glacierTemperature - 2, temperature) * onLand; break
-        case 'peaks': strength = smoothstep(r.peakShare, r.peakShare + 0.15, mountainShare); break
+        case 'volcanic':
+          strength = volcanic
+          break
+        case 'ocean':
+          strength = smoothstep(r.deepWater * 0.5, r.deepWater, depth)
+          break
+        case 'glacier':
+          strength = smoothstep(r.glacierTemperature + 3, r.glacierTemperature - 2, temperature) * onLand
+          break
+        case 'peaks':
+          strength = smoothstep(r.peakShare, r.peakShare + 0.15, mountainShare)
+          break
         case 'alpine':
-          strength = smoothstep(r.treelineTemperature + 1.5, r.treelineTemperature - 1.5, temperature) * smoothstep(r.alpineMinHeight * 0.7, r.alpineMinHeight, aboveSea)
+          strength =
+            smoothstep(r.treelineTemperature + 1.5, r.treelineTemperature - 1.5, temperature) *
+            smoothstep(r.alpineMinHeight * 0.7, r.alpineMinHeight, aboveSea)
           break
         case 'mangrove':
         case 'coast': {
-          const shore = smoothstep(r.coastHeight, r.coastHeight * 0.4, aboveSea) * smoothstep(r.deepWater, r.deepWater * 0.5, depth) * smoothstep(0.12, -0.02, continental)
-          const mangrove = shore * smoothstep(r.mangroveTemperature - 2, r.mangroveTemperature + 2, temperature) * smoothstep(0.6, 0.8, moisture)
+          const shore =
+            smoothstep(r.coastHeight, r.coastHeight * 0.4, aboveSea) *
+            smoothstep(r.deepWater, r.deepWater * 0.5, depth) *
+            smoothstep(0.12, -0.02, continental)
+          const mangrove =
+            shore *
+            smoothstep(r.mangroveTemperature - 2, r.mangroveTemperature + 2, temperature) *
+            smoothstep(0.6, 0.8, moisture)
           strength = kind === 'mangrove' ? mangrove : shore - mangrove
           if (kind === 'coast') strength /= Math.max(1e-4, 1 - mangrove) // share of what mangrove left
           break
         }
         case 'wetland':
-          strength = smoothstep(r.wetlandMoisture - 0.06, r.wetlandMoisture + 0.06, moisture) * smoothstep(r.wetlandMaxHeight, r.wetlandMaxHeight * 0.4, aboveSea) * smoothstep(0.45, 0.7, erosion) * onLand
+          strength =
+            smoothstep(r.wetlandMoisture - 0.06, r.wetlandMoisture + 0.06, moisture) *
+            smoothstep(r.wetlandMaxHeight, r.wetlandMaxHeight * 0.4, aboveSea) *
+            smoothstep(0.45, 0.7, erosion) *
+            onLand
           break
       }
       const w = clamp(strength, 0, 1) * remaining
@@ -656,11 +789,15 @@ export class World {
       }
       if (total <= 0) {
         // Far outside every climate biome: take the nearest one.
-        let best = this.climateIdx[0], bestD = Infinity
+        let best = this.climateIdx[0],
+          bestD = Infinity
         for (const i of this.climateIdx) {
           const b = o.biomes[i]
           const d = ((temperature - b.temperature) / 25) ** 2 + ((moisture - b.moisture) / 0.45) ** 2
-          if (d < bestD) { bestD = d; best = i }
+          if (d < bestD) {
+            bestD = d
+            best = i
+          }
         }
         n = start
         s.biomes[n] = best
@@ -674,8 +811,13 @@ export class World {
     out.count = 0
     let sum = 0
     for (let k = 0; k < max && k < n; k++) {
-      let best = -1, bw = -1
-      for (let i = 0; i < n; i++) if (s.weights[i] > bw) { bw = s.weights[i]; best = i }
+      let best = -1,
+        bw = -1
+      for (let i = 0; i < n; i++)
+        if (s.weights[i] > bw) {
+          bw = s.weights[i]
+          best = i
+        }
       if (best < 0 || bw <= 0) break
       out.biomes[out.count] = s.biomes[best]
       out.weights[out.count++] = bw
@@ -691,21 +833,33 @@ export class World {
    * @param overrides Apply the slope/cold/waterline/river overrides (rock, snow, sand, mud). The terrain
    *   shader applies those per pixel itself, so chunks pass `false` and get the biome soil colour only.
    */
-  ground(sample: WorldSample, slope: number, weightsOut: Float32Array = new Float32Array(GROUND_MATERIALS.length), colorOut: Float32Array = new Float32Array(3), overrides = true): { weights: Float32Array; color: Float32Array } {
+  ground(
+    sample: WorldSample,
+    slope: number,
+    weightsOut: Float32Array = new Float32Array(GROUND_MATERIALS.length),
+    colorOut: Float32Array = new Float32Array(3),
+    overrides = true
+  ): { weights: Float32Array; color: Float32Array } {
     const o = this.options
     const m = GROUND_MATERIALS.length
     weightsOut.fill(0)
-    let tr = 0, tg = 0, tb = 0
+    let tr = 0,
+      tg = 0,
+      tb = 0
     for (let i = 0; i < sample.count; i++) {
       const b = sample.biomes[i]
       const w = sample.weights[i]
       for (let j = 0; j < m; j++) weightsOut[j] += w * this.groundMix[b * m + j]
-      tr += w * this.tints[b * 3]; tg += w * this.tints[b * 3 + 1]; tb += w * this.tints[b * 3 + 2]
+      tr += w * this.tints[b * 3]
+      tg += w * this.tints[b * 3 + 1]
+      tb += w * this.tints[b * 3 + 2]
     }
     const g = o.ground
     // Overrides: steep ground is rock, cold ground is snow, the waterline is sand, river banks are mud.
     const rock = smoothstep(g.rockSlope * 0.7, g.rockSlope, slope)
-    const snow = smoothstep(g.snowTemperature + 1.5, g.snowTemperature - 1.5, sample.temperature) * (1 - smoothstep(1.2, 1.8, slope))
+    const snow =
+      smoothstep(g.snowTemperature + 1.5, g.snowTemperature - 1.5, sample.temperature) *
+      (1 - smoothstep(1.2, 1.8, slope))
     const sand = smoothstep(g.sandBand, g.sandBand * 0.3, Math.abs(sample.elevation - o.seaLevel)) * (1 - rock)
     const mud = sample.river * 0.8
     const blend = (j: number, t: number) => {
@@ -719,9 +873,13 @@ export class World {
       blend(5, snow)
     }
     const cols = this.groundColors()
-    let r = 0, gg = 0, bb = 0
+    let r = 0,
+      gg = 0,
+      bb = 0
     for (let j = 0; j < m; j++) {
-      r += weightsOut[j] * cols[j * 3]; gg += weightsOut[j] * cols[j * 3 + 1]; bb += weightsOut[j] * cols[j * 3 + 2]
+      r += weightsOut[j] * cols[j * 3]
+      gg += weightsOut[j] * cols[j * 3 + 1]
+      bb += weightsOut[j] * cols[j * 3 + 2]
     }
     // Biome tint applies to living/soil materials, not to rock and snow.
     const tintAmount = 1 - weightsOut[4] - weightsOut[5]
@@ -792,16 +950,24 @@ class ModifierGrid {
     this.cell = Math.max(8, sizes[sizes.length >> 1] ?? 8)
     const c = this.cell
     mods.forEach((m, i) => {
-      const x0 = Math.floor(m.minX / c), x1 = Math.floor(m.maxX / c)
-      const y0 = Math.floor(m.minY / c), y1 = Math.floor(m.maxY / c)
-      const z0 = Math.floor(m.minZ / c), z1 = Math.floor(m.maxZ / c)
-      if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { this.big.push(i); return }
-      for (let ix = x0; ix <= x1; ix++) for (let iy = y0; iy <= y1; iy++) for (let iz = z0; iz <= z1; iz++) {
-        const k = cellKey(ix, iy, iz)
-        const list = this.cells.get(k)
-        if (!list) this.cells.set(k, [i])
-        else if (list[list.length - 1] !== i) list.push(i) // hash collisions could repeat an index
+      const x0 = Math.floor(m.minX / c),
+        x1 = Math.floor(m.maxX / c)
+      const y0 = Math.floor(m.minY / c),
+        y1 = Math.floor(m.maxY / c)
+      const z0 = Math.floor(m.minZ / c),
+        z1 = Math.floor(m.maxZ / c)
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > MAX_CELLS) {
+        this.big.push(i)
+        return
       }
+      for (let ix = x0; ix <= x1; ix++)
+        for (let iy = y0; iy <= y1; iy++)
+          for (let iz = z0; iz <= z1; iz++) {
+            const k = cellKey(ix, iy, iz)
+            const list = this.cells.get(k)
+            if (!list) this.cells.set(k, [i])
+            else if (list[list.length - 1] !== i) list.push(i) // hash collisions could repeat an index
+          }
     })
   }
 
@@ -811,8 +977,10 @@ class ModifierGrid {
     const c = this.cell
     const local = this.cells.get(cellKey(Math.floor(x / c), Math.floor(y / c), Math.floor(z / c)))
     const big = this.big
-    let a = 0, b = 0
-    const na = local?.length ?? 0, nb = big.length
+    let a = 0,
+      b = 0
+    const na = local?.length ?? 0,
+      nb = big.length
     while (a < na || b < nb) {
       const i = b >= nb || (a < na && local![a] < big[b]) ? local![a++] : big[b++]
       const m = this.mods[i]
@@ -840,16 +1008,26 @@ export interface WorldRegion {
 function modifierRegion(mods: HeightModifier[]): WorldRegion | undefined {
   if (!mods.length) return undefined
   const prepared = buildModifierIndex(mods)
-  const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity]
+  const min: Vec3 = [Infinity, Infinity, Infinity],
+    max: Vec3 = [-Infinity, -Infinity, -Infinity]
   for (const m of prepared) {
-    min[0] = Math.min(min[0], m.minX); min[1] = Math.min(min[1], m.minY); min[2] = Math.min(min[2], m.minZ)
-    max[0] = Math.max(max[0], m.maxX); max[1] = Math.max(max[1], m.maxY); max[2] = Math.max(max[2], m.maxZ)
+    min[0] = Math.min(min[0], m.minX)
+    min[1] = Math.min(min[1], m.minY)
+    min[2] = Math.min(min[2], m.minZ)
+    max[0] = Math.max(max[0], m.maxX)
+    max[1] = Math.max(max[1], m.maxY)
+    max[2] = Math.max(max[2], m.maxZ)
   }
   return { min, max }
 }
 
 interface PreparedModifier {
-  minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+  minZ: number
+  maxZ: number
   apply: (x: number, y: number, z: number, h: number) => number
 }
 
@@ -859,35 +1037,61 @@ function buildModifierIndex(mods: HeightModifier[]): PreparedModifier[] {
       const [cx, cy, cz] = m.center
       const r = m.radius + m.falloff
       return {
-        minX: cx - r, maxX: cx + r, minY: cy - r, maxY: cy + r, minZ: cz - r, maxZ: cz + r,
+        minX: cx - r,
+        maxX: cx + r,
+        minY: cy - r,
+        maxY: cy + r,
+        minZ: cz - r,
+        maxZ: cz + r,
         apply: (x, y, z, h) => {
           if (m.height === null) return h
           const d = Math.hypot(x - cx, y - cy, z - cz)
           return lerp(h, m.height, smoothstep(m.radius + m.falloff, m.radius, d))
-        },
+        }
       }
     }
     const pts = m.points
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity,
+      minZ = Infinity,
+      maxZ = -Infinity
     for (const [x, y, z] of pts) {
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z)
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      minZ = Math.min(minZ, z)
+      maxZ = Math.max(maxZ, z)
     }
     const pad = m.width + m.falloff
     return {
-      minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad, minZ: minZ - pad, maxZ: maxZ + pad,
+      minX: minX - pad,
+      maxX: maxX + pad,
+      minY: minY - pad,
+      maxY: maxY + pad,
+      minZ: minZ - pad,
+      maxZ: maxZ + pad,
       apply: (x, y, z, h) => {
-        let best = Infinity, target = h
+        let best = Infinity,
+          target = h
         for (let i = 1; i < pts.length; i++) {
           const [ax, ay, az, ah] = pts[i - 1]
           const [bx, by, bz, bh] = pts[i]
-          const abx = bx - ax, aby = by - ay, abz = bz - az
+          const abx = bx - ax,
+            aby = by - ay,
+            abz = bz - az
           const len2 = abx * abx + aby * aby + abz * abz || 1
           const t = clamp(((x - ax) * abx + (y - ay) * aby + (z - az) * abz) / len2, 0, 1)
           const d = Math.hypot(x - (ax + abx * t), y - (ay + aby * t), z - (az + abz * t))
-          if (d < best) { best = d; target = ah + (bh - ah) * t }
+          if (d < best) {
+            best = d
+            target = ah + (bh - ah) * t
+          }
         }
         return lerp(h, target, smoothstep(m.width + m.falloff, m.width, best))
-      },
+      }
     }
   })
 }
@@ -913,21 +1117,33 @@ export class LocalFrame {
   constructor(world: World, latitude = world.options.origin[0], longitude = world.options.origin[1]) {
     this.world = world
     if (world.options.surface !== 'sphere') {
-      this.origin = [0, 0, 0]; this.east = [1, 0, 0]; this.up = [0, 1, 0]; this.north = [0, 0, -1]
+      this.origin = [0, 0, 0]
+      this.east = [1, 0, 0]
+      this.up = [0, 1, 0]
+      this.north = [0, 0, -1]
       return
     }
-    const la = (latitude * Math.PI) / 180, lo = (longitude * Math.PI) / 180
+    const la = (latitude * Math.PI) / 180,
+      lo = (longitude * Math.PI) / 180
     const up: Vec3 = [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)]
     const east: Vec3 = [Math.cos(lo), 0, -Math.sin(lo)]
-    const north: Vec3 = [up[1] * east[2] - up[2] * east[1], up[2] * east[0] - up[0] * east[2], up[0] * east[1] - up[1] * east[0]]
+    const north: Vec3 = [
+      up[1] * east[2] - up[2] * east[1],
+      up[2] * east[0] - up[0] * east[2],
+      up[0] * east[1] - up[1] * east[0]
+    ]
     const R = world.options.radius
     this.origin = [up[0] * R, up[1] * R, up[2] * R]
-    this.up = up; this.east = east; this.north = north
+    this.up = up
+    this.east = east
+    this.north = north
   }
 
   /** Base-surface point under local (x, z), planet-centred. */
   basePoint(x: number, z: number, out: Vec3 = [0, 0, 0]): Vec3 {
-    const o = this.origin, e = this.east, n = this.north
+    const o = this.origin,
+      e = this.east,
+      n = this.north
     out[0] = o[0] + e[0] * x - n[0] * z
     out[1] = o[1] + e[1] * x - n[1] * z
     out[2] = o[2] + e[2] * x - n[2] * z
@@ -951,8 +1167,16 @@ export class LocalFrame {
 
   /** Converts local (x, y, z) to a planet-centred position (identity on a flat world). */
   toWorld(x: number, y: number, z: number, out: Vec3 = [0, 0, 0]): Vec3 {
-    if (this.world.options.surface !== 'sphere') { out[0] = x; out[1] = y; out[2] = z; return out }
-    const o = this.origin, e = this.east, n = this.north, u = this.up
+    if (this.world.options.surface !== 'sphere') {
+      out[0] = x
+      out[1] = y
+      out[2] = z
+      return out
+    }
+    const o = this.origin,
+      e = this.east,
+      n = this.north,
+      u = this.up
     out[0] = o[0] + e[0] * x + u[0] * y - n[0] * z
     out[1] = o[1] + e[1] * x + u[1] * y - n[1] * z
     out[2] = o[2] + e[2] * x + u[2] * y - n[2] * z
@@ -997,23 +1221,36 @@ function sanitize(o: WorldOptions): WorldOptions {
     for (const [k, v] of Object.entries(obj)) {
       const d = defaults?.[k]
       if (typeof d === 'number' && (typeof v !== 'number' || !Number.isFinite(v))) obj[k] = d
-      else if (v && typeof v === 'object' && !Array.isArray(v) && d && typeof d === 'object') fix(v as Record<string, unknown>, d as Record<string, unknown>)
+      else if (v && typeof v === 'object' && !Array.isArray(v) && d && typeof d === 'object')
+        fix(v as Record<string, unknown>, d as Record<string, unknown>)
     }
   }
   fix(o as unknown as Record<string, unknown>, DEFAULT_WORLD as unknown as Record<string, unknown>)
   const positive = (v: number, min: number) => Math.max(min, v)
   const octaves = (v: number) => Math.min(16, Math.max(1, Math.round(v)))
   o.radius = positive(o.radius, 100)
-  o.continents.scale = positive(o.continents.scale, 1); o.continents.octaves = octaves(o.continents.octaves)
-  o.erosion.scale = positive(o.erosion.scale, 1); o.erosion.octaves = octaves(o.erosion.octaves)
-  o.mountains.scale = positive(o.mountains.scale, 1); o.mountains.rangeScale = positive(o.mountains.rangeScale, 1); o.mountains.octaves = octaves(o.mountains.octaves)
-  o.hills.scale = positive(o.hills.scale, 0.01); o.hills.octaves = octaves(o.hills.octaves)
-  o.detail.scale = positive(o.detail.scale, 0.001); o.detail.octaves = octaves(o.detail.octaves)
-  o.micro.scale = positive(o.micro.scale, 0.0001); o.micro.octaves = octaves(o.micro.octaves)
-  o.rivers.scale = positive(o.rivers.scale, 1); o.rivers.width = positive(o.rivers.width, 1e-4); o.rivers.valleyWidth = positive(o.rivers.valleyWidth, o.rivers.width)
-  o.climate.temperatureScale = positive(o.climate.temperatureScale, 1); o.climate.moistureScale = positive(o.climate.moistureScale, 1)
-  o.volcanoes.regionSize = positive(o.volcanoes.regionSize, 1); o.volcanoes.radius = positive(o.volcanoes.radius, 0.01)
-  o.rules.blend = positive(o.rules.blend, 0.01); o.rules.maxBiomes = Math.min(16, Math.max(1, Math.round(o.rules.maxBiomes)))
+  o.continents.scale = positive(o.continents.scale, 1)
+  o.continents.octaves = octaves(o.continents.octaves)
+  o.erosion.scale = positive(o.erosion.scale, 1)
+  o.erosion.octaves = octaves(o.erosion.octaves)
+  o.mountains.scale = positive(o.mountains.scale, 1)
+  o.mountains.rangeScale = positive(o.mountains.rangeScale, 1)
+  o.mountains.octaves = octaves(o.mountains.octaves)
+  o.hills.scale = positive(o.hills.scale, 0.01)
+  o.hills.octaves = octaves(o.hills.octaves)
+  o.detail.scale = positive(o.detail.scale, 0.001)
+  o.detail.octaves = octaves(o.detail.octaves)
+  o.micro.scale = positive(o.micro.scale, 0.0001)
+  o.micro.octaves = octaves(o.micro.octaves)
+  o.rivers.scale = positive(o.rivers.scale, 1)
+  o.rivers.width = positive(o.rivers.width, 1e-4)
+  o.rivers.valleyWidth = positive(o.rivers.valleyWidth, o.rivers.width)
+  o.climate.temperatureScale = positive(o.climate.temperatureScale, 1)
+  o.climate.moistureScale = positive(o.climate.moistureScale, 1)
+  o.volcanoes.regionSize = positive(o.volcanoes.regionSize, 1)
+  o.volcanoes.radius = positive(o.volcanoes.radius, 0.01)
+  o.rules.blend = positive(o.rules.blend, 0.01)
+  o.rules.maxBiomes = Math.min(16, Math.max(1, Math.round(o.rules.maxBiomes)))
   if (!o.continents.curve?.length) o.continents.curve = structuredClone(DEFAULT_WORLD.continents.curve)
   if (!o.biomes?.length) o.biomes = structuredClone(DEFAULT_WORLD.biomes)
   return o

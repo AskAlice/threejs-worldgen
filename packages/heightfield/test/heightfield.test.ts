@@ -16,7 +16,12 @@ function terrainMesh() {
 
 test('baked mesh heights match the surface, NaN outside', () => {
   const h = bakeHeightfield(terrainMesh(), 512)
-  for (const [x, z] of [[10, -5], [40, 20], [-30, -40], [55, 40]]) {
+  for (const [x, z] of [
+    [10, -5],
+    [40, 20],
+    [-30, -40],
+    [55, 40]
+  ]) {
     assert.ok(Math.abs(h(x, z) - surface(x - 10, z + 5)) < 0.05, `height at ${x},${z}`)
   }
   assert.ok(Number.isNaN(h(200, 0)))

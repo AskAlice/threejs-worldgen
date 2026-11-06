@@ -28,7 +28,10 @@ controls.enableDamping = true
 const sun = new THREE.DirectionalLight('#fff1dc', 3)
 sun.position.set(-30, 40, -20)
 scene.add(sun, new THREE.HemisphereLight('#cfe3ff', '#4a4030', 0.8))
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardNodeMaterial({ color: '#5d5446', roughness: 0.95 }))
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2),
+  new THREE.MeshStandardNodeMaterial({ color: '#5d5446', roughness: 0.95 })
+)
 scene.add(ground)
 
 const lighting = new ParticleLighting()
@@ -42,7 +45,13 @@ sparks.object.renderOrder = 3
 scene.add(smoke.object, flames.object, sparks.object)
 const heat = grid.splat(flames, 0, (p) => p.temperature.sub(400).max(0).div(1200).mul(0.02)) // heat per second
 const cell = grid.cellSize()
-const density = grid.splat(smoke, 1, (p) => p.size.mul(p.size).mul(p.size).mul(0.2 / (cell.x * cell.y * cell.z)).mul(p.t.oneMinus()))
+const density = grid.splat(smoke, 1, (p) =>
+  p.size
+    .mul(p.size)
+    .mul(p.size)
+    .mul(0.2 / (cell.x * cell.y * cell.z))
+    .mul(p.t.oneMinus())
+)
 const fireLight = new THREE.PointLight('#ff8a3a', 40, 60, 1.6)
 fireLight.position.set(0, 2, 0)
 scene.add(fireLight)
@@ -52,15 +61,20 @@ const color = pass(scene, camera).getTextureNode('output')
 pipeline.outputNode = color.add(bloom(color, 0.2, 0.3, 1.5))
 
 const spec = panels['threejs-particles']
-createPanel([{
-  name: 'threejs-particles',
-  classes: [
-    classOf('flames', flames, flames.options, specOptions(spec.flames)),
-    classOf('smoke', smoke, smoke.options, specOptions(spec.smoke)),
-    classOf('sparks', sparks, sparks.options, specOptions(spec.sparks)),
-    classOf('grid', grid, grid.options, specOptions(spec.grid)),
+createPanel(
+  [
+    {
+      name: 'threejs-particles',
+      classes: [
+        classOf('flames', flames, flames.options, specOptions(spec.flames)),
+        classOf('smoke', smoke, smoke.options, specOptions(spec.smoke)),
+        classOf('sparks', sparks, sparks.options, specOptions(spec.sparks)),
+        classOf('grid', grid, grid.options, specOptions(spec.grid))
+      ]
+    }
   ],
-}], { title: 'threejs-particles' })
+  { title: 'threejs-particles' }
+)
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -69,7 +83,9 @@ addEventListener('resize', () => {
 })
 Object.assign(window, { flames, smoke, sparks, grid, camera, controls, renderer, scene })
 
-let last = performance.now(), fps = 60, t = 0
+let last = performance.now(),
+  fps = 60,
+  t = 0
 renderer.setAnimationLoop(() => {
   const now = performance.now()
   const dt = Math.min(0.1, (now - last) / 1000)
@@ -79,7 +95,14 @@ renderer.setAnimationLoop(() => {
   controls.update()
   lighting.fromScene(scene)
   // One batched submission: emit + update for each system, the splats (P2G), then the grid resolve.
-  renderer.compute([...flames.prepare(renderer, dt, camera), ...smoke.prepare(renderer, dt, camera), ...sparks.prepare(renderer, dt, camera), heat, density, ...grid.resolvePasses(dt)])
+  renderer.compute([
+    ...flames.prepare(renderer, dt, camera),
+    ...smoke.prepare(renderer, dt, camera),
+    ...sparks.prepare(renderer, dt, camera),
+    heat,
+    density,
+    ...grid.resolvePasses(dt)
+  ])
   smoke.sort(renderer)
   fireLight.intensity = 40 * (1 + 0.2 * Math.sin(t * 13) + 0.1 * Math.sin(t * 23 + 1))
   pipeline.render()

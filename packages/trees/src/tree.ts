@@ -1,10 +1,19 @@
-import { Box3, type BufferGeometry } from 'three/webgpu'
+import type { Box3, BufferGeometry } from 'three/webgpu'
 import { hash, mulberry32 } from 'threejs-scatter'
 import { addLeafCards, addTreeFruit } from './leaves.ts'
 import { growSkeleton, type TreeSkeleton } from './space-colonization.ts'
 import { DEFAULT_TREE_PARAMS, type TreeParams } from './species.ts'
 import {
-  bezier, generateBamboo, generateCactus, generateFern, generateFlowers, generateLilyPads, generatePalm, generateReed, generateSucculent, generateTuft,
+  bezier,
+  generateBamboo,
+  generateCactus,
+  generateFern,
+  generateFlowers,
+  generateLilyPads,
+  generatePalm,
+  generateReed,
+  generateSucculent,
+  generateTuft
 } from './special.ts'
 import { addTube, createArrays, linearColor, toGeometry, type MeshArrays, type Vec3 } from './tube-mesh.ts'
 
@@ -48,7 +57,11 @@ export function generateTree(params: Partial<TreeParams>, seed = 1, options: Tre
  * Generates the same tree at several detail levels (see {@link TreeDetailOptions.detail}), growing its skeleton only
  * once. Used for levels of detail: `generateTreeLevels(species.oak, 3, [1, 0.4])`.
  */
-export function generateTreeLevels(params: Partial<TreeParams>, seed: number, details: readonly number[]): TreeGeometry[] {
+export function generateTreeLevels(
+  params: Partial<TreeParams>,
+  seed: number,
+  details: readonly number[]
+): TreeGeometry[] {
   const p: TreeParams = { ...DEFAULT_TREE_PARAMS, ...params }
   const skeleton = p.kind === 'colonization' ? growSkeleton(p, mulberry32(hash(seed, 0x7ee5))) : null
   return details.map((d) => {
@@ -60,15 +73,33 @@ export function generateTreeLevels(params: Partial<TreeParams>, seed: number, de
     const leaves = createArrays()
     const fruit = createArrays()
     switch (p.kind) {
-      case 'palm': generatePalm(p, rand, detail, trunk, leaves); break
-      case 'cactus': generateCactus(p, rand, detail, trunk); break
-      case 'fern': generateFern(p, rand, detail, trunk, leaves); break
-      case 'reed': generateReed(p, rand, detail, trunk, leaves); break
-      case 'flowers': generateFlowers(p, rand, detail, trunk, leaves, fruit); break
-      case 'tuft': generateTuft(p, rand, detail, trunk, leaves); break
-      case 'succulent': generateSucculent(p, rand, detail, trunk); break
-      case 'bamboo': generateBamboo(p, rand, detail, trunk, leaves); break
-      case 'lilyPad': generateLilyPads(p, rand, detail, trunk, fruit); break
+      case 'palm':
+        generatePalm(p, rand, detail, trunk, leaves)
+        break
+      case 'cactus':
+        generateCactus(p, rand, detail, trunk)
+        break
+      case 'fern':
+        generateFern(p, rand, detail, trunk, leaves)
+        break
+      case 'reed':
+        generateReed(p, rand, detail, trunk, leaves)
+        break
+      case 'flowers':
+        generateFlowers(p, rand, detail, trunk, leaves, fruit)
+        break
+      case 'tuft':
+        generateTuft(p, rand, detail, trunk, leaves)
+        break
+      case 'succulent':
+        generateSucculent(p, rand, detail, trunk)
+        break
+      case 'bamboo':
+        generateBamboo(p, rand, detail, trunk, leaves)
+        break
+      case 'lilyPad':
+        generateLilyPads(p, rand, detail, trunk, fruit)
+        break
       default: {
         addBranches(trunk, skeleton!, p, detail)
         if (p.propRoots > 0) addPropRoots(trunk, skeleton!, p, mulberry32(hash(seed, 0x9007)), detail)
@@ -99,7 +130,10 @@ function addBranches(out: MeshArrays, sk: TreeSkeleton, p: TreeParams, detail: n
   const prune = detail >= 1 ? 0 : p.tipRadius * (1 + (1 - detail) * 5)
   const bark = linearColor(p.barkColor)
   const at = (i: number): Vec3 => [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]]
-  const trunkSegs = Math.max(3, Math.round((p.buttress > 0 ? Math.max(p.radialSegments, 16) : p.radialSegments) * (0.45 + 0.55 * detail)))
+  const trunkSegs = Math.max(
+    3,
+    Math.round((p.buttress > 0 ? Math.max(p.radialSegments, 16) : p.radialSegments) * (0.45 + 0.55 * detail))
+  )
   const lobePhase = (P[3] * 7.1 + P[5] * 3.3) % (Math.PI * 2)
 
   const queue: [from: number, first: number][] = [[-1, 0]]
@@ -124,13 +158,19 @@ function addBranches(out: MeshArrays, sk: TreeSkeleton, p: TreeParams, detail: n
       // Reach below the ground (hides the base on slopes) and add rings near the ground for the flare.
       const r0 = pts[0]
       const b1 = pts[1]
-      const lerp = (t: number): Vec3 => [r0[0] + (b1[0] - r0[0]) * t, r0[1] + (b1[1] - r0[1]) * t, r0[2] + (b1[2] - r0[2]) * t]
+      const lerp = (t: number): Vec3 => [
+        r0[0] + (b1[0] - r0[0]) * t,
+        r0[1] + (b1[1] - r0[1]) * t,
+        r0[2] + (b1[2] - r0[2]) * t
+      ]
       const head: Vec3[] = [[r0[0], r0[1] - 0.4, r0[2]], r0, lerp(0.12), lerp(0.3), lerp(0.6)]
       pts.splice(0, 1, ...head)
       radii.splice(0, 1, ...head.map(() => radii[0]))
     }
     const base = sk.radius[0]
-    const segments = isTrunk ? trunkSegs : Math.max(3, Math.round(p.radialSegments * Math.sqrt(radii[0] / Math.max(base, 1e-4)) * (0.45 + 0.55 * detail)))
+    const segments = isTrunk
+      ? trunkSegs
+      : Math.max(3, Math.round(p.radialSegments * Math.sqrt(radii[0] / Math.max(base, 1e-4)) * (0.45 + 0.55 * detail)))
     const shade = 0.88 + 0.12 * ((nodes[0] * 0.6180339) % 1)
     addTube(out, pts, radii, {
       segments,
@@ -138,13 +178,22 @@ function addBranches(out: MeshArrays, sk: TreeSkeleton, p: TreeParams, detail: n
       card: isTrunk ? -1 : hash(first, 0xb4a7) / 4294967296,
       color: [bark[0] * shade, bark[1] * shade, bark[2] * shade],
       closeEnd: true,
-      shape: isTrunk ? (_k, theta, q) => {
-        const y = Math.max(0, q[1])
-        const flare = 1 + p.rootFlare * Math.exp(-y / (base * 1.2 + 0.05))
-        const lobes = p.buttress > 0 ? 1 + p.buttress * 1.6 * Math.pow(Math.max(0, Math.cos(theta * 5 + lobePhase)), 3) * Math.exp(-y / (base * 2.2 + 0.1)) : 1
-        return flare * lobes
-      } : undefined,
-      shade: isTrunk ? (_k, q) => 0.7 + 0.3 * Math.min(1, Math.max(0, q[1]) / 1.5) : undefined,
+      shape: isTrunk
+        ? (_k, theta, q) => {
+            const y = Math.max(0, q[1])
+            const flare = 1 + p.rootFlare * Math.exp(-y / (base * 1.2 + 0.05))
+            const lobes =
+              p.buttress > 0
+                ? 1 +
+                  p.buttress *
+                    1.6 *
+                    Math.max(0, Math.cos(theta * 5 + lobePhase)) ** 3 *
+                    Math.exp(-y / (base * 2.2 + 0.1))
+                : 1
+            return flare * lobes
+          }
+        : undefined,
+      shade: isTrunk ? (_k, q) => 0.7 + 0.3 * Math.min(1, Math.max(0, q[1]) / 1.5) : undefined
     })
   }
 }
@@ -165,6 +214,11 @@ function addPropRoots(out: MeshArrays, sk: TreeSkeleton, p: TreeParams, rand: ()
     const ctrl: Vec3 = [start[0] + Math.cos(a) * reach * 0.45, start[1] + 0.35, start[2] + Math.sin(a) * reach * 0.45]
     const pts = bezier(start, ctrl, end, steps)
     const r0 = p.baseRadius * 0.32
-    addTube(out, pts, pts.map((_, i) => r0 * (1 - 0.35 * (i / steps))), { segments: Math.max(3, Math.round(6 * detail)), color })
+    addTube(
+      out,
+      pts,
+      pts.map((_, i) => r0 * (1 - 0.35 * (i / steps))),
+      { segments: Math.max(3, Math.round(6 * detail)), color }
+    )
   }
 }

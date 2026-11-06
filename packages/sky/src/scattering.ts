@@ -77,7 +77,7 @@ export const DEFAULT_ATMOSPHERE: AtmosphereOptions = {
   layers: DEFAULT_LAYERS,
   scaleWithRadius: true,
   steps: 16,
-  lightSteps: 6,
+  lightSteps: 6
 }
 
 /**
@@ -87,7 +87,9 @@ export const DEFAULT_ATMOSPHERE: AtmosphereOptions = {
  */
 export function raySphere(o: Vec3, d: Vec3, r: number): [number, number] | null {
   const b = o[0] * d[0] + o[1] * d[1] + o[2] * d[2]
-  const px = o[0] - d[0] * b, py = o[1] - d[1] * b, pz = o[2] - d[2] * b
+  const px = o[0] - d[0] * b,
+    py = o[1] - d[1] * b,
+    pz = o[2] - d[2] * b
   const h2 = r * r - (px * px + py * py + pz * pz)
   if (h2 < 0) return null
   const h = Math.sqrt(h2)
@@ -99,7 +101,7 @@ export const phaseRayleigh = (mu: number) => (3 / (16 * Math.PI)) * (1 + mu * mu
 /** Cornette–Shanks Mie phase function. */
 export function phaseMie(mu: number, g: number): number {
   const g2 = g * g
-  return ((3 / (8 * Math.PI)) * ((1 - g2) * (1 + mu * mu))) / ((2 + g2) * Math.pow(Math.max(1e-6, 1 + g2 - 2 * g * mu), 1.5))
+  return ((3 / (8 * Math.PI)) * ((1 - g2) * (1 + mu * mu))) / ((2 + g2) * Math.max(1e-6, 1 + g2 - 2 * g * mu) ** 1.5)
 }
 
 /** Rayleigh, Mie and ozone densities (relative to sea level) at a height. */
@@ -116,18 +118,29 @@ const _d: Vec3 = [0, 0, 0]
  * Optical depths (Rayleigh, Mie, ozone; density × metres) from `p` along `d` to the top of the
  * atmosphere. Returns `null` if the ray hits the planet.
  */
-export function opticalDepth(a: AtmosphereOptions, planetRadius: number, p: Vec3, d: Vec3, steps = a.lightSteps): Vec3 | null {
+export function opticalDepth(
+  a: AtmosphereOptions,
+  planetRadius: number,
+  p: Vec3,
+  d: Vec3,
+  steps = a.lightSteps
+): Vec3 | null {
   const top = raySphere(p, d, planetRadius + a.height)
   if (!top || top[1] <= 0) return [0, 0, 0]
   const ground = raySphere(p, d, planetRadius)
   if (ground && ground[0] > 0) return null
-  const t0 = Math.max(0, top[0]), ds = (top[1] - t0) / steps
+  const t0 = Math.max(0, top[0]),
+    ds = (top[1] - t0) / steps
   const od: Vec3 = [0, 0, 0]
   for (let i = 0; i < steps; i++) {
     const t = t0 + (i + 0.5) * ds
-    const x = p[0] + d[0] * t, y = p[1] + d[1] * t, z = p[2] + d[2] * t
+    const x = p[0] + d[0] * t,
+      y = p[1] + d[1] * t,
+      z = p[2] + d[2] * t
     densities(a, Math.hypot(x, y, z) - planetRadius, _d)
-    od[0] += _d[0] * ds; od[1] += _d[1] * ds; od[2] += _d[2] * ds
+    od[0] += _d[0] * ds
+    od[1] += _d[1] * ds
+    od[2] += _d[2] * ds
   }
   return od
 }
@@ -152,29 +165,52 @@ export function transmittance(a: AtmosphereOptions, planetRadius: number, p: Vec
  * Light scattered towards a camera at `o` (relative to the planet centre) looking along `d`, lit by a
  * sun in direction `sun` with radiance scale `intensity`. Same model as the sky shader (no discs).
  */
-export function skyRadiance(a: AtmosphereOptions, planetRadius: number, o: Vec3, d: Vec3, sun: Vec3, intensity = a.sunIntensity): Vec3 {
+export function skyRadiance(
+  a: AtmosphereOptions,
+  planetRadius: number,
+  o: Vec3,
+  d: Vec3,
+  sun: Vec3,
+  intensity = a.sunIntensity
+): Vec3 {
   if (!a.enabled) return [0, 0, 0]
   const top = raySphere(o, d, planetRadius + a.height)
   if (!top || top[1] <= 0) return [0, 0, 0]
   let t1 = top[1]
   const ground = raySphere(o, d, planetRadius)
   if (ground && ground[0] > 0) t1 = ground[0]
-  const t0 = Math.max(0, top[0]), ds = (t1 - t0) / a.steps
+  const t0 = Math.max(0, top[0]),
+    ds = (t1 - t0) / a.steps
   const mu = d[0] * sun[0] + d[1] * sun[1] + d[2] * sun[2]
-  const pr = phaseRayleigh(mu), pm = phaseMie(mu, a.mieG)
-  const view: Vec3 = [0, 0, 0], sumR: Vec3 = [0, 0, 0], sumM: Vec3 = [0, 0, 0], p: Vec3 = [0, 0, 0]
+  const pr = phaseRayleigh(mu),
+    pm = phaseMie(mu, a.mieG)
+  const view: Vec3 = [0, 0, 0],
+    sumR: Vec3 = [0, 0, 0],
+    sumM: Vec3 = [0, 0, 0],
+    p: Vec3 = [0, 0, 0]
   for (let i = 0; i < a.steps; i++) {
     const t = t0 + (i + 0.5) * ds
-    p[0] = o[0] + d[0] * t; p[1] = o[1] + d[1] * t; p[2] = o[2] + d[2] * t
+    p[0] = o[0] + d[0] * t
+    p[1] = o[1] + d[1] * t
+    p[2] = o[2] + d[2] * t
     densities(a, Math.hypot(p[0], p[1], p[2]) - planetRadius, _d)
-    const dr = _d[0] * ds, dm = _d[1] * ds, dz = _d[2] * ds
-    view[0] += dr * 0.5; view[1] += dm * 0.5; view[2] += dz * 0.5 // optical depth to the sample's centre
+    const dr = _d[0] * ds,
+      dm = _d[1] * ds,
+      dz = _d[2] * ds
+    view[0] += dr * 0.5
+    view[1] += dm * 0.5
+    view[2] += dz * 0.5 // optical depth to the sample's centre
     const light = opticalDepth(a, planetRadius, p, sun)
     if (light) {
       const T = extinction(a, [view[0] + light[0], view[1] + light[1], view[2] + light[2]])
-      for (let c = 0; c < 3; c++) { sumR[c] += T[c] * dr; sumM[c] += T[c] * dm }
+      for (let c = 0; c < 3; c++) {
+        sumR[c] += T[c] * dr
+        sumM[c] += T[c] * dm
+      }
     }
-    view[0] += dr * 0.5; view[1] += dm * 0.5; view[2] += dz * 0.5
+    view[0] += dr * 0.5
+    view[1] += dm * 0.5
+    view[2] += dz * 0.5
   }
   return [0, 1, 2].map((c) => intensity * (sumR[c] * a.rayleigh[c] * pr + sumM[c] * a.mie * pm)) as Vec3
 }

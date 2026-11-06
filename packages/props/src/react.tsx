@@ -70,8 +70,22 @@ export interface RoadPathProps extends Partial<RoadPathOptions>, RoadSurfaceCont
  * <RoadPath points={[[0, 0], [60, 20], [140, 10]]} height={world.height} width={4} surface={{ surface: 'gravel', states: { wetness } }} />
  * ```
  */
-export function RoadPath({ ref, height, states, part, halfWidth, surfaceIndex, coords, look, time, ...options }: RoadPathProps): React.JSX.Element {
-  const path = useMemo(() => new RoadPathImpl({ height, states, part, halfWidth, surfaceIndex, coords, look, time }), [height, states, part, halfWidth, surfaceIndex, coords, look, time])
+export function RoadPath({
+  ref,
+  height,
+  states,
+  part,
+  halfWidth,
+  surfaceIndex,
+  coords,
+  look,
+  time,
+  ...options
+}: RoadPathProps): React.JSX.Element {
+  const path = useMemo(
+    () => new RoadPathImpl({ height, states, part, halfWidth, surfaceIndex, coords, look, time }),
+    [height, states, part, halfWidth, surfaceIndex, coords, look, time]
+  )
   useEffect(() => () => path.dispose(), [path])
   const last = useRef('')
   const key = JSON.stringify(options)

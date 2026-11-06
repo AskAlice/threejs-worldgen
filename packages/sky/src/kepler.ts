@@ -40,7 +40,9 @@ export function orbitalPeriod(semiMajorAxis: number, gm: number): number {
 
 /** Mean motion (radians per second) of an orbit around a parent with gravitational parameter `gm`. */
 export function meanMotion(el: OrbitalElements, gm: number): number {
-  return el.period > 0 ? (2 * Math.PI) / el.period : Math.sqrt(gm / (el.semiMajorAxis * el.semiMajorAxis * el.semiMajorAxis))
+  return el.period > 0
+    ? (2 * Math.PI) / el.period
+    : Math.sqrt(gm / (el.semiMajorAxis * el.semiMajorAxis * el.semiMajorAxis))
 }
 
 /**
@@ -54,7 +56,8 @@ export function solveKepler(meanAnomaly: number, e: number, tolerance = 1e-14): 
   const turns = Math.round(meanAnomaly / twoPi)
   const M = meanAnomaly - turns * twoPi
   if (e === 0) return meanAnomaly
-  let lo = M - e, hi = M + e
+  let lo = M - e,
+    hi = M + e
   let E = M + 0.85 * e * Math.sign(Math.sin(M))
   for (let i = 0; i < 100; i++) {
     const f = E - e * Math.sin(E) - M
@@ -74,32 +77,58 @@ export function solveKepler(meanAnomaly: number, e: number, tolerance = 1e-14): 
 
 /** Fills the in-plane unit vectors P (towards periapsis) and Q (90° ahead) in the y-up frame. */
 function perifocal(el: OrbitalElements, P: Vec3, Q: Vec3) {
-  const O = el.longitudeOfAscendingNode * DEG, w = el.argumentOfPeriapsis * DEG, i = el.inclination * DEG
-  const cO = Math.cos(O), sO = Math.sin(O), cw = Math.cos(w), sw = Math.sin(w), ci = Math.cos(i), si = Math.sin(i)
+  const O = el.longitudeOfAscendingNode * DEG,
+    w = el.argumentOfPeriapsis * DEG,
+    i = el.inclination * DEG
+  const cO = Math.cos(O),
+    sO = Math.sin(O),
+    cw = Math.cos(w),
+    sw = Math.sin(w),
+    ci = Math.cos(i),
+    si = Math.sin(i)
   // Astronomical z-up components, then (x, y, z) → (x, z, -y).
-  const px = cO * cw - sO * sw * ci, py = sO * cw + cO * sw * ci, pz = sw * si
-  const qx = -cO * sw - sO * cw * ci, qy = -sO * sw + cO * cw * ci, qz = cw * si
-  P[0] = px; P[1] = pz; P[2] = -py
-  Q[0] = qx; Q[1] = qz; Q[2] = -qy
+  const px = cO * cw - sO * sw * ci,
+    py = sO * cw + cO * sw * ci,
+    pz = sw * si
+  const qx = -cO * sw - sO * cw * ci,
+    qy = -sO * sw + cO * cw * ci,
+    qz = cw * si
+  P[0] = px
+  P[1] = pz
+  P[2] = -py
+  Q[0] = qx
+  Q[1] = qz
+  Q[2] = -qy
 }
 
-const _P: Vec3 = [0, 0, 0], _Q: Vec3 = [0, 0, 0]
+const _P: Vec3 = [0, 0, 0],
+  _Q: Vec3 = [0, 0, 0]
 
 /**
  * Position and velocity at `time` (seconds since J2000) relative to the parent.
  * @param gm Parent's gravitational parameter, m³/s². Only used when `el.period` is 0.
  */
-export function orbitState(el: OrbitalElements, gm: number, time: number, out: OrbitState = { position: [0, 0, 0], velocity: [0, 0, 0] }): OrbitState {
-  const a = el.semiMajorAxis, e = el.eccentricity
+export function orbitState(
+  el: OrbitalElements,
+  gm: number,
+  time: number,
+  out: OrbitState = { position: [0, 0, 0], velocity: [0, 0, 0] }
+): OrbitState {
+  const a = el.semiMajorAxis,
+    e = el.eccentricity
   const n = meanMotion(el, gm)
   const E = solveKepler(el.meanAnomalyAtEpoch * DEG + n * time, e)
-  const cE = Math.cos(E), sE = Math.sin(E)
+  const cE = Math.cos(E),
+    sE = Math.sin(E)
   const b = a * Math.sqrt(1 - e * e)
-  const x = a * (cE - e), y = b * sE
+  const x = a * (cE - e),
+    y = b * sE
   const k = n / (1 - e * cE)
-  const vx = -a * sE * k, vy = b * cE * k
+  const vx = -a * sE * k,
+    vy = b * cE * k
   perifocal(el, _P, _Q)
-  const p = out.position, v = out.velocity
+  const p = out.position,
+    v = out.velocity
   for (let j = 0; j < 3; j++) {
     p[j] = _P[j] * x + _Q[j] * y
     v[j] = _P[j] * vx + _Q[j] * vy
@@ -110,7 +139,8 @@ export function orbitState(el: OrbitalElements, gm: number, time: number, out: O
 /** Unit normal of the orbital plane (direction of the angular momentum) in the y-up frame. */
 export function orbitNormal(el: OrbitalElements): Vec3 {
   perifocal(el, _P, _Q)
-  const [px, py, pz] = _P, [qx, qy, qz] = _Q
+  const [px, py, pz] = _P,
+    [qx, qy, qz] = _Q
   return [py * qz - pz * qy, pz * qx - px * qz, px * qy - py * qx]
 }
 
@@ -120,12 +150,15 @@ export function orbitNormal(el: OrbitalElements): Vec3 {
  * @returns `segments` points as a flat [x, y, z, …] array, metres.
  */
 export function orbitPath(el: OrbitalElements, segments = 256): Float64Array {
-  const a = el.semiMajorAxis, e = el.eccentricity, b = a * Math.sqrt(1 - e * e)
+  const a = el.semiMajorAxis,
+    e = el.eccentricity,
+    b = a * Math.sqrt(1 - e * e)
   perifocal(el, _P, _Q)
   const out = new Float64Array(segments * 3)
   for (let s = 0; s < segments; s++) {
     const E = (s / segments) * 2 * Math.PI
-    const x = a * (Math.cos(E) - e), y = b * Math.sin(E)
+    const x = a * (Math.cos(E) - e),
+      y = b * Math.sin(E)
     for (let j = 0; j < 3; j++) out[s * 3 + j] = _P[j] * x + _Q[j] * y
   }
   return out
@@ -152,7 +185,8 @@ export interface Apsides {
  * @param gm Parent's gravitational parameter (only used when `el.period` is 0).
  */
 export function apsides(el: OrbitalElements, gm: number, from = 0): Apsides {
-  const a = el.semiMajorAxis, e = el.eccentricity
+  const a = el.semiMajorAxis,
+    e = el.eccentricity
   perifocal(el, _P, _Q)
   const n = meanMotion(el, gm)
   const twoPi = 2 * Math.PI
@@ -164,11 +198,15 @@ export function apsides(el: OrbitalElements, gm: number, from = 0): Apsides {
     periapsisPosition: [_P[0] * a * (1 - e), _P[1] * a * (1 - e), _P[2] * a * (1 - e)],
     apoapsisPosition: [-_P[0] * a * (1 + e), -_P[1] * a * (1 + e), -_P[2] * a * (1 + e)],
     nextPeriapsis: from + until(0),
-    nextApoapsis: from + until(Math.PI),
+    nextApoapsis: from + until(Math.PI)
   }
 }
 
 /** Conventional names of the apsides around a parent: perigee/apogee (home planet), perihelion/aphelion (star), else periapsis/apoapsis. */
 export function apsisNames(parentKind: 'star' | 'planet' | 'moon' | 'home'): [string, string] {
-  return parentKind === 'home' ? ['perigee', 'apogee'] : parentKind === 'star' ? ['perihelion', 'aphelion'] : ['periapsis', 'apoapsis']
+  return parentKind === 'home'
+    ? ['perigee', 'apogee']
+    : parentKind === 'star'
+      ? ['perihelion', 'aphelion']
+      : ['periapsis', 'apoapsis']
 }

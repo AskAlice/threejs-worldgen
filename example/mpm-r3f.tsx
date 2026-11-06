@@ -21,7 +21,8 @@ const terrain = buildTerrain(world, origin, DX, RES[0], 60)
 const backdrop = buildTerrain(world, [origin[0] - 300, origin[1], origin[2] - 300], 3, 200 + Math.round(span / 3), 0)
 backdrop.position.y = -0.3
 const start = { block: Number(params.get('block') ?? 24), dropHeight: Number(params.get('drop') ?? 1) }
-const c0 = dropAt(start.block, start.dropHeight), edge = (start.block * DX) / 2
+const c0 = dropAt(start.block, start.dropHeight),
+  edge = (start.block * DX) / 2
 
 function Jelly() {
   const options = useSpec('MPMSolver', spec)
@@ -35,10 +36,16 @@ function Jelly() {
     mpm.emit({ center: dropAt(view.block, view.dropHeight), size: [half, half, half] })
   }
   const view = useControls('demo', {
-    block: { value: start.block, min: 8, max: Math.round(Math.cbrt(config.capacity!)), step: 1, label: 'block (particles per edge)' },
+    block: {
+      value: start.block,
+      min: 8,
+      max: Math.round(Math.cbrt(config.capacity!)),
+      step: 1,
+      label: 'block (particles per edge)'
+    },
     dropHeight: { value: start.dropHeight, min: 0, max: 8, step: 0.1, label: 'drop height (m)' },
     follow: { value: false, label: 'domain follows camera target' },
-    'drop the block': button(drop),
+    'drop the block': button(drop)
   })
   latest.current = { mpm, view }
   useEffect(drop, [mpm])
@@ -50,14 +57,29 @@ function Jelly() {
   useFrame((_, dt) => {
     fps.current = fps.current * 0.95 + (1 / Math.max(1e-3, dt)) * 0.05
     if (view.follow && mpm && controls) mpm.center(controls.target.x, controls.target.y, controls.target.z)
-    const now = performance.now(), r = read.current
-    if (stats && !r.busy && now - r.last > 2000) { r.last = now; r.busy = true; void stats.measure().finally(() => (r.busy = false)) }
+    const now = performance.now(),
+      r = read.current
+    if (stats && !r.busy && now - r.last > 2000) {
+      r.last = now
+      r.busy = true
+      void stats.measure().finally(() => (r.busy = false))
+    }
   })
   useHud(() => `threejs-particles · <MPM>\n${stats?.hud(fps.current) ?? 'starting…'}`)
   useEffect(() => void Object.assign(window, { mpm, world, mpmStats: stats?.stats }), [mpm, stats]) // for the console
 
   // A fixed step: deterministic, and slow motion rather than instability when frames drop.
-  return <MPM ref={setMpm} {...options} capacity={config.capacity} resolution={RES} cellSize={DX} height={world.height} timeStep={1 / 60} />
+  return (
+    <MPM
+      ref={setMpm}
+      {...options}
+      capacity={config.capacity}
+      resolution={RES}
+      cellSize={DX}
+      height={world.height}
+      timeStep={1 / 60}
+    />
+  )
 }
 
 function Scene() {
@@ -69,7 +91,10 @@ function Scene() {
       <primitive object={terrain} />
       <primitive object={backdrop} />
       <Jelly />
-      <View position={[c0[0] + 2.2 * edge, c0[1] + edge, c0[2] + 2.5 * edge]} target={[c0[0], c0[1] - start.dropHeight - edge * 0.3, c0[2]]} />
+      <View
+        position={[c0[0] + 2.2 * edge, c0[1] + edge, c0[2] + 2.5 * edge]}
+        target={[c0[0], c0[1] - start.dropHeight - edge * 0.3, c0[2]]}
+      />
     </>
   )
 }
@@ -81,4 +106,8 @@ function Check() {
   return null
 }
 
-mount(params.has('check') ? <Check /> : <Scene />, { fov: 50, near: 0.1, far: 2000 }, { toneMapping: THREE.AgXToneMapping })
+mount(
+  params.has('check') ? <Check /> : <Scene />,
+  { fov: 50, near: 0.1, far: 2000 },
+  { toneMapping: THREE.AgXToneMapping }
+)

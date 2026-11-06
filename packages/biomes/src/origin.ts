@@ -51,8 +51,14 @@ export class FloatingOrigin {
 
   /** Moves render zero by `shift` (render-space metres): the camera and every listener move by −shift. */
   rebase(shift: Vec3): boolean {
-    this.origin[0] += shift[0]; this.origin[1] += shift[1]; this.origin[2] += shift[2]
-    this.camera.position.set(this.camera.position.x - shift[0], this.camera.position.y - shift[1], this.camera.position.z - shift[2])
+    this.origin[0] += shift[0]
+    this.origin[1] += shift[1]
+    this.origin[2] += shift[2]
+    this.camera.position.set(
+      this.camera.position.x - shift[0],
+      this.camera.position.y - shift[1],
+      this.camera.position.z - shift[2]
+    )
     this.camera.updateMatrixWorld()
     for (const l of this.listeners) l(this.origin, shift)
     return true
@@ -60,13 +66,17 @@ export class FloatingOrigin {
 
   /** Converts a world (planet-centred) position to render space. */
   toRender(p: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
-    out[0] = p[0] - this.origin[0]; out[1] = p[1] - this.origin[1]; out[2] = p[2] - this.origin[2]
+    out[0] = p[0] - this.origin[0]
+    out[1] = p[1] - this.origin[1]
+    out[2] = p[2] - this.origin[2]
     return out
   }
 
   /** Converts a render-space position to world (planet-centred) space. */
   toWorld(p: Vec3, out: Vec3 = [0, 0, 0]): Vec3 {
-    out[0] = p[0] + this.origin[0]; out[1] = p[1] + this.origin[1]; out[2] = p[2] + this.origin[2]
+    out[0] = p[0] + this.origin[0]
+    out[1] = p[1] + this.origin[1]
+    out[2] = p[2] + this.origin[2]
     return out
   }
 }

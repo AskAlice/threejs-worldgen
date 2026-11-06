@@ -98,7 +98,8 @@ export class InstanceStates {
     const { stride = 3, channels = STATE_CHANNELS, mode = 'max' } = options
     const idx = channels.map((c) => STATE_CHANNELS.indexOf(c))
     for (let i = 0; i < this.count; i++) {
-      const x = positions[i * stride], z = positions[i * stride + 2]
+      const x = positions[i * stride],
+        z = positions[i * stride + 2]
       for (let n = 0; n < channels.length; n++) {
         const k = i * 4 + idx[n]
         const v = field.value(channels[n], x, z)

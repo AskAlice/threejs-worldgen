@@ -1,7 +1,14 @@
 import type { DeepPartial } from 'threejs-biomes'
 import { resolve } from 'threejs-heightfield'
 import { DEFAULT_DECORATE, type DecorateOptions } from 'threejs-props'
-import { ARCHITECTURES, type ArchitectureName, type Architecture, type Climate, type RoofMaterial, type WallMaterial } from './architecture.ts'
+import {
+  ARCHITECTURES,
+  type ArchitectureName,
+  type Architecture,
+  type Climate,
+  type RoofMaterial,
+  type WallMaterial
+} from './architecture.ts'
 import { DEFAULT_BLOCKS, type BlockOptions } from './blocks.ts'
 import { DEFAULT_BUILDINGS, type BuildingOptions } from './buildings.ts'
 import { DEFAULT_DISTRICTS, type DistrictOptions } from './districts.ts'
@@ -132,7 +139,7 @@ export const DEFAULT_CITY_PROPS: CityPropsOptions = {
   fences: { chance: 0, offset: 4, length: 2.5, style: 'auto' },
   hayBales: { density: 0 },
   wells: { density: 0 },
-  enabled: true,
+  enabled: true
 }
 
 /** Level of detail by distance from the camera (metres). */
@@ -206,7 +213,14 @@ export interface CityOptions {
 /** Settings accepted by `City.create`, `set` and `reset`, and the `<City>` props: any subset, nested. */
 export type CityInput = DeepPartial<CityOptions>
 
-const W = (bayWidth: number, windowWidth: number, windowHeight: number, sill: number, frame: number, lit: number): WindowStyle => ({ bayWidth, windowWidth, windowHeight, sill, frame, lit })
+const W = (
+  bayWidth: number,
+  windowWidth: number,
+  windowHeight: number,
+  sill: number,
+  frame: number,
+  lit: number
+): WindowStyle => ({ bayWidth, windowWidth, windowHeight, sill, frame, lit })
 
 /** Default settings: a town. */
 export const DEFAULT_CITY: CityOptions = {
@@ -240,7 +254,7 @@ export const DEFAULT_CITY: CityOptions = {
       tower: W(1.6, 1.42, 2.75, 0.45, 0.06, 0.45),
       block: W(3.1, 1.35, 1.65, 0.9, 0.09, 0.35),
       house: W(3.4, 1.05, 1.35, 0.95, 0.1, 0.3),
-      shed: W(7, 4.5, 1.1, 4.6, 0.12, 0.2),
+      shed: W(7, 4.5, 1.1, 4.6, 0.12, 0.2)
     },
     walls: {
       plaster: ['#efe7da', '#e8dcc8', '#d9c4a5', '#e6d3b3', '#d8d2c4', '#c9d3d6', '#e7c9a9', '#f2efe6'],
@@ -250,7 +264,7 @@ export const DEFAULT_CITY: CityOptions = {
       concrete: ['#a9a9a4', '#bab6ad', '#8f9193', '#c8c3b8', '#9da1a2'],
       glass: ['#5d7286', '#4c6a73', '#6e8494', '#3f5363', '#7a8a8f'],
       adobe: ['#c9a27a', '#d4b08a', '#b98d64', '#dcbf97', '#c28f6a'],
-      metal: ['#9aa0a2', '#7f8a8c', '#a7a39a', '#6f7b84', '#b4b8b4'],
+      metal: ['#9aa0a2', '#7f8a8c', '#a7a39a', '#6f7b84', '#b4b8b4']
     },
     roofs: {
       tile: ['#a0573f', '#8e4a3a', '#b5643f', '#7a3f31', '#c27650'],
@@ -258,24 +272,31 @@ export const DEFAULT_CITY: CityOptions = {
       shingle: ['#5b4a44', '#6e5a4c', '#4f4f55', '#7a6a58'],
       metal: ['#7d8b8f', '#8e3b33', '#3f5a4a', '#9aa0a2', '#4a5866'],
       thatch: ['#a88d5b', '#9a7f50', '#b59c6a'],
-      concrete: ['#77736d', '#6a6c6e', '#85817a', '#5d5f61'],
+      concrete: ['#77736d', '#6a6c6e', '#85817a', '#5d5f61']
     },
     variation: 0.12,
-    patternScale: 1,
+    patternScale: 1
   },
   roadLook: {
     colors: { asphalt: '#3a3c3f', cobblestone: '#7c766c', gravel: '#9a8f7c', dirt: '#7a6249' },
-    sidewalk: '#a8a49c', kerb: '#bdb8ae', kerbHeight: 0.15, marking: '#e9e9e2', centerLine: '#e2b842', concrete: '#9d9a93', markings: true, wear: 0.5,
+    sidewalk: '#a8a49c',
+    kerb: '#bdb8ae',
+    kerbHeight: 0.15,
+    marking: '#e9e9e2',
+    centerLine: '#e2b842',
+    concrete: '#9d9a93',
+    markings: true,
+    wear: 0.5
   },
   props: DEFAULT_CITY_PROPS,
   weather: {
     walls: { wetness: 0, snow: 0, burn: 0, damage: 0 },
     roofs: { wetness: 0, snow: 0, burn: 0, damage: 0 },
-    roads: { wetness: 0, snow: 0, burn: 0, damage: 0 },
+    roads: { wetness: 0, snow: 0, burn: 0, damage: 0 }
   },
   lod: { simple: 450, hide: 9000, roads: 7000 },
   progressive: false,
-  buildBudget: 6,
+  buildBudget: 6
 }
 
 /** Street-layout presets, applied between the defaults and your input. */
@@ -284,9 +305,14 @@ export const ROAD_STYLES: Record<RoadStyle, CityInput> = {
   radial: { field: { grid: 0.55, radial: 1.3, radialDecay: 0.65, noise: 5, terrain: 1 } },
   organic: {
     field: { grid: 0.35, radial: 0.4, noise: 28, noiseScale: 220, terrain: 1.6, gridVariation: 60 },
-    roads: { primary: { segment: 30 }, secondary: { segment: 24, branchSpacing: 90 }, minor: { segment: 20 }, minAngle: 28 },
-    districts: { styles: { residential: { blockSize: 85, lotArea: 650 } } },
-  },
+    roads: {
+      primary: { segment: 30 },
+      secondary: { segment: 24, branchSpacing: 90 },
+      minor: { segment: 20 },
+      minAngle: 28
+    },
+    districts: { styles: { residential: { blockSize: 85, lotArea: 650 } } }
+  }
 }
 
 /** Deep-merges plain objects (arrays and everything else are replaced). Returns a new object. */
@@ -299,5 +325,10 @@ export function resolveCityOptions(input: CityInput = {}): CityOptions {
   const size = (input.size ?? DEFAULT_CITY.size) as SettlementSize
   const sizes = mergeOptions(DEFAULT_CITY.sizes, input.sizes)
   const style = input.style && input.style !== 'auto' ? input.style : sizes[size].style
-  return mergeOptions(DEFAULT_CITY, ROAD_STYLES[style], { roads: sizes[size].roads, districts: { styles: sizes[size].styles } }, input)
+  return mergeOptions(
+    DEFAULT_CITY,
+    ROAD_STYLES[style],
+    { roads: sizes[size].roads, districts: { styles: sizes[size].styles } },
+    input
+  )
 }

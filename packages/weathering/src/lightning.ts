@@ -1,5 +1,29 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Group, Mesh, MeshBasicNodeMaterial, PointLight, Sphere, Vector3, type Camera, type Node } from 'three/webgpu'
-import { attribute, cameraPosition, cross, int, modelWorldMatrix, normalize, positionGeometry, uniform, uniformArray, vec4 } from 'three/tsl'
+import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  Group,
+  Mesh,
+  MeshBasicNodeMaterial,
+  PointLight,
+  Sphere,
+  Vector3,
+  type Camera,
+  type Node
+} from 'three/webgpu'
+import {
+  attribute,
+  cameraPosition,
+  cross,
+  int,
+  modelWorldMatrix,
+  normalize,
+  positionGeometry,
+  uniform,
+  uniformArray,
+  vec4
+} from 'three/tsl'
 import { mulberry32 } from 'threejs-biomes'
 import type { Strike, Weather } from './weather.ts'
 import { merge, resolve } from 'threejs-heightfield'
@@ -39,8 +63,18 @@ export interface LightningOptions {
 
 /** Default lightning. */
 export const DEFAULT_LIGHTNING: LightningOptions = {
-  radius: 6000, cloudHeight: 1400, duration: 0.7, width: 2.5, detail: 7, branches: 6, branchLength: 0.3, jaggedness: 0.22,
-  color: '#dfe7ff', intensity: 30, flash: { intensity: 6, color: '#cfd9ff' }, maxBolts: 8,
+  radius: 6000,
+  cloudHeight: 1400,
+  duration: 0.7,
+  width: 2.5,
+  detail: 7,
+  branches: 6,
+  branchLength: 0.3,
+  jaggedness: 0.22,
+  color: '#dfe7ff',
+  intensity: 30,
+  flash: { intensity: 6, color: '#cfd9ff' },
+  maxBolts: 8
 }
 
 /** Partial settings for {@link Lightning}. */
@@ -94,7 +128,7 @@ export class Lightning {
   /** Shader uniforms. */
   readonly uniforms = {
     /** Bolt colour × intensity. */ color: uniform(new Color()),
-    /** Per-bolt brightness. */ brightness: uniformArray(new Array(16).fill(0), 'float'),
+    /** Per-bolt brightness. */ brightness: uniformArray(new Array(16).fill(0), 'float')
   }
 
   private origin: [number, number, number] = [0, 0, 0]
@@ -152,33 +186,45 @@ export class Lightning {
   update(time: number): void {
     const o = this.options
     const cam = this.camera.getWorldPosition(_v)
-    const fx = cam.x + this.origin[0], fz = cam.z + this.origin[2]
+    const fx = cam.x + this.origin[0],
+      fz = cam.z + this.origin[2]
     const R = o.radius
     const last = this.lastTime
     this.lastTime = time
     // New strikes since the last update (not on big jumps or when scrubbing back).
     if (this.listeners.size && last !== null && time > last && time - last < 5) {
-      for (const s of this.weather.strikes(fx - R, fz - R, fx + R, fz + R, last, time)) for (const l of this.listeners) l(s)
+      for (const s of this.weather.strikes(fx - R, fz - R, fx + R, fz + R, last, time))
+        for (const l of this.listeners) l(s)
     }
 
-    const visible = this.weather.strikes(fx - R, fz - R, fx + R, fz + R, time - o.duration, time + 1e-6).slice(-Math.min(o.maxBolts, 16))
+    const visible = this.weather
+      .strikes(fx - R, fz - R, fx + R, fz + R, time - o.duration, time + 1e-6)
+      .slice(-Math.min(o.maxBolts, 16))
     this.active = visible
     const seeds = visible.map((s) => s.seed)
     if (seeds.length !== this.slots.length || seeds.some((s, i) => s !== this.slots[i])) this.rebuild(visible)
 
-    let peak = 0, top: Strike | null = null
+    let peak = 0,
+      top: Strike | null = null
     const brightness = this.uniforms.brightness.array as number[]
     brightness.fill(0)
     visible.forEach((s, i) => {
       const b = flicker(s, time - s.time, o.duration)
       brightness[i] = b
-      if (b > peak) { peak = b; top = s }
+      if (b > peak) {
+        peak = b
+        top = s
+      }
     })
     this.flash = Math.min(1, peak)
     this.light.intensity = o.flash.intensity * peak
     if (top) {
       const s = top as Strike
-      this.light.position.set(s.x - this.origin[0], this.groundAt(s.x, s.z) + o.cloudHeight * 0.6 - this.origin[1], s.z - this.origin[2])
+      this.light.position.set(
+        s.x - this.origin[0],
+        this.groundAt(s.x, s.z) + o.cloudHeight * 0.6 - this.origin[1],
+        s.z - this.origin[2]
+      )
     }
     this.mesh.visible = visible.length > 0
   }
@@ -194,19 +240,33 @@ export class Lightning {
     const segments: number[] = [] // ax, ay, az, bx, by, bz, width, slot
     strikes.forEach((s, slot) => {
       const rand = mulberry32(s.seed)
-      const gx = s.x - this.origin[0], gy = this.groundAt(s.x, s.z) - this.origin[1], gz = s.z - this.origin[2]
-      const main = channel([gx + (rand() - 0.5) * o.cloudHeight * 0.3, gy + o.cloudHeight, gz + (rand() - 0.5) * o.cloudHeight * 0.3], [gx, gy, gz], o.detail, o.jaggedness, rand)
+      const gx = s.x - this.origin[0],
+        gy = this.groundAt(s.x, s.z) - this.origin[1],
+        gz = s.z - this.origin[2]
+      const main = channel(
+        [gx + (rand() - 0.5) * o.cloudHeight * 0.3, gy + o.cloudHeight, gz + (rand() - 0.5) * o.cloudHeight * 0.3],
+        [gx, gy, gz],
+        o.detail,
+        o.jaggedness,
+        rand
+      )
       pushChannel(segments, main, o.width, slot)
       for (let b = 0; b < o.branches; b++) {
         const start = main[Math.floor((0.1 + rand() * 0.6) * (main.length - 1))]
         const len = o.cloudHeight * o.branchLength * (0.4 + rand() * 0.6)
         const a = rand() * Math.PI * 2
-        const end: [number, number, number] = [start[0] + Math.cos(a) * len * 0.7, start[1] - len * (0.5 + rand() * 0.5), start[2] + Math.sin(a) * len * 0.7]
+        const end: [number, number, number] = [
+          start[0] + Math.cos(a) * len * 0.7,
+          start[1] - len * (0.5 + rand() * 0.5),
+          start[2] + Math.sin(a) * len * 0.7
+        ]
         pushChannel(segments, channel(start, end, Math.max(2, o.detail - 2), o.jaggedness, rand), o.width * 0.4, slot)
       }
     })
     const count = segments.length / 8
-    const pos = new Float32Array(count * 12), other = new Float32Array(count * 12), extra = new Float32Array(count * 8)
+    const pos = new Float32Array(count * 12),
+      other = new Float32Array(count * 12),
+      extra = new Float32Array(count * 8)
     const index = new Uint32Array(count * 6)
     for (let k = 0; k < count; k++) {
       const s = k * 8
@@ -242,7 +302,7 @@ export class Lightning {
     const sideSign = extra.x.sign()
     const slot = int(extra.x.abs().sub(1))
     m.positionNode = positionGeometry.add(side.mul(sideSign.mul(width).mul(0.5)))
-    m.colorNode = this.uniforms.color.mul(this.uniforms.brightness.element(slot) as unknown as Node<"float">)
+    m.colorNode = this.uniforms.color.mul(this.uniforms.brightness.element(slot) as unknown as Node<'float'>)
     return m
   }
 
@@ -270,15 +330,29 @@ function flicker(s: Strike, age: number, duration: number): number {
 }
 
 /** A jagged path from `a` to `b` by midpoint displacement. */
-function channel(a: [number, number, number], b: [number, number, number], levels: number, jag: number, rand: () => number): [number, number, number][] {
+function channel(
+  a: [number, number, number],
+  b: [number, number, number],
+  levels: number,
+  jag: number,
+  rand: () => number
+): [number, number, number][] {
   let pts = [a, b]
   for (let l = 0; l < levels; l++) {
     const next: [number, number, number][] = [pts[0]]
     for (let i = 1; i < pts.length; i++) {
-      const p = pts[i - 1], q = pts[i]
+      const p = pts[i - 1],
+        q = pts[i]
       const len = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2])
       const off = len * jag
-      next.push([(p[0] + q[0]) / 2 + (rand() - 0.5) * off * 2, (p[1] + q[1]) / 2 + (rand() - 0.5) * off * 0.5, (p[2] + q[2]) / 2 + (rand() - 0.5) * off * 2], q)
+      next.push(
+        [
+          (p[0] + q[0]) / 2 + (rand() - 0.5) * off * 2,
+          (p[1] + q[1]) / 2 + (rand() - 0.5) * off * 0.5,
+          (p[2] + q[2]) / 2 + (rand() - 0.5) * off * 2
+        ],
+        q
+      )
     }
     pts = next
   }

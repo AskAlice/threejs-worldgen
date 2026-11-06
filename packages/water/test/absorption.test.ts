@@ -2,7 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Color } from 'three/webgpu'
 import {
-  DEFAULT_APPEARANCE, absorptionCoefficients, applyAppearance, behindSample, createWaterUniforms, transmittance,
+  DEFAULT_APPEARANCE,
+  absorptionCoefficients,
+  applyAppearance,
+  behindSample,
+  createWaterUniforms,
+  transmittance
 } from '../src/material.ts'
 import { DEFAULT_LAKES } from '../src/lakes.ts'
 import { DEFAULT_RIVERS } from '../src/rivers.ts'
@@ -17,11 +22,20 @@ test('absorption: every channel fades with path, red fastest', () => {
   const deep = transmittance(sigma, 100)
   for (let c = 0; c < 3; c++) assert.ok(deep[c] < shallow[c] && shallow[c] < 1, `channel ${c} fades with depth`)
   assert.ok(shallow[0] < shallow[1] && shallow[1] < shallow[2], 'red is absorbed fastest')
-  assert.ok(shallow.every((t) => t > 0.5), 'the first metre keeps most of the bed')
-  assert.ok(deep.every((t) => t < 1e-3), 'deep water keeps none of the bed')
+  assert.ok(
+    shallow.every((t) => t > 0.5),
+    'the first metre keeps most of the bed'
+  )
+  assert.ok(
+    deep.every((t) => t < 1e-3),
+    'deep water keeps none of the bed'
+  )
 
   // Halving absorption doubles the depth at which a channel is 63% absorbed (Beer–Lambert is exponential).
-  const half = transmittance(sigma.map((s) => s / 2), 2)
+  const half = transmittance(
+    sigma.map((s) => s / 2),
+    2
+  )
   for (let c = 0; c < 3; c++) assert.ok(close(half[c], shallow[c]))
 })
 
@@ -30,7 +44,11 @@ test('absorption: ocean, lake and river defaults are per-channel and red-first',
     const [r, g, b] = absorptionCoefficients(a)
     assert.ok(r > g && g > b && b > 0, `ordered coefficients ${r} > ${g} > ${b}`)
   }
-  assert.deepEqual(absorptionCoefficients({ absorption: [-1, 0.5, 0.25] }), [0, 0.5, 0.25], 'negative coefficients are clamped')
+  assert.deepEqual(
+    absorptionCoefficients({ absorption: [-1, 0.5, 0.25] }),
+    [0, 0.5, 0.25],
+    'negative coefficients are clamped'
+  )
 })
 
 test('depth rejection: foreground samples fall back, and never leak', () => {

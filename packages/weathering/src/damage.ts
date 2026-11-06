@@ -22,7 +22,15 @@ export interface DamageTarget {
  * building (`channel: 'burn'`). Adds `amount` at the centre, fading to 0 over the outer `falloff`
  * share of the radius, clamped to 0…1. Returns the number of instances hit.
  */
-export function applyDamage(target: DamageTarget, x: number, z: number, radius: number, amount: number, channel: StateChannel = 'damage', falloff = 0.5): number {
+export function applyDamage(
+  target: DamageTarget,
+  x: number,
+  z: number,
+  radius: number,
+  amount: number,
+  channel: StateChannel = 'damage',
+  falloff = 0.5
+): number {
   target.field?.paint(x, z, radius, { [channel]: amount }, 'add', falloff)
   const { instances, positions, stride = 3 } = target
   if (!instances || !positions) return 0
@@ -60,7 +68,16 @@ export interface StormDamageOptions {
 }
 
 /** Default storm damage: starts at gale force, heavy in hurricanes. */
-export const DEFAULT_STORM_DAMAGE: StormDamageOptions = { seed: 1, threshold: 20, full: 45, rate: 0.6, interval: 10, susceptibility: 0.6, fieldBlock: 4, maxTicks: 720 }
+export const DEFAULT_STORM_DAMAGE: StormDamageOptions = {
+  seed: 1,
+  threshold: 20,
+  full: 45,
+  rate: 0.6,
+  interval: 10,
+  susceptibility: 0.6,
+  fieldBlock: 4,
+  maxTicks: 720
+}
 
 /**
  * Accumulates wind damage from a {@link Weather} into a {@link DamageTarget}: every `interval` seconds,
@@ -135,29 +152,35 @@ export class StormDamage {
         this.climate = []
       }
       for (let i = 0; i < instances.count; i++) {
-        const x = positions[i * stride], z = positions[i * stride + 2]
+        const x = positions[i * stride],
+          z = positions[i * stride + 2]
         const c = (this.climate[i] ??= this.weather.climateAt(x, z))
         const d = this.damageAt(x, z, time, c)
         if (d > 0) instances.add(i, 'damage', d * (1 - o.susceptibility * hash01(i, 0, 0, seed)))
       }
     }
     if (field) {
-      const n = field.options.resolution, b = Math.max(1, Math.round(o.fieldBlock)), t = field.texel
+      const n = field.options.resolution,
+        b = Math.max(1, Math.round(o.fieldBlock)),
+        t = field.texel
       const fieldKey = `${world}|${JSON.stringify(field.options)}|${b}`
       if (this.fieldKey !== fieldKey) {
         this.fieldKey = fieldKey
         this.fieldClimate = []
       }
       let block = 0
-      for (let bj = 0; bj < n; bj += b) for (let bi = 0; bi < n; bi += b, block++) {
-        const x = field.minX + (bi + b / 2) * t, z = field.minZ + (bj + b / 2) * t
-        const d = this.damageAt(x, z, time, (this.fieldClimate[block] ??= this.weather.climateAt(x, z)))
-        if (d <= 0) continue
-        for (let j = bj; j < Math.min(n, bj + b); j++) for (let i = bi; i < Math.min(n, bi + b); i++) {
-          const k = (j * n + i) * 4 + 3
-          field.data[k] = Math.min(1, field.data[k] + d * (1 - o.susceptibility * hash01(i, j, 1, seed)))
+      for (let bj = 0; bj < n; bj += b)
+        for (let bi = 0; bi < n; bi += b, block++) {
+          const x = field.minX + (bi + b / 2) * t,
+            z = field.minZ + (bj + b / 2) * t
+          const d = this.damageAt(x, z, time, (this.fieldClimate[block] ??= this.weather.climateAt(x, z)))
+          if (d <= 0) continue
+          for (let j = bj; j < Math.min(n, bj + b); j++)
+            for (let i = bi; i < Math.min(n, bi + b); i++) {
+              const k = (j * n + i) * 4 + 3
+              field.data[k] = Math.min(1, field.data[k] + d * (1 - o.susceptibility * hash01(i, j, 1, seed)))
+            }
         }
-      }
       field.touch()
     }
   }

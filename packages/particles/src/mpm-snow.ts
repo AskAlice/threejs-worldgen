@@ -2,10 +2,61 @@
 // plasticity that clamps the singular values of the elastic deformation gradient, and hardening of the Lamé
 // parameters with compaction. Registered as the `snow` material, with presets, and a surface renderer that turns
 // the particles into a lit, compacting snow cover.
-import { BufferAttribute, BufferGeometry, Color, Mesh, MeshSSSNodeMaterial, StorageBufferAttribute, type ComputeNode, type Renderer } from 'three/webgpu'
 import {
-  Fn, If, abs, atomicAdd, atomicLoad, atomicMax, atomicStore, bool, clamp, determinant, float, floor, instanceIndex, instancedArray, int, ivec2, mat3, max, min, mix,
-  positionGeometry, positionWorld, select, smoothstep, length, fwidth, normalize, dot, normalWorld, mx_noise_float, sqrt, cos, sin, fract, hash, step, storage, transformNormalToView, uniform, varying, vec2, vec3, vec4, vertexIndex,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  Mesh,
+  MeshSSSNodeMaterial,
+  StorageBufferAttribute,
+  type ComputeNode,
+  type Renderer
+} from 'three/webgpu'
+import {
+  Fn,
+  If,
+  abs,
+  atomicAdd,
+  atomicLoad,
+  atomicMax,
+  atomicStore,
+  bool,
+  clamp,
+  determinant,
+  float,
+  floor,
+  instanceIndex,
+  instancedArray,
+  int,
+  ivec2,
+  mat3,
+  max,
+  min,
+  mix,
+  positionGeometry,
+  positionWorld,
+  select,
+  smoothstep,
+  length,
+  fwidth,
+  normalize,
+  dot,
+  normalWorld,
+  mx_noise_float,
+  sqrt,
+  cos,
+  sin,
+  fract,
+  hash,
+  step,
+  storage,
+  transformNormalToView,
+  uniform,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+  vertexIndex
 } from 'three/tsl'
 import { registerMPMMaterial, type Mat3, type MPMMaterial } from './mpm-materials.ts'
 import { MPM_FIXED } from './mpm-reference.ts'
@@ -45,9 +96,36 @@ export interface SnowParams extends Record<string, number> {
  * packs a clean print instead of shoving the snow aside; holds a 0.4 m layer elastically). `wet` is heavy, more ductile and sticky (a larger θs keeps clumps together), with less hardening.
  */
 export const SNOW_PRESETS: Record<'powder' | 'packed' | 'wet', SnowParams> = {
-  powder: { density: 150, youngs: 35000, poisson: 0.2, compression: 0.015, stretch: 0.01, hardening: 6, maxHardening: 4, maxDensity: 550 },
-  packed: { density: 400, youngs: 140000, poisson: 0.2, compression: 0.025, stretch: 0.0075, hardening: 10, maxHardening: 3, maxDensity: 650 },
-  wet: { density: 500, youngs: 80000, poisson: 0.3, compression: 0.045, stretch: 0.015, hardening: 5, maxHardening: 3, maxDensity: 700 },
+  powder: {
+    density: 150,
+    youngs: 35000,
+    poisson: 0.2,
+    compression: 0.015,
+    stretch: 0.01,
+    hardening: 6,
+    maxHardening: 4,
+    maxDensity: 550
+  },
+  packed: {
+    density: 400,
+    youngs: 140000,
+    poisson: 0.2,
+    compression: 0.025,
+    stretch: 0.0075,
+    hardening: 10,
+    maxHardening: 3,
+    maxDensity: 650
+  },
+  wet: {
+    density: 500,
+    youngs: 80000,
+    poisson: 0.3,
+    compression: 0.045,
+    stretch: 0.015,
+    hardening: 5,
+    maxHardening: 3,
+    maxDensity: 700
+  }
 }
 
 /** Jp stays in this range (finite and positive; stretched snow at 10 is loose powder). The lower end is also at least density / maxDensity. */
@@ -77,12 +155,13 @@ export function snowStressGeneric<T>(o: MPMOps<T>, F: T[], J: T, Jp: T, p: Recor
   const iso = o.v(o.mul(o.mul(lambda, h), o.mul(o.sub(J, one), J)))
   const M = F.map((f, k) => o.v(o.sub(f, R[k])))
   const tau: T[] = []
-  for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) {
-    // ((F − R)·Fᵀ)[r][c] = Σk M[r][k]·F[c][k]
-    let sum = o.mul(M[r], F[c])
-    for (let k = 1; k < 3; k++) sum = o.add(sum, o.mul(M[k * 3 + r], F[k * 3 + c]))
-    tau.push(o.v(r === c ? o.add(o.mul(mu2, sum), iso) : o.mul(mu2, sum)))
-  }
+  for (let c = 0; c < 3; c++)
+    for (let r = 0; r < 3; r++) {
+      // ((F − R)·Fᵀ)[r][c] = Σk M[r][k]·F[c][k]
+      let sum = o.mul(M[r], F[c])
+      for (let k = 1; k < 3; k++) sum = o.add(sum, o.mul(M[k * 3 + r], F[k * 3 + c]))
+      tau.push(o.v(r === c ? o.add(o.mul(mu2, sum), iso) : o.mul(mu2, sum)))
+    }
   return tau
 }
 
@@ -93,14 +172,20 @@ export function snowStressGeneric<T>(o: MPMOps<T>, F: T[], J: T, Jp: T, p: Recor
  * since the hardening cap alone would let impacts crush snow to nothing. Jp also stays within
  * {@link SNOW_JP_RANGE} (0.1…10). On any {@link MPMOps}.
  */
-export function snowPlasticityGeneric<T>(o: MPMOps<T>, F: T[], Jp: T, p: Record<keyof SnowParams, T>): {
+export function snowPlasticityGeneric<T>(
+  o: MPMOps<T>,
+  F: T[],
+  Jp: T,
+  p: Record<keyof SnowParams, T>
+): {
   /** Clamped deformation gradient F = U·Σclamped·Vᵀ (column-major). */
   F: T[]
   /** New plastic volume ratio Jp, 0.1…10 ({@link SNOW_JP_RANGE}). */
   Jp: T
 } {
   const { U, S, V } = svd3Generic(o, F)
-  const lo = o.sub(o.num(1), p.compression), hi = o.add(o.num(1), p.stretch)
+  const lo = o.sub(o.num(1), p.compression),
+    hi = o.add(o.num(1), p.stretch)
   const Sc = S.map((s) => o.v(o.min(o.max(s, lo), hi)))
   const ratio = o.div(o.mul(o.mul(S[0], S[1]), S[2]), o.mul(o.mul(Sc[0], Sc[1]), Sc[2]))
   const floor = o.v(o.max(o.div(p.density, o.min(p.maxDensity, o.num(ICE_DENSITY))), o.num(SNOW_JP_RANGE[0])))
@@ -108,20 +193,34 @@ export function snowPlasticityGeneric<T>(o: MPMOps<T>, F: T[], Jp: T, p: Record<
   // k³ = Jp·ratio / floor below the floor (k < 1 scales Σclamped down, i.e. less plastic compaction), else 1.
   const k = o.v(o.min(o.num(1), o.exp(o.div(o.log(o.max(o.div(free, floor), o.num(1e-30))), o.num(3)))))
   const jp = o.min(o.max(free, floor), o.num(SNOW_JP_RANGE[1]))
-  return { F: usvGeneric(o, U, Sc.map((s) => o.mul(s, k)), V), Jp: o.v(jp) }
+  return {
+    F: usvGeneric(
+      o,
+      U,
+      Sc.map((s) => o.mul(s, k)),
+      V
+    ),
+    Jp: o.v(jp)
+  }
 }
 
 /** Density of ice, kg/m³: the most any `maxDensity` means. */
 export const ICE_DENSITY = 917
 
 /** Lamé (μ, λ) of snow parameters at a hardening factor. */
-export function snowLame(p: SnowParams, h = 1): {
+export function snowLame(
+  p: SnowParams,
+  h = 1
+): {
   /** Shear modulus μ, pascals. */
   mu: number
   /** Lamé first parameter λ, pascals. */
   lambda: number
 } {
-  return { mu: (h * p.youngs) / (2 * (1 + p.poisson)), lambda: (h * p.youngs * p.poisson) / ((1 + p.poisson) * (1 - 2 * p.poisson)) }
+  return {
+    mu: (h * p.youngs) / (2 * (1 + p.poisson)),
+    lambda: (h * p.youngs * p.poisson) / ((1 + p.poisson) * (1 - 2 * p.poisson))
+  }
 }
 
 /**
@@ -137,19 +236,21 @@ export function snowLame(p: SnowParams, h = 1): {
 export const SNOW: MPMMaterial<SnowParams> = registerMPMMaterial<SnowParams>({
   name: 'snow',
   defaults: { ...SNOW_PRESETS.packed },
-  stress: ({ F, J, Jp, params }) => scalarsMat3(snowStressGeneric(NODE_OPS, mat3Scalars(F), J, Jp, params as Record<keyof SnowParams, any>)),
+  stress: ({ F, J, Jp, params }) =>
+    scalarsMat3(snowStressGeneric(NODE_OPS, mat3Scalars(F), J, Jp, params as Record<keyof SnowParams, any>)),
   plasticity: ({ F, Jp, params }) => {
     const r = snowPlasticityGeneric(NODE_OPS, mat3Scalars(F), Jp, params as Record<keyof SnowParams, any>)
     return { F: scalarsMat3(r.F), Jp: r.Jp }
   },
   cpu: {
     stress: ({ F, J, Jp, params }) => snowStressGeneric(NUMBER_OPS, F, J, Jp, params as SnowParams),
-    plasticity: ({ F, Jp, params }) => snowPlasticityGeneric(NUMBER_OPS, F, Jp, params as SnowParams) as { F: Mat3; Jp: number },
+    plasticity: ({ F, Jp, params }) =>
+      snowPlasticityGeneric(NUMBER_OPS, F, Jp, params as SnowParams) as { F: Mat3; Jp: number }
   },
   soundSpeed: (p) => {
     const { mu, lambda } = snowLame(p, Math.max(1, p.maxHardening))
     return Math.sqrt((lambda + 2 * mu) / p.density)
-  },
+  }
 })
 
 // ---- Rendering: the particles as a snow cover ----
@@ -209,7 +310,7 @@ export const DEFAULT_SNOW_SURFACE: SnowSurfaceOptions = {
   roughness: 0.85,
   packedRoughness: 0.6,
   translucency: 0.35,
-  translucencyColor: '#7fb4ff',
+  translucencyColor: '#7fb4ff'
 }
 
 /** The snow shading uniforms {@link snowMaterial} builds on. */
@@ -237,8 +338,15 @@ export interface SnowShading {
 /** Snow shading uniforms set from options. */
 export function snowShading(o: SnowSurfaceOptions = DEFAULT_SNOW_SURFACE): SnowShading {
   const s: SnowShading = {
-    relief: uniform(0), glints: uniform(0), color: uniform(new Color()), packedColor: uniform(new Color()), packedJp: uniform(0), roughness: uniform(0), packedRoughness: uniform(0),
-    translucency: uniform(0), translucencyColor: uniform(new Color()),
+    relief: uniform(0),
+    glints: uniform(0),
+    color: uniform(new Color()),
+    packedColor: uniform(new Color()),
+    packedJp: uniform(0),
+    roughness: uniform(0),
+    packedRoughness: uniform(0),
+    translucency: uniform(0),
+    translucencyColor: uniform(new Color())
   }
   return setSnowShading(s, o)
 }
@@ -272,24 +380,41 @@ export function snowMaterial(s: SnowShading, Jp: any = float(1), normal: any = n
   //   rows or repeats), ~1 mm high;
   // - glints: a sparse few ice grains (~6 mm cells) with tilted, glossy facets (a clearcoat) that catch the sun through
   //   the normal lighting, so they are shadowed like everything else. Compacted snow is smoother and glints less.
-  const p = positionWorld, fw = length(fwidth(p)).toVar()
+  const p = positionWorld,
+    fw = length(fwidth(p)).toVar()
   const fresh = packed.mul(-0.7).add(1)
-  const theta = mx_noise_float(p.mul(0.13)).mul(2.2).add(mx_noise_float(p.mul(0.47).add(5.1)).mul(0.6))
-  const ct = cos(theta), st = sin(theta)
+  const theta = mx_noise_float(p.mul(0.13))
+    .mul(2.2)
+    .add(mx_noise_float(p.mul(0.47).add(5.1)).mul(0.6))
+  const ct = cos(theta),
+    st = sin(theta)
   const wind = (q: any) => {
     const u = vec2(q.x.mul(ct).sub(q.z.mul(st)), q.x.mul(st).add(q.z.mul(ct)))
-    return mx_noise_float(vec3(u.x.mul(1 / 0.05), u.y.mul(1 / 0.32), q.y.mul(1 / 0.2))).mul(smoothstep(0.5, 0.2, fw.mul(1 / 0.05)))
-      .add(mx_noise_float(q.mul(1 / 0.018)).mul(0.35).mul(smoothstep(0.5, 0.2, fw.mul(1 / 0.018))))
+    return mx_noise_float(vec3(u.x.mul(1 / 0.05), u.y.mul(1 / 0.32), q.y.mul(1 / 0.2)))
+      .mul(smoothstep(0.5, 0.2, fw.mul(1 / 0.05)))
+      .add(
+        mx_noise_float(q.mul(1 / 0.018))
+          .mul(0.35)
+          .mul(smoothstep(0.5, 0.2, fw.mul(1 / 0.018)))
+      )
   }
   const e = 0.004
   const h0 = wind(p)
-  const grad = vec3(wind(p.add(vec3(e, 0, 0))).sub(h0), 0, wind(p.add(vec3(0, 0, e))).sub(h0)).mul(s.relief.mul(fresh).div(e)).toVar()
+  const grad = vec3(wind(p.add(vec3(e, 0, 0))).sub(h0), 0, wind(p.add(vec3(0, 0, e))).sub(h0))
+    .mul(s.relief.mul(fresh).div(e))
+    .toVar()
   const cellSize = 0.006
   // Cell indices wrapped to [0, 4096) (the hash reads a uint, and float seeds must stay exact); repeats every 25 m.
-  const cell = fract(floor(p.div(cellSize)).div(4096)).mul(4096).toVar(), local = fract(p.div(cellSize)).sub(0.5).toVar()
+  const cell = fract(floor(p.div(cellSize)).div(4096))
+      .mul(4096)
+      .toVar(),
+    local = fract(p.div(cellSize)).sub(0.5).toVar()
   const r1 = fract(hash(cell.x.add(cell.z.mul(4096))).add(hash(cell.y.add(7)).mul(0.618))).toVar()
   const r2 = fract(hash(cell.z.add(cell.x.mul(4096)).add(1)).add(hash(cell.y.add(19)).mul(0.382))).toVar()
-  const glint = step(r1, s.glints.mul(fresh)).mul(smoothstep(0.45, 0.2, length(local))).mul(smoothstep(0.6, 0.25, fw.div(cellSize))).toVar()
+  const glint = step(r1, s.glints.mul(fresh))
+    .mul(smoothstep(0.45, 0.2, length(local)))
+    .mul(smoothstep(0.6, 0.25, fw.div(cellSize)))
+    .toVar()
   const tilt = vec3(r2.sub(0.5), 0, hash(r2.mul(1048576)).sub(0.5)).mul(0.9)
   const n = normalize(normal).toVar()
   const tangential = (v: any) => v.sub(n.mul(dot(n, v)))
@@ -339,7 +464,13 @@ export class MPMSnowSurface {
   readonly shading: SnowShading
   private readonly renderer: Renderer
   private readonly solver: MPMSolver
-  private readonly uniforms = { edgeDepth: uniform(0), edgeStart: uniform(0), edgeWidth: uniform(1), minDepth: uniform(0.03), debris: uniform(0) }
+  private readonly uniforms = {
+    edgeDepth: uniform(0),
+    edgeStart: uniform(0),
+    edgeWidth: uniform(1),
+    minDepth: uniform(0.03),
+    debris: uniform(0)
+  }
   private readonly passes: ComputeNode[]
 
   /**
@@ -355,7 +486,8 @@ export class MPMSnowSurface {
     const detail = Math.max(1, Math.round(this.options.detail))
     this.options.detail = detail
     const [nx, , nz] = solver.resolution
-    const cx = (nx - 1) * detail + 1, cz = (nz - 1) * detail + 1
+    const cx = (nx - 1) * detail + 1,
+      cz = (nz - 1) * detail + 1
     this.columns = [cx, cz]
     const cols = cx * cz
     const hs = solver.options.cellSize / detail
@@ -363,7 +495,8 @@ export class MPMSnowSurface {
     const raw = instancedArray(cols, 'vec4')
     // Per column: volume, Σw·Jp, Σw, top (a max), Σw·Jp².
     const acc = storage(new StorageBufferAttribute(new Int32Array(cols * 5), 1), 'int', cols * 5).toAtomic()
-    const b = solver.buffers, u = this.uniforms
+    const b = solver.buffers,
+      u = this.uniforms
     const snowId = solver.materials.indexOf('snow')
     const fixed = (v: any) => int(floor(v.mul(MPM_FIXED).add(0.5)))
     const restVolume = (solver.options.cellSize / 2) ** 3
@@ -371,9 +504,12 @@ export class MPMSnowSurface {
     const H = b.heights
     // Ground under column (i, k): bilinear between the solver's node-column heights (what the particles rest on).
     const groundAt = (i: any, k: any) => {
-      const gx = float(i).div(detail), gz = float(k).div(detail)
-      const i0 = (min as any)(int(floor(gx)), int(nx - 2)).toVar(), k0 = (min as any)(int(floor(gz)), int(nz - 2)).toVar()
-      const fx = gx.sub(float(i0)), fz = gz.sub(float(k0))
+      const gx = float(i).div(detail),
+        gz = float(k).div(detail)
+      const i0 = (min as any)(int(floor(gx)), int(nx - 2)).toVar(),
+        k0 = (min as any)(int(floor(gz)), int(nz - 2)).toVar()
+      const fx = gx.sub(float(i0)),
+        fz = gz.sub(float(k0))
       const h = (a: number, c: number) => H.element(k0.add(c).mul(nx).add(i0.add(a)))
       return mix(mix(h(0, 0), h(1, 0), fx), mix(h(0, 1), h(1, 1), fx), fz)
     }
@@ -383,41 +519,79 @@ export class MPMSnowSurface {
     const splat = Fn(() => {
       const i = instanceIndex
       const S = b.state.element(i).toVar()
-      If(b.velocity.element(i).w.greaterThan(0).and(snowId < 0 ? bool(true) : int(S.x).equal(snowId)), () => {
-        const P = b.position.element(i).xz.toVar(), y = b.position.element(i).y
-        const F0 = b.deformation.element(int(i).mul(3)).xyz, F1 = b.deformation.element(int(i).mul(3).add(1)).xyz, F2 = b.deformation.element(int(i).mul(3).add(2)).xyz
-        const J = determinant((mat3 as any)(F0, F1, F2)).mul(S.y).max(0).toVar()
-        const g = P.div(hs).toVar()
-        const base = floor(g.sub(0.5)).toVar()
-        const f = g.sub(base).toVar()
-        const w = [f.sub(1.5).mul(f.sub(1.5)).mul(0.5).toVar(), float(0.75).sub(f.sub(1).mul(f.sub(1))).toVar(), f.sub(0.5).mul(f.sub(0.5)).mul(0.5).toVar()]
-        const ib = ivec2(base as any).toVar()
-        for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) {
-          const c = ib.add(ivec2(j, k)).toVar()
-          If(c.x.greaterThanEqual(0).and(c.y.greaterThanEqual(0)).and(c.x.lessThan(cx)).and(c.y.lessThan(cz)), () => {
-            const weight = w[j].x.mul(w[k].y).toVar()
-            const n = c.y.mul(cx).add(c.x).mul(5).toVar()
-            atomicAdd(acc.element(n), fixed(weight.mul(J).mul(restVolume / (hs * hs))))
-            atomicAdd(acc.element(n.add(1)), fixed(weight.mul(S.y)))
-            atomicAdd(acc.element(n.add(2)), fixed(weight))
-            atomicAdd(acc.element(n.add(4)), fixed(weight.mul(S.y).mul(S.y)))
-          })
+      If(
+        b.velocity
+          .element(i)
+          .w.greaterThan(0)
+          .and(snowId < 0 ? bool(true) : int(S.x).equal(snowId)),
+        () => {
+          const P = b.position.element(i).xz.toVar(),
+            y = b.position.element(i).y
+          const F0 = b.deformation.element(int(i).mul(3)).xyz,
+            F1 = b.deformation.element(int(i).mul(3).add(1)).xyz,
+            F2 = b.deformation.element(int(i).mul(3).add(2)).xyz
+          const J = determinant((mat3 as any)(F0, F1, F2))
+            .mul(S.y)
+            .max(0)
+            .toVar()
+          const g = P.div(hs).toVar()
+          const base = floor(g.sub(0.5)).toVar()
+          const f = g.sub(base).toVar()
+          const w = [
+            f.sub(1.5).mul(f.sub(1.5)).mul(0.5).toVar(),
+            float(0.75)
+              .sub(f.sub(1).mul(f.sub(1)))
+              .toVar(),
+            f.sub(0.5).mul(f.sub(0.5)).mul(0.5).toVar()
+          ]
+          const ib = ivec2(base as any).toVar()
+          for (let k = 0; k < 3; k++)
+            for (let j = 0; j < 3; j++) {
+              const c = ib.add(ivec2(j, k)).toVar()
+              If(
+                c.x.greaterThanEqual(0).and(c.y.greaterThanEqual(0)).and(c.x.lessThan(cx)).and(c.y.lessThan(cz)),
+                () => {
+                  const weight = w[j].x.mul(w[k].y).toVar()
+                  const n = c.y.mul(cx).add(c.x).mul(5).toVar()
+                  atomicAdd(acc.element(n), fixed(weight.mul(J).mul(restVolume / (hs * hs))))
+                  atomicAdd(acc.element(n.add(1)), fixed(weight.mul(S.y)))
+                  atomicAdd(acc.element(n.add(2)), fixed(weight))
+                  atomicAdd(acc.element(n.add(4)), fixed(weight.mul(S.y).mul(S.y)))
+                }
+              )
+            }
+          // The top goes to the columns within 0.75 spacing of the particle (1 or 2 per axis: a particle sits between
+          // columns as often as on one, and must not leave a column uncovered or widen a footprint's rim much).
+          const lo = ivec2(floor(g) as any).toVar(),
+            fr = g.sub(floor(g)).toVar()
+          // Packed: height in the high bits, the particle's block id (state.z, low 8 bits) in the low ones, so the max
+          // also says which block the surface belongs to.
+          const block = int(floor(S.z)).bitAnd(255)
+          const top = (max as any)(
+            int(floor(max(y.add(radius), 0).mul(TOP_SCALE)))
+              .mul(256)
+              .add(block),
+            int(1)
+          ).toVar()
+          for (let k = 0; k < 2; k++)
+            for (let j = 0; j < 2; j++) {
+              const c = lo.add(ivec2(j, k)).toVar()
+              const near = (j ? fr.x.greaterThan(0.25) : fr.x.lessThan(0.75)).and(
+                k ? fr.y.greaterThan(0.25) : fr.y.lessThan(0.75)
+              )
+              If(
+                near
+                  .and(c.x.greaterThanEqual(0))
+                  .and(c.y.greaterThanEqual(0))
+                  .and(c.x.lessThan(cx))
+                  .and(c.y.lessThan(cz)),
+                () => {
+                  atomicMax(acc.element(c.y.mul(cx).add(c.x).mul(5).add(3)), top)
+                }
+              )
+            }
         }
-        // The top goes to the columns within 0.75 spacing of the particle (1 or 2 per axis: a particle sits between
-        // columns as often as on one, and must not leave a column uncovered or widen a footprint's rim much).
-        const lo = ivec2(floor(g) as any).toVar(), fr = g.sub(floor(g)).toVar()
-        // Packed: height in the high bits, the particle's block id (state.z, low 8 bits) in the low ones, so the max
-        // also says which block the surface belongs to.
-        const block = int(floor(S.z)).bitAnd(255)
-        const top = (max as any)(int(floor(max(y.add(radius), 0).mul(TOP_SCALE))).mul(256).add(block), int(1)).toVar()
-        for (let k = 0; k < 2; k++) for (let j = 0; j < 2; j++) {
-          const c = lo.add(ivec2(j, k)).toVar()
-          const near = (j ? fr.x.greaterThan(0.25) : fr.x.lessThan(0.75)).and(k ? fr.y.greaterThan(0.25) : fr.y.lessThan(0.75))
-          If(near.and(c.x.greaterThanEqual(0)).and(c.y.greaterThanEqual(0)).and(c.x.lessThan(cx)).and(c.y.lessThan(cz)), () => {
-            atomicMax(acc.element(c.y.mul(cx).add(c.x).mul(5).add(3)), top)
-          })
-        }
-      })
+      )
     })().compute(solver.capacity, [64])
 
     // Resolve (and clear): depth and mean Jp per column, blended to the static depth at the domain edge. The depth is
@@ -426,14 +600,20 @@ export class MPMSnowSurface {
     const resolve = Fn(() => {
       const n = int(instanceIndex).toVar()
       const load = (c: number): any => float(atomicLoad(acc.element(n.mul(5).add(c))) as any).div(MPM_FIXED)
-      const vol = load(0).toVar(), jw = load(1).toVar(), wsum = load(2).toVar(), j2w = load(4).toVar()
+      const vol = load(0).toVar(),
+        jw = load(1).toVar(),
+        wsum = load(2).toVar(),
+        j2w = load(4).toVar()
       const topInt = atomicLoad(acc.element(n.mul(5).add(3))).toVar()
       for (let c = 0; c < 5; c++) atomicStore(acc.element(n.mul(5).add(c)), int(0))
-      const top = float(topInt.div(256)).div(TOP_SCALE).sub(groundAt(n.mod(cx), n.div(cx)))
+      const top = float(topInt.div(256))
+        .div(TOP_SCALE)
+        .sub(groundAt(n.mod(cx), n.div(cx)))
       // The top only caps the volume where it is clearly lower (a footprint): on undisturbed snow the volume is smoother.
       const depth = select(topInt.greaterThan(0), min(vol, max(top, 0).add(radius)), vol)
       const blockId = select(topInt.greaterThan(0), float(topInt.bitAnd(255)), float(-1))
-      const x = float(n.mod(cx)).mul(hs), z = float(n.div(cx)).mul(hs)
+      const x = float(n.mod(cx)).mul(hs),
+        z = float(n.div(cx)).mul(hs)
       const edge = min(min(x, float((cx - 1) * hs).sub(x)), min(z, float((cz - 1) * hs).sub(z)))
       // Particles stay 2 cells inside the walls and their splat thins over ~1.5 columns: blend beyond that.
       const blend = smoothstep(u.edgeStart, u.edgeStart.add(u.edgeWidth), edge)
@@ -448,14 +628,18 @@ export class MPMSnowSurface {
     // Smooth (3×3, weights 1-4-1 per axis: light, so footprints keep their walls; 5×5 where flat) and add the ground.
     const smooth = Fn(() => {
       const n = int(instanceIndex).toVar()
-      const i = n.mod(cx).toVar(), k = n.div(cx).toVar()
-      const sum = vec4(0).toVar(), wide = float(0).toVar()
-      for (let dk = -4; dk <= 4; dk++) for (let di = -4; di <= 4; di++) {
-        const ii = iclamp(i.add(di), 0, cx - 1), kk = iclamp(k.add(dk), 0, cz - 1)
-        const r = raw.element(kk.mul(cx).add(ii))
-        if (Math.abs(di) <= 1 && Math.abs(dk) <= 1) sum.addAssign(r.mul(((di ? 1 : 4) * (dk ? 1 : 4)) / 36))
-        wide.addAssign(r.x.mul(1 / 81))
-      }
+      const i = n.mod(cx).toVar(),
+        k = n.div(cx).toVar()
+      const sum = vec4(0).toVar(),
+        wide = float(0).toVar()
+      for (let dk = -4; dk <= 4; dk++)
+        for (let di = -4; di <= 4; di++) {
+          const ii = iclamp(i.add(di), 0, cx - 1),
+            kk = iclamp(k.add(dk), 0, cz - 1)
+          const r = raw.element(kk.mul(cx).add(ii))
+          if (Math.abs(di) <= 1 && Math.abs(dk) <= 1) sum.addAssign(r.mul(((di ? 1 : 4) * (dk ? 1 : 4)) / 36))
+          wide.addAssign(r.x.mul(1 / 81))
+        }
       // Where the snow is nearly flat (the light and the wide average agree within a centimetre), take the wide one:
       // millimetre settling ripples of the particles would otherwise mottle low-sun shading. Footprints keep their walls.
       sum.x.assign(mix(wide, sum.x, smoothstep(0.004, 0.012, abs(sum.x.sub(wide)))))
@@ -466,7 +650,10 @@ export class MPMSnowSurface {
       // of the snowpack at emission), and in debris each block sits at its own height, so the surface breaks into
       // angular blocks of varied size that travel with the snow. Never deeper than the snow.
       const id = raw.element(n).w.toVar()
-      const lift = hash(id.add(17)).sub(0.45).add(hash(id.add(53)).mul(0.5)).mul(select(id.greaterThanEqual(0), float(1), float(0)))
+      const lift = hash(id.add(17))
+        .sub(0.45)
+        .add(hash(id.add(53)).mul(0.5))
+        .mul(select(id.greaterThanEqual(0), float(1), float(0)))
       const lumps = lift.mul(sum.z).mul(u.debris).max(depth.negate())
       this.surface.element(n).assign(vec4(ground.add(depth).add(lumps).sub(sink), depth, sum.y, sum.z))
     })().compute(cols, [64])
@@ -477,18 +664,20 @@ export class MPMSnowSurface {
     for (let k = 0; k < cz; k++) for (let i = 0; i < cx; i++) pos.set([i * hs, 0, k * hs], (k * cx + i) * 3)
     const index = new Uint32Array((cx - 1) * (cz - 1) * 6)
     let q = 0
-    for (let k = 0; k < cz - 1; k++) for (let i = 0; i < cx - 1; i++) {
-      const a = k * cx + i
-      index.set([a, a + cx, a + 1, a + 1, a + cx, a + cx + 1], q)
-      q += 6
-    }
+    for (let k = 0; k < cz - 1; k++)
+      for (let i = 0; i < cx - 1; i++) {
+        const a = k * cx + i
+        index.set([a, a + cx, a + 1, a + 1, a + cx, a + cx + 1], q)
+        q += 6
+      }
     const geo = new BufferGeometry()
     geo.setAttribute('position', new BufferAttribute(pos, 3))
     geo.setIndex(new BufferAttribute(index, 1))
     const surf = this.surface
     const vi = int(vertexIndex)
     const at = (di: number, dk: number) => {
-      const ii = iclamp(vi.mod(cx).add(di), 0, cx - 1), kk = iclamp(vi.div(cx).add(dk), 0, cz - 1)
+      const ii = iclamp(vi.mod(cx).add(di), 0, cx - 1),
+        kk = iclamp(vi.div(cx).add(dk), 0, cz - 1)
       return surf.element(kk.mul(cx).add(ii)).x
     }
     const normal = vec3(at(-1, 0).sub(at(1, 0)), 2 * hs, at(0, -1).sub(at(0, 1))).normalize()
@@ -505,7 +694,9 @@ export class MPMSnowSurface {
   /** Merges `input` into the settings (`detail` is fixed at construction; another value throws). */
   set(input: Partial<SnowSurfaceOptions>): this {
     if (input.detail !== undefined && Math.max(1, Math.round(input.detail)) !== this.options.detail) {
-      throw new Error(`threejs-particles: MPMSnowSurface 'detail' is fixed at construction (${this.options.detail} columns per cell), got ${input.detail}`)
+      throw new Error(
+        `threejs-particles: MPMSnowSurface 'detail' is fixed at construction (${this.options.detail} columns per cell), got ${input.detail}`
+      )
     }
     return this.applyOptions({ ...this.options, ...input, detail: this.options.detail })
   }

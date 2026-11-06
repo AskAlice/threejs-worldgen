@@ -42,12 +42,13 @@ export const DEFAULT_MILKY_WAY: MilkyWayOptions = {
   dust: 0.8,
   detail: 1,
   color: '#b9c8ff',
-  bulgeColor: '#ffd9a8',
+  bulgeColor: '#ffd9a8'
 }
 
 /** Unit y-up star-frame vector of an ecliptic longitude/latitude (degrees). */
 export function eclipticToVector(longitude: number, latitude: number): Vec3 {
-  const l = longitude * DEG, b = latitude * DEG
+  const l = longitude * DEG,
+    b = latitude * DEG
   return [Math.cos(b) * Math.cos(l), Math.sin(b), -Math.cos(b) * Math.sin(l)]
 }
 
@@ -80,7 +81,7 @@ export function createMilkyWayUniforms() {
     /** Disc colour (linear). */
     color: uniform(new Color()),
     /** Bulge colour (linear). */
-    bulgeColor: uniform(new Color()),
+    bulgeColor: uniform(new Color())
   }
 }
 
@@ -108,7 +109,9 @@ export function milkyWayNode(u: MilkyWayUniforms, cel: any): { color: any; band:
   const g: any = u.galactic.mul(cel)
   const b = asin(clamp(g.y, -1, 1)) // galactic latitude
   const l = atan(g.z, g.x) // galactic longitude, 0 at the centre
-  const bulge = exp(l.mul(l).div(-0.35)).mul(exp(b.mul(b).div(-0.045))).mul(u.bulge)
+  const bulge = exp(l.mul(l).div(-0.35))
+    .mul(exp(b.mul(b).div(-0.045)))
+    .mul(u.bulge)
   const w = u.width.mul(float(1).add(exp(l.mul(l).div(-0.6)).mul(0.8)))
   const band = exp(b.mul(b).div(w.mul(w)).negate())
   const p = cel.mul(u.detail).add(u.offset)

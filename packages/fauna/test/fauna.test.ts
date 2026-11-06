@@ -18,9 +18,12 @@ test('fish meshes: finite, sane bounds, unit normals, closed body', () => {
     assert.ok(z1 - z0 > 0.97, `${id}: shorter than 1`)
     assert.ok(x1 - x0 < 0.8 && x1 > 0 && x0 < 0, `${id}: width ${x0}…${x1}`)
     assert.ok(y1 - y0 < 1 && y1 > 0 && y0 < 0, `${id}: height ${y0}…${y1}`)
-    for (let i = 0; i < nv; i++) assert.ok(Math.abs(Math.hypot(m.normal[i * 3], m.normal[i * 3 + 1], m.normal[i * 3 + 2]) - 1) < 1e-4)
+    for (let i = 0; i < nv; i++)
+      assert.ok(Math.abs(Math.hypot(m.normal[i * 3], m.normal[i * 3 + 1], m.normal[i * 3 + 2]) - 1) < 1e-4)
     for (let i = 0; i < nv; i++) {
-      const s = m.attr[i * 4], h = m.attr[i * 4 + 1], w = m.attr[i * 4 + 3]
+      const s = m.attr[i * 4],
+        h = m.attr[i * 4 + 1],
+        w = m.attr[i * 4 + 3]
       assert.ok(s >= 0 && s <= 1 && h >= -1 && h <= 1 && w >= 0 && w <= 1)
     }
     // The body is a closed, consistently wound surface: every directed edge appears once and its
@@ -38,7 +41,8 @@ test('fish meshes: finite, sane bounds, unit normals, closed body', () => {
       assert.ok(edges.has(`${b},${a}`), `${id}: open edge ${key}`)
     }
     // Body normals point outwards (away from the spine).
-    let outward = 0, total = 0
+    let outward = 0,
+      total = 0
     for (let i = 0; i < nv; i++) {
       if (m.attr[i * 4 + 2] !== PART.body) continue
       total++
@@ -64,7 +68,9 @@ test('boids: separation keeps a minimum distance', () => {
   const minDist = () => {
     let m = Infinity
     const p = flock.position
-    for (let i = 0; i < flock.count; i++) for (let j = i + 1; j < flock.count; j++) m = Math.min(m, Math.hypot(p[i * 3] - p[j * 3], p[i * 3 + 1] - p[j * 3 + 1], p[i * 3 + 2] - p[j * 3 + 2]))
+    for (let i = 0; i < flock.count; i++)
+      for (let j = i + 1; j < flock.count; j++)
+        m = Math.min(m, Math.hypot(p[i * 3] - p[j * 3], p[i * 3 + 1] - p[j * 3 + 1], p[i * 3 + 2] - p[j * 3 + 2]))
     return m
   }
   for (let s = 0; s < 30; s++) flock.step(1 / 30)
@@ -99,7 +105,10 @@ for (let i = -187; i <= -185; i++) for (let j = 72; j <= 74; j++) tiles.push([i,
 test('placement: deterministic per tile', () => {
   const a = spawnTileNow(-162, 97, FISH_SPECIES, habitat, world.frame, opts)
   const b = spawnTileNow(-162, 97, FISH_SPECIES, habitat, world.frame, opts)
-  assert.deepEqual(a.map((g) => [g.species, g.seed, g.count, g.home]), b.map((g) => [g.species, g.seed, g.count, g.home]))
+  assert.deepEqual(
+    a.map((g) => [g.species, g.seed, g.count, g.home]),
+    b.map((g) => [g.species, g.seed, g.count, g.home])
+  )
 })
 
 test('placement: fish only in water, below the surface, above the bed', () => {
@@ -110,18 +119,32 @@ test('placement: fish only in water, below the surface, above the bed', () => {
     for (const g of spawnTileNow(i, j, FISH_SPECIES, habitat, world.frame, opts)) {
       const sp = FISH_SPECIES[g.species]
       const clearance = fishClearance(sp, margin)
-      const flock = new Flock(g.seed, g.count, g.home, { ...DEFAULT_BOIDS, margin: clearance, homeRadius: sp.school.roam }, g.environment)
+      const flock = new Flock(
+        g.seed,
+        g.count,
+        g.home,
+        { ...DEFAULT_BOIDS, margin: clearance, homeRadius: sp.school.roam },
+        g.environment
+      )
       kinds.add(`${g.species}:${sp.habitat.water}`)
       for (let step = 0; step <= 240; step++) {
         if (step % 60 === 0) {
           for (let f = 0; f < flock.count; f++) {
-            const x = flock.position[f * 3], y = flock.position[f * 3 + 1], z = flock.position[f * 3 + 2]
+            const x = flock.position[f * 3],
+              y = flock.position[f * 3 + 1],
+              z = flock.position[f * 3 + 2]
             world.frame.sample(x, z, sample)
             const where = `${g.species} at ${x.toFixed(1)},${y.toFixed(2)},${z.toFixed(1)} step ${step}`
             assert.ok(sample.waterLevel === sample.waterLevel, `dry: ${where}`)
             // The whole body (centre ± half its height) is under the surface and above the bed.
-            assert.ok(y + clearance - margin < sample.waterLevel, `above surface (${sample.waterLevel.toFixed(2)}): ${where}`)
-            assert.ok(y - (clearance - margin) > sample.elevation, `in the bed (${sample.elevation.toFixed(2)}): ${where}`)
+            assert.ok(
+              y + clearance - margin < sample.waterLevel,
+              `above surface (${sample.waterLevel.toFixed(2)}): ${where}`
+            )
+            assert.ok(
+              y - (clearance - margin) > sample.elevation,
+              `in the bed (${sample.elevation.toFixed(2)}): ${where}`
+            )
             fish++
           }
         }
@@ -130,5 +153,8 @@ test('placement: fish only in water, below the surface, above the bed', () => {
     }
   }
   assert.ok(fish > 100, `only ${fish} fish checked`)
-  assert.ok([...kinds].some((k) => k.endsWith(':fresh')) && [...kinds].some((k) => k.endsWith(':sea')), `kinds: ${[...kinds]}`)
+  assert.ok(
+    [...kinds].some((k) => k.endsWith(':fresh')) && [...kinds].some((k) => k.endsWith(':sea')),
+    `kinds: ${[...kinds]}`
+  )
 })

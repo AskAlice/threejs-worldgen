@@ -40,13 +40,17 @@ async function sandbox(name: SceneName) {
   scene.add(surface.object)
 
   const view = {
-    preset: (preset && Object.hasOwn(SNOW_PRESETS, preset) ? preset : name === 'avalanche' ? 'packed' : 'powder') as string,
+    preset: (preset && Object.hasOwn(SNOW_PRESETS, preset)
+      ? preset
+      : name === 'avalanche'
+        ? 'packed'
+        : 'powder') as string,
     walker: 'boots' as 'boots' | 'wheels',
     showWalker: true,
     showParticles: false,
     walkSpeed: 1.1,
     sink: 0.22,
-    releaseFriction: 0.2,
+    releaseFriction: 0.2
   }
   const walker = new Walker(spec)
   scene.add(walker.object)
@@ -55,7 +59,9 @@ async function sandbox(name: SceneName) {
     lay(mpm)
     walkStart = name === 'footprints' ? mpm.time + 0.6 : Infinity // let the cover settle first
   }
-  const walk = () => { walkStart = mpm.time }
+  const walk = () => {
+    walkStart = mpm.time
+  }
   const release = () => letGo(mpm, view.releaseFriction)
   reset()
 
@@ -65,17 +71,37 @@ async function sandbox(name: SceneName) {
   controls.target.fromArray(spec.target)
   controls.enableDamping = true
 
-  const gui = createPanel([{
-    name: 'threejs-particles',
-    classes: [
-      classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
-      classOf('MPMSnowSurface', surface, surface.options, specOptions(panels['threejs-particles'].MPMSnowSurface)),
+  const gui = createPanel(
+    [
+      {
+        name: 'threejs-particles',
+        classes: [
+          classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver)),
+          classOf('MPMSnowSurface', surface, surface.options, specOptions(panels['threejs-particles'].MPMSnowSurface))
+        ]
+      }
     ],
-  }], { title: 'threejs-particles · MPM snow' })
+    { title: 'threejs-particles · MPM snow' }
+  )
   const demo = gui.addFolder('demo')
-  demo.add({ scene: name }, 'scene', ['footprints', 'avalanche']).name('scene (reloads)').onChange((s: string) => { location.search = `?scene=${s}` })
-  demo.add(view, 'preset', Object.keys(SNOW_PRESETS)).name('snow preset (reloads)').onChange((p: string) => { location.search = `?scene=${name}&preset=${p}` })
-  demo.add(view, 'showParticles').name('show particles').onChange((v: boolean) => { mpm.object.visible = v })
+  demo
+    .add({ scene: name }, 'scene', ['footprints', 'avalanche'])
+    .name('scene (reloads)')
+    .onChange((s: string) => {
+      location.search = `?scene=${s}`
+    })
+  demo
+    .add(view, 'preset', Object.keys(SNOW_PRESETS))
+    .name('snow preset (reloads)')
+    .onChange((p: string) => {
+      location.search = `?scene=${name}&preset=${p}`
+    })
+  demo
+    .add(view, 'showParticles')
+    .name('show particles')
+    .onChange((v: boolean) => {
+      mpm.object.visible = v
+    })
   demo.add({ reset }, 'reset').name('reset the snow')
   if (name === 'footprints') {
     demo.add(view, 'walker', ['boots', 'wheels']).name('walker')
@@ -94,9 +120,24 @@ async function sandbox(name: SceneName) {
     renderer.setSize(innerWidth, innerHeight)
   })
 
-  Object.assign(window, { mpm, surface, camera, controls, renderer, scene, view, walk, release, reset, snowStats: () => stats(renderer, mpm, surface, walker), walkerPrints: walker.prints, groundAt: spec.ground })
+  Object.assign(window, {
+    mpm,
+    surface,
+    camera,
+    controls,
+    renderer,
+    scene,
+    view,
+    walk,
+    release,
+    reset,
+    snowStats: () => stats(renderer, mpm, surface, walker),
+    walkerPrints: walker.prints,
+    groundAt: spec.ground
+  })
 
-  let last = performance.now(), fps = 60
+  let last = performance.now(),
+    fps = 60
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.1, (now - last) / 1000)
@@ -109,8 +150,11 @@ async function sandbox(name: SceneName) {
     mpm.step(1 / 60) // fixed step: deterministic, and slow motion rather than instability when frames drop
     surface.update()
     renderer.render(scene, camera)
-    hud.textContent = `${fps.toFixed(0)} fps · ${mpm.count.toLocaleString()} snow particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s\n` +
-      (name === 'footprints' ? `${view.walker === 'boots' ? 'footprints' : 'tracks'}: "walk across" in the panel; ?scene=avalanche for the slope` : `"release the slab" in the panel (bed friction ${mpm.options.friction.toFixed(2)})`)
+    hud.textContent =
+      `${fps.toFixed(0)} fps · ${mpm.count.toLocaleString()} snow particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s\n` +
+      (name === 'footprints'
+        ? `${view.walker === 'boots' ? 'footprints' : 'tracks'}: "walk across" in the panel; ?scene=avalanche for the slope`
+        : `"release the slab" in the panel (bed friction ${mpm.options.friction.toFixed(2)})`)
   })
 }
 

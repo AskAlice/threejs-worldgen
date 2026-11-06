@@ -3,7 +3,16 @@ import type { District } from './districts.ts'
 import type { FarmBuilding } from './farm.ts'
 import type { Landmark } from './landmarks.ts'
 import type { Lot } from './lots.ts'
-import { boxCorners, insetPolygon, orientedBox, pointInPolygon, polygonArea, polygonCentroid, type OrientedBox, type Vec2 } from './polygon.ts'
+import {
+  boxCorners,
+  insetPolygon,
+  orientedBox,
+  pointInPolygon,
+  polygonArea,
+  polygonCentroid,
+  type OrientedBox,
+  type Vec2
+} from './polygon.ts'
 
 /** Building styles; each has its own proportions and window grid. */
 export type BuildingStyle = 'tower' | 'block' | 'house' | 'shed'
@@ -175,7 +184,7 @@ export const DEFAULT_BUILDINGS: BuildingOptions = {
   rooftop: 4,
   penthouses: 0.3,
   variation: 0.3,
-  areaPerPerson: 45,
+  areaPerPerson: 45
 }
 
 /** What {@link planBuilding} needs to know about the lot's surroundings. */
@@ -213,13 +222,25 @@ function shaftShape(foot: Vec2[], inset: number, kind: number): Vec2[] | null {
     if (fits(c, base)) r = c
   }
   if (!r) return base
-  const [cx, cz] = r.center, [ux, uz] = r.axis
+  const [cx, cz] = r.center,
+    [ux, uz] = r.axis
   const at = (u: number, v: number): Vec2 => [cx + ux * u - uz * v, cz + uz * u + ux * v]
   if (kind < 0.6) return boxCorners(r)
   if (kind < 0.85) {
     // Chamfered corners.
-    const c = Math.min(r.halfLength, r.halfWidth) * 0.3, L = r.halfLength, W = r.halfWidth
-    return [at(-L + c, -W), at(L - c, -W), at(L, -W + c), at(L, W - c), at(L - c, W), at(-L + c, W), at(-L, W - c), at(-L, -W + c)]
+    const c = Math.min(r.halfLength, r.halfWidth) * 0.3,
+      L = r.halfLength,
+      W = r.halfWidth
+    return [
+      at(-L + c, -W),
+      at(L - c, -W),
+      at(L, -W + c),
+      at(L, W - c),
+      at(L - c, W),
+      at(-L + c, W),
+      at(-L, W - c),
+      at(-L, -W + c)
+    ]
   }
   // Round (an ellipse with 16 sides).
   const out: Vec2[] = []
@@ -233,17 +254,22 @@ function shaftShape(foot: Vec2[], inset: number, kind: number): Vec2[] | null {
 /** Rectangle `w` wide (along the street) and `d` deep, set back from the street edge a→b of `lot` (shrunk until it fits). */
 export function streetRect(lot: Lot, along: number, w: number, d: number, setback: number): OrientedBox | null {
   const p = lot.polygon
-  const a = p[lot.front], b = p[(lot.front + 1) % p.length]
+  const a = p[lot.front],
+    b = p[(lot.front + 1) % p.length]
   const fl = Math.hypot(b[0] - a[0], b[1] - a[1])
-  const ux = (b[0] - a[0]) / fl, uz = (b[1] - a[1]) / fl
-  const nx = -uz, nz = ux // inward
+  const ux = (b[0] - a[0]) / fl,
+    uz = (b[1] - a[1]) / fl
+  const nx = -uz,
+    nz = ux // inward
   for (let s = 1; s >= 0.5; s -= 0.1) {
-    const dd = d * s, ww = w * (s < 0.75 ? s + 0.25 : 1)
+    const dd = d * s,
+      ww = w * (s < 0.75 ? s + 0.25 : 1)
     const cx = a[0] + ux * (along + w / 2) + nx * (setback + dd / 2)
     const cz = a[1] + uz * (along + w / 2) + nz * (setback + dd / 2)
-    const r: OrientedBox = ww >= dd
-      ? { center: [cx, cz], axis: [ux, uz], halfLength: ww / 2, halfWidth: dd / 2 }
-      : { center: [cx, cz], axis: [nx, nz], halfLength: dd / 2, halfWidth: ww / 2 }
+    const r: OrientedBox =
+      ww >= dd
+        ? { center: [cx, cz], axis: [ux, uz], halfLength: ww / 2, halfWidth: dd / 2 }
+        : { center: [cx, cz], axis: [nx, nz], halfLength: dd / 2, halfWidth: ww / 2 }
     if (fits(r, p)) return r
   }
   return null
@@ -251,28 +277,60 @@ export function streetRect(lot: Lot, along: number, w: number, d: number, setbac
 
 /** The main door: the middle of the wall (of outline `wall`, counter-clockwise) closest to the lot's street edge. */
 export function entranceFacing(wall: Vec2[], lot: Lot): Entrance {
-  const p = lot.polygon, fa = p[Math.max(0, lot.front)], fb = p[(Math.max(0, lot.front) + 1) % p.length]
+  const p = lot.polygon,
+    fa = p[Math.max(0, lot.front)],
+    fb = p[(Math.max(0, lot.front) + 1) % p.length]
   const fm: Vec2 = [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2]
   let entrance: Entrance = { x: wall[0][0], z: wall[0][1], nx: 0, nz: 1 }
   let bestD = Infinity
   for (let i = 0; i < wall.length; i++) {
-    const a = wall[i], b = wall[(i + 1) % wall.length]
-    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2
+    const a = wall[i],
+      b = wall[(i + 1) % wall.length]
+    const mx = (a[0] + b[0]) / 2,
+      mz = (a[1] + b[1]) / 2
     const dist = Math.hypot(mx - fm[0], mz - fm[1])
     const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
-    if (dist < bestD) { bestD = dist; entrance = { x: mx, z: mz, nx: (b[1] - a[1]) / l, nz: -(b[0] - a[0]) / l } }
+    if (dist < bestD) {
+      bestD = dist
+      entrance = { x: mx, z: mz, nx: (b[1] - a[1]) / l, nz: -(b[0] - a[0]) / l }
+    }
   }
   return entrance
 }
 
 /** A building from hand-made parts (landmarks, farm buildings): footprint, height and entrance worked out; `id` −1, base set later. */
-export function assembleBuilding(lot: Lot & { district: District }, use: Building['use'], style: BuildingStyle, parts: BuildingPart[], a: Pick<Building, 'material' | 'roofMaterial' | 'floors' | 'floorHeight'> & Partial<Pick<Building, 'tint' | 'population'>>, seed: number): Building {
+export function assembleBuilding(
+  lot: Lot & { district: District },
+  use: Building['use'],
+  style: BuildingStyle,
+  parts: BuildingPart[],
+  a: Pick<Building, 'material' | 'roofMaterial' | 'floors' | 'floorHeight'> &
+    Partial<Pick<Building, 'tint' | 'population'>>,
+  seed: number
+): Building {
   const foot = parts[0].tiers[0].polygon
   let height = 0
   for (const p of parts) height = Math.max(height, p.tiers[p.tiers.length - 1].top)
   return {
-    id: -1, lot: lot.id, district: lot.district, style, parts, population: 0, ...a, height, base: 0, bottom: 0, stilts: 0, center: polygonCentroid(foot), area: polygonArea(foot),
-    seed, details: [], balconies: [], shops: false, entrance: entranceFacing(foot, lot), use,
+    id: -1,
+    lot: lot.id,
+    district: lot.district,
+    style,
+    parts,
+    population: 0,
+    ...a,
+    height,
+    base: 0,
+    bottom: 0,
+    stilts: 0,
+    center: polygonCentroid(foot),
+    area: polygonArea(foot),
+    seed,
+    details: [],
+    balconies: [],
+    shops: false,
+    entrance: entranceFacing(foot, lot),
+    use
   }
 }
 
@@ -282,12 +340,20 @@ export function assembleBuilding(lot: Lot & { district: District }, use: Buildin
  * same building, and the random sequence differs per lot, so no two buildings are clones.
  * @returns `null` for empty lots (parks, courtyards, lots without street access, coverage misses).
  */
-export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, rand: () => number, id: number): Building | null {
+export function planBuilding(
+  lot: Lot,
+  site: BuildingSite,
+  o: BuildingOptions,
+  rand: () => number,
+  id: number
+): Building | null {
   const d = site.district
   const arch = site.architecture
   if (d === 'park' || lot.front < 0 || rand() >= site.coverage) return null
 
-  let floors = Math.round((site.floors[0] + (site.floors[1] - site.floors[0]) * Math.pow(site.density, 1.6)) * (1 + (rand() * 2 - 1) * o.variation))
+  let floors = Math.round(
+    (site.floors[0] + (site.floors[1] - site.floors[0]) * site.density ** 1.6) * (1 + (rand() * 2 - 1) * o.variation)
+  )
   floors = Math.max(1, Math.min(site.maxFloors, Math.max(Math.round(site.floors[0]), floors)))
   let style: BuildingStyle
   if (d === 'industrial') style = 'shed'
@@ -308,7 +374,8 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
   let stilts = 0
 
   const p = lot.polygon
-  const fa = p[lot.front], fb = p[(lot.front + 1) % p.length]
+  const fa = p[lot.front],
+    fb = p[(lot.front + 1) % p.length]
   const frontLen = Math.hypot(fb[0] - fa[0], fb[1] - fa[1])
 
   if (style === 'house' || style === 'shed') {
@@ -349,30 +416,49 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
       const wl = r.halfWidth * (1.6 + rand() * 0.8)
       const [ux, uz] = r.axis
       // Inward (away from the street) across the main rectangle's axis.
-      const sx = (fa[0] + fb[0]) / 2 - r.center[0], sz = (fa[1] + fb[1]) / 2 - r.center[1]
+      const sx = (fa[0] + fb[0]) / 2 - r.center[0],
+        sz = (fa[1] + fb[1]) / 2 - r.center[1]
       const back = -uz * sx + ux * sz > 0 ? -1 : 1
       const cx = r.center[0] + ux * side * (r.halfLength - ww) + -uz * back * (wl - r.halfWidth) * 0.9
       const cz = r.center[1] + uz * side * (r.halfLength - ww) + ux * back * (wl - r.halfWidth) * 0.9
       const wing: OrientedBox = { center: [cx, cz], axis: [-uz, ux], halfLength: wl, halfWidth: ww }
       if (fits(wing, p)) {
         const wRoof: RoofShape = roof === 'skillion' ? 'flat' : roof
-        parts.push({ tiers: [{ polygon: boxCorners(wing), top: floors === 2 && rand() < 0.5 ? fh : top }], rect: wing, roof: wRoof, roofHeight: wRoof === 'flat' ? 0 : roof === 'flat' ? 0 : ww * (roofHeight / r.halfWidth) })
+        parts.push({
+          tiers: [{ polygon: boxCorners(wing), top: floors === 2 && rand() < 0.5 ? fh : top }],
+          rect: wing,
+          roof: wRoof,
+          roofHeight: wRoof === 'flat' ? 0 : roof === 'flat' ? 0 : ww * (roofHeight / r.halfWidth)
+        })
       }
     }
     if (style === 'house' && roof !== 'flat' && rand() < o.chimneys) {
       const t = (rand() - 0.5) * 1.2 * r.halfLength
       const s = rand() < 0.5 ? -0.45 : 0.45
-      details.push({ kind: 'chimney', x: r.center[0] + r.axis[0] * t - r.axis[1] * s * r.halfWidth, z: r.center[1] + r.axis[1] * t + r.axis[0] * s * r.halfWidth, width: 0.7, depth: 0.7, bottom: top - 0.5, top: top + roofHeight + 0.9, angle: Math.atan2(r.axis[1], r.axis[0]) })
+      details.push({
+        kind: 'chimney',
+        x: r.center[0] + r.axis[0] * t - r.axis[1] * s * r.halfWidth,
+        z: r.center[1] + r.axis[1] * t + r.axis[0] * s * r.halfWidth,
+        width: 0.7,
+        depth: 0.7,
+        bottom: top - 0.5,
+        top: top + roofHeight + 0.9,
+        angle: Math.atan2(r.axis[1], r.axis[0])
+      })
     }
     if (stilts > 0) {
-      for (const part of parts) for (const [x, z] of part.tiers[0].polygon) {
-        details.push({ kind: 'post', x, z, width: 0.3, depth: 0.3, bottom: -stilts - 1, top: 0, angle: 0 })
-      }
+      for (const part of parts)
+        for (const [x, z] of part.tiers[0].polygon) {
+          details.push({ kind: 'post', x, z, width: 0.3, depth: 0.3, bottom: -stilts - 1, top: 0, angle: 0 })
+        }
     }
   } else {
     material = pick(style === 'tower' ? arch.towerMaterials : arch.blockMaterials, rand())
     const gap = d === 'downtown' ? 0 : o.sideGap
-    const foot = insetPolygon(p, lot.street.map((s) => (s ? site.setback : gap)))
+    const foot = insetPolygon(
+      p,
+      lot.street.map((s) => (s ? site.setback : gap))
+    )
     if (!foot || polygonArea(foot) < 40) return null
     const top = floors * fh
     let tiers: BuildingTier[] = [{ polygon: foot, top }]
@@ -381,32 +467,59 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
       const podium = Math.min(floors - 2, 2 + Math.floor(rand() * 4))
       const shaft = shaftShape(foot, 2.5 + rand() * 3, rand())
       if (shaft && polygonArea(shaft) > 120) {
-        tiers = [{ polygon: foot, top: podium * fh }, { polygon: shaft, top }]
+        tiers = [
+          { polygon: foot, top: podium * fh },
+          { polygon: shaft, top }
+        ]
         const crown = rand() < 0.6 ? insetPolygon(shaft, 2 + rand() * 2) : null
         if (crown && polygonArea(crown) > 60) {
           const k = Math.max(podium + 1, Math.round(floors * (0.78 + rand() * 0.1)))
-          tiers = [{ polygon: foot, top: podium * fh }, { polygon: shaft, top: k * fh }, { polygon: crown, top }]
+          tiers = [
+            { polygon: foot, top: podium * fh },
+            { polygon: shaft, top: k * fh },
+            { polygon: crown, top }
+          ]
         }
       }
     } else if (floors >= 3 && rand() < o.penthouses) {
       const pent = insetPolygon(foot, 2.5)
-      if (pent && polygonArea(pent) > 50) tiers = [{ polygon: foot, top: (floors - 1) * fh }, { polygon: pent, top }]
+      if (pent && polygonArea(pent) > 50)
+        tiers = [
+          { polygon: foot, top: (floors - 1) * fh },
+          { polygon: pent, top }
+        ]
     }
     parts.push({ tiers, rect: null, roof: 'flat', roofHeight: 0 })
     // Balconies on the longest walls of residential blocks.
     if (style === 'block' && d !== 'downtown' && rand() < arch.balconies) {
-      const edges = foot.map((a, i) => ({ a, b: foot[(i + 1) % foot.length], l: Math.hypot(foot[(i + 1) % foot.length][0] - a[0], foot[(i + 1) % foot.length][1] - a[1]) })).sort((x, y) => y.l - x.l).slice(0, 2)
+      const edges = foot
+        .map((a, i) => ({
+          a,
+          b: foot[(i + 1) % foot.length],
+          l: Math.hypot(foot[(i + 1) % foot.length][0] - a[0], foot[(i + 1) % foot.length][1] - a[1])
+        }))
+        .sort((x, y) => y.l - x.l)
+        .slice(0, 2)
       const spacing = 3.4 + rand() * 1.6
-      const bw = 2.2 + rand() * 1.2, bd = 1.1 + rand() * 0.5
+      const bw = 2.2 + rand() * 1.2,
+        bd = 1.1 + rand() * 0.5
       for (const e of edges) {
         if (e.l < 7) continue
-        const ux = (e.b[0] - e.a[0]) / e.l, uz = (e.b[1] - e.a[1]) / e.l
+        const ux = (e.b[0] - e.a[0]) / e.l,
+          uz = (e.b[1] - e.a[1]) / e.l
         const n = Math.floor((e.l - 2) / spacing)
         const off = (e.l - n * spacing) / 2 + spacing / 2
         for (let f = 1; f < Math.min(tiers[0].top / fh, 14); f++) {
           for (let i = 0; i < n && balconies.length < 48; i++) {
             const t = off + i * spacing
-            balconies.push({ x: e.a[0] + ux * t, z: e.a[1] + uz * t, angle: Math.atan2(uz, ux), width: bw, depth: bd, y: f * fh })
+            balconies.push({
+              x: e.a[0] + ux * t,
+              z: e.a[1] + uz * t,
+              angle: Math.atan2(uz, ux),
+              width: bw,
+              depth: bd,
+              y: f * fh
+            })
           }
         }
       }
@@ -421,12 +534,25 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
     const n = Math.floor(rand() * (o.rooftop + 1)) + (style === 'tower' ? 1 : 0)
     for (let i = 0; i < n; i++) {
       const r = rand()
-      const kind: DetailKind = style === 'house' ? 'plant' : r < 0.2 ? 'tank' : r < 0.32 && style === 'tower' ? 'antenna' : 'plant'
-      const w = kind === 'antenna' ? 0.4 : kind === 'tank' ? 2.5 + rand() * 1.5 : 1.5 + rand() * Math.min(5, tb.halfLength * 0.6)
+      const kind: DetailKind =
+        style === 'house' ? 'plant' : r < 0.2 ? 'tank' : r < 0.32 && style === 'tower' ? 'antenna' : 'plant'
+      const w =
+        kind === 'antenna'
+          ? 0.4
+          : kind === 'tank'
+            ? 2.5 + rand() * 1.5
+            : 1.5 + rand() * Math.min(5, tb.halfLength * 0.6)
       const dd = kind === 'plant' ? 1.5 + rand() * Math.min(4, tb.halfWidth * 0.6) : w
-      const h = kind === 'antenna' ? 6 + rand() * 14 : kind === 'tank' ? 2.5 + rand() * 2 : 1.2 + rand() * (style === 'tower' ? 4 : 2)
-      const u = (rand() * 2 - 1) * Math.max(0, tb.halfLength - w), v = (rand() * 2 - 1) * Math.max(0, tb.halfWidth - dd)
-      const x = tb.center[0] + tb.axis[0] * u - tb.axis[1] * v, z = tb.center[1] + tb.axis[1] * u + tb.axis[0] * v
+      const h =
+        kind === 'antenna'
+          ? 6 + rand() * 14
+          : kind === 'tank'
+            ? 2.5 + rand() * 2
+            : 1.2 + rand() * (style === 'tower' ? 4 : 2)
+      const u = (rand() * 2 - 1) * Math.max(0, tb.halfLength - w),
+        v = (rand() * 2 - 1) * Math.max(0, tb.halfWidth - dd)
+      const x = tb.center[0] + tb.axis[0] * u - tb.axis[1] * v,
+        z = tb.center[1] + tb.axis[1] * u + tb.axis[0] * v
       if (fits({ center: [x, z], axis: tb.axis, halfLength: w / 2, halfWidth: dd / 2 }, top.polygon)) {
         details.push({ kind, x, z, width: w, depth: dd, bottom: top.top, top: top.top + h, angle: ang })
       }
@@ -438,17 +564,29 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
   const wall = parts[0].tiers[0].polygon
   for (let i = 0; i < nAc; i++) {
     const k = Math.floor(rand() * wall.length)
-    const a = wall[k], b = wall[(k + 1) % wall.length]
+    const a = wall[k],
+      b = wall[(k + 1) % wall.length]
     const l = Math.hypot(b[0] - a[0], b[1] - a[1])
     if (l < 3) continue
-    const ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l
+    const ux = (b[0] - a[0]) / l,
+      uz = (b[1] - a[1]) / l
     const t = 1 + rand() * (l - 2)
     const f = Math.floor(rand() * Math.max(1, Math.round(parts[0].tiers[0].top / fh)))
-    details.push({ kind: 'ac', x: a[0] + ux * t + uz * 0.3, z: a[1] + uz * t - ux * 0.3, width: 0.9, depth: 0.6, bottom: f * fh + 0.4, top: f * fh + 1.0, angle: Math.atan2(uz, ux) })
+    details.push({
+      kind: 'ac',
+      x: a[0] + ux * t + uz * 0.3,
+      z: a[1] + uz * t - ux * 0.3,
+      width: 0.9,
+      depth: 0.6,
+      bottom: f * fh + 0.4,
+      top: f * fh + 1.0,
+      angle: Math.atan2(uz, ux)
+    })
   }
 
   const entrance = entranceFacing(wall, lot)
-  let height = 0, floorArea = 0
+  let height = 0,
+    floorArea = 0
   for (const part of parts) {
     let below = 0
     for (const t of part.tiers) {
@@ -460,9 +598,27 @@ export function planBuilding(lot: Lot, site: BuildingSite, o: BuildingOptions, r
   }
   const foot = parts[0].tiers[0].polygon
   return {
-    id, lot: lot.id, district: d, style, parts, material, roofMaterial, floors, floorHeight: fh, height,
-    base: 0, bottom: 0, stilts, center: polygonCentroid(foot), area: polygonArea(foot), seed,
+    id,
+    lot: lot.id,
+    district: d,
+    style,
+    parts,
+    material,
+    roofMaterial,
+    floors,
+    floorHeight: fh,
+    height,
+    base: 0,
+    bottom: 0,
+    stilts,
+    center: polygonCentroid(foot),
+    area: polygonArea(foot),
+    seed,
     population: (floorArea * RESIDENTIAL_SHARE[style] * (d === 'downtown' ? 0.6 : 1)) / o.areaPerPerson,
-    details, balconies, shops: d === 'downtown' && style !== 'house' ? rand() < 0.8 : style === 'block' && rand() < 0.3, entrance, use: null,
+    details,
+    balconies,
+    shops: d === 'downtown' && style !== 'house' ? rand() < 0.8 : style === 'block' && rand() < 0.3,
+    entrance,
+    use: null
   }
 }

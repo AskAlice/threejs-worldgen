@@ -103,26 +103,31 @@ export class RoadGraph {
 
   private indexEdge(id: number) {
     const e = this.edges[id]
-    const a = this.nodes[e.a], b = this.nodes[e.b]
+    const a = this.nodes[e.a],
+      b = this.nodes[e.b]
     const cs = this.cellSize
-    const i0 = Math.floor(Math.min(a.x, b.x) / cs), i1 = Math.floor(Math.max(a.x, b.x) / cs)
-    const j0 = Math.floor(Math.min(a.z, b.z) / cs), j1 = Math.floor(Math.max(a.z, b.z) / cs)
-    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
-      const k = this.key(i, j)
-      const list = this.edgeCells.get(k)
-      if (list) list.push(id)
-      else this.edgeCells.set(k, [id])
-    }
+    const i0 = Math.floor(Math.min(a.x, b.x) / cs),
+      i1 = Math.floor(Math.max(a.x, b.x) / cs)
+    const j0 = Math.floor(Math.min(a.z, b.z) / cs),
+      j1 = Math.floor(Math.max(a.z, b.z) / cs)
+    for (let i = i0; i <= i1; i++)
+      for (let j = j0; j <= j1; j++) {
+        const k = this.key(i, j)
+        const list = this.edgeCells.get(k)
+        if (list) list.push(id)
+        else this.edgeCells.set(k, [id])
+      }
   }
 
   /** Edge ids whose cells overlap the box (may contain duplicates and false positives). */
   private edgesNear(minX: number, minZ: number, maxX: number, maxZ: number, out: Set<number>): Set<number> {
     out.clear()
     const cs = this.cellSize
-    for (let i = Math.floor(minX / cs); i <= Math.floor(maxX / cs); i++) for (let j = Math.floor(minZ / cs); j <= Math.floor(maxZ / cs); j++) {
-      const list = this.edgeCells.get(this.key(i, j))
-      if (list) for (const e of list) out.add(e)
-    }
+    for (let i = Math.floor(minX / cs); i <= Math.floor(maxX / cs); i++)
+      for (let j = Math.floor(minZ / cs); j <= Math.floor(maxZ / cs); j++) {
+        const list = this.edgeCells.get(this.key(i, j))
+        if (list) for (const e of list) out.add(e)
+      }
     return out
   }
   private near = new Set<number>()
@@ -147,7 +152,8 @@ export class RoadGraph {
   /** Length of edge `e`, metres. */
   length(e: number): number {
     const edge = this.edges[e]
-    const a = this.nodes[edge.a], b = this.nodes[edge.b]
+    const a = this.nodes[edge.a],
+      b = this.nodes[edge.b]
     return Math.hypot(b.x - a.x, b.z - a.z)
   }
 
@@ -156,7 +162,13 @@ export class RoadGraph {
    * sharing one of those nodes. `skipEdge` is ignored (the edge about to be split at b).
    */
   crosses(ax: number, az: number, bx: number, bz: number, na = -1, nb = -1, skipEdge = -1): boolean {
-    const near = this.edgesNear(Math.min(ax, bx) - 0.01, Math.min(az, bz) - 0.01, Math.max(ax, bx) + 0.01, Math.max(az, bz) + 0.01, this.near)
+    const near = this.edgesNear(
+      Math.min(ax, bx) - 0.01,
+      Math.min(az, bz) - 0.01,
+      Math.max(ax, bx) + 0.01,
+      Math.max(az, bz) + 0.01,
+      this.near
+    )
     for (const id of near) {
       if (id === skipEdge) continue
       const e = this.edges[id]
@@ -166,12 +178,17 @@ export class RoadGraph {
         const far = this.nodes[shared === e.a ? e.b : e.a]
         const mine = shared === na ? [bx, bz] : [ax, az]
         const s = this.nodes[shared]
-        const d1x = far.x - s.x, d1z = far.z - s.z, d2x = mine[0] - s.x, d2z = mine[1] - s.z
-        const cross = d1x * d2z - d1z * d2x, dot = d1x * d2x + d1z * d2z
+        const d1x = far.x - s.x,
+          d1z = far.z - s.z,
+          d2x = mine[0] - s.x,
+          d2z = mine[1] - s.z
+        const cross = d1x * d2z - d1z * d2x,
+          dot = d1x * d2x + d1z * d2z
         if (dot > 0 && Math.abs(cross) < 1e-6 * Math.hypot(d1x, d1z) * Math.hypot(d2x, d2z)) return true
         continue
       }
-      const a = this.nodes[e.a], b = this.nodes[e.b]
+      const a = this.nodes[e.a],
+        b = this.nodes[e.b]
       if (segmentsTouch(ax, az, bx, bz, a.x, a.z, b.x, b.z, 1e-4)) return true
     }
     return false
@@ -183,7 +200,8 @@ export class RoadGraph {
    */
   addEdge(a: number, b: number, type: RoadType, width: number, sidewalk: number, bridge = false): number {
     if (a === b || this.edgeBetween(a, b) >= 0) return -1
-    const na = this.nodes[a], nb = this.nodes[b]
+    const na = this.nodes[a],
+      nb = this.nodes[b]
     if (Math.hypot(nb.x - na.x, nb.z - na.z) < 1e-3) return -1
     if (this.crosses(na.x, na.z, nb.x, nb.z, a, b)) return -1
     // A node lying on the new edge would be a crossing without a node.
@@ -212,7 +230,8 @@ export class RoadGraph {
   /** Splits edge `e` at (x, z) (projected onto it) with a new node; returns the node id. */
   splitEdge(e: number, x: number, z: number): number {
     const edge = this.edges[e]
-    const a = this.nodes[edge.a], b = this.nodes[edge.b]
+    const a = this.nodes[edge.a],
+      b = this.nodes[edge.b]
     const { t } = pointSegment(x, z, a.x, a.z, b.x, b.z)
     const n = this.addNode(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t)
     const oldB = edge.b
@@ -228,13 +247,17 @@ export class RoadGraph {
   /** Nearest node within `radius` of (x, z), skipping ids in `skip`; −1 if none. */
   nearestNode(x: number, z: number, radius: number, skip?: (id: number) => boolean): number {
     const cs = this.cellSize
-    let best = -1, bestD = radius
+    let best = -1,
+      bestD = radius
     for (let i = Math.floor((x - radius) / cs); i <= Math.floor((x + radius) / cs); i++) {
       for (let j = Math.floor((z - radius) / cs); j <= Math.floor((z + radius) / cs); j++) {
         for (const n of this.nodeCells.get(this.key(i, j)) ?? []) {
           if (skip?.(n)) continue
           const d = Math.hypot(this.nodes[n].x - x, this.nodes[n].z - z)
-          if (d <= bestD) { bestD = d; best = n }
+          if (d <= bestD) {
+            bestD = d
+            best = n
+          }
         }
       }
     }
@@ -247,7 +270,8 @@ export class RoadGraph {
     for (const id of this.edgesNear(x - radius, z - radius, x + radius, z + radius, this.near)) {
       if (skip?.(id)) continue
       const e = this.edges[id]
-      const a = this.nodes[e.a], b = this.nodes[e.b]
+      const a = this.nodes[e.a],
+        b = this.nodes[e.b]
       const { distance, t } = pointSegment(x, z, a.x, a.z, b.x, b.z)
       if (distance <= radius && (!best || distance < best.distance)) {
         best = { edge: id, u: t, x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, distance }
@@ -259,12 +283,20 @@ export class RoadGraph {
   /** First edge crossed by segment a→b (nearest to a), ignoring edges at node `skipNode`. `distance` is the parameter along a→b. */
   firstCrossing(ax: number, az: number, bx: number, bz: number, skipNode = -1): EdgeHit | null {
     let best: EdgeHit | null = null
-    for (const id of this.edgesNear(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), this.near)) {
+    for (const id of this.edgesNear(
+      Math.min(ax, bx),
+      Math.min(az, bz),
+      Math.max(ax, bx),
+      Math.max(az, bz),
+      this.near
+    )) {
       const e = this.edges[id]
       if (e.a === skipNode || e.b === skipNode) continue
-      const a = this.nodes[e.a], b = this.nodes[e.b]
+      const a = this.nodes[e.a],
+        b = this.nodes[e.b]
       const hit = segmentIntersection(ax, az, bx, bz, a.x, a.z, b.x, b.z)
-      if (hit && (!best || hit.t < best.distance)) best = { edge: id, u: hit.u, x: ax + (bx - ax) * hit.t, z: az + (bz - az) * hit.t, distance: hit.t }
+      if (hit && (!best || hit.t < best.distance))
+        best = { edge: id, u: hit.u, x: ax + (bx - ax) * hit.t, z: az + (bz - az) * hit.t, distance: hit.t }
     }
     return best
   }
@@ -298,7 +330,11 @@ export class RoadGraph {
       for (const e of this.nodes[cur].edges) {
         const nx = this.other(e, cur)
         const d = g[cur] + cost(this.edges[e], this.length(e))
-        if (d < g[nx]) { g[nx] = d; prev[nx] = cur; open.push(nx, d + h(nx)) }
+        if (d < g[nx]) {
+          g[nx] = d
+          prev[nx] = cur
+          open.push(nx, d + h(nx))
+        }
       }
     }
     if (from !== to && prev[to] < 0) return []
@@ -309,7 +345,10 @@ export class RoadGraph {
 
   /** Plain-data copy (nodes and edges), e.g. to send to a worker or save. */
   toJSON(): RoadGraphJSON {
-    return { nodes: this.nodes.map((n) => ({ ...n, edges: n.edges.slice() })), edges: this.edges.map((e) => ({ ...e })) }
+    return {
+      nodes: this.nodes.map((n) => ({ ...n, edges: n.edges.slice() })),
+      edges: this.edges.map((e) => ({ ...e }))
+    }
   }
 }
 
@@ -325,9 +364,13 @@ export class MinHeap {
   }
   /** Queues `id` with priority `key`. */
   push(id: number, key: number): void {
-    const ids = this.ids, keys = this.keys, ord = this.order
+    const ids = this.ids,
+      keys = this.keys,
+      ord = this.order
     let i = ids.length
-    ids.push(id); keys.push(key); ord.push(this.counter++)
+    ids.push(id)
+    keys.push(key)
+    ord.push(this.counter++)
     while (i > 0) {
       const p = (i - 1) >> 1
       if (keys[p] < keys[i] || (keys[p] === keys[i] && ord[p] < ord[i])) break
@@ -337,14 +380,19 @@ export class MinHeap {
   }
   /** Removes and returns the id with the smallest key. */
   pop(): number {
-    const ids = this.ids, keys = this.keys, ord = this.order
+    const ids = this.ids,
+      keys = this.keys,
+      ord = this.order
     const top = ids[0]
     const last = ids.length - 1
     this.swap(0, last)
-    ids.pop(); keys.pop(); ord.pop()
+    ids.pop()
+    keys.pop()
+    ord.pop()
     let i = 0
     for (;;) {
-      const l = i * 2 + 1, r = l + 1
+      const l = i * 2 + 1,
+        r = l + 1
       let m = i
       const less = (x: number, y: number) => keys[x] < keys[y] || (keys[x] === keys[y] && ord[x] < ord[y])
       if (l < ids.length && less(l, m)) m = l
@@ -356,7 +404,9 @@ export class MinHeap {
     return top
   }
   private swap(i: number, j: number) {
-    const ids = this.ids, keys = this.keys, ord = this.order
+    const ids = this.ids,
+      keys = this.keys,
+      ord = this.order
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
     ;[keys[i], keys[j]] = [keys[j], keys[i]]
     ;[ord[i], ord[j]] = [ord[j], ord[i]]

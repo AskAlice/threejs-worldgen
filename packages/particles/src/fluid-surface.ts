@@ -1,11 +1,74 @@
 import {
-  AddEquation, BufferAttribute, Color, CustomBlending, FloatType, HalfFloatType, InstancedBufferGeometry, LinearFilter, Mesh, MeshBasicNodeMaterial, NearestFilter,
-  OneFactor, PlaneGeometry, QuadMesh, RedFormat, RenderTarget, Scene, Sphere, Vector2, Vector3, type Camera, type PerspectiveCamera, type Renderer, type Texture,
+  AddEquation,
+  BufferAttribute,
+  Color,
+  CustomBlending,
+  FloatType,
+  HalfFloatType,
+  InstancedBufferGeometry,
+  LinearFilter,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NearestFilter,
+  OneFactor,
+  PlaneGeometry,
+  QuadMesh,
+  RedFormat,
+  RenderTarget,
+  Scene,
+  Sphere,
+  Vector2,
+  Vector3,
+  type Camera,
+  type PerspectiveCamera,
+  type Renderer,
+  type Texture
 } from 'three/webgpu'
 import {
-  Discard, Fn, If, Loop, abs, cameraFar, cameraNear, cameraPosition, cameraWorldMatrix, clamp, cross, dot, exp, floor, ivec3, modelWorldMatrix, mx_noise_float, float, fwidth, instanceIndex, length, max, min, mix,
-  normalize, perspectiveDepthToViewZ, pmremTexture, positionGeometry, positionView, pow, reflect, screenUV, select, smoothstep, sqrt, texture, uniform, varying, vec2, vec3, vec4,
-  viewZToPerspectiveDepth, viewportDepthTexture, viewportSharedTexture,
+  Discard,
+  Fn,
+  If,
+  Loop,
+  abs,
+  cameraFar,
+  cameraNear,
+  cameraPosition,
+  cameraWorldMatrix,
+  clamp,
+  cross,
+  dot,
+  exp,
+  floor,
+  ivec3,
+  modelWorldMatrix,
+  mx_noise_float,
+  float,
+  fwidth,
+  instanceIndex,
+  length,
+  max,
+  min,
+  mix,
+  normalize,
+  perspectiveDepthToViewZ,
+  pmremTexture,
+  positionGeometry,
+  positionView,
+  pow,
+  reflect,
+  screenUV,
+  select,
+  smoothstep,
+  sqrt,
+  texture,
+  uniform,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+  viewZToPerspectiveDepth,
+  viewportDepthTexture,
+  viewportSharedTexture
 } from 'three/tsl'
 import { ParticleLighting } from './system.ts'
 import { merge, type DeepPartial } from './options.ts'
@@ -87,7 +150,7 @@ export const DEFAULT_FLUID_SURFACE: FluidSurfaceOptions = {
   refraction: 0.06,
   roughness: 0.1,
   edge: 0.0005,
-  sky: ['#6f93c0', '#c5d3df', '#4a4a40'],
+  sky: ['#6f93c0', '#c5d3df', '#4a4a40']
 }
 
 /** What a {@link FluidSurface} draws: an `MPMSolver` (or anything with its pool buffers). */
@@ -162,7 +225,8 @@ export class FluidSurface {
   readonly uniforms = {
     /** Sphere radius, metres. */ radius: uniform(0.1),
     /** Radius multiplier of tagged particles. */ tagRadius: uniform(1),
-    /** Thickness scale: particle volume over sphere volume (overlapping spheres would overcount). */ volume: uniform(1),
+    /** Thickness scale: particle volume over sphere volume (overlapping spheres would overcount). */ volume:
+      uniform(1),
     /** Camera right, world. */ right: uniform(new Vector3(1, 0, 0)),
     /** Camera up, world. */ up: uniform(new Vector3(0, 1, 0)),
     /** Projection [0][0] and [1][1]. */ projection: uniform(new Vector2(1, 1)),
@@ -189,7 +253,7 @@ export class FluidSurface {
     /** Seconds (streak animation). */ time: uniform(0),
     /** Sky zenith (linear). */ zenith: uniform(new Color()),
     /** Sky horizon (linear). */ horizon: uniform(new Color()),
-    /** Ground (linear). */ ground: uniform(new Color()),
+    /** Ground (linear). */ ground: uniform(new Color())
   }
 
   private readonly source: FluidSource
@@ -216,7 +280,14 @@ export class FluidSurface {
     this.options = resolveFluidSurfaceOptions(input)
     this.lighting = lighting ?? new ParticleLighting()
     const target = (type: typeof FloatType | typeof HalfFloatType, format?: typeof RedFormat, depth = false) => {
-      const rt = new RenderTarget(1, 1, { type, format, depthBuffer: depth, magFilter: type === FloatType ? NearestFilter : LinearFilter, minFilter: type === FloatType ? NearestFilter : LinearFilter, generateMipmaps: false })
+      const rt = new RenderTarget(1, 1, {
+        type,
+        format,
+        depthBuffer: depth,
+        magFilter: type === FloatType ? NearestFilter : LinearFilter,
+        minFilter: type === FloatType ? NearestFilter : LinearFilter,
+        generateMipmaps: false
+      })
       return rt
     }
     this.depthRT = target(FloatType, RedFormat, true)
@@ -264,10 +335,13 @@ export class FluidSurface {
 
   /** Draws the offscreen passes for `camera` (call each frame before rendering the scene that holds `object`). */
   render(renderer: Renderer, camera: Camera): this {
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     renderer.getDrawingBufferSize(this.size)
-    const w = Math.max(1, Math.round(this.size.x * o.resolution)), h = Math.max(1, Math.round(this.size.y * o.resolution))
-    for (const rt of [this.depthRT, this.tempRT, this.smoothRT, this.thickRT, this.mistRT]) if (rt.width !== w || rt.height !== h) rt.setSize(w, h)
+    const w = Math.max(1, Math.round(this.size.x * o.resolution)),
+      h = Math.max(1, Math.round(this.size.y * o.resolution))
+    for (const rt of [this.depthRT, this.tempRT, this.smoothRT, this.thickRT, this.mistRT])
+      if (rt.width !== w || rt.height !== h) rt.setSize(w, h)
     u.texel.value.set(1 / w, 1 / h)
     const p = (camera as PerspectiveCamera).projectionMatrix.elements
     u.projection.value.set(p[0], p[5])
@@ -281,7 +355,9 @@ export class FluidSurface {
       mesh.matrixWorld.copy(mesh.matrix)
     }
 
-    const prevTarget = renderer.getRenderTarget(), prevAlpha = renderer.getClearAlpha(), prevAuto = renderer.autoClear
+    const prevTarget = renderer.getRenderTarget(),
+      prevAlpha = renderer.getClearAlpha(),
+      prevAuto = renderer.autoClear
     renderer.getClearColor(this.clear)
     renderer.autoClear = false
     renderer.setClearColor(0x000000, 0)
@@ -296,7 +372,10 @@ export class FluidSurface {
     renderer.render(this.mistScene, camera)
     let src = this.depthRT
     for (let i = 0; i < o.iterations; i++) {
-      for (const [dir, dst] of [[[1, 0], this.tempRT], [[0, 1], this.smoothRT]] as const) {
+      for (const [dir, dst] of [
+        [[1, 0], this.tempRT],
+        [[0, 1], this.smoothRT]
+      ] as const) {
         this.blurInput.value = src.texture
         u.direction.value.set(dir[0], dir[1])
         renderer.setRenderTarget(dst)
@@ -319,7 +398,8 @@ export class FluidSurface {
   /** Frees the GPU resources. */
   dispose(): void {
     for (const rt of [this.depthRT, this.tempRT, this.smoothRT, this.thickRT, this.mistRT]) rt.dispose()
-    for (const mesh of [this.depthMesh, this.thickMesh, this.mistMesh, this.object]) (mesh.material as MeshBasicNodeMaterial).dispose()
+    for (const mesh of [this.depthMesh, this.thickMesh, this.mistMesh, this.object])
+      (mesh.material as MeshBasicNodeMaterial).dispose()
     this.depthMesh.geometry.dispose()
     this.object.geometry.dispose()
     ;(this.blur.material as MeshBasicNodeMaterial).dispose()
@@ -327,7 +407,8 @@ export class FluidSurface {
   }
 
   private applyOptions(): this {
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     const spacing = this.source.options.cellSize / 2
     u.radius.value = o.radius * spacing
     u.tagRadius.value = o.tagRadius
@@ -358,18 +439,29 @@ export class FluidSurface {
 
   // How much of particle `i` (local position P) is spray: tagged drops never; else by the grid mass at its nearest node.
   private sprayOf(P: any): any {
-    const b = this.source.buffers, res = this.source.resolution, u = this.uniforms
+    const b = this.source.buffers,
+      res = this.source.resolution,
+      u = this.uniforms
     if (!b.grid || !res) return float(0)
     const [nx, ny, nz] = res
     // Trilinear between the 8 surrounding nodes (the nearest node alone would size particles in cell-sized blocks).
     const x: any = clamp(P.mul(u.invDx), vec3(0), vec3(nx - 1.001, ny - 1.001, nz - 1.001)).toVar()
     const i0: any = (ivec3 as any)(floor(x)).toVar()
     const f: any = x.sub(floor(x)).toVar()
-    const at = (di: number, dj: number, dk: number) => b.grid.element(i0.z.add(dk).mul(nx * ny).add(i0.y.add(dj).mul(nx)).add(i0.x.add(di))).w
+    const at = (di: number, dj: number, dk: number) =>
+      b.grid.element(
+        i0.z
+          .add(dk)
+          .mul(nx * ny)
+          .add(i0.y.add(dj).mul(nx))
+          .add(i0.x.add(di))
+      ).w
     const lerp = (a: any, c: any, t: any) => a.add(c.sub(a).mul(t))
     const mass = lerp(
       lerp(lerp(at(0, 0, 0), at(1, 0, 0), f.x), lerp(at(0, 1, 0), at(1, 1, 0), f.x), f.y),
-      lerp(lerp(at(0, 0, 1), at(1, 0, 1), f.x), lerp(at(0, 1, 1), at(1, 1, 1), f.x), f.y), f.z)
+      lerp(lerp(at(0, 0, 1), at(1, 0, 1), f.x), lerp(at(0, 1, 1), at(1, 1, 1), f.x), f.y),
+      f.z
+    )
     const tagged = b.state ? b.state.element(instanceIndex).z.notEqual(0) : null
     const s = smoothstep(u.spray.y, u.spray.x, mass)
     return tagged ? select(tagged, float(0), s) : s
@@ -379,19 +471,36 @@ export class FluidSurface {
   // thickness splat (water volume per pixel, metres) with its whitewater share in G, tagged-drop share in B and falling
   // share in A. Spray shrinks out of both (it is drawn as mist).
   private particleMesh(g: InstancedBufferGeometry, thickness: boolean): Mesh {
-    const u = this.uniforms, b = this.source.buffers
+    const u = this.uniforms,
+      b = this.source.buffers
     const m = new MeshBasicNodeMaterial({ depthTest: !thickness, depthWrite: !thickness })
     m.fog = false
     m.toneMapped = false
-    if (thickness) Object.assign(m, { transparent: true, blending: CustomBlending, blendEquation: AddEquation, blendSrc: OneFactor, blendDst: OneFactor, blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor })
-    const P = b.position.element(instanceIndex), V = b.velocity.element(instanceIndex)
+    if (thickness)
+      Object.assign(m, {
+        transparent: true,
+        blending: CustomBlending,
+        blendEquation: AddEquation,
+        blendSrc: OneFactor,
+        blendDst: OneFactor,
+        blendSrcAlpha: OneFactor,
+        blendDstAlpha: OneFactor
+      })
+    const P = b.position.element(instanceIndex),
+      V = b.velocity.element(instanceIndex)
     const keep = select(V.w.greaterThan(0), float(1), float(0))
     const scale = b.state ? select(b.state.element(instanceIndex).z.notEqual(0), u.tagRadius, float(1)) : float(1)
     // Sparse water: fast, it is spray (drawn as mist, so it shrinks out of the surface); slow, it is a film on the ground
     // (wider, flatter discs that merge into one sheet instead of beading).
-    const sparse = this.sprayOf(P.xyz), fast = smoothstep(2.5, 4, length(V.xyz))
+    const sparse = this.sprayOf(P.xyz),
+      fast = smoothstep(2.5, 4, length(V.xyz))
     const film: any = varying(sparse.mul(fast.oneMinus()))
-    const radius: any = varying(u.radius.mul(scale).mul(float(1).sub(sparse.mul(fast))).mul(film.mul(0.4).add(1)))
+    const radius: any = varying(
+      u.radius
+        .mul(scale)
+        .mul(float(1).sub(sparse.mul(fast)))
+        .mul(film.mul(0.4).add(1))
+    )
     const corner = positionGeometry.xy
     m.positionNode = P.xyz.add(u.right.mul(corner.x).add(u.up.mul(corner.y)).mul(radius.mul(keep)))
     const q = varying(corner)
@@ -405,10 +514,17 @@ export class FluidSurface {
     if (thickness) {
       // Chord through the sphere, scaled so the splat holds the particle's own water volume.
       const chord = nz.mul(radius.mul(2)).mul(u.volume).div(scale.mul(scale).mul(scale))
-      m.colorNode = vec4(chord, chord.mul(foamy), chord.mul(select(scale.notEqual(1), float(1), float(0))), chord.mul(falling))
+      m.colorNode = vec4(
+        chord,
+        chord.mul(foamy),
+        chord.mul(select(scale.notEqual(1), float(1), float(0))),
+        chord.mul(falling)
+      )
     } else {
       m.colorNode = Fn(() => {
-        If(r2.greaterThan(1), () => { Discard() })
+        If(r2.greaterThan(1), () => {
+          Discard()
+        })
         return vec4(positionView.z.add(nz.mul(radius)).negate(), 0, 0, 1)
       })()
       m.depthNode = viewZToPerspectiveDepth(positionView.z.add(nz.mul(radius)), cameraNear, cameraFar)
@@ -422,24 +538,41 @@ export class FluidSurface {
   // Spray as mist: soft Gaussian splats stretched along the velocity by the shutter (motion blur), accumulated additively
   // (R: opacity, G: opacity × view depth for the occlusion test; B: film, slow sparse water). Bulk water collapses to nothing.
   private mistParticles(g: InstancedBufferGeometry): Mesh {
-    const u = this.uniforms, b = this.source.buffers
+    const u = this.uniforms,
+      b = this.source.buffers
     const m = new MeshBasicNodeMaterial({ depthTest: false, depthWrite: false, transparent: true })
-    Object.assign(m, { blending: CustomBlending, blendEquation: AddEquation, blendSrc: OneFactor, blendDst: OneFactor, blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor })
+    Object.assign(m, {
+      blending: CustomBlending,
+      blendEquation: AddEquation,
+      blendSrc: OneFactor,
+      blendDst: OneFactor,
+      blendSrcAlpha: OneFactor,
+      blendDstAlpha: OneFactor
+    })
     m.fog = false
     m.toneMapped = false
-    const P = b.position.element(instanceIndex), V = b.velocity.element(instanceIndex)
+    const P = b.position.element(instanceIndex),
+      V = b.velocity.element(instanceIndex)
     const speed = length(V.xyz)
     const sparse = this.sprayOf(P.xyz).mul(select(V.w.greaterThan(0), float(1), float(0)))
     const fast = smoothstep(2.5, 4, speed)
-    const amount = sparse.mul(fast), film = sparse.mul(fast.oneMinus())
+    const amount = sparse.mul(fast),
+      film = sparse.mul(fast.oneMinus())
     const keep = select(sparse.greaterThan(0.01), float(1), float(0))
     const toCam = normalize(cameraPosition.sub(modelWorldMatrix.mul(vec4(P.xyz, 1)).xyz))
     const axis = select(speed.greaterThan(0.05), V.xyz.div(max(speed, 0.05)), u.up)
     const side = normalize(cross(axis, toCam))
     const corner = positionGeometry.xy
     const half = u.mistSize.add(speed.mul(u.shutter))
-    m.positionNode = P.xyz.add(side.mul(corner.x.mul(u.mistSize)).add(axis.mul(corner.y.mul(half))).mul(keep))
-    const q = varying(corner), a = varying(amount), fl = varying(film)
+    m.positionNode = P.xyz.add(
+      side
+        .mul(corner.x.mul(u.mistSize))
+        .add(axis.mul(corner.y.mul(half)))
+        .mul(keep)
+    )
+    const q = varying(corner),
+      a = varying(amount),
+      fl = varying(film)
     const profile: any = exp(dot(q, q).mul(-4))
     const alpha = profile.mul(a).mul(u.mist)
     // B: where slow sparse water lies as a film (the composite draws it as a faint wet sheen, not as a surface of beads).
@@ -465,16 +598,24 @@ export class FluidSurface {
         const px = min(u.smoothing.mul(u.projection.x).div(d0).mul(0.5).div(u.texel.x), 18)
         const sigma = max(px.mul(0.5), 0.5)
         const range = u.radius.mul(4)
-        const sum = float(0).toVar(), wsum = float(0).toVar()
+        const sum = float(0).toVar(),
+          wsum = float(0).toVar()
         // Filter the residual from the local depth slope, not the depth itself: a slanted surface (a pool seen at a grazing
         // angle) keeps its plane instead of being cut into terraces by the range weights. The slope is taken over half the
         // kernel, wide enough not to see single particles (a noisy slope would streak across the blur direction).
         const step = u.direction.mul(u.texel)
         const b = clamp(px.mul(0.5).floor(), 2, 9)
-        const dp = this.blurInput.sample(c.add(step.mul(b))).x, dm = this.blurInput.sample(c.sub(step.mul(b))).x
-        const slope = select(dp.greaterThan(0).and(dm.greaterThan(0)), dp.sub(dm).div(b.mul(2)), select(dp.greaterThan(0), dp.sub(d0).div(b), select(dm.greaterThan(0), d0.sub(dm).div(b), float(0)))).toVar()
+        const dp = this.blurInput.sample(c.add(step.mul(b))).x,
+          dm = this.blurInput.sample(c.sub(step.mul(b))).x
+        const slope = select(
+          dp.greaterThan(0).and(dm.greaterThan(0)),
+          dp.sub(dm).div(b.mul(2)),
+          select(dp.greaterThan(0), dp.sub(d0).div(b), select(dm.greaterThan(0), d0.sub(dm).div(b), float(0)))
+        ).toVar()
         // A neighbour far off the plane (a drop in front of the pool) is another surface: excluded.
-        If(abs(slope.mul(b)).greaterThan(range.mul(2)), () => { slope.assign(0) })
+        If(abs(slope.mul(b)).greaterThan(range.mul(2)), () => {
+          slope.assign(0)
+        })
         // Every texel out to the cap (skipping texels, or fractional offsets on this nearest-sampled float buffer, aliases
         // into stripes across the blur direction).
         Loop({ start: -18, end: 19, type: 'int', condition: '<' }, ({ i }: { i: any }) => {
@@ -482,7 +623,9 @@ export class FluidSurface {
           const d = this.blurInput.sample(c.add(step.mul(t))).x
           const r = d.sub(slope.mul(t))
           const dz = r.sub(d0).div(range)
-          const w = exp(t.mul(t).div(sigma.mul(sigma).mul(-2))).mul(exp(dz.mul(dz).negate())).mul(select(d.greaterThan(0), float(1), float(0)))
+          const w = exp(t.mul(t).div(sigma.mul(sigma).mul(-2)))
+            .mul(exp(dz.mul(dz).negate()))
+            .mul(select(d.greaterThan(0), float(1), float(0)))
           sum.addAssign(r.mul(w))
           wsum.addAssign(w)
         })
@@ -496,15 +639,27 @@ export class FluidSurface {
   // The water surface over the scene: normals from the smoothed depth, Fresnel sky reflection and sun highlight,
   // refracted scene colour through absorbing, scattering water, whitewater by speed, soft thin edges.
   private compositeMaterial(): MeshBasicNodeMaterial {
-    const u: any = this.uniforms, L: any = this.lighting.uniforms
+    const u: any = this.uniforms,
+      L: any = this.lighting.uniforms
     const m = new MeshBasicNodeMaterial({ transparent: true, depthTest: false, depthWrite: false })
     m.fog = false
     m.vertexNode = vec4(positionGeometry.xy, 0, 1)
-    const depthTex = texture(this.smoothRT.texture), thickTex = texture(this.thickRT.texture), rawTex = texture(this.depthRT.texture)
-    const view = (c: any, d: any): any => (vec3 as any)(c.x.mul(2).sub(1).mul(d).div(u.projection.x), float(1).sub(c.y.mul(2)).mul(d).div(u.projection.y), d.negate())
+    const depthTex = texture(this.smoothRT.texture),
+      thickTex = texture(this.thickRT.texture),
+      rawTex = texture(this.depthRT.texture)
+    const view = (c: any, d: any): any =>
+      (vec3 as any)(
+        c.x.mul(2).sub(1).mul(d).div(u.projection.x),
+        float(1).sub(c.y.mul(2)).mul(d).div(u.projection.y),
+        d.negate()
+      )
     const sky = (dir: any): any => {
       if (this.env) return pmremTexture(this.env, dir, u.roughness).rgb
-      const grad: any = select(dir.y.greaterThan(0), mix(u.horizon, u.zenith, pow(clamp(dir.y, 0, 1), 0.5)), mix(u.horizon, u.ground, clamp(dir.y.negate().mul(4), 0, 1)))
+      const grad: any = select(
+        dir.y.greaterThan(0),
+        mix(u.horizon, u.zenith, pow(clamp(dir.y, 0, 1), 0.5)),
+        mix(u.horizon, u.ground, clamp(dir.y.negate().mul(4), 0, 1))
+      )
       return grad.mul(dot(L.ambient, vec3(1 / 3)).mul(1.5))
     }
     const mixv = mix as any
@@ -516,9 +671,13 @@ export class FluidSurface {
       // Mist (spray): opacity from the accumulated splats, faded where the scene is in front of it.
       const M = mistTex.sample(c).toVar()
       const mistDepth = M.y.div(max(M.x, 1e-6))
-      const mistAlpha = float(1).sub(exp(M.x.negate())).mul(smoothstep(0, 0.15, sceneZ.sub(mistDepth))).toVar()
+      const mistAlpha = float(1)
+        .sub(exp(M.x.negate()))
+        .mul(smoothstep(0, 0.15, sceneZ.sub(mistDepth)))
+        .toVar()
       const mistColor = u.foamColor.mul(light).mul(0.9)
-      const surface = vec3(0).toVar(), coverage = float(0).toVar()
+      const surface = vec3(0).toVar(),
+        coverage = float(0).toVar()
       const d = depthTex.sample(c).x.toVar()
       If(d.greaterThan(0), () => {
         // Small tagged drops keep their own round (unsmoothed) depth: smoothing would flatten them into coins.
@@ -528,30 +687,47 @@ export class FluidSurface {
         d.assign(depthAt(c))
         const P: any = view(c, d).toVar()
         // Normal: of the two one-sided differences per axis, the smaller (no smearing across silhouettes).
-        const tx = u.texel.x, ty = u.texel.y
+        const tx = u.texel.x,
+          ty = u.texel.y
         const side = (dc: any): any => {
           const dd = depthAt(c.add(dc))
           return select(dd.greaterThan(0), view(c.add(dc), dd), P.add(P.sub(view(c.sub(dc), depthAt(c.sub(dc))))))
         }
-        const xr = side(vec2(tx, 0)).sub(P), xl = P.sub(side(vec2(tx, 0).negate()))
-        const yu = side(vec2(0, ty)).sub(P), yd = P.sub(side(vec2(0, ty).negate()))
+        const xr = side(vec2(tx, 0)).sub(P),
+          xl = P.sub(side(vec2(tx, 0).negate()))
+        const yu = side(vec2(0, ty)).sub(P),
+          yd = P.sub(side(vec2(0, ty).negate()))
         const ddx: any = select(abs(xr.z).lessThan(abs(xl.z)), xr, xl)
         const ddy: any = select(abs(yu.z).lessThan(abs(yd.z)), yu, yd)
         const nv: any = normalize(cross(ddy, ddx)).toVar()
-        If(dot(nv, P).greaterThan(0), () => { nv.assign(nv.negate()) })
+        If(dot(nv, P).greaterThan(0), () => {
+          nv.assign(nv.negate())
+        })
         const Vv: any = normalize(P.negate())
         const N = normalize(cameraWorldMatrix.mul(vec4(nv, 0)).xyz).toVar()
         const Vw = normalize(cameraWorldMatrix.mul(vec4(Vv, 0)).xyz).toVar()
         const NdV = clamp(dot(N, Vw), 0, 1)
-        const F = u.f0.add(float(1).sub(u.f0).mul(pow(float(1).sub(NdV), 5)))
+        const F = u.f0.add(
+          float(1)
+            .sub(u.f0)
+            .mul(pow(float(1).sub(NdV), 5))
+        )
         const R = reflect(Vw.negate(), N)
         // GGX sun highlight (capped: a sharp highlight on per-pixel normals would otherwise sparkle).
         const Ls = L.sunDirection
         const H = normalize(Ls.add(Vw))
         const a2 = u.roughness.mul(u.roughness).mul(u.roughness).mul(u.roughness)
-        const NdH = clamp(dot(N, H), 0, 1), NdL = clamp(dot(N, Ls), 0, 1)
+        const NdH = clamp(dot(N, H), 0, 1),
+          NdL = clamp(dot(N, Ls), 0, 1)
         const D = a2.div(NdH.mul(NdH).mul(a2.sub(1)).add(1).pow(2).mul(Math.PI))
-        const spec = L.sunColor.mul(min(D.mul(F).mul(NdL).div(max(NdV.mul(4), 0.1)), 4))
+        const spec = L.sunColor.mul(
+          min(
+            D.mul(F)
+              .mul(NdL)
+              .div(max(NdV.mul(4), 0.1)),
+            4
+          )
+        )
         const reflection = sky(R).mul(F).add(spec)
         // Through the water: the scene behind, shifted by the normal, absorbed and scattered by the thickness. The ground
         // seen through it is soaked, so darker (less light escapes its grains).
@@ -567,8 +743,15 @@ export class FluidSurface {
         const across = dot(Pw, u.right).mul(60)
         const fall = clamp(T.w.div(max(thick, 1e-5)), 0, 1)
         const n = mx_noise_float(vec3(across, Pw.y.mul(2.5).add(u.time.mul(8)), 0.5))
-        const streak = mix(float(1), smoothstep(-0.3, 0.35, n).mul(0.85).add(0.15), fall.mul(u.streaks).mul(smoothstep(1, 0.35, fwidth(across))))
-        const whitewater = clamp(T.y.div(max(thick, 1e-5)), 0, 1).mul(u.foam).mul(streak).mul(float(1).sub(exp(thick.mul(u.foamDensity).negate())))
+        const streak = mix(
+          float(1),
+          smoothstep(-0.3, 0.35, n).mul(0.85).add(0.15),
+          fall.mul(u.streaks).mul(smoothstep(1, 0.35, fwidth(across)))
+        )
+        const whitewater = clamp(T.y.div(max(thick, 1e-5)), 0, 1)
+          .mul(u.foam)
+          .mul(streak)
+          .mul(float(1).sub(exp(thick.mul(u.foamDensity).negate())))
         const foamLit = u.foamColor.mul(L.ambient.add(L.sunColor.mul(NdL.mul(0.6).add(0.25))))
         surface.assign(mixv(body.mul(float(1).sub(F)).add(reflection), foamLit, whitewater))
         // Soft edges (thickness with a one-pixel fwidth ramp), and a soft fade behind the opaque scene: tested with the raw
@@ -577,10 +760,16 @@ export class FluidSurface {
         const fw = fwidth(thick)
         const hidden = rawTex.sample(c).x.sub(sceneZ)
         const film = clamp(M.z.mul(0.7), 0, 1)
-        coverage.assign(smoothstep(u.edge.mul(0.15).sub(fw), u.edge.add(fw), thick).mul(smoothstep(u.radius.mul(2), u.radius, hidden)).mul(mix(float(1), float(0.3), film)))
+        coverage.assign(
+          smoothstep(u.edge.mul(0.15).sub(fw), u.edge.add(fw), thick)
+            .mul(smoothstep(u.radius.mul(2), u.radius, hidden))
+            .mul(mix(float(1), float(0.3), film))
+        )
       })
       const alpha = coverage.mul(float(1).sub(mistAlpha)).add(mistAlpha)
-      If(alpha.lessThan(0.002), () => { Discard() })
+      If(alpha.lessThan(0.002), () => {
+        Discard()
+      })
       return vec4(surface.mul(coverage).mul(float(1).sub(mistAlpha)).add(mistColor.mul(mistAlpha)).div(alpha), alpha)
     })()
     m.colorNode = color
@@ -593,7 +782,8 @@ export class FluidSurface {
 export function resolveFluidSurfaceOptions(input: unknown): FluidSurfaceOptions {
   const o = merge(structuredClone(DEFAULT_FLUID_SURFACE), input)
   const d = DEFAULT_FLUID_SURFACE
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
+  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
   const hex = (v: unknown, def: string) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : def)
   o.radius = num(o.radius, d.radius, 0.1, 4)
   o.tagRadius = num(o.tagRadius, d.tagRadius, 0.05, 4)

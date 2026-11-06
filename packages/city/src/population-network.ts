@@ -51,14 +51,21 @@ export function generateNetworks(data: PopulationData, input: Partial<NetworkOpt
   }
   const order: NetworkType[] = ['highway', 'road', 'track']
   const roads = plan(nodes, o).map(([a, b]) => ({ a: nodes[a], b: nodes[b], type: roadType(nodes[a], nodes[b]) }))
-  roads.sort((p, q) => order.indexOf(p.type) - order.indexOf(q.type) || Math.min(q.a.population, q.b.population) - Math.min(p.a.population, p.b.population) || p.a.id - q.a.id || p.b.id - q.b.id)
+  roads.sort(
+    (p, q) =>
+      order.indexOf(p.type) - order.indexOf(q.type) ||
+      Math.min(q.a.population, q.b.population) - Math.min(p.a.population, p.b.population) ||
+      p.a.id - q.a.id ||
+      p.b.id - q.b.id
+  )
   const usedRoad = new Uint8Array(data.cells.length)
   for (const r of roads) edges.push(routed(data, edges.length, r.type, r.a, r.b, o.slopeCost, o, usedRoad))
 
   if (o.railPopulation > 0) {
     const big = nodes.filter((s) => s.population >= o.railPopulation)
     const usedRail = new Uint8Array(data.cells.length)
-    for (const [a, b] of plan(big, o)) edges.push(routed(data, edges.length, 'rail', big[a], big[b], o.railSlopeCost, o, usedRail))
+    for (const [a, b] of plan(big, o))
+      edges.push(routed(data, edges.length, 'rail', big[a], big[b], o.railSlopeCost, o, usedRail))
   }
 
   if (o.powerlinePopulation > 0) {
@@ -69,15 +76,25 @@ export function generateNetworks(data: PopulationData, input: Partial<NetworkOpt
 }
 
 /** Settlements reachable from `start` over edges of the given types (ids). */
-export function reachable(network: Network, start: number, types: NetworkType[] = ['highway', 'road', 'track']): Set<number> {
+export function reachable(
+  network: Network,
+  start: number,
+  types: NetworkType[] = ['highway', 'road', 'track']
+): Set<number> {
   const adj = new Map<number, number[]>()
   for (const e of network.edges) {
     if (!types.includes(e.type)) continue
     adj.set(e.from, [...(adj.get(e.from) ?? []), e.to])
     adj.set(e.to, [...(adj.get(e.to) ?? []), e.from])
   }
-  const seen = new Set([start]), stack = [start]
-  while (stack.length) for (const m of adj.get(stack.pop()!) ?? []) if (!seen.has(m)) { seen.add(m); stack.push(m) }
+  const seen = new Set([start]),
+    stack = [start]
+  while (stack.length)
+    for (const m of adj.get(stack.pop()!) ?? [])
+      if (!seen.has(m)) {
+        seen.add(m)
+        stack.push(m)
+      }
   return seen
 }
 
@@ -90,7 +107,9 @@ function spanningTree(nodes: Settlement[]): [number, number][] {
   const n = nodes.length
   const links: [number, number][] = []
   if (n < 2) return links
-  const inTree = new Uint8Array(n), best = new Float64Array(n).fill(Infinity), from = new Int32Array(n).fill(-1)
+  const inTree = new Uint8Array(n),
+    best = new Float64Array(n).fill(Infinity),
+    from = new Int32Array(n).fill(-1)
   best[0] = 0
   for (let it = 0; it < n; it++) {
     let u = -1
@@ -100,7 +119,10 @@ function spanningTree(nodes: Settlement[]): [number, number][] {
     for (let v = 0; v < n; v++) {
       if (inTree[v]) continue
       const d = dist(nodes[u], nodes[v])
-      if (d < best[v]) { best[v] = d; from[v] = u }
+      if (d < best[v]) {
+        best[v] = d
+        from[v] = u
+      }
     }
   }
   return links
@@ -116,20 +138,29 @@ function plan(nodes: Settlement[], o: NetworkOptions): [number, number][] {
   const linked = new Set<string>()
   const add = (a: number, b: number) => {
     const d = dist(nodes[a], nodes[b])
-    adj[a].push({ to: b, len: d }); adj[b].push({ to: a, len: d })
+    adj[a].push({ to: b, len: d })
+    adj[b].push({ to: a, len: d })
     linked.add(a < b ? `${a},${b}` : `${b},${a}`)
   }
   for (const [a, b] of links) add(a, b)
   const candidates: { a: number; b: number; g: number }[] = []
   const seen = new Set<string>()
   for (let a = 0; a < n; a++) {
-    const near = nodes.map((_, b) => b).filter((b) => b !== a).sort((p, q) => dist(nodes[a], nodes[p]) - dist(nodes[a], nodes[q]) || p - q).slice(0, o.neighbours)
+    const near = nodes
+      .map((_, b) => b)
+      .filter((b) => b !== a)
+      .sort((p, q) => dist(nodes[a], nodes[p]) - dist(nodes[a], nodes[q]) || p - q)
+      .slice(0, o.neighbours)
     for (const b of near) {
       const key = a < b ? `${a},${b}` : `${b},${a}`
       if (seen.has(key)) continue
       seen.add(key)
       const d = Math.max(1, dist(nodes[a], nodes[b]))
-      candidates.push({ a: Math.min(a, b), b: Math.max(a, b), g: (nodes[a].population * nodes[b].population) / d ** o.gravityExponent })
+      candidates.push({
+        a: Math.min(a, b),
+        b: Math.max(a, b),
+        g: (nodes[a].population * nodes[b].population) / d ** o.gravityExponent
+      })
     }
   }
   candidates.sort((p, q) => q.g - p.g || p.a - q.a || p.b - q.b)
@@ -138,7 +169,11 @@ function plan(nodes: Settlement[], o: NetworkOptions): [number, number][] {
     if (added >= limit) break
     if (linked.has(`${a},${b}`)) continue
     const d = dist(nodes[a], nodes[b])
-    if (graphDistance(adj, a, b, d * o.detour) > d * o.detour) { add(a, b); links.push([a, b]); added++ }
+    if (graphDistance(adj, a, b, d * o.detour) > d * o.detour) {
+      add(a, b)
+      links.push([a, b])
+      added++
+    }
   }
   return links
 }
@@ -154,7 +189,10 @@ function graphDistance(adj: { to: number; len: number }[][], a: number, b: numbe
     if (du > (best.get(u) ?? Infinity) || du > bound) continue
     for (const { to, len } of adj[u]) {
       const dv = du + len
-      if (dv < (best.get(to) ?? Infinity) && dv <= bound) { best.set(to, dv); heap.push(to, dv) }
+      if (dv < (best.get(to) ?? Infinity) && dv <= bound) {
+        best.set(to, dv)
+        heap.push(to, dv)
+      }
     }
   }
   return Infinity
@@ -162,12 +200,29 @@ function graphDistance(adj: { to: number; len: number }[][], a: number, b: numbe
 
 // --- routing ---------------------------------------------------------------------------------------
 
-function routed(data: PopulationData, id: number, type: NetworkType, a: Settlement, b: Settlement, slopeCost: number, o: NetworkOptions, used: Uint8Array): NetworkEdge {
+function routed(
+  data: PopulationData,
+  id: number,
+  type: NetworkType,
+  a: Settlement,
+  b: Settlement,
+  slopeCost: number,
+  o: NetworkOptions,
+  used: Uint8Array
+): NetworkEdge {
   const path = aStar(data, data.index.get(a.cell)!, data.index.get(b.cell)!, slopeCost, o, used)
   for (const i of path) used[i] = 1
   const pts: [number, number][] = [a.position, ...path.slice(1, -1).map((i) => data.cells[i].position), b.position]
   const points = chaikin(pts, o.smoothing)
-  return { id, type, from: a.id, to: b.id, points, cells: path.map((i) => data.cells[i].cell), length: polylineLength(points) }
+  return {
+    id,
+    type,
+    from: a.id,
+    to: b.id,
+    points,
+    cells: path.map((i) => data.cells[i].cell),
+    length: polylineLength(points)
+  }
 }
 
 function straight(data: PopulationData, id: number, a: Settlement, b: Settlement): NetworkEdge {
@@ -176,16 +231,28 @@ function straight(data: PopulationData, id: number, a: Settlement, b: Settlement
   const cells: string[] = []
   for (let k = 0; k <= steps; k++) {
     const t = k / steps
-    const c = data.grid.cellAtLocal(a.position[0] + (b.position[0] - a.position[0]) * t, a.position[1] + (b.position[1] - a.position[1]) * t, data.resolution)
+    const c = data.grid.cellAtLocal(
+      a.position[0] + (b.position[0] - a.position[0]) * t,
+      a.position[1] + (b.position[1] - a.position[1]) * t,
+      data.resolution
+    )
     if (cells[cells.length - 1] !== c) cells.push(c)
   }
   return { id, type: 'powerline', from: a.id, to: b.id, points: [a.position, b.position], cells, length: d }
 }
 
 // A* over the fine hex grid: cost = length × (1 + slopeCost·slope²) × water × reuse.
-function aStar(data: PopulationData, start: number, goal: number, slopeCost: number, o: NetworkOptions, used: Uint8Array): number[] {
+function aStar(
+  data: PopulationData,
+  start: number,
+  goal: number,
+  slopeCost: number,
+  o: NetworkOptions,
+  used: Uint8Array
+): number[] {
   const cells = data.cells
-  const g = new Float64Array(cells.length).fill(Infinity), came = new Int32Array(cells.length).fill(-1)
+  const g = new Float64Array(cells.length).fill(Infinity),
+    came = new Int32Array(cells.length).fill(-1)
   const minFactor = Math.min(1, o.reuse)
   const gp = cells[goal].position
   const h = (i: number) => Math.hypot(cells[i].position[0] - gp[0], cells[i].position[1] - gp[1]) * minFactor
@@ -203,7 +270,11 @@ function aStar(data: PopulationData, start: number, goal: number, slopeCost: num
       const s = (cv.elevation - cu.elevation) / (len || 1)
       const cost = len * (1 + slopeCost * s * s) * (cv.landUse === 'water' ? o.waterCost : 1) * (used[v] ? o.reuse : 1)
       const gv = g[u] + cost
-      if (gv < g[v]) { g[v] = gv; came[v] = u; heap.push(v, gv + h(v)) }
+      if (gv < g[v]) {
+        g[v] = gv
+        came[v] = u
+        heap.push(v, gv + h(v))
+      }
     }
   }
   const path = [goal]
@@ -217,7 +288,8 @@ export function chaikin(points: [number, number][], passes: number): [number, nu
   for (let k = 0; k < passes && p.length > 2; k++) {
     const q: [number, number][] = [p[0]]
     for (let i = 0; i < p.length - 1; i++) {
-      const [ax, az] = p[i], [bx, bz] = p[i + 1]
+      const [ax, az] = p[i],
+        [bx, bz] = p[i + 1]
       if (i > 0) q.push([ax * 0.75 + bx * 0.25, az * 0.75 + bz * 0.25])
       if (i < p.length - 2) q.push([ax * 0.25 + bx * 0.75, az * 0.25 + bz * 0.75])
     }
@@ -237,22 +309,31 @@ function polylineLength(p: [number, number][]): number {
 class Heap {
   private items: number[] = []
   private prio: number[] = []
-  get size(): number { return this.items.length }
+  get size(): number {
+    return this.items.length
+  }
   push(item: number, p: number) {
-    const it = this.items, pr = this.prio
+    const it = this.items,
+      pr = this.prio
     let i = it.length
-    it.push(item); pr.push(p)
+    it.push(item)
+    pr.push(p)
     while (i > 0) {
       const j = (i - 1) >> 1
       if (pr[j] <= p) break
-      it[i] = it[j]; pr[i] = pr[j]; i = j
+      it[i] = it[j]
+      pr[i] = pr[j]
+      i = j
     }
-    it[i] = item; pr[i] = p
+    it[i] = item
+    pr[i] = p
   }
   pop(): [number, number] {
-    const it = this.items, pr = this.prio
+    const it = this.items,
+      pr = this.prio
     const top: [number, number] = [it[0], pr[0]]
-    const item = it.pop()!, p = pr.pop()!
+    const item = it.pop()!,
+      p = pr.pop()!
     if (it.length) {
       let i = 0
       for (;;) {
@@ -260,9 +341,12 @@ class Heap {
         if (c >= it.length) break
         if (c + 1 < it.length && pr[c + 1] < pr[c]) c++
         if (pr[c] >= p) break
-        it[i] = it[c]; pr[i] = pr[c]; i = c
+        it[i] = it[c]
+        pr[i] = pr[c]
+        i = c
       }
-      it[i] = item; pr[i] = p
+      it[i] = item
+      pr[i] = p
     }
     return top
   }

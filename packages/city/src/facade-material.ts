@@ -1,7 +1,29 @@
 import { Color, DataTexture, MeshStandardNodeMaterial, RGBAFormat, UnsignedByteType, Vector4 } from 'three/webgpu'
 import {
-  abs, attribute, clamp, float, floor, fract, fwidth, hash, int, ivec2, max, mix, mx_noise_float, normalLocal,
-  positionLocal, sin, smoothstep, step, textureLoad, uniform, uniformArray, uv, vec3, vec4,
+  abs,
+  attribute,
+  clamp,
+  float,
+  floor,
+  fract,
+  fwidth,
+  hash,
+  int,
+  ivec2,
+  max,
+  mix,
+  mx_noise_float,
+  normalLocal,
+  positionLocal,
+  sin,
+  smoothstep,
+  step,
+  textureLoad,
+  uniform,
+  uniformArray,
+  uv,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { BUILDING_STYLES } from './buildings.ts'
 import type { FacadeOptions, Weather, WeatherOptions } from './options.ts'
@@ -25,9 +47,15 @@ export function createCityUniforms() {
     /** Window frame colour. */
     frame: uniform(new Color('#e8e4dc')),
     /** Per building style: bay width, window width, window height, sill. */
-    windowA: uniformArray(BUILDING_STYLES.map(() => new Vector4(3, 1.4, 1.6, 0.9)), 'vec4'),
+    windowA: uniformArray(
+      BUILDING_STYLES.map(() => new Vector4(3, 1.4, 1.6, 0.9)),
+      'vec4'
+    ),
     /** Per building style: frame width, lit share, floor height, unused. */
-    windowB: uniformArray(BUILDING_STYLES.map(() => new Vector4(0.1, 0.3, 3, 0)), 'vec4'),
+    windowB: uniformArray(
+      BUILDING_STYLES.map(() => new Vector4(0.1, 0.3, 3, 0)),
+      'vec4'
+    ),
     /** Pattern size multiplier (bricks, planks, tiles). */
     patternScale: uniform(1),
     /** Wall weather: wetness, snow, burn, damage. */
@@ -35,7 +63,7 @@ export function createCityUniforms() {
     /** Roof weather: wetness, snow, burn, damage. */
     roofWeather: uniform(new Vector4()),
     /** Road weather: wetness, snow, burn, damage. */
-    roadWeather: uniform(new Vector4()),
+    roadWeather: uniform(new Vector4())
   }
 }
 
@@ -43,7 +71,12 @@ export function createCityUniforms() {
 export type CityUniforms = ReturnType<typeof createCityUniforms>
 
 /** Copies facade and weather options into the uniforms. */
-export function applyFacadeUniforms(u: CityUniforms, f: FacadeOptions, floorHeight: Record<string, number>, weather: WeatherOptions): void {
+export function applyFacadeUniforms(
+  u: CityUniforms,
+  f: FacadeOptions,
+  floorHeight: Record<string, number>,
+  weather: WeatherOptions
+): void {
   u.night.value = f.night
   u.windowLight.value.set(f.windowLight)
   u.lightIntensity.value = f.lightIntensity
@@ -96,7 +129,12 @@ export class BuildingWeather {
   get(id: number): Weather {
     const d = this.texture.image.data as Uint8Array
     const k = id * 4
-    return { wetness: (d[k] ?? 0) / 255, snow: (d[k + 1] ?? 0) / 255, burn: (d[k + 2] ?? 0) / 255, damage: (d[k + 3] ?? 0) / 255 }
+    return {
+      wetness: (d[k] ?? 0) / 255,
+      snow: (d[k + 1] ?? 0) / 255,
+      burn: (d[k + 2] ?? 0) / 255,
+      damage: (d[k + 3] ?? 0) / 255
+    }
   }
 
   /** Clears every override. */
@@ -135,15 +173,24 @@ export interface SurfaceShading {
  * cracks and holes. `p` is a position in metres (object space), `up` how much the surface faces up.
  */
 export function weatherSurface(s: SurfaceShading, w: N, p: N, up: N, porosity: N = float(1)): SurfaceShading {
-  const wet = w.x, snow = w.y, burn = w.z, damage = w.w
+  const wet = w.x,
+    snow = w.y,
+    burn = w.z,
+    damage = w.w
   let color = s.color.mul(float(1).sub(wet.mul(0.45).mul(porosity)))
   let roughness = s.roughness.mul(float(1).sub(wet.mul(0.7)))
   let metalness = s.metalness
   let emissive = s.emissive
   // Damage: thin cracks plus missing patches showing a dark interior.
   const n1 = mx_noise_float(p.mul(0.9))
-  const crack = float(1).sub(smoothstep(0, damage.mul(0.04), abs(n1))).mul(step(0.01, damage))
-  const hole = smoothstep(float(1).sub(damage.mul(0.5)), float(1.02).sub(damage.mul(0.5)), mx_noise_float(p.mul(0.23)).mul(0.5).add(0.5)).mul(step(0.01, damage))
+  const crack = float(1)
+    .sub(smoothstep(0, damage.mul(0.04), abs(n1)))
+    .mul(step(0.01, damage))
+  const hole = smoothstep(
+    float(1).sub(damage.mul(0.5)),
+    float(1.02).sub(damage.mul(0.5)),
+    mx_noise_float(p.mul(0.23)).mul(0.5).add(0.5)
+  ).mul(step(0.01, damage))
   color = mix(color, color.mul(0.35), crack.mul(0.8))
   color = mix(color, vec3(0.02), hole)
   roughness = mix(roughness, float(1), hole)
@@ -154,7 +201,13 @@ export function weatherSurface(s: SurfaceShading, w: N, p: N, up: N, porosity: N
   color = mix(color, vec3(0.025, 0.022, 0.02), char)
   roughness = mix(roughness, float(1), char)
   metalness = mix(metalness, float(0), char)
-  emissive = emissive.mul(float(1).sub(char)).add(vec3(1, 0.32, 0.06).mul(smoothstep(0.8, 1, burn).mul(smoothstep(0.92, 1, soot)).mul(3)))
+  emissive = emissive.mul(float(1).sub(char)).add(
+    vec3(1, 0.32, 0.06).mul(
+      smoothstep(0.8, 1, burn)
+        .mul(smoothstep(0.92, 1, soot))
+        .mul(3)
+    )
+  )
   // Snow settles on upward faces, thinning with noise near its edge.
   const lie = smoothstep(0.35, 0.8, up.add(mx_noise_float(p.mul(0.5)).mul(0.15))).mul(smoothstep(0, 0.3, snow))
   const cover = clamp(lie.mul(snow.mul(1.6)), 0, 1)
@@ -180,8 +233,11 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
   const wuv = uv() as N
   const shops = step(7.5, f.x)
   const style = int(f.x.sub(shops.mul(8)))
-  const A = (u.windowA as N).element(style), B = (u.windowB as N).element(style)
-  const len = f.z, bayW = A.x, fh = max(B.z, 1)
+  const A = (u.windowA as N).element(style),
+    B = (u.windowB as N).element(style)
+  const len = f.z,
+    bayW = A.x,
+    fh = max(B.z, 1)
   const nBays = floor(len.div(bayW))
   const lu = wuv.x.sub(len.sub(nBays.mul(bayW)).mul(0.5))
   const bayIdx = floor(lu.div(bayW))
@@ -190,15 +246,25 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
   const floorIdx = floor(v.div(fh))
   const fv = v.sub(floorIdx.mul(fh))
   const shop = shops.mul(float(1).sub(step(0.5, floorIdx)))
-  const ww = mix(A.y, bayW.mul(0.86), shop), wh = mix(A.z, fh.mul(0.72), shop), sill = mix(A.w, float(0.25), shop)
-  const inside = step(0, lu).mul(step(lu, nBays.mul(bayW))).mul(step(0, v)).mul(step(0.5, nBays))
-  const dx = abs(fu).sub(ww.mul(0.5)), dy = abs(fv.sub(sill.add(wh.mul(0.5)))).sub(wh.mul(0.5))
+  const ww = mix(A.y, bayW.mul(0.86), shop),
+    wh = mix(A.z, fh.mul(0.72), shop),
+    sill = mix(A.w, float(0.25), shop)
+  const inside = step(0, lu)
+    .mul(step(lu, nBays.mul(bayW)))
+    .mul(step(0, v))
+    .mul(step(0.5, nBays))
+  const dx = abs(fu).sub(ww.mul(0.5)),
+    dy = abs(fv.sub(sill.add(wh.mul(0.5)))).sub(wh.mul(0.5))
   const d = max(dx, dy)
   const aa = fwidth(v).add(0.003)
-  const win = float(1).sub(smoothstep(aa.negate(), aa, d)).mul(inside)
+  const win = float(1)
+    .sub(smoothstep(aa.negate(), aa, d))
+    .mul(inside)
   const frameW = B.x
   const ring = smoothstep(frameW.negate().sub(aa), frameW.negate().add(aa), d)
-  const mullion = float(1).sub(smoothstep(frameW.mul(0.5).sub(aa), frameW.mul(0.5).add(aa), abs(fu))).mul(step(0.95, ww))
+  const mullion = float(1)
+    .sub(smoothstep(frameW.mul(0.5).sub(aa), frameW.mul(0.5).add(aa), abs(fu)))
+    .mul(step(0.95, ww))
   const frame = max(ring, mullion).mul(win)
   const glassMask = win.sub(frame).max(0)
   const h1 = hash(bayIdx.add(500).add(floorIdx.mul(613)).add(f.y.mul(1e5)))
@@ -213,16 +279,30 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
   const brick = bond(wuv.x, v, s.mul(0.24), s.mul(0.075), s.mul(0.008))
   const stone = bond(wuv.x, v, s.mul(0.9), s.mul(0.45), s.mul(0.02))
   const plankRow = floor(v.div(s.mul(0.2)))
-  const plank = float(1).sub(band(fract(v.div(s.mul(0.2))).sub(0.5), float(0.42))).mul(float(1).sub(smoothstep(0.1, 0.4, fwidth(v).div(s.mul(0.2)))))
-  const panel = max(float(1).sub(band(fract(wuv.x.div(3)).sub(0.5).mul(3), float(1.48))), float(1).sub(band(fract(v.div(fh)).sub(0.5).mul(fh), fh.mul(0.5).sub(0.02))))
-  const corrugation = sin(wuv.x.mul(Math.PI * 2).div(s.mul(0.15))).mul(0.06).mul(float(1).sub(smoothstep(0.03, 0.08, fwidth(wuv.x))))
+  const plank = float(1)
+    .sub(band(fract(v.div(s.mul(0.2))).sub(0.5), float(0.42)))
+    .mul(float(1).sub(smoothstep(0.1, 0.4, fwidth(v).div(s.mul(0.2)))))
+  const panel = max(
+    float(1).sub(band(fract(wuv.x.div(3)).sub(0.5).mul(3), float(1.48))),
+    float(1).sub(band(fract(v.div(fh)).sub(0.5).mul(fh), fh.mul(0.5).sub(0.02)))
+  )
+  const corrugation = sin(wuv.x.mul(Math.PI * 2).div(s.mul(0.15)))
+    .mul(0.06)
+    .mul(float(1).sub(smoothstep(0.03, 0.08, fwidth(wuv.x))))
   const stain = mx_noise_float(p.mul(0.15)).mul(0.08)
   let factor: N = float(1).add(grain).add(stain)
   factor = factor.add(eq(mat, 1).mul(brick.cell.sub(0.5).mul(0.22).mul(brick.fade).add(brick.joint.mul(0.3))))
   factor = factor.add(eq(mat, 2).mul(hash(plankRow.add(31)).sub(0.5).mul(0.16).sub(plank.mul(0.35))))
   factor = factor.add(eq(mat, 3).mul(stone.cell.sub(0.5).mul(0.28).mul(stone.fade).sub(stone.joint.mul(0.3))))
   factor = factor.add(eq(mat, 4).mul(panel.mul(-0.18)))
-  factor = factor.add(eq(mat, 6).mul(float(1).sub(smoothstep(0, 0.7, v)).mul(-0.15).add(mx_noise_float(p.mul(0.4)).mul(0.06))))
+  factor = factor.add(
+    eq(mat, 6).mul(
+      float(1)
+        .sub(smoothstep(0, 0.7, v))
+        .mul(-0.15)
+        .add(mx_noise_float(p.mul(0.4)).mul(0.06))
+    )
+  )
   factor = factor.add(eq(mat, 7).mul(corrugation))
   const wallRough = mix(float(0.9), float(0.3), eq(mat, 5)).sub(eq(mat, 7).mul(0.45))
   const wallMetal = eq(mat, 5).mul(0.35).add(eq(mat, 7).mul(0.45))
@@ -234,7 +314,13 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
   const metalness = mix(wallMetal, float(0.55), glassMask)
   const glow = u.windowLight.mul(u.lightIntensity).mul(u.night).mul(lit).mul(glassMask).mul(h2.mul(0.8).add(0.4))
   const w = buildingWeather(u.wallWeather, weather)
-  const ws = weatherSurface({ color, roughness, metalness, emissive: glow }, w, p, (normalLocal as N).y, mix(float(1), float(0.3), glassMask))
+  const ws = weatherSurface(
+    { color, roughness, metalness, emissive: glow },
+    w,
+    p,
+    (normalLocal as N).y,
+    mix(float(1), float(0.3), glassMask)
+  )
 
   const m = new MeshStandardNodeMaterial()
   m.colorNode = vec4(ws.color, 1)
@@ -252,20 +338,37 @@ export function createFacadeMaterial(u: CityUniforms, weather: BuildingWeather):
  * the colour before weather, e.g. a per-instance shade: unlike a BatchedMesh instance colour, which
  * three.js multiplies in after `colorNode`, it leaves snow and ash untinted.
  */
-export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | null, shade: N = float(1)): MeshStandardNodeMaterial {
+export function createRoofMaterial(
+  u: CityUniforms,
+  weather: BuildingWeather | null,
+  shade: N = float(1)
+): MeshStandardNodeMaterial {
   const f = attribute('facade', 'vec4') as N
   const tint = attribute('tint', 'vec3') as N
   const ruv = uv() as N
   const p = positionLocal as N
-  const part = f.x, mat = f.w
+  const part = f.x,
+    mat = f.w
   const s = u.patternScale
   const tile = bond(ruv.x, ruv.y, s.mul(0.25), s.mul(0.32), s.mul(0.01))
-  const tileShade = sin(fract(ruv.x.div(s.mul(0.25))).mul(Math.PI)).mul(0.18).mul(tile.fade)
+  const tileShade = sin(fract(ruv.x.div(s.mul(0.25))).mul(Math.PI))
+    .mul(0.18)
+    .mul(tile.fade)
   const slate = bond(ruv.x, ruv.y, s.mul(0.35), s.mul(0.25), s.mul(0.012))
-  const shingle = bond(ruv.x, ruv.y, s.mul(0.3).mul(hash(floor(ruv.y.div(s.mul(0.2))).add(16384)).add(0.6)), s.mul(0.2), s.mul(0.01))
-  const seam = float(1).sub(band(fract(ruv.x.div(s.mul(0.5))).sub(0.5), float(0.47))).mul(float(1).sub(smoothstep(0.1, 0.4, fwidth(ruv.x).div(s.mul(0.5)))))
+  const shingle = bond(
+    ruv.x,
+    ruv.y,
+    s.mul(0.3).mul(hash(floor(ruv.y.div(s.mul(0.2))).add(16384)).add(0.6)),
+    s.mul(0.2),
+    s.mul(0.01)
+  )
+  const seam = float(1)
+    .sub(band(fract(ruv.x.div(s.mul(0.5))).sub(0.5), float(0.47)))
+    .mul(float(1).sub(smoothstep(0.1, 0.4, fwidth(ruv.x).div(s.mul(0.5)))))
   const fibres = mx_noise_float(vec3(ruv.x.mul(9), ruv.y.mul(0.6), 3.1)).mul(0.18)
-  const gravel = mx_noise_float(p.mul(3)).mul(0.05).add(mx_noise_float(p.mul(0.2)).mul(0.08))
+  const gravel = mx_noise_float(p.mul(3))
+    .mul(0.05)
+    .add(mx_noise_float(p.mul(0.2)).mul(0.08))
   let factor: N = float(1)
   factor = factor.add(eq(mat, 0).mul(tile.cell.sub(0.5).mul(0.18).add(tileShade).sub(tile.joint.mul(0.3))))
   factor = factor.add(eq(mat, 1).mul(slate.cell.sub(0.5).mul(0.16).sub(slate.joint.mul(0.35))))
@@ -285,11 +388,21 @@ export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | n
   color = color.add(eq(part, 4).mul(vec3(0.55, 0.57, 0.58)))
   color = color.add(eq(part, 5).mul(vec3(0.24, 0.17, 0.11)))
   color = color.add(eq(part, 6).mul(vec3(0.12, 0.13, 0.14)))
-  const roughness = isRoof.mul(roofRough).add(eq(part, 2).mul(0.1)).add(eq(part, 4).mul(0.4)).add(eq(part, 6).mul(0.35)).add(eq(part, 1).add(eq(part, 3)).add(eq(part, 5)).mul(0.9))
+  const roughness = isRoof
+    .mul(roofRough)
+    .add(eq(part, 2).mul(0.1))
+    .add(eq(part, 4).mul(0.4))
+    .add(eq(part, 6).mul(0.35))
+    .add(eq(part, 1).add(eq(part, 3)).add(eq(part, 5)).mul(0.9))
   const metalness = isRoof.mul(roofMetal).add(eq(part, 2).mul(0.6)).add(eq(part, 4).mul(0.6)).add(eq(part, 6).mul(0.5))
   const glow = u.windowLight.mul(u.lightIntensity).mul(u.night).mul(eq(part, 2)).mul(0.5)
   const w = weather ? buildingWeather(u.roofWeather, weather) : u.roofWeather
-  const ws = weatherSurface({ color: color.mul(shade), roughness, metalness, emissive: glow }, w, p, (normalLocal as N).y)
+  const ws = weatherSurface(
+    { color: color.mul(shade), roughness, metalness, emissive: glow },
+    w,
+    p,
+    (normalLocal as N).y
+  )
 
   const m = new MeshStandardNodeMaterial()
   m.colorNode = vec4(ws.color, 1)
@@ -298,4 +411,3 @@ export function createRoofMaterial(u: CityUniforms, weather: BuildingWeather | n
   m.emissiveNode = ws.emissive
   return m
 }
-

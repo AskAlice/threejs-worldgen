@@ -2,7 +2,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { World } from '../src/world.ts'
 import { chunkId, chunkSize, type ChunkKey } from '../src/chunk.ts'
-import { selectChunks, maxLevel, type ChunkBounds, type ChunkSelection, type LodHistory, type LodSettings } from '../src/lod.ts'
+import {
+  selectChunks,
+  maxLevel,
+  type ChunkBounds,
+  type ChunkSelection,
+  type LodHistory,
+  type LodSettings
+} from '../src/lod.ts'
 
 const lod: LodSettings = { rootSize: 4096, lodFactor: 2, minChunkSize: 1, viewDistance: 12000 }
 
@@ -29,7 +36,12 @@ test('flat-world LOD converges, covers the area once and gets fine near the came
   const ids = new Set(sel.show.map(chunkId))
   for (const k of sel.show) {
     let { level, x, y } = k
-    while (level > 0) { level--; x = Math.floor(x / 2); y = Math.floor(y / 2); assert.ok(!ids.has(chunkId({ face: -1, level, x, y })), 'overlap') }
+    while (level > 0) {
+      level--
+      x = Math.floor(x / 2)
+      y = Math.floor(y / 2)
+      assert.ok(!ids.has(chunkId({ face: -1, level, x, y })), 'overlap')
+    }
   }
   // Total shown area equals the root tiles' area (no holes).
   const area = sel.show.reduce((a, k) => a + chunkSize(world, k, lod.rootSize) ** 2, 0)

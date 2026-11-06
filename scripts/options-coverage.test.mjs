@@ -5,7 +5,12 @@ import * as leva from '../example/leva-options.ts'
 
 test('every primitive option editable: nothing to report', () => {
   const defaults = { a: 1, b: 'x', c: true, d: { e: 2, f: '#ffffff' } }
-  assert.deepEqual(coverage(defaults, { target: structuredClone(defaults) }), { uncovered: [], unreasoned: [], unused: [], unparsed: [] })
+  assert.deepEqual(coverage(defaults, { target: structuredClone(defaults) }), {
+    uncovered: [],
+    unreasoned: [],
+    unused: [],
+    unparsed: []
+  })
 })
 
 test('target defaults to the defaults object', () => {
@@ -43,28 +48,38 @@ test('skips need a reason, and stale skips are reported', () => {
 })
 
 test('paramDefaults reads literal parameter defaults', () => {
-  function f(sample, x, z, e = 0.25, name = 'a', on = true, opts = {}) { return [sample, x, z, e, name, on, opts] }
+  function f(sample, x, z, e = 0.25, name = 'a', on = true, opts = {}) {
+    return [sample, x, z, e, name, on, opts]
+  }
   assert.deepEqual(paramDefaults(f), { e: 0.25, name: 'a', on: true, opts: {} })
 })
 
 test('paramDefaults: destructured parameters, by property key', () => {
-  function f(world, { a = 1, b = 0.5, renamed: r = 'x', nested: { deep = 2 } = {}, ...rest } = {}) { return [world, a, b, r, deep, rest] }
+  function f(world, { a = 1, b = 0.5, renamed: r = 'x', nested: { deep = 2 } = {}, ...rest } = {}) {
+    return [world, a, b, r, deep, rest]
+  }
   assert.deepEqual(paramDefaults(f), { a: 1, b: 0.5, renamed: 'x', nested: { deep: 2 } })
 })
 
 test('paramDefaults: nested parentheses, brackets, strings and comments do not end the list', () => {
-  function f(a = Math.max(1, 2), b = [3, (4)], c = '),(', /* d = 9, */ e = (1 + 2) * 2) { return [a, b, c, e] }
+  function f(a = Math.max(1, 2), b = [3, 4], c = '),(', /* d = 9, */ e = (1 + 2) * 2) {
+    return [a, b, c, e]
+  }
   assert.deepEqual(paramDefaults(f), { a: 2, b: [3, 4], c: '),(', e: 6 })
 })
 
 test('paramDefaults: .25, 1_000, negative and expression defaults are evaluated', () => {
-  function f(a = .25, b = 1_000, c = -1, d = 2 * Math.PI, e = 'x'.repeat(2), g = a * 4) { return [a, b, c, d, e, g] }
+  function f(a = 0.25, b = 1_000, c = -1, d = 2 * Math.PI, e = 'x'.repeat(2), g = a * 4) {
+    return [a, b, c, d, e, g]
+  }
   assert.deepEqual(paramDefaults(f), { a: 0.25, b: 1000, c: -1, d: 2 * Math.PI, e: 'xx', g: 1 })
 })
 
 test('paramDefaults: a default it cannot evaluate is kept as UnparsedDefault, never dropped', () => {
   const LIMIT = 3
-  function f(a = LIMIT * 2, b = 1) { return [a, b] }
+  function f(a = LIMIT * 2, b = 1) {
+    return [a, b]
+  }
   const d = paramDefaults(f)
   assert.ok(d.a instanceof UnparsedDefault)
   assert.equal(d.a.source, 'LIMIT * 2')
@@ -76,18 +91,53 @@ test('paramDefaults: a default it cannot evaluate is kept as UnparsedDefault, ne
 })
 
 test('paramDefaults: arrow functions, methods and class constructors', () => {
-  assert.deepEqual(paramDefaults((x, y = 2) => x + y), { y: 2 })
-  assert.deepEqual(paramDefaults((x) => (x ? 1 : 0)), {})
-  assert.deepEqual(paramDefaults({ m(a, b = 'q') { return [a, b] } }.m), { b: 'q' })
-  assert.deepEqual(paramDefaults(class { constructor(a = 7) { this.a = a } go(b = 8) { return b } }), { a: 7 })
+  assert.deepEqual(
+    paramDefaults((x, y = 2) => x + y),
+    { y: 2 }
+  )
+  assert.deepEqual(
+    paramDefaults((x) => (x ? 1 : 0)),
+    {}
+  )
+  assert.deepEqual(
+    paramDefaults(
+      {
+        m(a, b = 'q') {
+          return [a, b]
+        }
+      }.m
+    ),
+    { b: 'q' }
+  )
+  assert.deepEqual(
+    paramDefaults(
+      class {
+        constructor(a = 7) {
+          this.a = a
+        }
+        go(b = 8) {
+          return b
+        }
+      }
+    ),
+    { a: 7 }
+  )
 })
 
 test('levaTarget: what the R3F page edits, from the same manifest (dotted skips, arrays)', () => {
-  const defaults = { seed: 1, center: [0, 0], facade: { night: 0, walls: { brick: ['#aa0000'] } }, weather: { walls: { wet: 0 } } }
+  const defaults = {
+    seed: 1,
+    center: [0, 0],
+    facade: { night: 0, walls: { brick: ['#aa0000'] } },
+    weather: { walls: { wet: 0 } }
+  }
   const spec = { defaults, arrays: true, skip: { center: 'from the site', 'facade.walls': 'palettes' } }
   const r = coverage(defaults, { target: levaTarget(spec, defaults, leva), skip: spec.skip, arrays: spec.arrays })
   assert.deepEqual(r, { uncovered: [], unreasoned: [], unused: [], unparsed: [] })
   // Without `arrays` leva leaves arrays out, so an unskipped array is caught.
   const noArrays = { ...spec, arrays: false, skip: { 'facade.walls': 'palettes' } }
-  assert.deepEqual(coverage(defaults, { target: levaTarget(noArrays, defaults, leva), skip: noArrays.skip }).uncovered, ['center'])
+  assert.deepEqual(
+    coverage(defaults, { target: levaTarget(noArrays, defaults, leva), skip: noArrays.skip }).uncovered,
+    ['center']
+  )
 })

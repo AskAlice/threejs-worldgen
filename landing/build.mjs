@@ -20,7 +20,12 @@ import { SITE, GITHUB, ORDER, DEMOS, esc, plain, imgAlt, seoTags, jsonLd } from 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const out = resolve(root, process.argv[2] ?? 'site')
 const AUTHOR = { '@type': 'Person', '@id': `${SITE}#author`, name: 'AskAlice', url: 'https://github.com/AskAlice' }
-const HOME = { name: 'threejs-worldgen', short: 'worldgen', accent: '#1f5a35', icon: '<circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6 19c4-3 7 1 10-2s6-6 10-3M9 9c3 2 6 1 8-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="27" cy="6" r="2.2" fill="currentColor"/>' }
+const HOME = {
+  name: 'threejs-worldgen',
+  short: 'worldgen',
+  accent: '#1f5a35',
+  icon: '<circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6 19c4-3 7 1 10-2s6-6 10-3M9 9c3 2 6 1 8-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="27" cy="6" r="2.2" fill="currentColor"/>'
+}
 
 // Related packages for the "Works with" row on each lander.
 const RELATED = {
@@ -35,13 +40,16 @@ const RELATED = {
   fauna: ['biomes', 'water', 'trees', 'sky'],
   weathering: ['sky', 'trees', 'city', 'grass'],
   sky: ['weathering', 'biomes', 'water', 'fauna'],
-  heightfield: ['grass', 'scatter', 'biomes'],
+  heightfield: ['grass', 'scatter', 'biomes']
 }
 
 // Package order: ORDER in landing/seo.mjs. threejs-heightfield gets a lander but no homepage card: the homepage links
 // it from the foundations note.
-const pkgs = await Promise.all(readdirSync(join(root, 'landing/packages')).filter((f) => f.endsWith('.mjs'))
-  .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default))
+const pkgs = await Promise.all(
+  readdirSync(join(root, 'landing/packages'))
+    .filter((f) => f.endsWith('.mjs'))
+    .map(async (f) => (await import(pathToFileURL(join(root, 'landing/packages', f)))).default)
+)
 pkgs.sort((a, b) => ORDER.indexOf(a.short) - ORDER.indexOf(b.short))
 const cards = pkgs.filter((p) => p.short !== 'heightfield')
 
@@ -56,23 +64,35 @@ function dims(p) {
   if (!file) return ''
   const b = readFileSync(file)
   if (b.readUInt32BE(0) === 0x89504e47) return ` width="${b.readUInt32BE(16)}" height="${b.readUInt32BE(20)}"`
-  for (let i = 2; i + 9 < b.length;) {
-    if (b[i] !== 0xff || b[i + 1] === 0xff) { i++; continue }
+  for (let i = 2; i + 9 < b.length; ) {
+    if (b[i] !== 0xff || b[i + 1] === 0xff) {
+      i++
+      continue
+    }
     const m = b[i + 1]
-    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return ` width="${b.readUInt16BE(i + 7)}" height="${b.readUInt16BE(i + 5)}"`
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc)
+      return ` width="${b.readUInt16BE(i + 7)}" height="${b.readUInt16BE(i + 5)}"`
     i += 2 + b.readUInt16BE(i + 2)
   }
   return ''
 }
-const ogImage = (short) => `${SITE}media/og/${short && existsSync(join(root, 'landing/media/og', `${short}.jpg`)) ? short : 'home'}.jpg`
-const pkgJson = (p) => { try { return JSON.parse(readFileSync(join(root, 'packages', p.short, 'package.json'), 'utf8')) } catch { return {} } }
+const ogImage = (short) =>
+  `${SITE}media/og/${short && existsSync(join(root, 'landing/media/og', `${short}.jpg`)) ? short : 'home'}.jpg`
+const pkgJson = (p) => {
+  try {
+    return JSON.parse(readFileSync(join(root, 'packages', p.short, 'package.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
 const hasDemo = (href) => existsSync(join(root, 'example', href.split(/[?#]/)[0] || 'index.html'))
 const demosOf = (p) => (p.demos ?? []).filter((d) => hasDemo(d.href))
 const docsOf = (p) => `docs/modules/${p.name}.html`
 const reactDocsOf = (p) => `docs/modules/${p.name}_react.html`
 
 // Tiny highlighter for the code cards: comments, strings, numbers, keywords, Types, calls and JSX tags.
-const TOKENS = /(\/\/[^\n]*)|('[^'\n]*'|"[^"\n]*"|`[^`]*`)|\b(import|from|export|const|let|var|await|async|function|return|new|for|of|if|else|type|interface)\b|((?<=<\/?)[a-z][\w.]*)|\b([A-Z][A-Za-z0-9_]*)\b|\b([a-z_$][\w$]*)(?=\()|(\b\d[\d_.]*(?:e-?\d+)?\b)/g
+const TOKENS =
+  /(\/\/[^\n]*)|('[^'\n]*'|"[^"\n]*"|`[^`]*`)|\b(import|from|export|const|let|var|await|async|function|return|new|for|of|if|else|type|interface)\b|((?<=<\/?)[a-z][\w.]*)|\b([A-Z][A-Za-z0-9_]*)\b|\b([a-z_$][\w$]*)(?=\()|(\b\d[\d_.]*(?:e-?\d+)?\b)/g
 function highlight(src) {
   let html = ''
   let last = 0
@@ -85,13 +105,17 @@ function highlight(src) {
   return html + esc(src.slice(last))
 }
 
-const iconSvg = (p, size = '') => `<svg viewBox="0 0 32 32" aria-hidden="true"${size} style="color:${p.accent}">${p.icon}</svg>`
-const favicon = (p) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="color:${p.accent}">${p.icon}</svg>`)}`
+const iconSvg = (p, size = '') =>
+  `<svg viewBox="0 0 32 32" aria-hidden="true"${size} style="color:${p.accent}">${p.icon}</svg>`
+const favicon = (p) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="color:${p.accent}">${p.icon}</svg>`)}`
 
 // Abstract blueprint still for packages without screenshots: a grid, contour lines and the package mark. No fake renders.
 function sketch(p, label = 'in development') {
   const id = `g-${p.short}`
-  const contours = [0, 1, 2, 3, 4, 5].map((i) => `<ellipse cx="${560 + i * 18}" cy="${170 + i * 6}" rx="${120 + i * 70}" ry="${50 + i * 28}" />`).join('')
+  const contours = [0, 1, 2, 3, 4, 5]
+    .map((i) => `<ellipse cx="${560 + i * 18}" cy="${170 + i * 6}" rx="${120 + i * 70}" ry="${50 + i * 28}" />`)
+    .join('')
   return `<svg viewBox="0 0 1050 450" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${esc(p.name)}: ${esc(label)} (illustration)">
   <defs><pattern id="${id}" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="rgba(244,241,232,.07)"/></pattern>
   <radialGradient id="${id}-r" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="${p.accent}" stop-opacity=".55"/><stop offset="1" stop-color="${p.accent}" stop-opacity="0"/></radialGradient></defs>
@@ -104,7 +128,8 @@ function sketch(p, label = 'in development') {
 
 // A feature/hero media item. Paths are relative to site/media/ (sources: media/ and landing/media/).
 function media(m, p, prefix) {
-  if (m.stack) return `<div class="stack reveal">${m.stack.map((s) => media({ ...s, inStack: true }, p, prefix)).join('')}</div>`
+  if (m.stack)
+    return `<div class="stack reveal">${m.stack.map((s) => media({ ...s, inStack: true }, p, prefix)).join('')}</div>`
   const cls = `frame${m.natural ? ' natural' : ''}${m.inStack ? '' : ' reveal'}`
   const tag = m.tag ? `<span class="tag">${esc(m.tag)}</span>` : ''
   const file = m.video ?? m.img
@@ -112,7 +137,8 @@ function media(m, p, prefix) {
     if (file) warnings.push(`${p.short}: missing media ${file}`)
     return `<div class="${cls}">${sketch(p, 'screenshot soon')}${tag}</div>`
   }
-  if (m.video) return `<div class="${cls}"><video muted loop playsinline preload="none" poster="${prefix}media/${m.poster}" data-src="${prefix}media/${m.video}"${dims(m.poster)} aria-label="${esc(m.alt)}"></video>${tag}</div>`
+  if (m.video)
+    return `<div class="${cls}"><video muted loop playsinline preload="none" poster="${prefix}media/${m.poster}" data-src="${prefix}media/${m.video}"${dims(m.poster)} aria-label="${esc(m.alt)}"></video>${tag}</div>`
   return `<div class="${cls}"><img loading="lazy" decoding="async" src="${prefix}media/${m.img}"${dims(m.img)} alt="${esc(m.alt)}" />${tag}</div>`
 }
 
@@ -153,7 +179,9 @@ const script = (embed, prefix) => `
       }
     }, { threshold: 0.15 })
     document.querySelectorAll('.reveal, video[data-src]').forEach((el) => io.observe(el))
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.querySelectorAll('video[data-src]').forEach((v) => io.unobserve(v))${embed ? `
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.querySelectorAll('video[data-src]').forEach((v) => io.unobserve(v))${
+      embed
+        ? `
 
     // Live WebGPU demo in the hero viewport. The still image stays when WebGPU is unavailable or motion is reduced.
     const stage = document.getElementById('stage')
@@ -172,7 +200,9 @@ const script = (embed, prefix) => `
       new IntersectionObserver(([e]) => {
         frame.contentWindow?.postMessage(e.isIntersecting ? ${JSON.stringify(embed.ns + ':play')} : ${JSON.stringify(embed.ns + ':pause')}, '*')
       }).observe(stage)
-    }` : ''}
+    }`
+        : ''
+    }
   </script>
 </body>
 </html>
@@ -197,18 +227,28 @@ function lander(p) {
   const shortName = p.name.replace(/^threejs/, '')
   const docs = P + docsOf(p)
   const reactDocs = existsSync(join(root, `packages/${p.short}/src/react.tsx`)) ? P + reactDocsOf(p) : null
-  const barText = p.hero?.embed && main ? '<span class="live">live · rendered in your browser</span>'
-    : heroImg ? `<span class="live">${main ? `screenshot · ${esc(main.href.split(/[?#]/)[0])}` : 'screenshot'}</span>`
-    : '<span class="live dev">in development</span>'
-  const stage = heroImg ? `<img src="${P}media/${heroImg}"${dims(heroImg)} fetchpriority="high" alt="${esc(p.hero.alt)}" />` : sketch(p)
+  const barText =
+    p.hero?.embed && main
+      ? '<span class="live">live · rendered in your browser</span>'
+      : heroImg
+        ? `<span class="live">${main ? `screenshot · ${esc(main.href.split(/[?#]/)[0])}` : 'screenshot'}</span>`
+        : '<span class="live dev">in development</span>'
+  const stage = heroImg
+    ? `<img src="${P}media/${heroImg}"${dims(heroImg)} fetchpriority="high" alt="${esc(p.hero.alt)}" />`
+    : sketch(p)
   // Feature rows: `features`, then any `sections` (each { id, label, heading, intro, rows }, e.g. a sub-system).
   let side = 0 // alternate text left/right, counting only non-wide rows (as on the original grass lander)
   const row = (f, i) => {
     const n = String(i + 1).padStart(2, '0')
     const planned = f.planned ? '<span class="planned">planned</span>' : ''
-    const chips = f.chips ? `<ul class="chips" aria-label="${esc(f.title)}">${f.chips.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''
-    const m = f.media ? media(f.media, p, P) : `<div class="frame reveal">${sketch(p, f.planned ? 'planned' : p.name)}</div>`
-    if (f.wide) return `
+    const chips = f.chips
+      ? `<ul class="chips" aria-label="${esc(f.title)}">${f.chips.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`
+      : ''
+    const m = f.media
+      ? media(f.media, p, P)
+      : `<div class="frame reveal">${sketch(p, f.planned ? 'planned' : p.name)}</div>`
+    if (f.wide)
+      return `
         <div class="row wide">
           <div class="text reveal">
             <div><span class="num">${n}</span>${planned}<h3>${f.title}</h3><p class="sub">${f.sub}</p></div>
@@ -227,29 +267,52 @@ function lander(p) {
           ${m}
         </div>`
   }
-  const codeCard = (c, title, sub) => c ? `
+  const codeCard = (c, title, sub) =>
+    c
+      ? `
           <div class="code">
             <header><b>${title}</b><span>${esc(c.file ?? sub)}</span></header>
 <pre><code>${highlight(c.src.replace(/^\n/, '').replace(/\s+$/, ''))}</code></pre>
-          </div>` : ''
+          </div>`
+      : ''
   const finalLinks = [
-    ...demos.map((d, i) => `<a class="btn ${i ? 'btn-line' : 'btn-amber'}" href="${P}demo/${d.href}">${esc(d.label)}</a>`),
+    ...demos.map(
+      (d, i) => `<a class="btn ${i ? 'btn-line' : 'btn-amber'}" href="${P}demo/${d.href}">${esc(d.label)}</a>`
+    ),
     `<a class="btn ${demos.length ? 'btn-line' : 'btn-amber'}" href="${docs}">Documentation</a>`,
-    ...(dev ? [`<a class="btn btn-line" href="${GITHUB}/tree/main/packages/${p.short}">Follow on GitHub</a>`] : []),
+    ...(dev ? [`<a class="btn btn-line" href="${GITHUB}/tree/main/packages/${p.short}">Follow on GitHub</a>`] : [])
   ]
   const url = `${SITE}${p.short}/`
   const related = (RELATED[p.short] ?? []).map((s) => pkgs.find((q) => q.short === s)).filter(Boolean)
-  const ld = { '@graph': [
-    { '@type': 'SoftwareSourceCode', '@id': `${url}#software`, name: p.name, description: p.description, url,
-      codeRepository: `${GITHUB}/tree/main/packages/${p.short}`, programmingLanguage: 'TypeScript', runtimePlatform: 'Web browser (WebGPU)',
-      license: 'https://www.apache.org/licenses/LICENSE-2.0', version: pkgJson(p).version, image: ogImage(p.short), author: AUTHOR,
-      keywords: (pkgJson(p).keywords ?? ['three.js', 'WebGPU', 'React Three Fiber', 'procedural generation']).join(', '),
-      ...(dev ? { creativeWorkStatus: 'in development' } : {}) },
-    { '@type': 'BreadcrumbList', itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'threejs-worldgen', item: SITE },
-      { '@type': 'ListItem', position: 2, name: p.name, item: url },
-    ] },
-  ] }
+  const ld = {
+    '@graph': [
+      {
+        '@type': 'SoftwareSourceCode',
+        '@id': `${url}#software`,
+        name: p.name,
+        description: p.description,
+        url,
+        codeRepository: `${GITHUB}/tree/main/packages/${p.short}`,
+        programmingLanguage: 'TypeScript',
+        runtimePlatform: 'Web browser (WebGPU)',
+        license: 'https://www.apache.org/licenses/LICENSE-2.0',
+        version: pkgJson(p).version,
+        image: ogImage(p.short),
+        author: AUTHOR,
+        keywords: (pkgJson(p).keywords ?? ['three.js', 'WebGPU', 'React Three Fiber', 'procedural generation']).join(
+          ', '
+        ),
+        ...(dev ? { creativeWorkStatus: 'in development' } : {})
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'threejs-worldgen', item: SITE },
+          { '@type': 'ListItem', position: 2, name: p.name, item: url }
+        ]
+      }
+    ]
+  }
   return `${head({ title: p.title, description: p.description, url, ogAlt: `${p.name}: ${plain(p.pitch)}`, short: p.short, accent: p.accent, icon: favicon(p), P, hero: heroImg, ld })}
   <header class="site">
     <div class="wrap">
@@ -312,7 +375,9 @@ function lander(p) {
       </div>
     </section>
 
-${[{ id: 'features', label: "What's in the box", ...p.features }, ...(p.sections ?? [])].map((s) => `
+${[{ id: 'features', label: "What's in the box", ...p.features }, ...(p.sections ?? [])]
+  .map(
+    (s) => `
     <section id="${s.id}">
       <div class="wrap">
         <div class="features-head">
@@ -324,17 +389,27 @@ ${[{ id: 'features', label: "What's in the box", ...p.features }, ...(p.sections
         </div>
 ${s.rows.map(row).join('\n')}
       </div>
-    </section>`).join('')}
-${related.length ? `
+    </section>`
+  )
+  .join('')}
+${
+  related.length
+    ? `
     <section class="related" aria-labelledby="works-with">
       <div class="wrap">
         <h2 id="works-with" class="reveal">Works with</h2>
-        <ul class="reveal">${related.map((q) => `
-          <li style="--accent:${q.accent}"><a href="${P}${q.short}/">${iconSvg(q)}<div><b>threejs<i>${esc(q.name.replace(/^threejs/, ''))}</i></b><span>${q.pitch}</span></div></a></li>`).join('')}
+        <ul class="reveal">${related
+          .map(
+            (q) => `
+          <li style="--accent:${q.accent}"><a href="${P}${q.short}/">${iconSvg(q)}<div><b>threejs<i>${esc(q.name.replace(/^threejs/, ''))}</i></b><span>${q.pitch}</span></div></a></li>`
+          )
+          .join('')}
         </ul>
       </div>
     </section>
-` : ''}
+`
+    : ''
+}
     <section class="final">
       <div class="wrap">
         <h2 class="reveal">${p.final.heading}</h2>
@@ -352,11 +427,31 @@ ${script(p.hero?.embed && main ? p.hero.embed : null, P)}`
 // ---------- homepage ----------
 
 const FLOW = [
-  ['Ground', ['biomes'], 'Seeded climate, height and 20 blended biomes on a flat world or a whole planet, with streaming LOD terrain.'],
-  ['Water and growth', ['water', 'scatter', 'trees', 'grass'], 'Oceans, lakes and rivers carved into that ground, then forests, rocks and grass placed where the biome wants them.'],
-  ['People', ['city'], 'Population density decides where settlements grow and how big; they lay roads, lots and buildings and flatten the terrain under them.'],
-  ['Life and things', ['props', 'vehicles', 'fauna'], 'Street furniture beside the roads, vehicles on the networks and animals in the biomes and waters that suit them.'],
-  ['Weather and sky', ['weathering', 'sky'], 'Rain, snow, lightning and wildfire wear everything down; the sky turns day into night over a Keplerian solar system.'],
+  [
+    'Ground',
+    ['biomes'],
+    'Seeded climate, height and 20 blended biomes on a flat world or a whole planet, with streaming LOD terrain.'
+  ],
+  [
+    'Water and growth',
+    ['water', 'scatter', 'trees', 'grass'],
+    'Oceans, lakes and rivers carved into that ground, then forests, rocks and grass placed where the biome wants them.'
+  ],
+  [
+    'People',
+    ['city'],
+    'Population density decides where settlements grow and how big; they lay roads, lots and buildings and flatten the terrain under them.'
+  ],
+  [
+    'Life and things',
+    ['props', 'vehicles', 'fauna'],
+    'Street furniture beside the roads, vehicles on the networks and animals in the biomes and waters that suit them.'
+  ],
+  [
+    'Weather and sky',
+    ['weathering', 'sky'],
+    'Rain, snow, lightning and wildfire wear everything down; the sky turns day into night over a Keplerian solar system.'
+  ]
 ]
 
 function home() {
@@ -365,7 +460,9 @@ function home() {
     const demos = demosOf(p)
     const thumb = p.thumb && hasMedia(p.thumb) ? p.thumb : p.hero?.img && hasMedia(p.hero.img) ? p.hero.img : null
     const alt = imgAlt(p, thumb) ?? `${p.name} screenshot`
-    const img = thumb ? `<img loading="lazy" decoding="async" src="media/${thumb}"${dims(thumb)} alt="${esc(`${p.name}: ${alt}`)}" />` : sketch(p)
+    const img = thumb
+      ? `<img loading="lazy" decoding="async" src="media/${thumb}"${dims(thumb)} alt="${esc(`${p.name}: ${alt}`)}" />`
+      : sketch(p)
     return `
         <li class="card reveal" style="--accent:${p.accent}">
           <div class="thumb">${img}</div>
@@ -385,7 +482,10 @@ function home() {
   const step = ([title, shorts, text]) => `
         <li class="reveal">
           <b>${title}</b>
-          <div class="pkgs">${shorts.filter((s) => by[s]).map((s) => `<a href="${s}/" style="background:${by[s].accent}">${s}</a>`).join('')}</div>
+          <div class="pkgs">${shorts
+            .filter((s) => by[s])
+            .map((s) => `<a href="${s}/" style="background:${by[s].accent}">${s}</a>`)
+            .join('')}</div>
           <p>${text}</p>
         </li>`
   // Homepage hero: a dedicated planet still if one has been captured, else the biomes orbit shot.
@@ -393,13 +493,35 @@ function home() {
   const home = HOME
   const heroImg = hasMedia(hero) ? hero : 'hero.jpg'
   const title = 'threejs-worldgen · Procedural worlds for three.js, from an ant to the solar system'
-  const description = 'Procedural worlds for three.js and React Three Fiber: biomes, terrain, water, forests, grass, cities, weather and sky, as small packages that share one idea of where the ground is.'
-  const ld = { '@graph': [
-    { '@type': 'WebSite', '@id': `${SITE}#website`, name: 'threejs-worldgen', url: SITE, description, inLanguage: 'en', author: { '@id': AUTHOR['@id'] }, publisher: { '@id': AUTHOR['@id'] } },
-    { ...AUTHOR, sameAs: [GITHUB] },
-    { '@type': 'ItemList', name: 'threejs-worldgen packages', numberOfItems: pkgs.length, itemListElement: pkgs.map((p, i) => (
-      { '@type': 'ListItem', position: i + 1, name: p.name, description: p.description, url: `${SITE}${p.short}/` })) },
-  ] }
+  const description =
+    'Procedural worlds for three.js and React Three Fiber: biomes, terrain, water, forests, grass, cities, weather and sky, as small packages that share one idea of where the ground is.'
+  const ld = {
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE}#website`,
+        name: 'threejs-worldgen',
+        url: SITE,
+        description,
+        inLanguage: 'en',
+        author: { '@id': AUTHOR['@id'] },
+        publisher: { '@id': AUTHOR['@id'] }
+      },
+      { ...AUTHOR, sameAs: [GITHUB] },
+      {
+        '@type': 'ItemList',
+        name: 'threejs-worldgen packages',
+        numberOfItems: pkgs.length,
+        itemListElement: pkgs.map((p, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: p.name,
+          description: p.description,
+          url: `${SITE}${p.short}/`
+        }))
+      }
+    ]
+  }
   return `${head({ title, description, url: SITE, ogAlt: `threejs-worldgen: screenshots of ${cards.length} procedural world packages for three.js`, short: 'home', accent: home.accent, icon: 'favicon.svg', P: '', hero: heroImg, ld })}
   <header class="site">
     <div class="wrap">
@@ -492,7 +614,12 @@ function home() {
       </div>
     </section>
   </main>
-${footer('threejs-worldgen · Apache-2.0', [['Demos', 'demo/demos.html'], ['Docs', 'docs/'], ['threejs-grass', 'grass/'], ['GitHub', GITHUB]])}
+${footer('threejs-worldgen · Apache-2.0', [
+  ['Demos', 'demo/demos.html'],
+  ['Docs', 'docs/'],
+  ['threejs-grass', 'grass/'],
+  ['GitHub', GITHUB]
+])}
 ${script(null, '')}`
 }
 
@@ -511,46 +638,92 @@ for (const f of ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-51
   if (existsSync(join(root, 'landing', f))) cpSync(join(root, 'landing', f), join(out, f))
   else warnings.push(`missing landing/${f} (run node landing/og.mjs)`)
 }
-writeFileSync(join(out, 'site.webmanifest'), JSON.stringify({
-  name: 'threejs-worldgen', short_name: 'worldgen', description: 'Procedural worlds for three.js and React Three Fiber',
-  start_url: './', scope: './', display: 'browser', background_color: '#f4f1e8', theme_color: HOME.accent,
-  icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml' }, { src: 'icon-192.png', sizes: '192x192', type: 'image/png' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }],
-}, null, 2) + '\n')
+writeFileSync(
+  join(out, 'site.webmanifest'),
+  JSON.stringify(
+    {
+      name: 'threejs-worldgen',
+      short_name: 'worldgen',
+      description: 'Procedural worlds for three.js and React Three Fiber',
+      start_url: './',
+      scope: './',
+      display: 'browser',
+      background_color: '#f4f1e8',
+      theme_color: HOME.accent,
+      icons: [
+        { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+        { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
+      ]
+    },
+    null,
+    2
+  ) + '\n'
+)
 
 // Demo pages (built by Vite into <out>/demo): inject the same head tags between <!-- seo --> markers (idempotent).
 const demoDir = join(out, 'demo')
-const demos = existsSync(demoDir) ? readdirSync(demoDir).filter((f) => f.endsWith('.html')).sort() : []
+const demos = existsSync(demoDir)
+  ? readdirSync(demoDir)
+      .filter((f) => f.endsWith('.html'))
+      .sort()
+  : []
 for (const f of demos) {
   let html = readFileSync(join(demoDir, f), 'utf8').replace(/\n\s*<!-- seo -->[\s\S]*?<!-- \/seo -->/, '')
   const current = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? f
   if (!DEMOS[f]) warnings.push(`demo/${f}: no entry in DEMOS, using a generic title and description`)
-  const [short, title, description] = DEMOS[f] ?? [null, `${current} · threejs-worldgen live demo`, `${current}: a live WebGPU demo from threejs-worldgen, procedural worlds for three.js and React Three Fiber.`]
+  const [short, title, description] = DEMOS[f] ?? [
+    null,
+    `${current} · threejs-worldgen live demo`,
+    `${current}: a live WebGPU demo from threejs-worldgen, procedural worlds for three.js and React Three Fiber.`
+  ]
   const p = pkgs.find((q) => q.short === short)
-  const tags = seoTags({ title, description, url: `${SITE}demo/${f}`, image: ogImage(short), imageAlt: `${p?.name ?? 'threejs-worldgen'} live demo`, themeColor: p?.accent ?? HOME.accent })
-  html = html.replace(/<html(?![^>]*\blang=)/, '<html lang="en"').replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>
+  const tags = seoTags({
+    title,
+    description,
+    url: `${SITE}demo/${f}`,
+    image: ogImage(short),
+    imageAlt: `${p?.name ?? 'threejs-worldgen'} live demo`,
+    themeColor: p?.accent ?? HOME.accent
+  })
+  html = html.replace(/<html(?![^>]*\blang=)/, '<html lang="en"').replace(
+    /<title>[^<]*<\/title>/,
+    `<title>${esc(title)}</title>
     <!-- seo -->
-    ${tags.replace(/\n  /g, '\n    ')}
+    ${tags.replace(/\n {2}/g, '\n    ')}
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
-    <!-- /seo -->`)
+    <!-- /seo -->`
+  )
   writeFileSync(join(demoDir, f), html)
 }
 
 // sitemap.xml: homepage, landers, demos and the docs entry pages. TypeDoc writes docs/sitemap.xml with every API page.
-const docsModules = existsSync(join(out, 'docs/modules')) ? readdirSync(join(out, 'docs/modules')).filter((f) => f.endsWith('.html')).sort().map((f) => `docs/modules/${f}`) : []
+const docsModules = existsSync(join(out, 'docs/modules'))
+  ? readdirSync(join(out, 'docs/modules'))
+      .filter((f) => f.endsWith('.html'))
+      .sort()
+      .map((f) => `docs/modules/${f}`)
+  : []
 const docsIndex = existsSync(join(out, 'docs/index.html')) ? ['docs/'] : []
 const today = new Date().toISOString().slice(0, 10)
 const urls = ['', ...pkgs.map((p) => `${p.short}/`), ...demos.map((f) => `demo/${f}`), ...docsIndex, ...docsModules]
-writeFileSync(join(out, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+writeFileSync(
+  join(out, 'sitemap.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((u) => `  <url><loc>${SITE}${u}</loc><lastmod>${today}</lastmod></url>`).join('\n')}
 </urlset>
-`)
-writeFileSync(join(out, 'robots.txt'), `User-agent: *
+`
+)
+writeFileSync(
+  join(out, 'robots.txt'),
+  `User-agent: *
 Allow: /
 
 Sitemap: ${SITE}sitemap.xml
-${existsSync(join(out, 'docs/sitemap.xml')) ? `Sitemap: ${SITE}docs/sitemap.xml\n` : ''}`)
+${existsSync(join(out, 'docs/sitemap.xml')) ? `Sitemap: ${SITE}docs/sitemap.xml\n` : ''}`
+)
 
 for (const w of warnings) console.warn('warning:', w)
 console.log(`landing: wrote ${out}/index.html and ${pkgs.length} landers (${pkgs.map((p) => p.short).join(', ')})`)

@@ -1,13 +1,36 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Mesh, Object3D, PerspectiveCamera, Scene } from 'three/webgpu'
-import { Corn, FlattenMap, PLANT_STRIDE, createCanopyGeometry, createCornGeometry, plantRows, pointInPolygon, type CornField } from '../src/index.ts'
+import { type Mesh, Object3D, PerspectiveCamera, Scene } from 'three/webgpu'
+import {
+  Corn,
+  FlattenMap,
+  PLANT_STRIDE,
+  createCanopyGeometry,
+  createCornGeometry,
+  plantRows,
+  pointInPolygon,
+  type CornField
+} from '../src/index.ts'
 
 // An L-shaped (concave) field with rows at 30°.
-const L: CornField = { polygon: [[0, 0], [40, 0], [40, 15], [15, 15], [15, 40], [0, 40]], rowDirection: Math.PI / 6, rowSpacing: 0.76 }
+const L: CornField = {
+  polygon: [
+    [0, 0],
+    [40, 0],
+    [40, 15],
+    [15, 15],
+    [15, 40],
+    [0, 40]
+  ],
+  rowDirection: Math.PI / 6,
+  rowSpacing: 0.76
+}
 const opts = { plantSpacing: 0.18, seed: 7 }
 
-const plants = (a: Float32Array) => Array.from({ length: a.length / PLANT_STRIDE }, (_, i) => Array.from(a.subarray(i * PLANT_STRIDE, (i + 1) * PLANT_STRIDE)))
+const plants = (a: Float32Array) =>
+  Array.from({ length: a.length / PLANT_STRIDE }, (_, i) =>
+    Array.from(a.subarray(i * PLANT_STRIDE, (i + 1) * PLANT_STRIDE))
+  )
 
 test('rows: every plant is inside the field polygon, on the row lattice', () => {
   const out = plantRows([L], -10, -10, 50, 50, opts)
@@ -15,7 +38,8 @@ test('rows: every plant is inside the field polygon, on the row lattice', () => 
   // ~ area / (row spacing × plant spacing), less the gaps.
   const area = 40 * 15 + 15 * 25
   assert.ok(n > (area / (0.76 * 0.18)) * 0.9 && n < (area / (0.76 * 0.18)) * 1.02, `plant count ${n}`)
-  const bx = -Math.sin(L.rowDirection), bz = Math.cos(L.rowDirection)
+  const bx = -Math.sin(L.rowDirection),
+    bz = Math.cos(L.rowDirection)
   const v0 = L.polygon[0][0] * bx + L.polygon[0][1] * bz
   for (const [x, z] of plants(out)) {
     assert.ok(pointInPolygon(L.polygon, x, z), `(${x}, ${z}) inside`)
@@ -27,9 +51,22 @@ test('rows: every plant is inside the field polygon, on the row lattice', () => 
 })
 
 test('rows: chunks stitch exactly (each plant in exactly one chunk)', () => {
-  const whole = plants(plantRows([L], 0, 0, 40, 40, opts)).map((p) => p.join()).sort()
-  const parts = [[0, 0], [16, 0], [32, 0], [0, 16], [16, 16], [32, 16], [0, 32], [16, 32], [32, 32]]
-    .flatMap(([x, z]) => plants(plantRows([L], x, z, x + 16, z + 16, opts)).map((p) => p.join())).sort()
+  const whole = plants(plantRows([L], 0, 0, 40, 40, opts))
+    .map((p) => p.join())
+    .sort()
+  const parts = [
+    [0, 0],
+    [16, 0],
+    [32, 0],
+    [0, 16],
+    [16, 16],
+    [32, 16],
+    [0, 32],
+    [16, 32],
+    [32, 32]
+  ]
+    .flatMap(([x, z]) => plants(plantRows([L], x, z, x + 16, z + 16, opts)).map((p) => p.join()))
+    .sort()
   assert.deepEqual(parts, whole)
 })
 
@@ -57,7 +94,7 @@ test('flatten map: a stamp flattens exactly its radius, falling along the travel
   assert.equal(map.sample(0, 1.62), 0)
   assert.equal(map.sample(1.2, 1.2), 0)
   // Fall direction (G/B bytes) points forwards (+X) on the centreline.
-  const o = ((100 * map.width) + 100) * 4
+  const o = (100 * map.width + 100) * 4
   assert.ok(map.data[o + 1] > 240 && Math.abs(map.data[o + 2] - 128) < 3)
   map.clear()
   assert.equal(map.sample(0, 0), 0)
@@ -136,8 +173,10 @@ test('geometry: plant model levels of detail and the canopy surface', () => {
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]]
     if (wall.getZ(a) || wall.getZ(b) || wall.getZ(c)) continue
-    const ux = pos.getX(b) - pos.getX(a), uz = pos.getZ(b) - pos.getZ(a)
-    const vx = pos.getX(c) - pos.getX(a), vz = pos.getZ(c) - pos.getZ(a)
+    const ux = pos.getX(b) - pos.getX(a),
+      uz = pos.getZ(b) - pos.getZ(a)
+    const vx = pos.getX(c) - pos.getX(a),
+      vz = pos.getZ(c) - pos.getZ(a)
     topArea += Math.abs(ux * vz - uz * vx) / 2
   }
   assert.ok(Math.abs(topArea - (40 * 15 + 15 * 25)) < 1, `canopy area ${topArea}`)
@@ -150,8 +189,12 @@ test('corn: two fields on one scene update independently, disposing one leaves t
   const b = new Corn({ camera, scene, fields: [L] })
   let ca = 0
   let cb = 0
-  a.update = () => { ca++ }
-  b.update = () => { cb++ }
+  a.update = () => {
+    ca++
+  }
+  b.update = () => {
+    cb++
+  }
   const render = () => scene.onBeforeRender(null as never, scene, camera, null as never, null as never, null as never)
 
   render()

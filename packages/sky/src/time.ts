@@ -44,7 +44,7 @@ export const DEFAULT_CLOCK: ClockOptions = {
   timeScale: 1,
   dayLength: 0,
   paused: false,
-  maxStep: 0.25,
+  maxStep: 0.25
 }
 
 /**

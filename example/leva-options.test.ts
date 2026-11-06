@@ -28,9 +28,24 @@ test('nested objects become collapsed folders with unique /-joined keys', () => 
 })
 
 test('colours, choices, booleans and strings; arrays, null and skipped keys are left out', () => {
-  const s = levaSchema({ glass: '#33465a', style: 'grid', name: 'x', on: true, list: [1], none: null, hidden: 1, deep: { hidden: 2 }, empty: { list: [] } }, folder, {
-    choices: { style: ['auto', 'radial'] }, skip: ['hidden'],
-  })
+  const s = levaSchema(
+    {
+      glass: '#33465a',
+      style: 'grid',
+      name: 'x',
+      on: true,
+      list: [1],
+      none: null,
+      hidden: 1,
+      deep: { hidden: 2 },
+      empty: { list: [] }
+    },
+    folder,
+    {
+      choices: { style: ['auto', 'radial'] },
+      skip: ['hidden']
+    }
+  )
   assert.deepEqual(s.glass, { value: '#33465a', label: 'glass' })
   assert.deepEqual(s.style, { value: 'grid', options: ['grid', 'auto', 'radial'], label: 'style' })
   assert.deepEqual(s.name, { value: 'x', label: 'name' })
@@ -40,27 +55,39 @@ test('colours, choices, booleans and strings; arrays, null and skipped keys are 
 
 test('nest turns leva values back into the nested options object', () => {
   assert.deepEqual(nest({ seed: 2, 'facade/night': 1, 'weather/walls/snow': 0.5, 'weather/walls/burn': 0 }), {
-    seed: 2, facade: { night: 1 }, weather: { walls: { snow: 0.5, burn: 0 } },
+    seed: 2,
+    facade: { night: 1 },
+    weather: { walls: { snow: 0.5, burn: 0 } }
   })
 })
 
 test('ranges and choices keyed by path win over the same name elsewhere', () => {
   const s = levaSchema({ fences: { style: 'auto' }, mailboxes: { style: 'us', spacing: 45 } }, folder, {
-    choices: { style: ['auto', 'picket'], 'mailboxes/style': ['us', 'eu'] }, ranges: { 'mailboxes/spacing': [10, 100, 1] },
+    choices: { style: ['auto', 'picket'], 'mailboxes/style': ['us', 'eu'] },
+    ranges: { 'mailboxes/spacing': [10, 100, 1] }
   }) as any
   assert.deepEqual(s.fences.folder['fences/style'].options, ['auto', 'picket'])
   assert.deepEqual(s.mailboxes.folder['mailboxes/style'].options, ['us', 'eu'])
-  assert.deepEqual([s.mailboxes.folder['mailboxes/spacing'].min, s.mailboxes.folder['mailboxes/spacing'].max], [10, 100])
+  assert.deepEqual(
+    [s.mailboxes.folder['mailboxes/spacing'].min, s.mailboxes.folder['mailboxes/spacing'].max],
+    [10, 100]
+  )
 })
 
 test('dotted skips leave out that path only, as in the panel', () => {
-  const s = levaSchema({ facade: { walls: { a: 1 }, night: 0 }, weather: { walls: { a: 2 } } }, folder, { skip: ['facade.walls'] }) as any
+  const s = levaSchema({ facade: { walls: { a: 1 }, night: 0 }, weather: { walls: { a: 2 } } }, folder, {
+    skip: ['facade.walls']
+  }) as any
   assert.deepEqual(Object.keys(s.facade.folder), ['facade/night'])
   assert.deepEqual(Object.keys(s.weather.folder.walls.folder), ['weather/walls/a'])
 })
 
 test('arrays: element controls under /-indexed keys, ranges and choices by the array name; nest rebuilds the arrays', () => {
-  const s = levaSchema({ center: [5, -5], avoid: ['ice'], none: [] }, folder, { arrays: true, ranges: { center: [-10, 10, 1] }, choices: { avoid: ['ice', 'peaks'] } }) as any
+  const s = levaSchema({ center: [5, -5], avoid: ['ice'], none: [] }, folder, {
+    arrays: true,
+    ranges: { center: [-10, 10, 1] },
+    choices: { avoid: ['ice', 'peaks'] }
+  }) as any
   assert.deepEqual(Object.keys(s), ['center', 'avoid'])
   assert.deepEqual(s.center.folder['center/1'], { value: -5, min: -10, max: 10, step: 1, label: '1' })
   assert.deepEqual(s.avoid.folder['avoid/0'].options, ['ice', 'peaks'])
@@ -68,15 +95,37 @@ test('arrays: element controls under /-indexed keys, ranges and choices by the a
 })
 
 test('specSchema takes a panel manifest class; schemaValues + nest round-trip the edited options', () => {
-  const spec = { defaults: { seed: 1, center: [0, 0], deep: { on: true } }, arrays: true, skip: { center: 'from the site' }, ranges: { seed: [0, 9, 1] as [number, number, number] } }
+  const spec = {
+    defaults: { seed: 1, center: [0, 0], deep: { on: true } },
+    arrays: true,
+    skip: { center: 'from the site' },
+    ranges: { seed: [0, 9, 1] as [number, number, number] }
+  }
   assert.deepEqual(specSchema(spec), { skip: ['center'], ranges: spec.ranges, choices: undefined, arrays: true })
   const levaFolder = (schema: unknown, settings: object) => ({ schema, settings }) // leva's own shape
-  assert.deepEqual(nest(schemaValues(levaSchema(spec.defaults, levaFolder, specSchema(spec)))), { seed: 1, deep: { on: true } })
+  assert.deepEqual(nest(schemaValues(levaSchema(spec.defaults, levaFolder, specSchema(spec)))), {
+    seed: 1,
+    deep: { on: true }
+  })
 })
 
 test('changed keeps only the edited options, so presets under them (e.g. a size class) still apply', () => {
-  const defaults = { size: 'town', roads: { arms: 0, primary: { width: 12 } }, styles: { floors: [1, 7] }, center: [0, 0] }
+  const defaults = {
+    size: 'town',
+    roads: { arms: 0, primary: { width: 12 } },
+    styles: { floors: [1, 7] },
+    center: [0, 0]
+  }
   assert.deepEqual(changed(structuredClone(defaults), defaults), {})
-  const edited = { size: 'village', roads: { arms: 0, primary: { width: 9 } }, styles: { floors: [1, 4] }, center: [0, 0] }
-  assert.deepEqual(changed(edited, defaults), { size: 'village', roads: { primary: { width: 9 } }, styles: { floors: [1, 4] } })
+  const edited = {
+    size: 'village',
+    roads: { arms: 0, primary: { width: 9 } },
+    styles: { floors: [1, 4] },
+    center: [0, 0]
+  }
+  assert.deepEqual(changed(edited, defaults), {
+    size: 'village',
+    roads: { primary: { width: 9 } },
+    styles: { floors: [1, 4] }
+  })
 })

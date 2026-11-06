@@ -29,10 +29,12 @@ export interface WindOptions {
 }
 
 /** An object, or a React-style ref to one (`current` is `null` until mounted). */
-export type ObjectRef<T extends Object3D = Object3D> = T | {
-  /** The object, or `null` while it is not mounted. */
-  current: T | null
-}
+export type ObjectRef<T extends Object3D = Object3D> =
+  | T
+  | {
+      /** The object, or `null` while it is not mounted. */
+      current: T | null
+    }
 
 /** Something that pushes grass aside: characters, vehicles, balls… */
 export interface Interactor {
@@ -93,7 +95,7 @@ const DEFAULTS: Omit<GrassSettings, keyof GrassStyle | 'wind'> = {
     { distance: 8, density: 1, segments: 5 },
     { distance: 25, density: 0.25, segments: 3 },
     { distance: 60, density: 0.06, segments: 2 },
-    { distance: 120, density: 0.03, segments: 1 },
+    { distance: 120, density: 0.03, segments: 1 }
   ],
   maxSlope: 1.2,
   grassMap: null,
@@ -104,7 +106,7 @@ const DEFAULTS: Omit<GrassSettings, keyof GrassStyle | 'wind'> = {
   receiveShadow: true,
   sun: null,
   debugLods: false,
-  buildBudget: 3,
+  buildBudget: 3
 }
 const DEFAULT_WIND: WindOptions = { direction: [1, 0.35], strength: 0.45, scale: 0.045, speed: 0.8 }
 
@@ -150,7 +152,17 @@ export function writeSettings(u: GrassUniforms, s: GrassSettings): void {
 
 /** Settings that change tile contents and therefore require a rebuild. */
 export function layoutKey(s: GrassSettings): string {
-  return JSON.stringify([s.type, s.tileSize, s.density, s.heightVariation, s.widthVariation, s.clumping, s.clumpSize, s.maxSlope, s.lods])
+  return JSON.stringify([
+    s.type,
+    s.tileSize,
+    s.density,
+    s.heightVariation,
+    s.widthVariation,
+    s.clumping,
+    s.clumpSize,
+    s.maxSlope,
+    s.lods
+  ])
 }
 
 /** Settings that require a new material instance. Only the draw type is baked into the material;

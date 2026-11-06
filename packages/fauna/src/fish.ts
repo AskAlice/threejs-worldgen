@@ -1,10 +1,45 @@
-import { DynamicDrawUsage, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, Sphere, type BufferGeometry, type Material, type Object3D } from 'three/webgpu'
+import {
+  DynamicDrawUsage,
+  Group,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
+  Sphere,
+  type BufferGeometry,
+  type Material,
+  type Object3D
+} from 'three/webgpu'
 import { mulberry32, seedOf } from 'threejs-biomes'
 import { DEFAULT_BOIDS, type BoidParams } from './boids.ts'
-import { Clock, DEFAULT_STATES, hookScene, mergeInput, prepareRenderer, toGeometry, type DeepPartial, type FaunaRenderer, type MaterialStates, type Predator } from './common.ts'
+import {
+  Clock,
+  DEFAULT_STATES,
+  hookScene,
+  mergeInput,
+  prepareRenderer,
+  toGeometry,
+  type DeepPartial,
+  type FaunaRenderer,
+  type MaterialStates,
+  type Predator
+} from './common.ts'
 import { buildFishMesh, DEFAULT_FISH_DETAIL, type FishDetail, type FishMeshData } from './fish-geometry.ts'
-import { applyFishSpecies, applyStates, createFishMaterial, createFishUniforms, type FishUniforms } from './fish-material.ts'
-import { DEFAULT_WATER_RULES, FISH_SPECIES, fishClearance, fishHabitat, MAX_FISH_PITCH, type FishSpecies, type WaterRules } from './fish-species.ts'
+import {
+  applyFishSpecies,
+  applyStates,
+  createFishMaterial,
+  createFishUniforms,
+  type FishUniforms
+} from './fish-material.ts'
+import {
+  DEFAULT_WATER_RULES,
+  FISH_SPECIES,
+  fishClearance,
+  fishHabitat,
+  MAX_FISH_PITCH,
+  type FishSpecies,
+  type WaterRules
+} from './fish-species.ts'
 import { DEFAULT_LAYER, FaunaLayer, type FaunaGroup, type FaunaLayerOptions, type FaunaLayerSettings } from './layer.ts'
 import type { Habitat } from './placement.ts'
 
@@ -37,7 +72,7 @@ export const DEFAULT_FISH_SCHOOLS: FishSchoolsSettings = {
   species: structuredClone(FISH_SPECIES) as Record<string, FishSpecies>,
   water: { ...DEFAULT_WATER_RULES },
   margin: 0.15,
-  detail: { ...DEFAULT_FISH_DETAIL },
+  detail: { ...DEFAULT_FISH_DETAIL }
 }
 
 /**
@@ -81,22 +116,39 @@ export class FishSchools extends FaunaLayer<FishSpecies, FishSchoolsSettings> {
     return super.reset(input)
   }
 
-  protected defaults(): FishSchoolsSettings { return DEFAULT_FISH_SCHOOLS }
-  protected species(): Readonly<Record<string, FishSpecies>> { return this.settings.species }
-  protected habitat(): Habitat<FishSpecies> { return fishHabitat(this.settings.water, this.settings.margin) }
+  protected defaults(): FishSchoolsSettings {
+    return DEFAULT_FISH_SCHOOLS
+  }
+  protected species(): Readonly<Record<string, FishSpecies>> {
+    return this.settings.species
+  }
+  protected habitat(): Habitat<FishSpecies> {
+    return fishHabitat(this.settings.water, this.settings.margin)
+  }
   protected placementOf(sp: FishSpecies): unknown {
     return [sp.habitat, sp.school, sp.length, sp.lengthVariation, sp.shape.depth, sp.shape.tail.height]
   }
-  protected override layoutExtra(): unknown { return [this.settings.water, this.settings.margin] }
-  protected maxPitch(): number { return MAX_FISH_PITCH }
+  protected override layoutExtra(): unknown {
+    return [this.settings.water, this.settings.margin]
+  }
+  protected maxPitch(): number {
+    return MAX_FISH_PITCH
+  }
 
   protected boidParams(sp: FishSpecies): BoidParams {
-    const L = sp.length, spacing = sp.school.spacing * L, v = sp.school.speed * L
+    const L = sp.length,
+      spacing = sp.school.spacing * L,
+      v = sp.school.speed * L
     return {
       ...DEFAULT_BOIDS,
-      separationDistance: spacing, neighborRadius: spacing * 4, minDistance: spacing * 0.5,
-      minSpeed: v * 0.3, maxSpeed: v * 2, maxAccel: v * 3,
-      homeRadius: sp.school.roam, margin: fishClearance(sp, this.settings.margin),
+      separationDistance: spacing,
+      neighborRadius: spacing * 4,
+      minDistance: spacing * 0.5,
+      minSpeed: v * 0.3,
+      maxSpeed: v * 2,
+      maxAccel: v * 3,
+      homeRadius: sp.school.roam,
+      margin: fishClearance(sp, this.settings.margin)
     }
   }
 
@@ -118,9 +170,13 @@ export class FishSchools extends FaunaLayer<FishSpecies, FishSchoolsSettings> {
     return Math.max(-0.3, Math.min(0.3, -turnRate * 0.1))
   }
 
-  protected geometryKey(sp: FishSpecies): string { return JSON.stringify([sp.shape, this.settings.detail]) }
+  protected geometryKey(sp: FishSpecies): string {
+    return JSON.stringify([sp.shape, this.settings.detail])
+  }
 
-  protected createGeometry(sp: FishSpecies): BufferGeometry { return toGeometry(this.meshData(sp)) }
+  protected createGeometry(sp: FishSpecies): BufferGeometry {
+    return toGeometry(this.meshData(sp))
+  }
 
   protected createMaterial(id: string): Material {
     const u = createFishUniforms()
@@ -182,7 +238,16 @@ export interface FishOptions extends FishInput {
   renderer?: FaunaRenderer
 }
 
-const FISH_DEFAULTS: Omit<FishSettings, 'species'> = { preset: 'trout', seed: 1, speed: 1, turn: 0, detail: { ...DEFAULT_FISH_DETAIL }, states: { ...DEFAULT_STATES }, castShadow: true, receiveShadow: true }
+const FISH_DEFAULTS: Omit<FishSettings, 'species'> = {
+  preset: 'trout',
+  seed: 1,
+  speed: 1,
+  turn: 0,
+  detail: { ...DEFAULT_FISH_DETAIL },
+  states: { ...DEFAULT_STATES },
+  castShadow: true,
+  receiveShadow: true
+}
 
 /**
  * One procedural fish (a hero asset or a gallery item): any {@link FishSpecies}, live-editable, swimming
@@ -235,7 +300,10 @@ export class Fish {
   /** Changes settings, merging into earlier ones. Shape changes rebuild the mesh; everything else is instant. */
   set(input: FishInput): this {
     mergeInput(this.input, input)
-    const base = mergeInput(structuredClone(FISH_DEFAULTS), { ...this.input, species: undefined }) as Omit<FishSettings, 'species'>
+    const base = mergeInput(structuredClone(FISH_DEFAULTS), { ...this.input, species: undefined }) as Omit<
+      FishSettings,
+      'species'
+    >
     const preset = FISH_SPECIES[base.preset] ?? FISH_SPECIES.trout
     const species = mergeInput(structuredClone(preset) as FishSpecies, this.input.species ?? {})
     const s: FishSettings = { ...base, species }
@@ -280,7 +348,8 @@ export class Fish {
 
   /** Advances the swimming. Called automatically when a `scene` was given (and by `<Fish>`). */
   update(delta: number = this.clock.tick()): void {
-    const s = this.settings, sw = s.species.swim
+    const s = this.settings,
+      sw = s.species.swim
     this.time += delta
     this.phase += Math.PI * 2 * Math.max(0.6, sw.beat * s.speed) * delta
     this.finPhase += Math.PI * 2 * (1.5 + 2 * sw.flutter) * delta

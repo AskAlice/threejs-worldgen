@@ -55,10 +55,14 @@ export function maxLevel(world: World, s: LodSettings): number {
 
 /** The four children of a chunk. */
 export function children(k: ChunkKey): ChunkKey[] {
-  const l = k.level + 1, x = k.x * 2, y = k.y * 2
+  const l = k.level + 1,
+    x = k.x * 2,
+    y = k.y * 2
   return [
-    { face: k.face, level: l, x, y }, { face: k.face, level: l, x: x + 1, y },
-    { face: k.face, level: l, x, y: y + 1 }, { face: k.face, level: l, x: x + 1, y: y + 1 },
+    { face: k.face, level: l, x, y },
+    { face: k.face, level: l, x: x + 1, y },
+    { face: k.face, level: l, x, y: y + 1 },
+    { face: k.face, level: l, x: x + 1, y: y + 1 }
   ]
 }
 
@@ -73,7 +77,14 @@ export function children(k: ChunkKey): ChunkKey[] {
  * @param history Optional previous frame's decisions; gives the split test hysteresis so a chunk at a
  *   distance boundary does not flip level every frame.
  */
-export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds: (k: ChunkKey) => ChunkBounds | undefined, maxElevation: number, history?: LodHistory): ChunkSelection {
+export function selectChunks(
+  world: World,
+  camera: Vec3,
+  s: LodSettings,
+  bounds: (k: ChunkKey) => ChunkBounds | undefined,
+  maxElevation: number,
+  history?: LodHistory
+): ChunkSelection {
   const sphere = world.options.surface === 'sphere'
   const R = world.options.radius
   const deepest = maxLevel(world, s)
@@ -90,14 +101,19 @@ export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds:
     if (b) return b
     const size = chunkSize(world, k, s.rootSize)
     if (!sphere) {
-      return { center: [(k.x + 0.5) * size, 0, (k.y + 0.5) * size], radius: size * 0.71 + Math.max(maxElevation, 200), maxElevation }
+      return {
+        center: [(k.x + 0.5) * size, 0, (k.y + 0.5) * size],
+        radius: size * 0.71 + Math.max(maxElevation, 200),
+        maxElevation
+      }
     }
     const step = 2 / 2 ** k.level
     const d = cubeToSphere(k.face, -1 + (k.x + 0.5) * step, -1 + (k.y + 0.5) * step, tmp)
     return { center: [d[0] * R, d[1] * R, d[2] * R], radius: size * 0.75 + Math.max(maxElevation, 200), maxElevation }
   }
 
-  const distance = (b: ChunkBounds) => Math.hypot(camera[0] - b.center[0], camera[1] - b.center[1], camera[2] - b.center[2])
+  const distance = (b: ChunkBounds) =>
+    Math.hypot(camera[0] - b.center[0], camera[1] - b.center[1], camera[2] - b.center[2])
   const size = (k: ChunkKey) => chunkSize(world, k, s.rootSize)
   const shouldSplit = (k: ChunkKey, b: ChunkBounds) => {
     if (k.level >= deepest) return false
@@ -148,8 +164,10 @@ export function selectChunks(world: World, camera: Vec3, s: LodSettings, bounds:
     for (let f = 0; f < 6; f++) visit({ face: f, level: 0, x: 0, y: 0 })
   } else {
     const r = s.rootSize
-    const x0 = Math.floor((camera[0] - s.viewDistance) / r), x1 = Math.floor((camera[0] + s.viewDistance) / r)
-    const z0 = Math.floor((camera[2] - s.viewDistance) / r), z1 = Math.floor((camera[2] + s.viewDistance) / r)
+    const x0 = Math.floor((camera[0] - s.viewDistance) / r),
+      x1 = Math.floor((camera[0] + s.viewDistance) / r)
+    const z0 = Math.floor((camera[2] - s.viewDistance) / r),
+      z1 = Math.floor((camera[2] + s.viewDistance) / r)
     for (let y = z0; y <= z1; y++) for (let x = x0; x <= x1; x++) visit({ face: -1, level: 0, x, y })
   }
   need.sort((a, b) => a.priority - b.priority)

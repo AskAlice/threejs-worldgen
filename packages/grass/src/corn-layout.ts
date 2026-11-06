@@ -35,34 +35,64 @@ export const PLANT_STRIDE = 5
  * real corn turns its leaves into the gaps). Output is sorted by `rank`, a per-plant random number in [0, 1): the
  * first `n` plants are an even thinning of the rectangle, which is how distant levels of detail drop plants.
  */
-export function plantRows(fields: readonly CornField[], minX: number, minZ: number, maxX: number, maxZ: number, { plantSpacing, seed, gaps = 0.04 }: PlantOptions): Float32Array {
+export function plantRows(
+  fields: readonly CornField[],
+  minX: number,
+  minZ: number,
+  maxX: number,
+  maxZ: number,
+  { plantSpacing, seed, gaps = 0.04 }: PlantOptions
+): Float32Array {
   const out: number[] = []
   fields.forEach((field, f) => {
     const { polygon, rowDirection, rowSpacing } = field
     if (polygon.length < 3 || !(rowSpacing > 0) || !(plantSpacing > 0)) return
     const b = bounds(polygon)
-    const x0 = Math.max(minX, b.minX), x1 = Math.min(maxX, b.maxX)
-    const z0 = Math.max(minZ, b.minZ), z1 = Math.min(maxZ, b.maxZ)
+    const x0 = Math.max(minX, b.minX),
+      x1 = Math.min(maxX, b.maxX)
+    const z0 = Math.max(minZ, b.minZ),
+      z1 = Math.min(maxZ, b.maxZ)
     if (x0 >= x1 || z0 >= z1) return
-    const ax = Math.cos(rowDirection), az = Math.sin(rowDirection) // along the row
-    const bx = -az, bz = ax // across the rows
+    const ax = Math.cos(rowDirection),
+      az = Math.sin(rowDirection) // along the row
+    const bx = -az,
+      bz = ax // across the rows
     const [px, pz] = polygon[0]
     const u0 = px * ax + pz * az
     const v0 = px * bx + pz * bz
     // Lattice ranges covering the clipped rectangle (corners projected onto both axes), one spot of margin for jitter.
-    let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity
-    for (const [cx, cz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
-      const u = cx * ax + cz * az, v = cx * bx + cz * bz
-      uMin = Math.min(uMin, u); uMax = Math.max(uMax, u); vMin = Math.min(vMin, v); vMax = Math.max(vMax, v)
+    let uMin = Infinity,
+      uMax = -Infinity,
+      vMin = Infinity,
+      vMax = -Infinity
+    for (const [cx, cz] of [
+      [x0, z0],
+      [x1, z0],
+      [x0, z1],
+      [x1, z1]
+    ]) {
+      const u = cx * ax + cz * az,
+        v = cx * bx + cz * bz
+      uMin = Math.min(uMin, u)
+      uMax = Math.max(uMax, u)
+      vMin = Math.min(vMin, v)
+      vMax = Math.max(vMax, v)
     }
-    const kMin = Math.floor((vMin - v0) / rowSpacing - 0.5), kMax = Math.ceil((vMax - v0) / rowSpacing)
-    const jMin = Math.floor((uMin - u0) / plantSpacing) - 1, jMax = Math.ceil((uMax - u0) / plantSpacing) + 1
+    const kMin = Math.floor((vMin - v0) / rowSpacing - 0.5),
+      kMax = Math.ceil((vMax - v0) / rowSpacing)
+    const jMin = Math.floor((uMin - u0) / plantSpacing) - 1,
+      jMax = Math.ceil((uMax - u0) / plantSpacing) + 1
     const fieldSeed = hash2(seed, f + 1)
     for (let k = kMin; k <= kMax; k++) {
       const v = v0 + (k + 0.5) * rowSpacing
       for (let j = jMin; j <= jMax; j++) {
         const rand = mulberry32(hash2(hash2(k, j), fieldSeed))
-        const gap = rand(), along = rand(), across = rand(), turn = rand(), s = rand(), rank = rand()
+        const gap = rand(),
+          along = rand(),
+          across = rand(),
+          turn = rand(),
+          s = rand(),
+          rank = rand()
         if (gap < gaps) continue
         const u = u0 + (j + 0.5 + (along - 0.5) * 0.5) * plantSpacing
         const w = v + (across - 0.5) * 0.04
@@ -75,9 +105,13 @@ export function plantRows(fields: readonly CornField[], minX: number, minZ: numb
   })
   // Sort plants by rank so any prefix is an even thinning.
   const n = out.length / PLANT_STRIDE
-  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => out[a * PLANT_STRIDE + 4] - out[b * PLANT_STRIDE + 4])
+  const order = Array.from({ length: n }, (_, i) => i).sort(
+    (a, b) => out[a * PLANT_STRIDE + 4] - out[b * PLANT_STRIDE + 4]
+  )
   const sorted = new Float32Array(out.length)
-  order.forEach((from, to) => sorted.set(out.slice(from * PLANT_STRIDE, from * PLANT_STRIDE + PLANT_STRIDE), to * PLANT_STRIDE))
+  order.forEach((from, to) =>
+    sorted.set(out.slice(from * PLANT_STRIDE, from * PLANT_STRIDE + PLANT_STRIDE), to * PLANT_STRIDE)
+  )
   return sorted
 }
 
@@ -94,9 +128,15 @@ export function pointInPolygon(polygon: readonly (readonly [number, number])[], 
 
 /** Axis-aligned bounds of a polygon. */
 export function bounds(polygon: readonly (readonly [number, number])[]) {
-  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+  let minX = Infinity,
+    minZ = Infinity,
+    maxX = -Infinity,
+    maxZ = -Infinity
   for (const [x, z] of polygon) {
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z)
+    minX = Math.min(minX, x)
+    maxX = Math.max(maxX, x)
+    minZ = Math.min(minZ, z)
+    maxZ = Math.max(maxZ, z)
   }
   return { minX, minZ, maxX, maxZ }
 }
@@ -141,8 +181,10 @@ export class FlattenMap {
    */
   stamp(x: number, z: number, radius: number, dirX = 0, dirZ = 0): boolean {
     const t = this.texel
-    const i0 = Math.max(0, Math.floor((x - radius - t - this.minX) / t)), i1 = Math.min(this.width - 1, Math.floor((x + radius + t - this.minX) / t))
-    const j0 = Math.max(0, Math.floor((z - radius - t - this.minZ) / t)), j1 = Math.min(this.height - 1, Math.floor((z + radius + t - this.minZ) / t))
+    const i0 = Math.max(0, Math.floor((x - radius - t - this.minX) / t)),
+      i1 = Math.min(this.width - 1, Math.floor((x + radius + t - this.minX) / t))
+    const j0 = Math.max(0, Math.floor((z - radius - t - this.minZ) / t)),
+      j1 = Math.min(this.height - 1, Math.floor((z + radius + t - this.minZ) / t))
     const travel = Math.hypot(dirX, dirZ)
     let changed = false
     for (let j = j0; j <= j1; j++) {

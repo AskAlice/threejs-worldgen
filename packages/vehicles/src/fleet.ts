@@ -1,10 +1,30 @@
 import {
-  BufferAttribute, BufferGeometry, CylinderGeometry, DynamicDrawUsage, Euler, Group, InstancedBufferAttribute, InstancedMesh,
-  Matrix4, PlaneGeometry, Quaternion, Sphere, Vector3, type MeshBasicNodeMaterial, type MeshPhysicalNodeMaterial, type Object3D,
+  BufferAttribute,
+  BufferGeometry,
+  CylinderGeometry,
+  DynamicDrawUsage,
+  Euler,
+  Group,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
+  PlaneGeometry,
+  Quaternion,
+  Sphere,
+  Vector3,
+  type MeshBasicNodeMaterial,
+  type MeshPhysicalNodeMaterial,
+  type Object3D
 } from 'three/webgpu'
 import { InstanceStates, type MaterialStates, type StateLook } from 'threejs-weathering'
 import { rgb, type MeshData } from './mesh.ts'
-import { createFxMaterial, createVehicleMaterial, createVehicleUniforms, createWakeMaterial, type VehicleUniforms } from './material.ts'
+import {
+  createFxMaterial,
+  createVehicleMaterial,
+  createVehicleUniforms,
+  createWakeMaterial,
+  type VehicleUniforms
+} from './material.ts'
 import type { VehicleParams, VehicleParamsOf, VehicleType } from './models.ts'
 import type { RoadNetwork } from './paths.ts'
 import { DEFAULT_FLEET, FleetSim, type FleetEnvironment, type FleetInput, type FleetSettings } from './sim.ts'
@@ -50,8 +70,15 @@ interface PartView {
   states: InstanceStates
 }
 
-const _mv = new Matrix4(), _mm = new Matrix4(), _mr = new Matrix4(), _q = new Quaternion(), _e = new Euler(0, 0, 0, 'YXZ')
-const _p = new Vector3(), _s = new Vector3(1, 1, 1), _d = new Vector3(), _up = new Vector3(0, 1, 0)
+const _mv = new Matrix4(),
+  _mm = new Matrix4(),
+  _mr = new Matrix4(),
+  _q = new Quaternion(),
+  _e = new Euler(0, 0, 0, 'YXZ')
+const _p = new Vector3(),
+  _s = new Vector3(1, 1, 1),
+  _d = new Vector3(),
+  _up = new Vector3(0, 1, 0)
 const ZERO = new Matrix4().makeScale(0, 0, 0)
 const stage = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, hidden: false }
 
@@ -71,7 +98,10 @@ function toGeometry(data: MeshData): BufferGeometry {
   g.setAttribute('uv', new BufferAttribute(uv, 2))
   g.setIndex(new BufferAttribute(data.index, 1))
   const [x0, y0, z0, x1, y1, z1] = data.bounds
-  g.boundingSphere = new Sphere(new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2)
+  g.boundingSphere = new Sphere(
+    new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+    Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2
+  )
   return g
 }
 
@@ -201,7 +231,8 @@ export class Fleet {
     const sim = this.sim
     const byModel: number[][] = sim.models.map(() => [])
     for (let v = 0; v < sim.count; v++) byModel[sim.model[v]].push(v)
-    let fxCapacity = 0, wakeCapacity = 0
+    let fxCapacity = 0,
+      wakeCapacity = 0
     sim.models.forEach((model, mi) => {
       const vehicles = byModel[mi]
       if (!vehicles.length) return
@@ -220,7 +251,8 @@ export class Fleet {
         mesh.boundingSphere = this.bounds
         for (let j = 0; j < vehicles.length; j++) {
           const v = vehicles[j]
-          for (let k = 0; k < part.mounts.length; k++) look.array.set(sim.tint.subarray(v * 3, v * 3 + 3), (j * part.mounts.length + k) * 4)
+          for (let k = 0; k < part.mounts.length; k++)
+            look.array.set(sim.tint.subarray(v * 3, v * 3 + 3), (j * part.mounts.length + k) * 4)
         }
         this.views.push({ mesh, model: mi, part: pi, vehicles, look, states })
         this.object.add(mesh)
@@ -228,7 +260,10 @@ export class Fleet {
     })
     if (fxCapacity) {
       const cone = new CylinderGeometry(0, 1, 1, 12, 1, true).translate(0, 0.5, 0)
-      cone.setAttribute('fxLook', new InstancedBufferAttribute(new Float32Array(fxCapacity * 4), 4).setUsage(DynamicDrawUsage))
+      cone.setAttribute(
+        'fxLook',
+        new InstancedBufferAttribute(new Float32Array(fxCapacity * 4), 4).setUsage(DynamicDrawUsage)
+      )
       this.fx = new InstancedMesh(cone, this.fxMaterial, fxCapacity)
       this.fx.instanceMatrix.setUsage(DynamicDrawUsage)
       this.fx.frustumCulled = false
@@ -238,7 +273,10 @@ export class Fleet {
     }
     if (wakeCapacity) {
       const plane = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5)
-      plane.setAttribute('wakeLook', new InstancedBufferAttribute(new Float32Array(wakeCapacity * 4), 4).setUsage(DynamicDrawUsage))
+      plane.setAttribute(
+        'wakeLook',
+        new InstancedBufferAttribute(new Float32Array(wakeCapacity * 4), 4).setUsage(DynamicDrawUsage)
+      )
       this.wakes = new InstancedMesh(plane, this.wakeMaterial, wakeCapacity)
       this.wakes.instanceMatrix.setUsage(DynamicDrawUsage)
       this.wakes.frustumCulled = false
@@ -284,10 +322,18 @@ export class Fleet {
 
   /** What vehicle `i` is and where it is. */
   vehicle(i: number): VehicleInfo {
-    const s = this.sim, m = s.models[s.model[i]], p = s.pose
+    const s = this.sim,
+      m = s.models[s.model[i]],
+      p = s.pose
     return {
-      type: m.type, style: m.style, group: s.group[i], position: [p[i * 8], p[i * 8 + 1], p[i * 8 + 2]], heading: p[i * 8 + 3],
-      speed: s.speed[i], states: s.states.get(i), heat: s.heat[i],
+      type: m.type,
+      style: m.style,
+      group: s.group[i],
+      position: [p[i * 8], p[i * 8 + 1], p[i * 8 + 2]],
+      heading: p[i * 8 + 3],
+      speed: s.speed[i],
+      states: s.states.get(i),
+      heat: s.heat[i]
     }
   }
 
@@ -326,12 +372,23 @@ export class Fleet {
     this.statesVersion = version
     this.hadHeat = heat
     // Bounds of every vehicle, shared by every part mesh for culling.
-    let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity, reach = 0
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity,
+      reach = 0
     for (let v = 0; v < sim.count; v++) {
-      const x = pose[v * 8], y = pose[v * 8 + 1], z = pose[v * 8 + 2]
-      if (x < minX) minX = x; if (x > maxX) maxX = x
-      if (y < minY) minY = y; if (y > maxY) maxY = y
-      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z
+      const x = pose[v * 8],
+        y = pose[v * 8 + 1],
+        z = pose[v * 8 + 2]
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      if (z < minZ) minZ = z
+      if (z > maxZ) maxZ = z
     }
     for (const m of sim.models) reach = Math.max(reach, Math.hypot(...m.size))
     if (sim.count) {
@@ -344,7 +401,8 @@ export class Fleet {
       const arr = view.mesh.instanceMatrix.array as Float32Array
       const mounts = part.mounts
       for (let j = 0; j < view.vehicles.length; j++) {
-        const v = view.vehicles[j], o = v * 8
+        const v = view.vehicles[j],
+          o = v * 8
         if (!sim.active[v]) {
           for (let k = 0; k < mounts.length; k++) ZERO.toArray(arr, (j * mounts.length + k) * 16)
           continue
@@ -356,22 +414,41 @@ export class Fleet {
           const slot = (j * mounts.length + k) * 16
           if (mount.stage === -1) {
             const a = sim.anchor
-            _mm.compose(_p.set(a[v * 4], a[v * 4 + 1], a[v * 4 + 2]), _q.setFromAxisAngle(_up, a[v * 4 + 3]), _s.set(1, 1, 1))
+            _mm.compose(
+              _p.set(a[v * 4], a[v * 4 + 1], a[v * 4 + 2]),
+              _q.setFromAxisAngle(_up, a[v * 4 + 3]),
+              _s.set(1, 1, 1)
+            )
             _mm.toArray(arr, slot)
             continue
           }
           if (mount.stage !== undefined && mount.stage < active) {
             const st = sim.stageState(v, mount.stage, stage)
             if (!st || st.hidden) ZERO.toArray(arr, slot)
-            else _mm.compose(_p.set(st.x, st.y, st.z), _q.setFromEuler(_e.set(st.rx, st.ry, st.rz, 'YXZ')), _s.set(1, 1, 1)).toArray(arr, slot)
+            else
+              _mm
+                .compose(_p.set(st.x, st.y, st.z), _q.setFromEuler(_e.set(st.rx, st.ry, st.rz, 'YXZ')), _s.set(1, 1, 1))
+                .toArray(arr, slot)
             continue
           }
           _mm.copy(_mv).multiply(_mr.makeTranslation(mount.position[0], mount.position[1], mount.position[2]))
-          if (mount.rotation) _mm.multiply(_mr.makeRotationFromEuler(_e.set(mount.rotation[0], mount.rotation[1], mount.rotation[2], 'YXZ')))
+          if (mount.rotation)
+            _mm.multiply(
+              _mr.makeRotationFromEuler(_e.set(mount.rotation[0], mount.rotation[1], mount.rotation[2], 'YXZ'))
+            )
           if (mount.steer) _mm.multiply(_mr.makeRotationY(pose[o + 6] * mount.steer))
           if (mount.spin) {
-            const a = mount.spin.by === 'distance' ? sim.travel[v] * mount.spin.rate : sim.time * mount.spin.rate * (0.25 + 0.75 * pose[o + 7])
-            _mm.multiply(mount.spin.axis === 0 ? _mr.makeRotationX(a) : mount.spin.axis === 1 ? _mr.makeRotationY(a) : _mr.makeRotationZ(a))
+            const a =
+              mount.spin.by === 'distance'
+                ? sim.travel[v] * mount.spin.rate
+                : sim.time * mount.spin.rate * (0.25 + 0.75 * pose[o + 7])
+            _mm.multiply(
+              mount.spin.axis === 0
+                ? _mr.makeRotationX(a)
+                : mount.spin.axis === 1
+                  ? _mr.makeRotationY(a)
+                  : _mr.makeRotationZ(a)
+            )
           }
           _mm.toArray(arr, slot)
         }
@@ -379,13 +456,17 @@ export class Fleet {
       view.mesh.count = view.vehicles.length * mounts.length
       view.mesh.instanceMatrix.needsUpdate = true
       if (statesChanged) {
-        const src = sim.states.array, dst = view.states.array
-        for (let j = 0; j < view.vehicles.length; j++) for (let k = 0; k < mounts.length; k++) dst.set(src.subarray(view.vehicles[j] * 4, view.vehicles[j] * 4 + 4), (j * mounts.length + k) * 4)
+        const src = sim.states.array,
+          dst = view.states.array
+        for (let j = 0; j < view.vehicles.length; j++)
+          for (let k = 0; k < mounts.length; k++)
+            dst.set(src.subarray(view.vehicles[j] * 4, view.vehicles[j] * 4 + 4), (j * mounts.length + k) * 4)
         view.states.attribute.needsUpdate = true
       }
       if (heatChanged) {
         const look = view.look.array as Float32Array
-        for (let j = 0; j < view.vehicles.length; j++) for (let k = 0; k < mounts.length; k++) look[(j * mounts.length + k) * 4 + 3] = sim.heat[view.vehicles[j]]
+        for (let j = 0; j < view.vehicles.length; j++)
+          for (let k = 0; k < mounts.length; k++) look[(j * mounts.length + k) * 4 + 3] = sim.heat[view.vehicles[j]]
         view.look.needsUpdate = true
       }
     }
@@ -394,28 +475,48 @@ export class Fleet {
   }
 
   private vehicleMatrix(v: number, out: Matrix4): Matrix4 {
-    const p = this.sim.pose, o = v * 8
-    return out.compose(_p.set(p[o], p[o + 1], p[o + 2]), _q.setFromEuler(_e.set(p[o + 4], p[o + 3], p[o + 5], 'YXZ')), _s.set(1, 1, 1))
+    const p = this.sim.pose,
+      o = v * 8
+    return out.compose(
+      _p.set(p[o], p[o + 1], p[o + 2]),
+      _q.setFromEuler(_e.set(p[o + 4], p[o + 3], p[o + 5], 'YXZ')),
+      _s.set(1, 1, 1)
+    )
   }
 
   private updateFx(): void {
     const fx = this.fx
     if (!fx) return
-    const sim = this.sim, s = this.settings
+    const sim = this.sim,
+      s = this.settings
     const arr = fx.instanceMatrix.array as Float32Array
     const look = fx.geometry.getAttribute('fxLook') as InstancedBufferAttribute
     const la = look.array as Float32Array
     let n = 0
-    const emit = (px: number, py: number, pz: number, dir: Vector3, radius: number, length: number, color: [number, number, number], intensity: number, seed: number) => {
+    const emit = (
+      px: number,
+      py: number,
+      pz: number,
+      dir: Vector3,
+      radius: number,
+      length: number,
+      color: [number, number, number],
+      intensity: number,
+      seed: number
+    ) => {
       if (n >= fx.instanceMatrix.count || length <= 0.01) return
       _q.setFromUnitVectors(_up, dir)
       _mm.compose(_p.set(px, py, pz), _q, _s.set(radius, length, radius)).toArray(arr, n * 16)
-      la[n * 4] = color[0] * intensity; la[n * 4 + 1] = color[1] * intensity; la[n * 4 + 2] = color[2] * intensity; la[n * 4 + 3] = seed
+      la[n * 4] = color[0] * intensity
+      la[n * 4 + 1] = color[1] * intensity
+      la[n * 4 + 2] = color[2] * intensity
+      la[n * 4 + 3] = seed
       n++
     }
     for (let v = 0; v < sim.count; v++) {
       if (!sim.active[v]) continue
-      const model = sim.models[sim.model[v]], o = v * 8
+      const model = sim.models[sim.model[v]],
+        o = v * 8
       if (s.exhaust && model.exhausts.length) {
         const throttle = sim.pose[o + 7]
         if (throttle > 0.01) {
@@ -424,7 +525,9 @@ export class Fleet {
           for (const ex of model.exhausts) {
             if (ex.stage !== undefined && ex.stage !== active) continue
             _d.set(ex.position[0], ex.position[1], ex.position[2]).applyMatrix4(_mv)
-            const px = _d.x, py = _d.y, pz = _d.z
+            const px = _d.x,
+              py = _d.y,
+              pz = _d.z
             _d.set(ex.direction[0], ex.direction[1], ex.direction[2]).transformDirection(_mv)
             const flicker = model.stages ? 1 : 0.6 + 0.4 * throttle
             let length = ex.length * throttle * flicker
@@ -434,19 +537,54 @@ export class Fleet {
               length = Math.min(length, Math.max(2, alt + ex.radius))
               const spill = (1 - alt / 80) * throttle
               if (ex.stage === 0 && spill > 0) {
-                const h = sim.anchor[v * 4 + 3], c = Math.cos(h), sn = Math.sin(h), a = sim.anchor
-                for (const side of [-1, 1]) emit(a[v * 4], a[v * 4 + 1] + 0.5, a[v * 4 + 2], _d.set(c * side, 0.25, -sn * side).normalize(), ex.radius * 2.5, model.size[1] * 0.5 * spill, rgb('#ffcf8a'), 2, v + side)
+                const h = sim.anchor[v * 4 + 3],
+                  c = Math.cos(h),
+                  sn = Math.sin(h),
+                  a = sim.anchor
+                for (const side of [-1, 1])
+                  emit(
+                    a[v * 4],
+                    a[v * 4 + 1] + 0.5,
+                    a[v * 4 + 2],
+                    _d.set(c * side, 0.25, -sn * side).normalize(),
+                    ex.radius * 2.5,
+                    model.size[1] * 0.5 * spill,
+                    rgb('#ffcf8a'),
+                    2,
+                    v + side
+                  )
               }
               _d.set(ex.direction[0], ex.direction[1], ex.direction[2]).transformDirection(_mv)
             }
-            emit(px, py, pz, _d, ex.radius * (0.8 + 0.2 * throttle), length, rgb(ex.color), model.stages ? 3 : 1.6, v * 0.37)
+            emit(
+              px,
+              py,
+              pz,
+              _d,
+              ex.radius * (0.8 + 0.2 * throttle),
+              length,
+              rgb(ex.color),
+              model.stages ? 3 : 1.6,
+              v * 0.37
+            )
           }
         }
       }
       const heat = sim.heat[v]
       if (s.flames && heat > 0.02) {
-        const h = model.size[1], w = Math.min(model.size[0], model.size[2])
-        emit(sim.pose[o], sim.pose[o + 1] + h * 0.35, sim.pose[o + 2], _d.set(0, 1, 0), Math.min(12, w * 0.45), Math.min(30, h * (0.8 + 1.6 * heat)), FLAME, 1.4 * heat + 0.3, v * 0.71)
+        const h = model.size[1],
+          w = Math.min(model.size[0], model.size[2])
+        emit(
+          sim.pose[o],
+          sim.pose[o + 1] + h * 0.35,
+          sim.pose[o + 2],
+          _d.set(0, 1, 0),
+          Math.min(12, w * 0.45),
+          Math.min(30, h * (0.8 + 1.6 * heat)),
+          FLAME,
+          1.4 * heat + 0.3,
+          v * 0.71
+        )
       }
     }
     fx.count = n
@@ -462,19 +600,26 @@ export class Fleet {
     const look = wakes.geometry.getAttribute('wakeLook') as InstancedBufferAttribute
     const la = look.array as Float32Array
     let n = 0
-    if (this.settings.wakes) for (let v = 0; v < sim.count; v++) {
-      const model = sim.models[sim.model[v]], speed = sim.speed[v]
-      if (!sim.active[v] || !model.wake || speed < 0.5 || n >= wakes.instanceMatrix.count) continue
-      const o = v * 8, yaw = sim.pose[o + 3]
-      const back = model.size[2] * 0.45
-      _q.setFromAxisAngle(_up, yaw)
-      _mm.compose(
-        _p.set(sim.pose[o] - Math.sin(yaw) * back, sim.pose[o + 1] + 0.06, sim.pose[o + 2] - Math.cos(yaw) * back), _q,
-        _s.set(model.size[0] * model.wake * (1.2 + speed * 0.12), 1, (model.size[2] * 0.8 + speed * 6) * model.wake),
-      ).toArray(arr, n * 16)
-      la[n * 4] = Math.min(1, speed / 8); la[n * 4 + 1] = v * 1.3
-      n++
-    }
+    if (this.settings.wakes)
+      for (let v = 0; v < sim.count; v++) {
+        const model = sim.models[sim.model[v]],
+          speed = sim.speed[v]
+        if (!sim.active[v] || !model.wake || speed < 0.5 || n >= wakes.instanceMatrix.count) continue
+        const o = v * 8,
+          yaw = sim.pose[o + 3]
+        const back = model.size[2] * 0.45
+        _q.setFromAxisAngle(_up, yaw)
+        _mm
+          .compose(
+            _p.set(sim.pose[o] - Math.sin(yaw) * back, sim.pose[o + 1] + 0.06, sim.pose[o + 2] - Math.cos(yaw) * back),
+            _q,
+            _s.set(model.size[0] * model.wake * (1.2 + speed * 0.12), 1, (model.size[2] * 0.8 + speed * 6) * model.wake)
+          )
+          .toArray(arr, n * 16)
+        la[n * 4] = Math.min(1, speed / 8)
+        la[n * 4 + 1] = v * 1.3
+        n++
+      }
     wakes.count = n
     wakes.instanceMatrix.needsUpdate = true
     look.needsUpdate = true
@@ -487,7 +632,12 @@ export class Fleet {
       this.object.remove(v.mesh)
     }
     this.views = []
-    for (const m of [this.fx, this.wakes]) if (m) { m.geometry.dispose(); m.dispose(); this.object.remove(m) }
+    for (const m of [this.fx, this.wakes])
+      if (m) {
+        m.geometry.dispose()
+        m.dispose()
+        this.object.remove(m)
+      }
     this.fx = this.wakes = null
   }
 
@@ -529,12 +679,24 @@ export interface VehicleSettings {
 }
 
 /** A {@link VehicleSettings} of one known kind: its parameters are typed from that kind's definitions. */
-export type VehicleSettingsOf<K extends VehicleType> = Omit<VehicleSettings, 'type' | 'params'> & { type: K; params: VehicleParamsOf<K> }
+export type VehicleSettingsOf<K extends VehicleType> = Omit<VehicleSettings, 'type' | 'params'> & {
+  type: K
+  params: VehicleParamsOf<K>
+}
 
 /** Default {@link VehicleSettings}. */
 export const DEFAULT_VEHICLE: VehicleSettings = {
-  type: 'car', seed: 1, params: {}, speed: 0, tint: '', heading: 0, launch: false, period: 90, lights: 0, crumple: 0.12,
-  states: { wetness: 0, snow: 0, burn: 0, damage: 0, heat: 0 },
+  type: 'car',
+  seed: 1,
+  params: {},
+  speed: 0,
+  tint: '',
+  heading: 0,
+  launch: false,
+  period: 90,
+  lights: 0,
+  crumple: 0.12,
+  states: { wetness: 0, snow: 0, burn: 0, damage: 0, heat: 0 }
 }
 
 /**
@@ -569,11 +731,23 @@ export class Vehicle {
     const s = this.settings
     const rocketPad = s.type === 'rocket' && s.launch
     return {
-      seed: s.seed, lights: s.lights, crumple: s.crumple, states: s.states,
-      groups: [{
-        type: s.type, count: 1, params: s.params, variants: 1, tint: s.tint, speed: [s.speed, s.speed],
-        route: rocketPad ? { kind: 'pad', position: [0, 0, 0], heading: s.heading, period: s.period, countdown: 5 } : { kind: 'static', position: [0, 0, 0], heading: s.heading },
-      }],
+      seed: s.seed,
+      lights: s.lights,
+      crumple: s.crumple,
+      states: s.states,
+      groups: [
+        {
+          type: s.type,
+          count: 1,
+          params: s.params,
+          variants: 1,
+          tint: s.tint,
+          speed: [s.speed, s.speed],
+          route: rocketPad
+            ? { kind: 'pad', position: [0, 0, 0], heading: s.heading, period: s.period, countdown: 5 }
+            : { kind: 'static', position: [0, 0, 0], heading: s.heading }
+        }
+      ]
     }
   }
 

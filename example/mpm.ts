@@ -51,13 +51,22 @@ async function sandbox() {
   drop()
 
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000)
-  const c0 = center(), edge = (view.block * DX) / 2
+  const c0 = center(),
+    edge = (view.block * DX) / 2
   camera.position.set(c0[0] + 2.2 * edge, c0[1] + edge, c0[2] + 2.5 * edge)
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.target.set(c0[0], c0[1] - view.dropHeight - edge * 0.3, c0[2])
   controls.enableDamping = true
 
-  const gui = createPanel([{ name: 'threejs-particles', classes: [classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver))] }], { title: 'threejs-particles · MPM' })
+  const gui = createPanel(
+    [
+      {
+        name: 'threejs-particles',
+        classes: [classOf('MPMSolver', mpm, mpm.options, specOptions(panels['threejs-particles'].MPMSolver))]
+      }
+    ],
+    { title: 'threejs-particles · MPM' }
+  )
   const demo = gui.addFolder('demo')
   demo.add(view, 'block', 8, Math.round(Math.cbrt(mpm.capacity)), 1).name('block (particles per edge)')
   demo.add(view, 'dropHeight', 0, 8, 0.1).name('drop height (m)')
@@ -72,10 +81,12 @@ async function sandbox() {
   Object.assign(window, { mpm, world, camera, controls, renderer, scene })
 
   const { stats, measure, hud: status } = jellyStats(mpm, world)
-  let reading = false, lastRead = 0
+  let reading = false,
+    lastRead = 0
   Object.assign(window, { mpmStats: stats })
 
-  let last = performance.now(), fps = 60
+  let last = performance.now(),
+    fps = 60
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.1, (now - last) / 1000)
@@ -85,7 +96,11 @@ async function sandbox() {
     if (view.follow) mpm.center(controls.target.x, controls.target.y, controls.target.z)
     mpm.step(1 / 60) // fixed step: deterministic, and slow motion rather than instability when frames drop
     renderer.render(scene, camera)
-    if (!reading && now - lastRead > 2000) { lastRead = now; reading = true; void measure().finally(() => (reading = false)) }
+    if (!reading && now - lastRead > 2000) {
+      lastRead = now
+      reading = true
+      void measure().finally(() => (reading = false))
+    }
     hud.textContent = status(fps)
   })
 }

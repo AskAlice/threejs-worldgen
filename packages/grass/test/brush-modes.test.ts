@@ -7,7 +7,7 @@ const CASES: { mode: BrushMode; channel: 0 | 1; sign: 1 | -1 }[] = [
   { mode: 'add', channel: 0, sign: 1 },
   { mode: 'erase', channel: 0, sign: -1 },
   { mode: 'raise', channel: 1, sign: 1 },
-  { mode: 'lower', channel: 1, sign: -1 },
+  { mode: 'lower', channel: 1, sign: -1 }
 ]
 
 for (const { mode, channel, sign } of CASES) {

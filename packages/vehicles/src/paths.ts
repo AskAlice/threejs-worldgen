@@ -32,11 +32,22 @@ export function catmullRom(points: readonly (readonly number[])[], closed: boole
   const out: number[] = []
   const segs = closed ? n : n - 1
   for (let i = 0; i < segs; i++) {
-    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+    const p0 = at(i - 1),
+      p1 = at(i),
+      p2 = at(i + 1),
+      p3 = at(i + 2)
     for (let s = 0; s < subdivisions; s++) {
-      const t = s / subdivisions, t2 = t * t, t3 = t2 * t
+      const t = s / subdivisions,
+        t2 = t * t,
+        t3 = t2 * t
       for (let k = 0; k < 3; k++) {
-        out.push(0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3))
+        out.push(
+          0.5 *
+            (2 * p1[k] +
+              (-p0[k] + p2[k]) * t +
+              (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 +
+              (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)
+        )
       }
     }
   }
@@ -67,7 +78,9 @@ export class Path {
     const n = flat.length / 3
     this.distances = new Float64Array(n)
     for (let i = 1; i < n; i++) {
-      this.distances[i] = this.distances[i - 1] + Math.hypot(flat[i * 3] - flat[i * 3 - 3], flat[i * 3 + 1] - flat[i * 3 - 2], flat[i * 3 + 2] - flat[i * 3 - 1])
+      this.distances[i] =
+        this.distances[i - 1] +
+        Math.hypot(flat[i * 3] - flat[i * 3 - 3], flat[i * 3 + 1] - flat[i * 3 - 2], flat[i * 3 + 2] - flat[i * 3 - 1])
     }
     this.length = n ? this.distances[n - 1] : 0
   }
@@ -77,19 +90,27 @@ export class Path {
    * open ones, where the tangent flips on the way back).
    */
   sample(s: number, out: PathSample = createPathSample()): PathSample {
-    const L = this.length, n = this.distances.length
+    const L = this.length,
+      n = this.distances.length
     if (n < 2 || L <= 0) {
-      out.x = this.points[0] ?? 0; out.y = this.points[1] ?? 0; out.z = this.points[2] ?? 0
+      out.x = this.points[0] ?? 0
+      out.y = this.points[1] ?? 0
+      out.z = this.points[2] ?? 0
       return out
     }
-    let d = s, dir = 1
+    let d = s,
+      dir = 1
     if (this.closed) d = ((s % L) + L) % L
     else {
       d = ((s % (2 * L)) + 2 * L) % (2 * L)
-      if (d > L) { d = 2 * L - d; dir = -1 }
+      if (d > L) {
+        d = 2 * L - d
+        dir = -1
+      }
     }
     // Binary search for the segment.
-    let lo = 0, hi = n - 1
+    let lo = 0,
+      hi = n - 1
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1
       if (this.distances[mid] <= d) lo = mid
@@ -98,17 +119,30 @@ export class Path {
     const seg = this.distances[hi] - this.distances[lo] || 1
     const t = (d - this.distances[lo]) / seg
     const p = this.points
-    const ax = p[lo * 3], ay = p[lo * 3 + 1], az = p[lo * 3 + 2]
-    const bx = p[hi * 3], by = p[hi * 3 + 1], bz = p[hi * 3 + 2]
-    out.x = ax + (bx - ax) * t; out.y = ay + (by - ay) * t; out.z = az + (bz - az) * t
+    const ax = p[lo * 3],
+      ay = p[lo * 3 + 1],
+      az = p[lo * 3 + 2]
+    const bx = p[hi * 3],
+      by = p[hi * 3 + 1],
+      bz = p[hi * 3 + 2]
+    out.x = ax + (bx - ax) * t
+    out.y = ay + (by - ay) * t
+    out.z = az + (bz - az) * t
     const len = Math.hypot(bx - ax, by - ay, bz - az) || 1
-    out.tx = ((bx - ax) / len) * dir; out.ty = ((by - ay) / len) * dir; out.tz = ((bz - az) / len) * dir
+    out.tx = ((bx - ax) / len) * dir
+    out.ty = ((by - ay) / len) * dir
+    out.tz = ((bz - az) / len) * dir
     return out
   }
 }
 
 /** A circle of `segments` points (closed path input) around `center` at height `center[1]`. */
-export function circlePoints(center: readonly number[], radius: number, segments = 48, clockwise = false): [number, number, number][] {
+export function circlePoints(
+  center: readonly number[],
+  radius: number,
+  segments = 48,
+  clockwise = false
+): [number, number, number][] {
   const pts: [number, number, number][] = []
   for (let i = 0; i < segments; i++) {
     const a = ((clockwise ? -i : i) / segments) * Math.PI * 2
@@ -123,7 +157,12 @@ export function circlePoints(center: readonly number[], radius: number, segments
  */
 export interface RoadNetwork {
   /** Intersections; `y` may be NaN (then a height function or 0 is used). */
-  readonly nodes: readonly { readonly x: number; readonly y: number; readonly z: number; readonly edges: readonly number[] }[]
+  readonly nodes: readonly {
+    readonly x: number
+    readonly y: number
+    readonly z: number
+    readonly edges: readonly number[]
+  }[]
   /** Straight road segments between nodes. */
   readonly edges: readonly { readonly a: number; readonly b: number; readonly width: number }[]
 }
@@ -191,7 +230,9 @@ export class RoadNavigator {
 
   /** Length of edge `e`, metres. */
   length(e: number): number {
-    const ed = this.roads.edges[e], a = this.roads.nodes[ed.a], b = this.roads.nodes[ed.b]
+    const ed = this.roads.edges[e],
+      a = this.roads.nodes[ed.a],
+      b = this.roads.nodes[ed.b]
     return Math.hypot(b.x - a.x, b.z - a.z)
   }
 
@@ -201,18 +242,21 @@ export class RoadNavigator {
   }
 
   private dir(e: number, from: number, out: Float32Array | number[], o: number): void {
-    const a = this.roads.nodes[from], b = this.roads.nodes[this.other(e, from)]
+    const a = this.roads.nodes[from],
+      b = this.roads.nodes[this.other(e, from)]
     const l = Math.hypot(b.x - a.x, b.z - a.z) || 1
     out[o] = (b.x - a.x) / l
     out[o + 1] = (b.z - a.z) / l
   }
 
   private choose(i: number): void {
-    const e = this.edge[i], at = this.other(e, this.from[i])
+    const e = this.edge[i],
+      at = this.other(e, this.from[i])
     const options = this.roads.nodes[at].edges.filter((x) => x !== e && this.length(x) > 0.5)
     const h = hash4(this.seed, i, this.visits[i]++, 0x7a3)
     this.next[i] = options.length ? options[h % options.length] : e
-    const len = this.length(e), nextLen = this.length(this.next[i])
+    const len = this.length(e),
+      nextLen = this.length(this.next[i])
     this.cornerOut[i] = this.next[i] === e ? 0 : Math.min(this.maxCorner, len / 2.5, nextLen / 2.5)
   }
 
@@ -250,7 +294,10 @@ export class RoadNavigator {
     this.choose(i)
   }
 
-  /** Moves vehicle `i` forward by `ds` metres, turning onto chosen edges at junctions. */  advance(i: number, ds: number): void {
+  /** Moves vehicle `i` forward by `ds` metres, turning onto chosen edges at junctions. */ advance(
+    i: number,
+    ds: number
+  ): void {
     let e = this.edge[i]
     if (e < 0) return
     this.u[i] += ds
@@ -278,21 +325,33 @@ export class RoadNavigator {
     const e = this.edge[i]
     if (e < 0) return out
     const ed = this.roads.edges[e]
-    const a = this.roads.nodes[this.from[i]], bId = this.other(e, this.from[i]), b = this.roads.nodes[bId]
+    const a = this.roads.nodes[this.from[i]],
+      bId = this.other(e, this.from[i]),
+      b = this.roads.nodes[bId]
     const len = this.length(e) || 1
     const u = this.u[i]
-    const dx = (b.x - a.x) / len, dz = (b.z - a.z) / len
-    let x = a.x + dx * u, z = a.z + dz * u, tx = dx, tz = dz
-    const rOut = this.cornerOut[i], rIn = this.cornerIn[i]
+    const dx = (b.x - a.x) / len,
+      dz = (b.z - a.z) / len
+    let x = a.x + dx * u,
+      z = a.z + dz * u,
+      tx = dx,
+      tz = dz
+    const rOut = this.cornerOut[i],
+      rIn = this.cornerIn[i]
     // Quadratic Bézier through the junction: P0 = N − d_in·r, P2 = N + d_out·r.
     const corner = (nx: number, nz: number, ix: number, iz: number, ox: number, oz: number, r: number, t: number) => {
-      const p0x = nx - ix * r, p0z = nz - iz * r, p2x = nx + ox * r, p2z = nz + oz * r
+      const p0x = nx - ix * r,
+        p0z = nz - iz * r,
+        p2x = nx + ox * r,
+        p2z = nz + oz * r
       const m = 1 - t
       x = m * m * p0x + 2 * m * t * nx + t * t * p2x
       z = m * m * p0z + 2 * m * t * nz + t * t * p2z
-      tx = m * ix + t * ox; tz = m * iz + t * oz
+      tx = m * ix + t * ox
+      tz = m * iz + t * oz
       const l = Math.hypot(tx, tz) || 1
-      tx /= l; tz /= l
+      tx /= l
+      tz /= l
     }
     if (rOut > 0 && u > len - rOut) {
       const o = [0, 0]
@@ -305,7 +364,8 @@ export class RoadNavigator {
     // Right of travel direction (tx, tz) with y up is (−tz, tx).
     out.x = x - tz * lane
     out.z = z + tx * lane
-    const ya = this.nodeY(this.from[i]), yb = this.nodeY(bId)
+    const ya = this.nodeY(this.from[i]),
+      yb = this.nodeY(bId)
     out.y = ya + (yb - ya) * Math.max(0, Math.min(1, u / len))
     out.yaw = Math.atan2(tx, tz)
     out.pitch = Math.atan2(yb - ya, len)

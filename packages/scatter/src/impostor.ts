@@ -1,10 +1,48 @@
 import {
-  Box3, Color, LinearFilter, Mesh, MeshStandardNodeMaterial, NodeMaterial, OrthographicCamera, PlaneGeometry, RenderTarget, Scene, Sphere,
-  SRGBColorSpace, Vector3, type BufferGeometry, type Material, type Node, type Object3D, type Renderer, type Texture,
+  Box3,
+  Color,
+  LinearFilter,
+  type Mesh,
+  MeshStandardNodeMaterial,
+  type NodeMaterial,
+  OrthographicCamera,
+  PlaneGeometry,
+  RenderTarget,
+  Scene,
+  Sphere,
+  SRGBColorSpace,
+  Vector3,
+  type BufferGeometry,
+  type Material,
+  type Node,
+  type Object3D,
+  type Renderer,
+  type Texture
 } from 'three/webgpu'
 import {
-  abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, diffuseColor, float, max, normalize, normalWorld, positionGeometry,
-  round, select, sin, step, texture, uv, varying, vec2, vec3, vec4,
+  abs,
+  attribute,
+  cameraPosition,
+  cameraViewMatrix,
+  clamp,
+  cos,
+  cross,
+  diffuseColor,
+  float,
+  max,
+  normalize,
+  normalWorld,
+  positionGeometry,
+  round,
+  select,
+  sin,
+  step,
+  texture,
+  uv,
+  varying,
+  vec2,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { frameDirection } from './octahedral.ts'
 
@@ -72,7 +110,13 @@ export interface ImpostorSurface {
 }
 
 /** Defaults of {@link ImpostorOptions}. */
-export const DEFAULT_IMPOSTOR: ImpostorOptions = { mode: 'octahedral', frames: 8, size: 1024, hemisphere: true, alphaTest: 0.5 }
+export const DEFAULT_IMPOSTOR: ImpostorOptions = {
+  mode: 'octahedral',
+  frames: 8,
+  size: 1024,
+  hemisphere: true,
+  alphaTest: 0.5
+}
 
 /**
  * Renders `object` from many directions into a texture atlas and returns a material + quad that draw it as a
@@ -90,7 +134,10 @@ export const DEFAULT_IMPOSTOR: ImpostorOptions = { mode: 'octahedral', frames: 8
  *   `surface.mask`, e.g. which pixels are foliage, so a re-shaded impostor can treat them differently.
  */
 export async function bakeImpostor(
-  renderer: Renderer, object: Object3D, options: Partial<ImpostorOptions> = {}, mask?: (source: Material) => Node<'float'> | number,
+  renderer: Renderer,
+  object: Object3D,
+  options: Partial<ImpostorOptions> = {},
+  mask?: (source: Material) => Node<'float'> | number
 ): Promise<Impostor> {
   const o: ImpostorOptions = { ...DEFAULT_IMPOSTOR, ...options }
   const billboard = o.mode === 'billboard'
@@ -114,7 +161,12 @@ export async function bakeImpostor(
   const camera = new OrthographicCamera(-R, R, R, -R, R * 0.5, R * 3.5)
 
   const makeTarget = (srgb: boolean) => {
-    const rt = new RenderTarget(o.size, o.size, { depthBuffer: true, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter })
+    const rt = new RenderTarget(o.size, o.size, {
+      depthBuffer: true,
+      generateMipmaps: false,
+      minFilter: LinearFilter,
+      magFilter: LinearFilter
+    })
     if (srgb) rt.texture.colorSpace = SRGBColorSpace
     return rt
   }
@@ -125,7 +177,7 @@ export async function bakeImpostor(
     target: renderer.getRenderTarget(),
     autoClear: renderer.autoClear,
     clearColor: renderer.getClearColor(new Color()),
-    clearAlpha: renderer.getClearAlpha(),
+    clearAlpha: renderer.getClearAlpha()
   }
   // One bake material per source material and pass, shared by every mesh that uses it.
   const baked = new Map<string, Material>()
@@ -137,7 +189,7 @@ export async function bakeImpostor(
   }
   const passes: [RenderTarget, (m: Material) => Material][] = [
     [albedoTarget, convertFor('albedo')],
-    [normalTarget, convertFor('normal')],
+    [normalTarget, convertFor('normal')]
   ]
   try {
     for (const [target, convert] of passes) {
@@ -182,7 +234,12 @@ export async function bakeImpostor(
   const geometry = new PlaneGeometry(2, 2)
   // Explicit bounds: the material moves and scales the quad per instance.
   geometry.boundingSphere = new Sphere(new Vector3(), Math.SQRT2)
-  const { material, surface } = createImpostorMaterial(albedoTarget.texture, normalTarget.texture, { ...o, frames }, bounds)
+  const { material, surface } = createImpostorMaterial(
+    albedoTarget.texture,
+    normalTarget.texture,
+    { ...o, frames },
+    bounds
+  )
   // The atlases are only reachable through shader nodes, so the material owns them: disposing it frees them too
   // (this is what `disposeLayers` relies on).
   const disposeMaterial = material.dispose.bind(material)
@@ -202,7 +259,7 @@ export async function bakeImpostor(
     dispose() {
       material.dispose()
       geometry.dispose()
-    },
+    }
   }
 }
 
@@ -215,14 +272,18 @@ function bakeMaterial(source: Material, pass: 'albedo' | 'normal', mask: Node<'f
     // Classic materials: approximate with a node material carrying the common colour/alpha properties.
     const s = source as any
     const m = new MeshStandardNodeMaterial()
-    for (const k of ['color', 'map', 'alphaMap', 'alphaTest', 'vertexColors', 'side', 'opacity', 'roughness']) if (s[k] !== undefined) (m as any)[k] = s[k]
+    for (const k of ['color', 'map', 'alphaMap', 'alphaTest', 'vertexColors', 'side', 'opacity', 'roughness'])
+      if (s[k] !== undefined) (m as any)[k] = s[k]
     return bakeMaterial(m, pass, mask)
   }
   const m = (source as NodeMaterial).clone()
   m.transparent = false
   m.depthWrite = true
   if (m.alphaTest <= 0 && (source as NodeMaterial).transparent) m.alphaTest = 0.5
-  m.outputNode = pass === 'albedo' ? vec4(diffuseColor.rgb, 1) : vec4(octEncodeNode(normalize(normalWorld), false), roughnessOf(m), mask)
+  m.outputNode =
+    pass === 'albedo'
+      ? vec4(diffuseColor.rgb, 1)
+      : vec4(octEncodeNode(normalize(normalWorld), false), roughnessOf(m), mask)
   return m
 }
 
@@ -243,7 +304,9 @@ function octEncodeNode(d: any, hemisphere: boolean): any {
     return vec2(p.x.add(p.y), p.x.sub(p.y)).add(1).mul(0.5)
   }
   const p = vec2(d.x, d.z).div(abs(d.x).add(abs(d.y)).add(abs(d.z)).max(1e-5))
-  const folded = float(1).sub(abs(vec2(p.y, p.x))).mul(signNotZero(p))
+  const folded = float(1)
+    .sub(abs(vec2(p.y, p.x)))
+    .mul(signNotZero(p))
   return select(d.y.lessThan(0), folded, p).add(1).mul(0.5)
 }
 
@@ -256,7 +319,9 @@ function octDecodeNode(uvIn: any, hemisphere: boolean): any {
   }
   const p = uvIn.mul(2).sub(1)
   const y = float(1).sub(abs(p.x)).sub(abs(p.y))
-  const folded = float(1).sub(abs(vec2(p.y, p.x))).mul(signNotZero(p))
+  const folded = float(1)
+    .sub(abs(vec2(p.y, p.x)))
+    .mul(signNotZero(p))
   const q = select(y.lessThan(0), folded, p)
   return normalize(vec3(q.x, y, q.y))
 }
@@ -299,7 +364,9 @@ function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOp
 
   const material = new MeshStandardNodeMaterial({ roughness: 0.85, metalness: 0 })
   material.alphaTest = o.alphaTest
-  material.positionNode = center.add(view.right.mul(positionGeometry.x).add(view.up.mul(positionGeometry.y)).mul(bounds.radius).mul(aPos.w))
+  material.positionNode = center.add(
+    view.right.mul(positionGeometry.x).add(view.up.mul(positionGeometry.y)).mul(bounds.radius).mul(aPos.w)
+  )
 
   const inset = 0.5 / Math.max(1, o.size / N)
   const atlasUv = vCell.add(clamp(uv() as any, inset, 1 - inset)).div(N)
@@ -309,7 +376,13 @@ function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOp
   // normal of the surface pixel the chosen view shows. It is the same normal at every view, so lighting and the
   // weather states driven by it (snow on upward faces) do not shift as the camera moves.
   const n: any = rot(octDecodeNode(normalSample.rg, false))
-  const surface: ImpostorSurface = { color: sample.rgb.mul(vTint), alpha: sample.a, normal: n, roughness: normalSample.b, mask: normalSample.a }
+  const surface: ImpostorSurface = {
+    color: sample.rgb.mul(vTint),
+    alpha: sample.a,
+    normal: n,
+    roughness: normalSample.b,
+    mask: normalSample.a
+  }
   material.colorNode = vec4(surface.color, surface.alpha)
   material.normalNode = cameraViewMatrix.mul(vec4(n, 0)).xyz.normalize()
   material.roughnessNode = surface.roughness

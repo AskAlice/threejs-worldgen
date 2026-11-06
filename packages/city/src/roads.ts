@@ -81,11 +81,22 @@ export const DEFAULT_ROADS: RoadOptions = {
   extent: 1.3,
   rural: { primary: 'asphalt', secondary: 'gravel', minor: 'dirt' },
   unpavedWidth: 0.7,
-  traffic: { primary: { lanes: 2, speed: 16.7 }, secondary: { lanes: 1, speed: 13.9 }, minor: { lanes: 1, speed: 8.3 } },
-  surfaceSpeed: { asphalt: 1, cobblestone: 0.6, gravel: 0.7, dirt: 0.5 },
+  traffic: {
+    primary: { lanes: 2, speed: 16.7 },
+    secondary: { lanes: 1, speed: 13.9 },
+    minor: { lanes: 1, speed: 8.3 }
+  },
+  surfaceSpeed: { asphalt: 1, cobblestone: 0.6, gravel: 0.7, dirt: 0.5 }
 }
 
-interface Proposal { from: number; dx: number; dz: number; type: RoadType; run: number; t: number }
+interface Proposal {
+  from: number
+  dx: number
+  dz: number
+  type: RoadType
+  run: number
+  t: number
+}
 
 /** Everything road growth needs about the place. */
 export interface RoadContext {
@@ -113,7 +124,12 @@ const DEG = Math.PI / 180
  * True if a road leaving a junction along (ux, uz) meets every road direction in `dirs` at least
  * `minAngle` apart. Directions need not be unit length: only the angles between them count.
  */
-export function junctionClears(dirs: readonly (readonly [number, number])[], ux: number, uz: number, minAngle: number): boolean {
+export function junctionClears(
+  dirs: readonly (readonly [number, number])[],
+  ux: number,
+  uz: number,
+  minAngle: number
+): boolean {
   const u = Math.hypot(ux, uz) || 1
   const minCos = Math.cos(minAngle * DEG)
   for (const [vx, vz] of dirs) {
@@ -135,15 +151,24 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
   const rand = mulberry32(ctx.seed ^ 0x51ed)
   const proposals: Proposal[] = []
   const queue = new MinHeap()
-  const push = (p: Proposal) => { proposals.push(p); queue.push(proposals.length - 1, p.t) }
+  const push = (p: Proposal) => {
+    proposals.push(p)
+    queue.push(proposals.length - 1, p.t)
+  }
   const cls = (t: RoadType) => o[t]
   const dir: [number, number] = [0, 0]
 
   // Arterials leave the centre along the field's major and minor directions.
   const centre = graph.addNode(cx, cz)
   const t0 = field.angle(cx, cz)
-  const starts: [number, number][] = [[Math.cos(t0), Math.sin(t0)], [-Math.cos(t0), -Math.sin(t0)], [-Math.sin(t0), Math.cos(t0)], [Math.sin(t0), -Math.cos(t0)]]
-  for (let i = 0; i < Math.max(1, Math.min(4, ctx.arms)); i++) push({ from: centre, dx: starts[i][0], dz: starts[i][1], type: 'primary', run: 0, t: 0 })
+  const starts: [number, number][] = [
+    [Math.cos(t0), Math.sin(t0)],
+    [-Math.cos(t0), -Math.sin(t0)],
+    [-Math.sin(t0), Math.cos(t0)],
+    [Math.sin(t0), -Math.cos(t0)]
+  ]
+  for (let i = 0; i < Math.max(1, Math.min(4, ctx.arms)); i++)
+    push({ from: centre, dx: starts[i][0], dz: starts[i][1], type: 'primary', run: 0, t: 0 })
 
   const reach = (type: RoadType, x: number, z: number) => {
     const d = Math.hypot(x - cx, z - cz)
@@ -153,11 +178,22 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
   }
 
   // Local constraints for one step a→b. Returns null if the step must be pruned.
-  const water = (ax: number, az: number, ux: number, uz: number, length: number, type: RoadType): { length: number; bridge: boolean } | null => {
+  const water = (
+    ax: number,
+    az: number,
+    ux: number,
+    uz: number,
+    length: number,
+    type: RoadType
+  ): { length: number; bridge: boolean } | null => {
     const step = site.cell * 0.5
     const n = Math.max(2, Math.ceil(length / step))
     let wetAt = -1
-    for (let i = 1; i <= n; i++) if (site.wet(ax + (ux * length * i) / n, az + (uz * length * i) / n)) { wetAt = (length * i) / n; break }
+    for (let i = 1; i <= n; i++)
+      if (site.wet(ax + (ux * length * i) / n, az + (uz * length * i) / n)) {
+        wetAt = (length * i) / n
+        break
+      }
     if (wetAt < 0) return { length, bridge: false }
     if (type === 'minor' || o.maxBridge <= 0) return null
     // Bridge: march across to the far bank (two dry samples in a row).
@@ -171,7 +207,9 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
 
   const gradeOk = (ax: number, az: number, bx: number, bz: number) => {
     const l = Math.hypot(bx - ax, bz - az) / 2 || 1
-    const ha = site.height(ax, az), hm = site.height((ax + bx) / 2, (az + bz) / 2), hb = site.height(bx, bz)
+    const ha = site.height(ax, az),
+      hm = site.height((ax + bx) / 2, (az + bz) / 2),
+      hb = site.height(bx, bz)
     return Math.max(Math.abs(hm - ha), Math.abs(hb - hm)) / l <= o.maxGrade
   }
 
@@ -187,18 +225,26 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
     return junctionClears(dirs, ux, uz, o.minAngle)
   }
 
-  interface Step { end: number; stop: boolean; through: boolean; ux: number; uz: number }
+  interface Step {
+    end: number
+    stop: boolean
+    through: boolean
+    ux: number
+    uz: number
+  }
 
   // Tries one step from `from` towards (ux, uz) with step length L; commits it and returns the result.
   const attempt = (from: number, ux: number, uz: number, L: number, type: RoadType): Step | null => {
     const a = graph.nodes[from]
     const c = cls(type)
-    let bx = a.x + ux * L, bz = a.z + uz * L
+    let bx = a.x + ux * L,
+      bz = a.z + uz * L
     if (!reach(type, bx, bz) || !site.contains(bx, bz)) return null
     const w = water(a.x, a.z, ux, uz, L, type)
     if (!w) return null
     if (w.bridge) {
-      bx = a.x + ux * w.length; bz = a.z + uz * w.length
+      bx = a.x + ux * w.length
+      bz = a.z + uz * w.length
       if (!site.contains(bx, bz)) return null
     } else if (!gradeOk(a.x, a.z, bx, bz)) return null
 
@@ -219,13 +265,17 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
       for (const n of [edge.a, edge.b]) {
         const node = graph.nodes[n]
         if (Math.hypot(node.x - hit.x, node.z - hit.z) < o.snapRadius * 0.6 && !notMine(n)) {
-          const vx = node.x - a.x, vz = node.z - a.z
-          if (graph.crosses(a.x, a.z, node.x, node.z, from, n) || !angleOk(from, vx, vz) || !angleOk(n, -vx, -vz)) return null
+          const vx = node.x - a.x,
+            vz = node.z - a.z
+          if (graph.crosses(a.x, a.z, node.x, node.z, from, n) || !angleOk(from, vx, vz) || !angleOk(n, -vx, -vz))
+            return null
           return commit(n, true, true)
         }
       }
-      const ex = graph.nodes[edge.b].x - graph.nodes[edge.a].x, ez = graph.nodes[edge.b].z - graph.nodes[edge.a].z
-      const vx = hit.x - a.x, vz = hit.z - a.z
+      const ex = graph.nodes[edge.b].x - graph.nodes[edge.a].x,
+        ez = graph.nodes[edge.b].z - graph.nodes[edge.a].z
+      const vx = hit.x - a.x,
+        vz = hit.z - a.z
       if (graph.crosses(a.x, a.z, hit.x, hit.z, from, -1, hit.edge) || !angleOk(from, vx, vz)) return null
       // The new road must meet the crossed one at a decent angle (both of its directions at the split point).
       if (Math.abs((vx * ex + vz * ez) / ((Math.hypot(vx, vz) || 1) * (Math.hypot(ex, ez) || 1))) >= minCos) return null
@@ -236,21 +286,38 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
     const near = graph.nearestNode(bx, bz, o.snapRadius, notMine)
     if (near >= 0) {
       const node = graph.nodes[near]
-      const vx = node.x - a.x, vz = node.z - a.z
-      if (!w.bridge && !graph.crosses(a.x, a.z, node.x, node.z, from, near) && angleOk(from, vx, vz) && angleOk(near, -vx, -vz)) return commit(near, true, false)
+      const vx = node.x - a.x,
+        vz = node.z - a.z
+      if (
+        !w.bridge &&
+        !graph.crosses(a.x, a.z, node.x, node.z, from, near) &&
+        angleOk(from, vx, vz) &&
+        angleOk(near, -vx, -vz)
+      )
+        return commit(near, true, false)
       if (!w.bridge) return null
     }
 
     // 3. Ending near a road: join it with a T junction.
-    const side = w.bridge ? null : graph.nearestEdge(bx, bz, o.snapRadius, (id) => graph.edges[id].a === from || graph.edges[id].b === from)
+    const side = w.bridge
+      ? null
+      : graph.nearestEdge(bx, bz, o.snapRadius, (id) => graph.edges[id].a === from || graph.edges[id].b === from)
     if (side) {
       const edge = graph.edges[side.edge]
-      const ex = graph.nodes[edge.b].x - graph.nodes[edge.a].x, ez = graph.nodes[edge.b].z - graph.nodes[edge.a].z
-      const vx = side.x - a.x, vz = side.z - a.z
+      const ex = graph.nodes[edge.b].x - graph.nodes[edge.a].x,
+        ez = graph.nodes[edge.b].z - graph.nodes[edge.a].z
+      const vx = side.x - a.x,
+        vz = side.z - a.z
       const l = Math.hypot(vx, vz)
       const el = Math.hypot(ex, ez) || 1
-      if (l > 1 && side.u > 0.02 && side.u < 0.98 && Math.abs((vx * ex + vz * ez) / (l * el)) < minCos
-        && !graph.crosses(a.x, a.z, side.x, side.z, from, -1, side.edge) && angleOk(from, vx, vz)) {
+      if (
+        l > 1 &&
+        side.u > 0.02 &&
+        side.u < 0.98 &&
+        Math.abs((vx * ex + vz * ez) / (l * el)) < minCos &&
+        !graph.crosses(a.x, a.z, side.x, side.z, from, -1, side.edge) &&
+        angleOk(from, vx, vz)
+      ) {
         return commit(-1, true, false, side.edge, side.x, side.z)
       }
       return null
@@ -261,7 +328,11 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
     return commit(graph.addNode(bx, bz), false, false)
   }
 
-  const turns: Record<RoadType, number[]> = { primary: [0, 12, -12, 25, -25, 40, -40], secondary: [0, 15, -15, 30, -30], minor: [0, 12, -12] }
+  const turns: Record<RoadType, number[]> = {
+    primary: [0, 12, -12, 25, -25, 40, -40],
+    secondary: [0, 15, -15, 30, -30],
+    minor: [0, 12, -12]
+  }
   let steps = 0
   while (queue.size && steps < o.maxSegments) {
     const p = proposals[queue.pop()]
@@ -272,10 +343,12 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
     const L = c.segment * (0.85 + 0.3 * rand())
     // Follow the field (midpoint method), so roads trace its streamlines.
     field.align(a.x + p.dx * L * 0.5, a.z + p.dz * L * 0.5, p.dx, p.dz, dir)
-    const fx = dir[0], fz = dir[1]
+    const fx = dir[0],
+      fz = dir[1]
     let result: Step | null = null
     for (const turn of turns[p.type]) {
-      const cs = Math.cos(turn * DEG), sn = Math.sin(turn * DEG)
+      const cs = Math.cos(turn * DEG),
+        sn = Math.sin(turn * DEG)
       result = attempt(p.from, fx * cs - fz * sn, fx * sn + fz * cs, L, p.type)
       if (result) break
     }
@@ -283,15 +356,17 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
     const end = graph.nodes[result.end]
     if (result.stop) {
       // Ran into another road: maybe carry on through the junction.
-      if (result.through && rand() < c.through) push({ from: result.end, dx: result.ux, dz: result.uz, type: p.type, run: p.run, t: p.t + 1 })
+      if (result.through && rand() < c.through)
+        push({ from: result.end, dx: result.ux, dz: result.uz, type: p.type, run: p.run, t: p.t + 1 })
       continue
     }
     push({ from: result.end, dx: result.ux, dz: result.uz, type: p.type, run: p.run + L, t: p.t + 1 })
 
     // Global goals: side roads at regular spacing.
-    const spacing = p.type === 'minor' || (p.type === 'secondary' && districts.style(end.x, end.z).blockSize > 0)
-      ? districts.style(end.x, end.z).blockSize
-      : c.branchSpacing
+    const spacing =
+      p.type === 'minor' || (p.type === 'secondary' && districts.style(end.x, end.z).blockSize > 0)
+        ? districts.style(end.x, end.z).blockSize
+        : c.branchSpacing
     const run = p.run + L
     if (spacing <= 0 || run < spacing * (0.85 + 0.3 * rand())) continue
     proposals[proposals.length - 1].run = 0
@@ -312,10 +387,17 @@ export function* growRoads(ctx: RoadContext, options: RoadOptions): Generator<vo
  * runs through farmland (whichever is rougher), cobblestones for the side streets of an old-town
  * core. Unpaved and rural roads lose their sidewalks (no kerbs) and get narrower.
  */
-export function assignSurfaces(graph: RoadGraph, districts: DistrictMap, urban: Record<RoadType, RoadSurface>, oldTown: RoadSurface | null, o: RoadOptions): void {
+export function assignSurfaces(
+  graph: RoadGraph,
+  districts: DistrictMap,
+  urban: Record<RoadType, RoadSurface>,
+  oldTown: RoadSurface | null,
+  o: RoadOptions
+): void {
   const rank = (s: RoadSurface) => ROAD_SURFACES.indexOf(s)
   for (const e of graph.edges) {
-    const a = graph.nodes[e.a], b = graph.nodes[e.b]
+    const a = graph.nodes[e.a],
+      b = graph.nodes[e.b]
     const d = districts.at((a.x + b.x) / 2, (a.z + b.z) / 2)
     let s = urban[e.type]
     if (d === 'farmland' && rank(o.rural[e.type]) > rank(s)) s = o.rural[e.type]

@@ -1,4 +1,15 @@
-import { cellArea, cellToBoundary, cellToChildren, cellToLatLng, cellToParent, getHexagonEdgeLengthAvg, getResolution, gridDisk, h3IndexToSplitLong, latLngToCell } from 'h3-js'
+import {
+  cellArea,
+  cellToBoundary,
+  cellToChildren,
+  cellToLatLng,
+  cellToParent,
+  getHexagonEdgeLengthAvg,
+  getResolution,
+  gridDisk,
+  h3IndexToSplitLong,
+  latLngToCell
+} from 'h3-js'
 import type { LocalFrame, Vec3, World } from 'threejs-biomes'
 
 /** H3's Earth radius (authalic), metres. Published H3 cell sizes are for a sphere this big. */
@@ -76,10 +87,14 @@ export class HexGrid {
 
   /** The resolution (0…15) whose average edge length is closest (in ratio) to `metres` on this world. */
   resolutionFor(metres: number): number {
-    let best = 0, bestErr = Infinity
+    let best = 0,
+      bestErr = Infinity
     for (let r = 0; r <= 15; r++) {
       const err = Math.abs(Math.log(this.edgeLength(r) / metres))
-      if (err < bestErr) { bestErr = err; best = r }
+      if (err < bestErr) {
+        bestErr = err
+        best = r
+      }
     }
     return best
   }
@@ -96,26 +111,44 @@ export class HexGrid {
   /** Base-surface world position of a latitude/longitude in degrees (on the sphere, or `[x, 0, z]`). */
   fromLatLng(lat: number, lng: number, out: Vec3 = [0, 0, 0]): Vec3 {
     if (this.sphere) {
-      const R = this.world.options.radius, la = lat * RAD, lo = lng * RAD
-      out[0] = Math.cos(la) * Math.sin(lo) * R; out[1] = Math.sin(la) * R; out[2] = Math.cos(la) * Math.cos(lo) * R
+      const R = this.world.options.radius,
+        la = lat * RAD,
+        lo = lng * RAD
+      out[0] = Math.cos(la) * Math.sin(lo) * R
+      out[1] = Math.sin(la) * R
+      out[2] = Math.cos(la) * Math.cos(lo) * R
       return out
     }
     let dl = lng - PLANE_ANCHOR[1]
     dl -= Math.round(dl / 360) * 360
-    out[0] = dl * RAD * H3_EARTH_RADIUS; out[1] = 0; out[2] = -(lat - PLANE_ANCHOR[0]) * RAD * H3_EARTH_RADIUS
+    out[0] = dl * RAD * H3_EARTH_RADIUS
+    out[1] = 0
+    out[2] = -(lat - PLANE_ANCHOR[0]) * RAD * H3_EARTH_RADIUS
     return out
   }
 
   /** Local `[x, z]` of a base-surface world position (NaN on the far side of a planet). */
   toLocal(p: Vec3, out: [number, number] = [0, 0]): [number, number] {
-    if (!this.sphere) { out[0] = p[0]; out[1] = p[2]; return out }
-    const f = this.frame, u = f.up, R = this.world.options.radius
+    if (!this.sphere) {
+      out[0] = p[0]
+      out[1] = p[2]
+      return out
+    }
+    const f = this.frame,
+      u = f.up,
+      R = this.world.options.radius
     const len = Math.hypot(p[0], p[1], p[2]) || 1
     const cos = (p[0] * u[0] + p[1] * u[1] + p[2] * u[2]) / len
-    if (cos <= 1e-6) { out[0] = NaN; out[1] = NaN; return out }
+    if (cos <= 1e-6) {
+      out[0] = NaN
+      out[1] = NaN
+      return out
+    }
     // Gnomonic: scale the direction onto the frame's tangent plane (inverse of `frame.basePoint`).
     const t = R / (cos * len)
-    const qx = p[0] * t - f.origin[0], qy = p[1] * t - f.origin[1], qz = p[2] * t - f.origin[2]
+    const qx = p[0] * t - f.origin[0],
+      qy = p[1] * t - f.origin[1],
+      qz = p[2] * t - f.origin[2]
     out[0] = qx * f.east[0] + qy * f.east[1] + qz * f.east[2]
     out[1] = -(qx * f.north[0] + qy * f.north[1] + qz * f.north[2])
     return out
@@ -123,10 +156,17 @@ export class HexGrid {
 
   /** Base-surface world position under local `[x, z]` (on the sphere, or `[x, 0, z]`). */
   fromLocal(x: number, z: number, out: Vec3 = [0, 0, 0]): Vec3 {
-    if (!this.sphere) { out[0] = x; out[1] = 0; out[2] = z; return out }
+    if (!this.sphere) {
+      out[0] = x
+      out[1] = 0
+      out[2] = z
+      return out
+    }
     const p = this.frame.basePoint(x, z, out)
     const k = this.world.options.radius / (Math.hypot(p[0], p[1], p[2]) || 1)
-    out[0] *= k; out[1] *= k; out[2] *= k
+    out[0] *= k
+    out[1] *= k
+    out[2] *= k
     return out
   }
 
@@ -164,7 +204,8 @@ export class HexGrid {
     const b = this.boundaryLocal(cell)
     let a = 0
     for (let i = 0; i < b.length; i++) {
-      const [x0, z0] = b[i], [x1, z1] = b[(i + 1) % b.length]
+      const [x0, z0] = b[i],
+        [x1, z1] = b[(i + 1) % b.length]
       a += x0 * z1 - x1 * z0
     }
     return Math.abs(a) / 2

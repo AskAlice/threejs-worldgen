@@ -1,8 +1,57 @@
-import { Color, DataTexture, DoubleSide, MeshPhysicalNodeMaterial, Vector2, Vector3, Vector4, type Node } from 'three/webgpu'
 import {
-  Discard, Fn, Loop, abs, atan, attribute, cameraPosition, clamp, color, cos, dot, faceDirection, float, floor, fract, hash, int, length, max, min, mix, sign,
-  modelWorldMatrix, mx_noise_float, normalize, positionGeometry, positionWorld, pow, sin, smoothstep, sqrt, step,
-  texture, time, transformNormalToView, uniform, uniformArray, uv, varying, varyingProperty, vec2, vec3, vec4,
+  Color,
+  DataTexture,
+  DoubleSide,
+  MeshPhysicalNodeMaterial,
+  Vector2,
+  Vector3,
+  Vector4,
+  type Node
+} from 'three/webgpu'
+import {
+  Discard,
+  Fn,
+  Loop,
+  abs,
+  atan,
+  attribute,
+  cameraPosition,
+  clamp,
+  color,
+  cos,
+  dot,
+  faceDirection,
+  float,
+  floor,
+  fract,
+  hash,
+  int,
+  length,
+  max,
+  min,
+  mix,
+  sign,
+  modelWorldMatrix,
+  mx_noise_float,
+  normalize,
+  positionGeometry,
+  positionWorld,
+  pow,
+  sin,
+  smoothstep,
+  sqrt,
+  step,
+  texture,
+  time,
+  transformNormalToView,
+  uniform,
+  uniformArray,
+  uv,
+  varying,
+  varyingProperty,
+  vec2,
+  vec3,
+  vec4
 } from 'three/tsl'
 
 /** Maximum number of simultaneous {@link Interactor}s. Extra ones are ignored. */
@@ -66,9 +115,12 @@ export function createGrassUniforms() {
     /** Global multiplier on interactor push. */
     interactionStrength: uniform(1),
     /** xyz = world position, w = radius (0 = unused slot). */
-    interactors: uniformArray(Array.from({ length: MAX_INTERACTORS }, () => new Vector4()), 'vec4'),
+    interactors: uniformArray(
+      Array.from({ length: MAX_INTERACTORS }, () => new Vector4()),
+      'vec4'
+    ),
     /** Number of active entries in `interactors`. */
-    interactorCount: uniform(0, 'int'),
+    interactorCount: uniform(0, 'int')
   }
 }
 
@@ -111,11 +163,15 @@ export function windGust(u: WindUniforms, xz: Node<'vec2'>) {
   const ripple = sin(dot(xz, u.windDirection).mul(u.windScale.mul(9)).sub(time.mul(u.windSpeed).mul(5)))
   const gust = clamp(smoothstep(-0.25, 0.7, gustNoise).mul(0.8).add(ripple.mul(0.2)).add(0.1), 0, 1)
   const across = vec2(u.windDirection.y.negate(), u.windDirection.x)
-  const swirl = across.mul(sin(dot(xz, across).mul(u.windScale.mul(6)).add(time.mul(u.windSpeed).mul(1.7)).add(gustNoise.mul(3))).mul(0.25).mul(gust))
+  const swirl = across.mul(
+    sin(dot(xz, across).mul(u.windScale.mul(6)).add(time.mul(u.windSpeed).mul(1.7)).add(gustNoise.mul(3)))
+      .mul(0.25)
+      .mul(gust)
+  )
   return { gust, swirl }
 }
 
-const LOD_COLORS =[new Color('#ff4d4d'), new Color('#ffd23f'), new Color('#4dd96b'), new Color('#4da6ff')]
+const LOD_COLORS = [new Color('#ff4d4d'), new Color('#ffd23f'), new Color('#4dd96b'), new Color('#4da6ff')]
 
 /**
  * One material, two shapes:
@@ -143,7 +199,11 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
   // so thinning happens blade-by-blade instead of popping at tile boundaries.
   const d = u.lodDistances
   const k = u.lodDensities
-  const seg = (a: any, b: any) => dist.sub(a).div(max(b.sub(a), 1e-3)).clamp(0, 1)
+  const seg = (a: any, b: any) =>
+    dist
+      .sub(a)
+      .div(max(b.sub(a), 1e-3))
+      .clamp(0, 1)
   const density = mix(mix(mix(k.x, k.y, seg(d.x, d.y)), k.z, seg(d.y, d.z)), k.w, seg(d.z, d.w))
   const thin = float(1).sub(smoothstep(density.mul(0.75), density, aParams.z))
   const widthCompensation = density.max(0.02).sqrt().reciprocal() // fewer blades → wider blades, same coverage
@@ -192,14 +252,18 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
   const flowAngle = aPatch.z.mul(1.6)
   const flowDir = vec2(
     u.windDirection.x.mul(cos(flowAngle)).sub(u.windDirection.y.mul(sin(flowAngle))),
-    u.windDirection.x.mul(sin(flowAngle)).add(u.windDirection.y.mul(cos(flowAngle))),
+    u.windDirection.x.mul(sin(flowAngle)).add(u.windDirection.y.mul(cos(flowAngle)))
   )
   const comb = clamp(u.windStrength.mul(0.6).add(0.35), 0, 0.85)
   const droopDir = normalize(mix(facing, flowDir, comb))
   const droop = droopDir.mul(u.curvature.mul(r.mul(r).mul(1.5).add(0.25))) // most blades stand, a few flop over
   const flutterRate = fract(seed.mul(13.1)).mul(2.5).add(2.5)
   const flutter = sin(time.mul(flutterRate).add(seed.mul(40))).mul(gust.mul(0.1).add(0.05))
-  const wind = u.windDirection.mul(gust.add(0.15).add(flutter)).add(swirl).add(facing.mul(flutter.mul(0.5))).mul(u.windStrength)
+  const wind = u.windDirection
+    .mul(gust.add(0.15).add(flutter))
+    .add(swirl)
+    .add(facing.mul(flutter.mul(0.5)))
+    .mul(u.windStrength)
   const bendVec = Fn(() => droop.add(wind.div(u.stiffness)).add(interaction().mul(2.2)))()
 
   // Wind, bending and the blade frame are computed once per vertex inside `position` and handed to
@@ -223,7 +287,10 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
     // Folded blade: the midrib (uv.x = 0.5) sits behind the edges, giving a V cross-section.
     const midrib = float(1).sub(abs(uv().x.mul(2).sub(1)))
     const fold = billboard ? vec2(0) : facingT.mul(midrib.mul(width).mul(-0.22))
-    const xz = sideT.mul(positionGeometry.x.mul(width)).add(fold).add(offset.mul(t.mul(t).mul(height)))
+    const xz = sideT
+      .mul(positionGeometry.x.mul(width))
+      .add(fold)
+      .add(offset.mul(t.mul(t).mul(height)))
     const y = t.mul(height).mul(sqrt(float(1).sub(amount.mul(amount))))
     return aOffset.xyz.add(vec3(xz.x, y, xz.y))
   })
@@ -254,14 +321,21 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
       const strands = 17
       const sx = uv().x.mul(strands)
       const id = floor(sx)
-      const strandHeight = hash(id.add(seed.mul(1000))).pow(0.6).mul(0.7).add(0.3)
-      const lean = hash(id.mul(3.1).add(seed.mul(500))).sub(0.5).mul(2.4)
+      const strandHeight = hash(id.add(seed.mul(1000)))
+        .pow(0.6)
+        .mul(0.7)
+        .add(0.3)
+      const lean = hash(id.mul(3.1).add(seed.mul(500)))
+        .sub(0.5)
+        .mul(2.4)
       const fx = fract(sx).sub(0.5).sub(lean.mul(t))
       const halfWidth = float(0.42).mul(float(1).sub(t.div(strandHeight)).pow(0.8))
       Discard(t.greaterThan(strandHeight).or(abs(fx).greaterThan(halfWidth)))
       tipT = t.div(strandHeight)
     }
-    const variation = float(1).add(fract(seed.mul(91.7)).sub(0.5).mul(2).mul(u.colorVariation).mul(float(1).sub(farness)))
+    const variation = float(1).add(
+      fract(seed.mul(91.7)).sub(0.5).mul(2).mul(u.colorVariation).mul(float(1).sub(farness))
+    )
     let c: any = mix(u.baseColor, u.tipColor, pow(tipT, 1.2)).mul(variation)
     // Field-scale variation: brighter/darker patches and sun-dried yellowish areas.
     c = c.mul(float(1).add(patches.x.mul(u.patchiness).mul(0.7)))
@@ -271,7 +345,11 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
     // Dense grass occludes its own base.
     c = c.mul(mix(mix(float(0.32), float(0.7), farness), float(1), smoothstep(0, 0.75, tipT)))
     const i = vExtra.x
-    const lodColor = mix(mix(mix(color(LOD_COLORS[0]), color(LOD_COLORS[1]), step(0.5, i)), color(LOD_COLORS[2]), step(1.5, i)), color(LOD_COLORS[3]), step(2.5, i))
+    const lodColor = mix(
+      mix(mix(color(LOD_COLORS[0]), color(LOD_COLORS[1]), step(0.5, i)), color(LOD_COLORS[2]), step(1.5, i)),
+      color(LOD_COLORS[3]),
+      step(2.5, i)
+    )
     return vec4(mix(c, lodColor.mul(mix(float(0.4), float(1), tipT)), u.debugLods), 1)
   })
 
@@ -280,12 +358,20 @@ export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboar
     const viewDir = normalize(cameraPosition.sub(positionWorld))
     const back = pow(max(dot(viewDir, u.sunDirection.negate()), 0), 4)
     const albedo = mix(u.baseColor, u.tipColor, t)
-    return albedo.mul(u.sunColor).mul(back.mul(u.translucency).mul(t.mul(t)).mul(0.45)).mul(float(1).sub(u.debugLods))
+    return albedo
+      .mul(u.sunColor)
+      .mul(back.mul(u.translucency).mul(t.mul(t)).mul(0.45))
+      .mul(float(1).sub(u.debugLods))
   })
 
   // Physical only for its specular-intensity knob: grass is glossy, but full dielectric Fresnel at grazing
   // angles turns a whole field white when looking towards the sun.
-  const material = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.5, metalness: 0, specularIntensity: billboard ? 0.18 : 0.24 })
+  const material = new MeshPhysicalNodeMaterial({
+    side: DoubleSide,
+    roughness: 0.5,
+    metalness: 0,
+    specularIntensity: billboard ? 0.18 : 0.24
+  })
   material.positionNode = position()
   material.normalNode = transformNormalToView(billboard ? billboardNormal() : bladeNormal())
   material.colorNode = albedo()

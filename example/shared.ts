@@ -88,14 +88,19 @@ export function createEnvironment(renderer: THREE.WebGPURenderer, scene: THREE.S
   }
 
   return {
-    sky, sun, pipeline, bloomPass, setSun, follow,
+    sky,
+    sun,
+    pipeline,
+    bloomPass,
+    setSun,
+    follow,
     render: () => pipeline.render(),
     dispose() {
       pipeline.dispose()
       envTarget?.dispose()
       pmrem.dispose()
       scene.remove(sky, sun, sun.target)
-    },
+    }
   }
 }
 
@@ -106,7 +111,9 @@ export function createGroundMaterial(grass?: Grass) {
   const n2 = mx_noise_float(p.mul(2.7)).mul(0.5).add(0.5)
   const n3 = mx_noise_float(p.mul(9.0)).mul(0.5).add(0.5)
   // Soil under grass: a darkened version of the grass base colour, so it suits every preset.
-  const under: any = grass ? grass.uniforms.baseColor.mul(mix(float(0.65), float(0.95), n1.mul(n2))) : vec3(0.05, 0.09, 0.02)
+  const under: any = grass
+    ? grass.uniforms.baseColor.mul(mix(float(0.65), float(0.95), n1.mul(n2)))
+    : vec3(0.05, 0.09, 0.02)
   const dirt = mix(vec3(0.3, 0.2, 0.11), vec3(0.58, 0.44, 0.27), n2.mul(0.6).add(n3.mul(0.4)))
   const material = new THREE.MeshStandardNodeMaterial({ roughness: 0.95 })
   const coverage = grass ? grass.mapNode(p).coverage : float(1)
@@ -114,7 +121,9 @@ export function createGroundMaterial(grass?: Grass) {
   let ground = under
   if (grass) {
     const u = grass.uniforms
-    const field = mix(u.baseColor, u.tipColor, 0.55).mul(float(1).add(mx_noise_float(p.mul(0.05)).mul(u.patchiness).mul(0.7)))
+    const field = mix(u.baseColor, u.tipColor, 0.55).mul(
+      float(1).add(mx_noise_float(p.mul(0.05)).mul(u.patchiness).mul(0.7))
+    )
     ground = mix(under, field, smoothstep(12, 70, distance(positionWorld, cameraPosition)))
   }
   material.colorNode = mix(dirt, ground, smoothstep(0.15, 0.7, coverage))
@@ -134,8 +143,15 @@ export function createMinimap(map: GrassMap, size = 160) {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 128
   Object.assign(canvas.style, {
-    position: 'fixed', left: '12px', bottom: '12px', width: `${size}px`, height: `${size}px`,
-    border: '1px solid #fff6', borderRadius: '6px', imageRendering: 'pixelated', zIndex: '10',
+    position: 'fixed',
+    left: '12px',
+    bottom: '12px',
+    width: `${size}px`,
+    height: `${size}px`,
+    border: '1px solid #fff6',
+    borderRadius: '6px',
+    imageRendering: 'pixelated',
+    zIndex: '10'
   })
   const ctx = canvas.getContext('2d')!
   const img = ctx.createImageData(128, 128)
@@ -167,4 +183,3 @@ export function createMinimap(map: GrassMap, size = 160) {
   }
   return { canvas, update }
 }
-

@@ -13,14 +13,19 @@ import { Backdrop, View, mount, useHud, useSpec } from './r3f-shared'
 // raycastHeight under the pointer. Every parameter default of the package is a control, from the same panel manifest
 // (heightfield.panel.ts).
 const spec = panels['threejs-heightfield']
-const fnSurface = surface(SIZE, 160), patch = surface(140, 140)
+const fnSurface = surface(SIZE, 160),
+  patch = surface(140, 140)
 const markerGeometry = new THREE.SphereGeometry(0.45, 8, 6)
 
 function Sandbox() {
   const { maxResolution } = useSpec('createHeightSampler', spec.createHeightSampler)
   const { e } = useSpec('slopeAt', spec.slopeAt)
   const { maxDistance, step } = useSpec('raycastHeight', spec.raycastHeight)
-  const view = useControls('view', { source: { value: 'mesh', options: ['function', 'mesh'] }, markers: { value: 96, min: 8, max: 256, step: 1 }, showSource: true })
+  const view = useControls('view', {
+    source: { value: 'mesh', options: ['function', 'mesh'] },
+    markers: { value: 96, min: 8, max: 256, step: 1 },
+    showSource: true
+  })
 
   // Re-bakes only when the source or maxResolution changes (timed for the HUD).
   const [meshSource, setMeshSource] = useState<THREE.Group | null>(null)
@@ -41,13 +46,18 @@ function Sandbox() {
   const hits = useRef(0)
   useLayoutEffect(() => {
     const mesh = markers.current!
-    const m = new THREE.Matrix4(), c = new THREE.Color()
+    const m = new THREE.Matrix4(),
+      c = new THREE.Color()
     hits.current = 0
     for (let j = 0, k = 0; j < n; j++) {
       for (let i = 0; i < n; i++, k++) {
-        const x = (i / (n - 1) - 0.5) * SIZE, z = (j / (n - 1) - 0.5) * SIZE
+        const x = (i / (n - 1) - 0.5) * SIZE,
+          z = (j / (n - 1) - 0.5) * SIZE
         const y = sample(x, z)
-        if (y !== y) { mesh.setMatrixAt(k, m.makeScale(0, 0, 0)); continue }
+        if (y !== y) {
+          mesh.setMatrixAt(k, m.makeScale(0, 0, 0))
+          continue
+        }
         hits.current++
         mesh.setMatrixAt(k, m.makeTranslation(x, y + 0.3, z))
         mesh.setColorAt(k, slopeColor(slope(x, z), c))
@@ -73,10 +83,15 @@ function Sandbox() {
   useEffect(() => void Object.assign(window, { sample }), [sample]) // for the console
 
   useHud(() => {
-    const source = view.source === 'mesh' ? `mesh baked at maxResolution ${maxResolution} in ${bake.current.ms.toFixed(1)} ms` : 'height function (used as-is; maxResolution only applies to meshes)'
+    const source =
+      view.source === 'mesh'
+        ? `mesh baked at maxResolution ${maxResolution} in ${bake.current.ms.toFixed(1)} ms`
+        : 'height function (used as-is; maxResolution only applies to meshes)'
     const { hit, us } = ray.current
     const s = hit ? slope(hit.x, hit.z) : null
-    const at = hit ? `hit (${hit.x.toFixed(1)}, ${hit.y.toFixed(2)}, ${hit.z.toFixed(1)}) · slope ${s?.toFixed(2) ?? '—'}` : 'no hit'
+    const at = hit
+      ? `hit (${hit.x.toFixed(1)}, ${hit.y.toFixed(2)}, ${hit.z.toFixed(1)}) · slope ${s?.toFixed(2) ?? '—'}`
+      : 'no hit'
     return `threejs-heightfield · useHeightSampler — ${source}\n${hits.current.toLocaleString()} / ${(n ** 2).toLocaleString()} samples on terrain (NaN elsewhere)\nraycastHeight: ${at} · ${us.toFixed(0)} µs`
   })
 

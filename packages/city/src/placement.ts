@@ -12,7 +12,14 @@ import type { RoadOptions } from './roads.ts'
 export type SettlementSize = 'farmstead' | 'hamlet' | 'village' | 'town' | 'city' | 'metropolis'
 
 /** Every size class, smallest first. */
-export const SETTLEMENT_SIZES: readonly SettlementSize[] = ['farmstead', 'hamlet', 'village', 'town', 'city', 'metropolis']
+export const SETTLEMENT_SIZES: readonly SettlementSize[] = [
+  'farmstead',
+  'hamlet',
+  'village',
+  'town',
+  'city',
+  'metropolis'
+]
 
 /** Street layout styles. */
 export type RoadStyle = 'grid' | 'organic' | 'radial'
@@ -57,44 +64,95 @@ const PAVED: Record<RoadType, RoadSurface> = { primary: 'asphalt', secondary: 'a
  */
 export const DEFAULT_SIZE_CLASSES: Record<SettlementSize, SizeClass> = {
   farmstead: {
-    population: [1, 50], radius: [260, 420], maxFloors: 2, style: 'organic', arms: 0, districts: { downtown: 0, farmland: 0, industrial: 0, park: 0 },
-    surfaces: { primary: 'asphalt', secondary: 'gravel', minor: 'dirt' }, oldTown: null, mainStreet: 0, landmarks: NONE,
-    roads: { primary: { width: 7.5 } }, styles: {},
+    population: [1, 50],
+    radius: [260, 420],
+    maxFloors: 2,
+    style: 'organic',
+    arms: 0,
+    districts: { downtown: 0, farmland: 0, industrial: 0, park: 0 },
+    surfaces: { primary: 'asphalt', secondary: 'gravel', minor: 'dirt' },
+    oldTown: null,
+    mainStreet: 0,
+    landmarks: NONE,
+    roads: { primary: { width: 7.5 } },
+    styles: {}
   },
   hamlet: {
-    population: [50, 1000], radius: [70, 130], maxFloors: 2, style: 'organic', arms: 2, districts: { downtown: 0, farmland: 0.75, industrial: 0, park: 0 },
-    surfaces: { primary: 'gravel', secondary: 'dirt', minor: 'dirt' }, oldTown: null, mainStreet: 0, landmarks: NONE,
+    population: [50, 1000],
+    radius: [70, 130],
+    maxFloors: 2,
+    style: 'organic',
+    arms: 2,
+    districts: { downtown: 0, farmland: 0.75, industrial: 0, park: 0 },
+    surfaces: { primary: 'gravel', secondary: 'dirt', minor: 'dirt' },
+    oldTown: null,
+    mainStreet: 0,
+    landmarks: NONE,
     // Lanes branch off the road through it every ~40 m: the junctions the houses cluster round.
     roads: { primary: { width: 7, branchSpacing: 40, branchChance: 0.9 }, secondary: { width: 5, branchChance: 0.3 } },
-    styles: { residential: { blockSize: 0, lotArea: 1000, lotWidth: 18, setback: 7, coverage: 0.9, floors: [1, 1.5] } },
+    styles: { residential: { blockSize: 0, lotArea: 1000, lotWidth: 18, setback: 7, coverage: 0.9, floors: [1, 1.5] } }
   },
   village: {
-    population: [1000, 10_000], radius: [160, 320], maxFloors: 2, style: 'organic', arms: 2, districts: { downtown: 0, farmland: 0.8, industrial: 0, park: 0.03 },
-    surfaces: { primary: 'asphalt', secondary: 'gravel', minor: 'gravel' }, oldTown: null, mainStreet: 0, landmarks: { church: 1, townHall: 0.5, waterTower: 0 },
+    population: [1000, 10_000],
+    radius: [160, 320],
+    maxFloors: 2,
+    style: 'organic',
+    arms: 2,
+    districts: { downtown: 0, farmland: 0.8, industrial: 0, park: 0.03 },
+    surfaces: { primary: 'asphalt', secondary: 'gravel', minor: 'gravel' },
+    oldTown: null,
+    mainStreet: 0,
+    landmarks: { church: 1, townHall: 0.5, waterTower: 0 },
     roads: { primary: { width: 8, sidewalk: 1.5 }, secondary: { width: 6, branchSpacing: 130, branchChance: 0.6 } },
-    styles: { residential: { blockSize: 0, lotArea: 1400, lotWidth: 20, setback: 7, coverage: 0.9, floors: [1, 2] } },
+    styles: { residential: { blockSize: 0, lotArea: 1400, lotWidth: 20, setback: 7, coverage: 0.9, floors: [1, 2] } }
   },
   town: {
-    population: [10_000, 100_000], radius: [420, 800], maxFloors: 3, style: 'grid', arms: 2, districts: { downtown: 0.3, farmland: 0.72, industrial: 0.1, park: 0.05 },
-    surfaces: PAVED, oldTown: null, mainStreet: 42, landmarks: { church: 1, townHall: 1, waterTower: 1 },
+    population: [10_000, 100_000],
+    radius: [420, 800],
+    maxFloors: 3,
+    style: 'grid',
+    arms: 2,
+    districts: { downtown: 0.3, farmland: 0.72, industrial: 0.1, park: 0.05 },
+    surfaces: PAVED,
+    oldTown: null,
+    mainStreet: 42,
+    landmarks: { church: 1, townHall: 1, waterTower: 1 },
     roads: {},
     styles: {
       // Narrower than the district defaults, to keep a town's main street tight: scaled with the
       // `DEFAULT_ROADS` #89 retune like the district block sizes.
       downtown: { blockSize: 85, lotArea: 380, lotWidth: 9, setback: 0, coverage: 1, floors: [2, 3] },
-      residential: { blockSize: 108, lotArea: 850, lotWidth: 17, setback: 6, floors: [1, 2] },
-    },
+      residential: { blockSize: 108, lotArea: 850, lotWidth: 17, setback: 6, floors: [1, 2] }
+    }
   },
   city: {
-    population: [100_000, 1_000_000], radius: [1000, 2000], maxFloors: 70, style: 'grid', arms: 4, districts: { downtown: 0.26, farmland: 0.95, industrial: 0.16, park: 0.07 },
-    surfaces: PAVED, oldTown: null, mainStreet: 0, landmarks: NONE, roads: {}, styles: {},
+    population: [100_000, 1_000_000],
+    radius: [1000, 2000],
+    maxFloors: 70,
+    style: 'grid',
+    arms: 4,
+    districts: { downtown: 0.26, farmland: 0.95, industrial: 0.16, park: 0.07 },
+    surfaces: PAVED,
+    oldTown: null,
+    mainStreet: 0,
+    landmarks: NONE,
+    roads: {},
+    styles: {}
   },
   metropolis: {
-    population: [1_000_000, 10_000_000], radius: [1800, 2800], maxFloors: 110, style: 'grid', arms: 4, districts: { downtown: 0.3, farmland: 0.97, industrial: 0.16, park: 0.07 },
-    surfaces: PAVED, oldTown: null, mainStreet: 0, landmarks: NONE,
+    population: [1_000_000, 10_000_000],
+    radius: [1800, 2800],
+    maxFloors: 110,
+    style: 'grid',
+    arms: 4,
+    districts: { downtown: 0.3, farmland: 0.97, industrial: 0.16, park: 0.07 },
+    surfaces: PAVED,
+    oldTown: null,
+    mainStreet: 0,
+    landmarks: NONE,
     roads: { maxSegments: 15_000 },
-    styles: { downtown: { floors: [8, 80] } },
-  },
+    styles: { downtown: { floors: [8, 80] } }
+  }
 }
 
 /** A settlement of the population model, as a `City` to build. */
@@ -121,9 +179,13 @@ export function citySize(settlementClass: SettlementClass): SettlementSize {
 }
 
 /** City radius for a settlement: where its population sits (log scale) in its size class's `population` range, mapped onto the class's `radius` range. */
-export function cityRadius(settlement: Settlement, sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES): number {
+export function cityRadius(
+  settlement: Settlement,
+  sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES
+): number {
   const c = sizes[citySize(settlement.class)]
-  const p0 = Math.max(1, c.population[0]), p1 = c.population[1]
+  const p0 = Math.max(1, c.population[0]),
+    p1 = c.population[1]
   const t = p1 > p0 ? Math.log(Math.max(1, settlement.population) / p0) / Math.log(p1 / p0) : 1
   return c.radius[0] + (c.radius[1] - c.radius[0]) * Math.min(1, Math.max(0, t))
 }
@@ -140,7 +202,11 @@ export function cityRadius(settlement: Settlement, sizes: Record<SettlementSize,
  * const city = await City.create({ world, camera, scene, center: [site.x, site.z], size: site.size, radius: site.radius, seed: site.seed })
  * ```
  */
-export function planCities(data: PopulationData, sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES, network: Network | null = null): CitySite[] {
+export function planCities(
+  data: PopulationData,
+  sizes: Record<SettlementSize, SizeClass> = DEFAULT_SIZE_CLASSES,
+  network: Network | null = null
+): CitySite[] {
   const seed = seedOf(data.options.seed)
   const roads = network?.edges.filter((e) => e.type === 'highway' || e.type === 'road' || e.type === 'track') ?? []
   const out: CitySite[] = []
@@ -152,10 +218,21 @@ export function planCities(data: PopulationData, sizes: Record<SettlementSize, S
       let best = Infinity
       for (const e of roads) {
         const d = nearestOnPolyline(e.points, s.position[0], s.position[1]).distance
-        if (d < best) { best = d; road = { points: e.points.map(([x, z]) => [x, z]), type: e.type === 'track' ? 'secondary' : 'primary' } }
+        if (d < best) {
+          best = d
+          road = { points: e.points.map(([x, z]) => [x, z]), type: e.type === 'track' ? 'secondary' : 'primary' }
+        }
       }
     }
-    out.push({ x: s.position[0], z: s.position[1], size, radius: cityRadius(s, sizes), seed: Math.floor(hash01(lo, hi, seed, 3) * 2 ** 31), settlement: s, road })
+    out.push({
+      x: s.position[0],
+      z: s.position[1],
+      size,
+      radius: cityRadius(s, sizes),
+      seed: Math.floor(hash01(lo, hi, seed, 3) * 2 ** 31),
+      settlement: s,
+      road
+    })
   }
   return out
 }

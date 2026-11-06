@@ -88,7 +88,15 @@ export interface SourceTable {
 /** An empty table for up to `max` sources. */
 export function createSourceTable(max: number): SourceTable {
   const n = Math.max(1, Math.floor(max))
-  return { count: 0, total: 0, positions: new Float32Array(n * 4), data: new Float32Array(n * 4), motion: new Float32Array(n * 4), order: [], cdf: new Float32Array(n) }
+  return {
+    count: 0,
+    total: 0,
+    positions: new Float32Array(n * 4),
+    data: new Float32Array(n * 4),
+    motion: new Float32Array(n * 4),
+    order: [],
+    cdf: new Float32Array(n)
+  }
 }
 
 /** Most sources a table holds. */
@@ -102,7 +110,12 @@ export function sourceCapacity(table: SourceTable): number {
  * weight ≤ 0 are skipped. If there are more than the table holds, the heaviest are kept (ties keep
  * the earlier one), so the selection is deterministic.
  */
-export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, count = Math.floor(sources.length / SOURCE_STRIDE), motion?: ArrayLike<number> | null): SourceTable {
+export function fillSourceTable(
+  table: SourceTable,
+  sources: ArrayLike<number>,
+  count = Math.floor(sources.length / SOURCE_STRIDE),
+  motion?: ArrayLike<number> | null
+): SourceTable {
   const max = sourceCapacity(table)
   const order = (table.order ??= [])
   order.length = 0
@@ -132,14 +145,16 @@ export function fillSourceTable(table: SourceTable, sources: ArrayLike<number>, 
 
 // Comparators shared by every refresh (no closure per call); `sorting` is the list being sorted.
 let sorting: ArrayLike<number> | null = null
-const heaviestFirst = (a: number, b: number) => sorting![b * SOURCE_STRIDE + 3] - sorting![a * SOURCE_STRIDE + 3] || a - b
+const heaviestFirst = (a: number, b: number) =>
+  sorting![b * SOURCE_STRIDE + 3] - sorting![a * SOURCE_STRIDE + 3] || a - b
 const ascending = (a: number, b: number) => a - b
 
 /** The source a uniform random `u` in [0, 1) picks: the first whose prefix sum exceeds `u × total` (what the GPU does). */
 export function pickSource(table: SourceTable, u: number): number {
   if (table.count === 0) return -1
   const target = u * table.total
-  let lo = 0, hi = table.count - 1
+  let lo = 0,
+    hi = table.count - 1
   while (lo < hi) {
     const mid = (lo + hi) >> 1
     if (table.cdf[mid] <= target) lo = mid + 1

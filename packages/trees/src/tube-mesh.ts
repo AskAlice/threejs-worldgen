@@ -85,11 +85,32 @@ export interface MeshArrays {
 
 /** Empty {@link MeshArrays}. */
 export function createArrays(): MeshArrays {
-  return { positions: new FloatList(), normals: new FloatList(), uvs: new FloatList(), colors: new FloatList(), indices: new IndexList(), cards: new FloatList(256) }
+  return {
+    positions: new FloatList(),
+    normals: new FloatList(),
+    uvs: new FloatList(),
+    colors: new FloatList(),
+    indices: new IndexList(),
+    cards: new FloatList(256)
+  }
 }
 
 /** Appends one vertex to every stream of `out`. */
-export function pushVertex(out: MeshArrays, x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, v: number, r: number, g: number, b: number, card: number): void {
+export function pushVertex(
+  out: MeshArrays,
+  x: number,
+  y: number,
+  z: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  u: number,
+  v: number,
+  r: number,
+  g: number,
+  b: number,
+  card: number
+): void {
   out.positions.push3(x, y, z)
   out.normals.push3(nx, ny, nz)
   out.uvs.push2(u, v)
@@ -151,7 +172,21 @@ export function addTube(out: MeshArrays, points: Vec3[], radii: number[], o: Tub
       const dy = nrm[1] * c + bin[1] * si
       const dz = nrm[2] * c + bin[2] * si
       const rr = r * (o.shape ? o.shape(k, theta, p) : 1)
-      pushVertex(out, p[0] + dx * rr, p[1] + dy * rr, p[2] + dz * rr, dx, dy, dz, s / segs, length * vScale, o.color[0] * shade, o.color[1] * shade, o.color[2] * shade, card)
+      pushVertex(
+        out,
+        p[0] + dx * rr,
+        p[1] + dy * rr,
+        p[2] + dz * rr,
+        dx,
+        dy,
+        dz,
+        s / segs,
+        length * vScale,
+        o.color[0] * shade,
+        o.color[1] * shade,
+        o.color[2] * shade,
+        card
+      )
     }
   }
   const row = segs + 1
@@ -203,8 +238,21 @@ export function addStrip(out: MeshArrays, points: Vec3[], o: StripOptions): void
       const ny = up[1] - side[1] * s * 0.35
       const nz = up[2] - side[2] * s * 0.35
       const nl = Math.hypot(nx, ny, nz) || 1
-      pushVertex(out, p[0] + side[0] * w * s + up[0] * centre, p[1] + side[1] * w * s + up[1] * centre, p[2] + side[2] * w * s + up[2] * centre,
-        nx / nl, ny / nl, nz / nl, (s + 1) / 2, v, o.color[0], o.color[1], o.color[2], card)
+      pushVertex(
+        out,
+        p[0] + side[0] * w * s + up[0] * centre,
+        p[1] + side[1] * w * s + up[1] * centre,
+        p[2] + side[2] * w * s + up[2] * centre,
+        nx / nl,
+        ny / nl,
+        nz / nl,
+        (s + 1) / 2,
+        v,
+        o.color[0],
+        o.color[1],
+        o.color[2],
+        card
+      )
     }
   }
   for (let k = 0; k < n - 1; k++) {

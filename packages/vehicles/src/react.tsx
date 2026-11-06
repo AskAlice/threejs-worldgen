@@ -47,8 +47,12 @@ export interface FleetProps extends FleetInput {
 export function Fleet({ ref, roads = null, height, env, look, ...settings }: FleetProps): React.JSX.Element {
   const fleet = useMemo(() => new FleetImpl(settings, { roads, height, look }), [look])
   useEffect(() => () => fleet.dispose(), [fleet])
-  useEffect(() => { fleet.setRoads(roads) }, [fleet, roads])
-  useEffect(() => { fleet.reset(settings) })
+  useEffect(() => {
+    fleet.setRoads(roads)
+  }, [fleet, roads])
+  useEffect(() => {
+    fleet.reset(settings)
+  })
   useImperativeHandle(ref, () => fleet, [fleet])
   useFrame((_, delta) => fleet.update(delta, env))
   return <primitive object={fleet.object} />
@@ -81,8 +85,12 @@ export function Traffic({ ref, roads = null, height, env, look, ...settings }: T
   const camera = useThree((state) => state.camera)
   const traffic = useMemo(() => new TrafficImpl(settings, { roads, height, look }), [look])
   useEffect(() => () => traffic.dispose(), [traffic])
-  useEffect(() => { traffic.setRoads(roads) }, [traffic, roads])
-  useEffect(() => { traffic.reset(settings) })
+  useEffect(() => {
+    traffic.setRoads(roads)
+  }, [traffic, roads])
+  useEffect(() => {
+    traffic.reset(settings)
+  })
   useImperativeHandle(ref, () => traffic, [traffic])
   useFrame((_, delta) => traffic.update(delta, camera))
   return <primitive object={traffic.object} />
@@ -107,7 +115,9 @@ export interface VehicleProps extends Partial<VehicleSettings> {
 export function Vehicle({ ref, env, ...settings }: VehicleProps): React.JSX.Element {
   const vehicle = useMemo(() => new VehicleImpl(settings), [])
   useEffect(() => () => vehicle.dispose(), [vehicle])
-  useEffect(() => { vehicle.reset(settings) })
+  useEffect(() => {
+    vehicle.reset(settings)
+  })
   useImperativeHandle(ref, () => vehicle, [vehicle])
   useFrame((_, delta) => vehicle.update(delta, env))
   return <primitive object={vehicle.object} />
@@ -136,7 +146,9 @@ export function Exhaust({ fleet, ref, ...settings }: ExhaustProps): null {
   const { gl, camera } = useThree()
   const exhaust = useMemo(() => new VehicleExhaust(fleet, settings), [fleet])
   useEffect(() => () => exhaust.dispose(), [exhaust])
-  useEffect(() => { exhaust.reset(settings) })
+  useEffect(() => {
+    exhaust.reset(settings)
+  })
   useImperativeHandle(ref, () => exhaust, [exhaust])
   useFrame((_, delta) => exhaust.update(gl as unknown as Renderer, delta, camera)) // after the fleet (mounted after it); a positive priority would take over rendering
   return null

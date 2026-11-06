@@ -9,9 +9,11 @@
 export function catenaryParameter(span: number, sag: number): number {
   if (!(span > 0) || !(sag > 0)) return Infinity
   // s(a) falls monotonically from ∞ (a → 0) to 0 (a → ∞): bisect in log space.
-  let lo = Math.log(span * 1e-4), hi = Math.log(span * 1e7)
+  let lo = Math.log(span * 1e-4),
+    hi = Math.log(span * 1e7)
   for (let i = 0; i < 80; i++) {
-    const mid = (lo + hi) / 2, a = Math.exp(mid)
+    const mid = (lo + hi) / 2,
+      a = Math.exp(mid)
     const s = a * (Math.cosh(span / (2 * a)) - 1)
     if (s > sag) lo = mid
     else hi = mid
@@ -29,7 +31,13 @@ export function catenaryDip(span: number, a: number, u: number): number {
  * `segments + 1` points (xyz) of a cable from `a` to `b` sagging `sag` metres below the chord at
  * midspan. Endpoints are exact.
  */
-export function catenaryPoints(a: readonly number[], b: readonly number[], sag: number, segments: number, out = new Float32Array((segments + 1) * 3)): Float32Array {
+export function catenaryPoints(
+  a: readonly number[],
+  b: readonly number[],
+  sag: number,
+  segments: number,
+  out = new Float32Array((segments + 1) * 3)
+): Float32Array {
   const L = Math.hypot(b[0] - a[0], b[2] - a[2])
   const k = catenaryParameter(L, sag)
   for (let i = 0; i <= segments; i++) {

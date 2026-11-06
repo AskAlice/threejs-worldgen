@@ -13,13 +13,58 @@
  * with their size scaled to match, so they keep their apparent size and stay inside the depth range.
  */
 import {
-  AdditiveBlending, BufferGeometry, DoubleSide, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry,
-  LineBasicNodeMaterial, LineSegments, Matrix4, Mesh, MeshBasicNodeMaterial, NodeMaterial, PlaneGeometry, PointLight, Quaternion, RingGeometry,
-  Sphere, SphereGeometry, Sprite, SpriteNodeMaterial, Vector3, type Camera, type Material,
+  AdditiveBlending,
+  BufferGeometry,
+  DoubleSide,
+  Float32BufferAttribute,
+  Group,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  LineBasicNodeMaterial,
+  LineSegments,
+  Matrix4,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NodeMaterial,
+  PlaneGeometry,
+  PointLight,
+  Quaternion,
+  RingGeometry,
+  Sphere,
+  SphereGeometry,
+  Sprite,
+  SpriteNodeMaterial,
+  Vector3,
+  type Camera,
+  type Material
 } from 'three/webgpu'
 import {
-  Fn, If, abs, attribute, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, cross, dot, exp, float, length, max, mix, mx_fractal_noise_float,
-  mx_worley_noise_float, normalize, positionLocal, pow, sin, smoothstep, uniform, uv, varying, vec3, vec4,
+  Fn,
+  If,
+  abs,
+  attribute,
+  cameraPosition,
+  cameraProjectionMatrix,
+  cameraViewMatrix,
+  cross,
+  dot,
+  exp,
+  float,
+  length,
+  max,
+  mix,
+  mx_fractal_noise_float,
+  mx_worley_noise_float,
+  normalize,
+  positionLocal,
+  pow,
+  sin,
+  smoothstep,
+  uniform,
+  uv,
+  varying,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { StarSystem, type Body, type SystemInput } from './bodies.ts'
 import { orbitPath } from './kepler.ts'
@@ -85,7 +130,7 @@ export const DEFAULT_SOLAR_SYSTEM: SolarSystemSettings = {
   starLight: 2.5,
   ambient: 0.03,
   hidden: [],
-  segments: 64,
+  segments: 64
 }
 
 /** Input for {@link SolarSystem}: any subset of {@link SolarSystemSettings}. */
@@ -121,25 +166,36 @@ function surfaceColor(n: any, style: any, c0: any, c1: any, c2: any, off: any) {
   return Fn(() => {
     const out = vec3(0).toVar()
     const fbm = (p: any, oct = 4) => mx_fractal_noise_float(p, oct, 2, 0.5)
-    If(style.lessThan(0.5), () => { // ocean world
+    If(style.lessThan(0.5), () => {
+      // ocean world
       const land = smoothstep(0.02, 0.08, fbm(n.mul(1.8).add(off), 5))
       const ground = mix(c1, c2, smoothstep(-0.1, 0.25, fbm(n.mul(5).add(off.yzx))))
       const ice = smoothstep(0.78, 0.86, abs(n.y).add(fbm(n.mul(6).add(off.zxy)).mul(0.08)))
       out.assign(mix(mix(c0, ground, land), vec3(0.9, 0.93, 0.97), ice))
-    }).ElseIf(style.lessThan(2.5), () => { // rocky / desert
-      const base = mix(c0, c1, smoothstep(-0.25, 0.3, fbm(n.mul(3).add(off), 5)))
-      const craters = smoothstep(0.08, 0.0, mx_worley_noise_float(n.mul(10).add(off)))
-      const ice = smoothstep(0.88, 0.95, abs(n.y)).mul(style.greaterThan(1.5).select(0.2, 0.6))
-      out.assign(mix(mix(base, c2, craters.mul(0.5)), vec3(0.85), ice))
-    }).ElseIf(style.lessThan(4.5), () => { // gas / ice giant bands
-      const gas = style.lessThan(3.5)
-      const y = n.y.add(fbm(n.mul(vec3(2, 7, 2)).add(off), 4).mul(0.07))
-      const bands = sin(y.mul(gas.select(22, 9)).add(off.x)).mul(0.5).add(0.5)
-      const fine = sin(y.mul(gas.select(68, 28)).add(off.y)).mul(0.5).add(0.5)
-      out.assign(mix(mix(c0, c2, bands), c1, fine.mul(gas.select(0.35, 0.14))))
-    }).Else(() => { // moon
-      out.assign(vec3(moonAlbedo(n).mul(5.5)).mul(mix(c1, c0, 0.7)))
     })
+      .ElseIf(style.lessThan(2.5), () => {
+        // rocky / desert
+        const base = mix(c0, c1, smoothstep(-0.25, 0.3, fbm(n.mul(3).add(off), 5)))
+        const craters = smoothstep(0.08, 0.0, mx_worley_noise_float(n.mul(10).add(off)))
+        const ice = smoothstep(0.88, 0.95, abs(n.y)).mul(style.greaterThan(1.5).select(0.2, 0.6))
+        out.assign(mix(mix(base, c2, craters.mul(0.5)), vec3(0.85), ice))
+      })
+      .ElseIf(style.lessThan(4.5), () => {
+        // gas / ice giant bands
+        const gas = style.lessThan(3.5)
+        const y = n.y.add(fbm(n.mul(vec3(2, 7, 2)).add(off), 4).mul(0.07))
+        const bands = sin(y.mul(gas.select(22, 9)).add(off.x))
+          .mul(0.5)
+          .add(0.5)
+        const fine = sin(y.mul(gas.select(68, 28)).add(off.y))
+          .mul(0.5)
+          .add(0.5)
+        out.assign(mix(mix(c0, c2, bands), c1, fine.mul(gas.select(0.35, 0.14))))
+      })
+      .Else(() => {
+        // moon
+        out.assign(vec3(moonAlbedo(n).mul(5.5)).mul(mix(c1, c0, 0.7)))
+      })
     return out
   })()
 }
@@ -161,7 +217,15 @@ function instancedFrom(base: BufferGeometry, count: number): InstancedBufferGeom
   return g
 }
 
-interface Slot { body: Body; transform: BodyTransform; custom?: Mesh; instance: number; ring: number; glow: number; drawn: Vec3 }
+interface Slot {
+  body: Body
+  transform: BodyTransform
+  custom?: Mesh
+  instance: number
+  ring: number
+  glow: number
+  drawn: Vec3
+}
 
 /**
  * Renders a star system for orbital views.
@@ -197,9 +261,17 @@ export class SolarSystem {
     starColor: uniform(new Vector3(1, 1, 1)),
     starLight: uniform(2.5),
     ambient: uniform(0.03),
-    apsisSize: uniform(0.006),
+    apsisSize: uniform(0.006)
   }
-  private parts: { bodies?: Mesh; rings?: Mesh; glows?: Mesh; star?: Mesh; glow?: Sprite; orbits?: LineSegments; markers?: Mesh } = {}
+  private parts: {
+    bodies?: Mesh
+    rings?: Mesh
+    glows?: Mesh
+    star?: Mesh
+    glow?: Sprite
+    orbits?: LineSegments
+    markers?: Mesh
+  } = {}
   private orbitPaths: { slot: Slot; path: Float64Array }[] = []
 
   /** Creates the view; anything not given uses {@link DEFAULT_SOLAR_SYSTEM}. */
@@ -265,7 +337,8 @@ export class SolarSystem {
 
   private build() {
     this.disposeParts()
-    const s = this.settings, u = this.u
+    const s = this.settings,
+      u = this.u
     const seed = seedOf(this.system.options.seed)
     const sphere = new SphereGeometry(1, s.segments, Math.max(8, s.segments / 2))
     const bodies = this.system.bodies
@@ -273,20 +346,32 @@ export class SolarSystem {
     const ringed = procedural.filter((b) => b.rings)
     const glowing = bodies.filter((b) => b.kind !== 'star' && b.atmosphere)
     this.slots = bodies.map((body) => ({
-      body, transform: { position: new Vector3(), quaternion: new Quaternion(), radius: 0, distance: 0 },
-      instance: procedural.indexOf(body), ring: ringed.indexOf(body), glow: glowing.indexOf(body), drawn: [0, 0, 0],
+      body,
+      transform: { position: new Vector3(), quaternion: new Quaternion(), radius: 0, distance: 0 },
+      instance: procedural.indexOf(body),
+      ring: ringed.indexOf(body),
+      glow: glowing.indexOf(body),
+      drawn: [0, 0, 0]
     }))
 
     // Star: emissive sphere + glow sprite.
     const starBody = bodies[0]
     const starMat = new MeshBasicNodeMaterial()
     const tint = vec3(...kelvinToRgb(starBody.temperature))
-    starMat.colorNode = tint.mul(mx_fractal_noise_float(normalize(positionLocal).mul(14), 3, 2, 0.5).mul(0.12).add(1)).mul(8)
+    starMat.colorNode = tint
+      .mul(mx_fractal_noise_float(normalize(positionLocal).mul(14), 3, 2, 0.5).mul(0.12).add(1))
+      .mul(8)
     const custom = this.materials[starBody.name]
     this.parts.star = new Mesh(sphere, custom ?? starMat)
     const glowMat = new SpriteNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending })
     const d = length(uv().sub(0.5)).mul(2)
-    glowMat.colorNode = tint.mul(exp(d.mul(-6)).mul(1.5).add(exp(d.mul(-2.2)).mul(0.25))).mul(smoothstep(1, 0.6, d))
+    glowMat.colorNode = tint
+      .mul(
+        exp(d.mul(-6))
+          .mul(1.5)
+          .add(exp(d.mul(-2.2)).mul(0.25))
+      )
+      .mul(smoothstep(1, 0.6, d))
     this.parts.glow = new Sprite(glowMat)
     this.object.add(this.parts.star!, this.parts.glow!)
 
@@ -302,22 +387,40 @@ export class SolarSystem {
     // Every procedural body: one instanced sphere.
     if (procedural.length) {
       const g = instancedFrom(sphere, procedural.length)
-      for (const [name, size] of [['aPos', 3], ['aQuat', 4], ['aRadius', 1]] as const) instanced(g, name, procedural.length, size)
-      const c0 = instanced(g, 'aColor0', procedural.length, 3), c1 = instanced(g, 'aColor1', procedural.length, 3), c2 = instanced(g, 'aColor2', procedural.length, 3)
+      for (const [name, size] of [
+        ['aPos', 3],
+        ['aQuat', 4],
+        ['aRadius', 1]
+      ] as const)
+        instanced(g, name, procedural.length, size)
+      const c0 = instanced(g, 'aColor0', procedural.length, 3),
+        c1 = instanced(g, 'aColor1', procedural.length, 3),
+        c2 = instanced(g, 'aColor2', procedural.length, 3)
       // Style rides in aSeed.w: WebGPU allows at most 8 vertex buffers per pipeline.
       const off = instanced(g, 'aSeed', procedural.length, 4)
       procedural.forEach((b, i) => {
-        c0.array.set(hexToLinear(b.colors[0]), i * 3); c1.array.set(hexToLinear(b.colors[1]), i * 3); c2.array.set(hexToLinear(b.colors[2]), i * 3)
+        c0.array.set(hexToLinear(b.colors[0]), i * 3)
+        c1.array.set(hexToLinear(b.colors[1]), i * 3)
+        c2.array.set(hexToLinear(b.colors[2]), i * 3)
         off.array[i * 4 + 3] = Math.max(0, STYLES.indexOf(b.surface as any))
         for (let k = 0; k < 3; k++) off.array[i * 4 + k] = (hash3(seed, b.index, k + 1) / 4294967296) * 100
       })
-      const aPos = attribute('aPos', 'vec3'), aQuat = attribute('aQuat', 'vec4'), aRadius = attribute('aRadius', 'float')
+      const aPos = attribute('aPos', 'vec3'),
+        aQuat = attribute('aQuat', 'vec4'),
+        aRadius = attribute('aRadius', 'float')
       const world = rotate(aQuat, positionLocal.mul(aRadius)).add(aPos)
       const vNormal: any = varying(rotate(aQuat, normalize(positionLocal)))
       const vWorld: any = varying(world)
       const n = normalize(positionLocal) // body frame: features stay put as it spins
       const aSeed = attribute('aSeed', 'vec4')
-      const albedo = surfaceColor(n, aSeed.w, attribute('aColor0', 'vec3'), attribute('aColor1', 'vec3'), attribute('aColor2', 'vec3'), aSeed.xyz)
+      const albedo = surfaceColor(
+        n,
+        aSeed.w,
+        attribute('aColor0', 'vec3'),
+        attribute('aColor1', 'vec3'),
+        attribute('aColor2', 'vec3'),
+        aSeed.xyz
+      )
       const toStar: any = normalize(u.starPosition.sub(vWorld))
       const lambert = max(dot(normalize(vNormal), toStar), 0)
       const m = new NodeMaterial()
@@ -331,7 +434,14 @@ export class SolarSystem {
     if (ringed.length) {
       const base = new RingGeometry(1, 2, 128, 1).rotateX(-Math.PI / 2)
       const g = instancedFrom(base, ringed.length)
-      for (const [name, size] of [['aPos', 3], ['aQuat', 4], ['aRadius', 1], ['aBand', 3], ['aRingColor', 3]] as const) instanced(g, name, ringed.length, size)
+      for (const [name, size] of [
+        ['aPos', 3],
+        ['aQuat', 4],
+        ['aRadius', 1],
+        ['aBand', 3],
+        ['aRingColor', 3]
+      ] as const)
+        instanced(g, name, ringed.length, size)
       ringed.forEach((b, i) => {
         const r = b.rings!
         g.getAttribute('aBand').array.set([r.inner, r.outer, r.opacity], i * 3)
@@ -339,16 +449,27 @@ export class SolarSystem {
       })
       const aBand = attribute('aBand', 'vec3')
       const t = length(positionLocal.xz).sub(1) // 0 inner … 1 outer
-      const radial = normalize(positionLocal.xz).mul(mix(aBand.x, aBand.y, t)).mul(attribute('aRadius', 'float'))
+      const radial = normalize(positionLocal.xz)
+        .mul(mix(aBand.x, aBand.y, t))
+        .mul(attribute('aRadius', 'float'))
       const world = rotate(attribute('aQuat', 'vec4'), vec3(radial.x, 0, radial.y)).add(attribute('aPos', 'vec3'))
       const vT = varying(t)
-      const rings = mx_fractal_noise_float(vec3(vT.mul(38), float(seed % 997), 0.5), 4, 2.3, 0.6).mul(0.5).add(0.5)
+      const rings = mx_fractal_noise_float(vec3(vT.mul(38), float(seed % 997), 0.5), 4, 2.3, 0.6)
+        .mul(0.5)
+        .add(0.5)
       const gaps = smoothstep(0.08, 0.2, abs(sin(vT.mul(9.3).add(1.7))))
       const lit = u.starLight.mul(0.5).add(u.ambient) // thin rings scatter light about evenly
       const m = new NodeMaterial()
-      m.side = DoubleSide; m.transparent = true; m.depthWrite = false; m.fog = false
+      m.side = DoubleSide
+      m.transparent = true
+      m.depthWrite = false
+      m.fog = false
       m.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1))
-      const alpha = rings.mul(gaps).mul(aBand.z).mul(smoothstep(0, 0.04, vT)).mul(smoothstep(1, 0.95, vT))
+      const alpha = rings
+        .mul(gaps)
+        .mul(aBand.z)
+        .mul(smoothstep(0, 0.04, vT))
+        .mul(smoothstep(1, 0.95, vT))
       m.colorNode = vec4(attribute('aRingColor', 'vec3').mul(rings.mul(0.5).add(0.6)).mul(lit), alpha)
       this.parts.rings = new Mesh(g, m)
       base.dispose() // its attributes live on in the instanced geometry
@@ -357,24 +478,37 @@ export class SolarSystem {
     // Atmosphere glows: one instanced shell, rim-lit towards the star.
     if (glowing.length) {
       const g = instancedFrom(sphere, glowing.length)
-      for (const [name, size] of [['aPos', 3], ['aRadius', 1], ['aGlow', 4]] as const) instanced(g, name, glowing.length, size)
-      glowing.forEach((b, i) => g.getAttribute('aGlow').array.set([...hexToLinear(b.atmosphere!.color), b.atmosphere!.density], i * 4))
+      for (const [name, size] of [
+        ['aPos', 3],
+        ['aRadius', 1],
+        ['aGlow', 4]
+      ] as const)
+        instanced(g, name, glowing.length, size)
+      glowing.forEach((b, i) =>
+        g.getAttribute('aGlow').array.set([...hexToLinear(b.atmosphere!.color), b.atmosphere!.density], i * 4)
+      )
       const nrm = normalize(positionLocal)
       const world = nrm.mul(attribute('aRadius', 'float').mul(1.04)).add(attribute('aPos', 'vec3'))
-      const vWorld = varying(world), vN = varying(nrm)
+      const vWorld = varying(world),
+        vN = varying(nrm)
       const viewDir = normalize(cameraPosition.sub(vWorld))
       const rim = pow(float(1).sub(max(dot(vN, viewDir), 0)), 3)
       const lit = smoothstep(-0.25, 0.5, dot(vN, normalize(u.starPosition.sub(vWorld))))
       const glow = attribute('aGlow', 'vec4')
       const m = new NodeMaterial()
-      m.transparent = true; m.depthWrite = false; m.blending = AdditiveBlending; m.fog = false
+      m.transparent = true
+      m.depthWrite = false
+      m.blending = AdditiveBlending
+      m.fog = false
       m.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1))
       m.colorNode = vec4(glow.xyz.mul(rim.mul(lit).mul(glow.w).mul(1.6)), 1)
       this.parts.glows = new Mesh(g, m)
     }
 
     // Orbit lines: every orbit in one LineSegments buffer, rewritten as parents move.
-    this.orbitPaths = this.slots.filter((sl) => sl.body.orbit).map((slot) => ({ slot, path: orbitPath(slot.body.orbit!, 256) }))
+    this.orbitPaths = this.slots
+      .filter((sl) => sl.body.orbit)
+      .map((slot) => ({ slot, path: orbitPath(slot.body.orbit!, 256) }))
     if (this.orbitPaths.length) {
       const segs = this.orbitPaths.length * 256
       const g = new BufferGeometry()
@@ -391,21 +525,29 @@ export class SolarSystem {
       for (let i = 0; i < this.orbitPaths.length * 2; i++) kind.array[i] = i % 2
       const aPos = attribute('aPos', 'vec3')
       const f = normalize(aPos.sub(cameraPosition))
-      const right = normalize(cross(f, vec3(0, 1, 0).add(vec3(1e-4, 0, 0)))), up = cross(right, f)
+      const right = normalize(cross(f, vec3(0, 1, 0).add(vec3(1e-4, 0, 0)))),
+        up = cross(right, f)
       const size = length(aPos.sub(cameraPosition)).mul(u.apsisSize)
       const world = aPos.add(right.mul(positionLocal.x).add(up.mul(positionLocal.y)).mul(size))
       const r = length(positionLocal.xy).mul(2)
-      const ringShape = smoothstep(1, 0.85, r).mul(smoothstep(0.45, 0.6, r)).add(smoothstep(0.25, 0.1, r))
+      const ringShape = smoothstep(1, 0.85, r)
+        .mul(smoothstep(0.45, 0.6, r))
+        .add(smoothstep(0.25, 0.1, r))
       const [pc, ac] = s.apsisColors.map((c) => vec3(...hexToLinear(c)))
       const m = new NodeMaterial()
-      m.transparent = true; m.depthWrite = false; m.fog = false
+      m.transparent = true
+      m.depthWrite = false
+      m.fog = false
       m.vertexNode = cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1))
       m.colorNode = vec4(mix(pc, ac, attribute('aKind', 'float')).mul(2), ringShape)
       this.parts.markers = new Mesh(mg, m)
       quad.dispose()
     }
     for (const part of [this.parts.bodies, this.parts.rings, this.parts.glows, this.parts.orbits, this.parts.markers]) {
-      if (part) { part.frustumCulled = false; this.object.add(part) }
+      if (part) {
+        part.frustumCulled = false
+        this.object.add(part)
+      }
     }
   }
 
@@ -426,22 +568,30 @@ export class SolarSystem {
    */
   update(time: number, camera?: Camera): void {
     this.time = time
-    const s = this.settings, sys = this.system, parts = this.parts
+    const s = this.settings,
+      sys = this.system,
+      parts = this.parts
     const o = sys.position(s.origin, time, this.origin)
-    o[0] += s.originOffset[0]; o[1] += s.originOffset[1]; o[2] += s.originOffset[2]
+    o[0] += s.originOffset[0]
+    o[1] += s.originOffset[1]
+    o[2] += s.originOffset[2]
     const cam = camera ? new Vector3().setFromMatrixPosition(camera.matrixWorld) : null
     const spread = Math.sqrt(Math.max(1, s.exaggerateSizes)) // satellites move out so exaggerated planets don't swallow them
-    const rot = new Matrix4(), tmp = new Vector3(), q = new Quaternion()
+    const rot = new Matrix4(),
+      tmp = new Vector3(),
+      q = new Quaternion()
     const bodies = parts.bodies?.geometry as InstancedBufferGeometry | undefined
     const rings = parts.rings?.geometry as InstancedBufferGeometry | undefined
     const glows = parts.glows?.geometry as InstancedBufferGeometry | undefined
     const truePos: Vec3[] = []
     for (const slot of this.slots) {
-      const b = slot.body, v = slot.transform
+      const b = slot.body,
+        v = slot.transform
       const t = sys.position(b.index, time)
       const p: Vec3 = [t[0], t[1], t[2]]
       if (b.parentIndex > 0) {
-        const pt = truePos[b.parentIndex], pd = this.slots[b.parentIndex].drawn
+        const pt = truePos[b.parentIndex],
+          pd = this.slots[b.parentIndex].drawn
         for (let k = 0; k < 3; k++) p[k] = pd[k] + (t[k] - pt[k]) * spread
       }
       truePos.push(t)
@@ -462,15 +612,25 @@ export class SolarSystem {
       v.quaternion.setFromRotationMatrix(rot)
       const shown = hidden ? 0 : radius
       if (b.kind === 'star') {
-        parts.star!.position.copy(pos); parts.star!.scale.setScalar(shown); parts.star!.quaternion.copy(v.quaternion)
-        parts.glow!.position.copy(pos); parts.glow!.scale.setScalar(shown * 9)
+        parts.star!.position.copy(pos)
+        parts.star!.scale.setScalar(shown)
+        parts.star!.quaternion.copy(v.quaternion)
+        parts.glow!.position.copy(pos)
+        parts.glow!.scale.setScalar(shown * 9)
         this.light.position.copy(pos)
         this.u.starPosition.value.copy(pos)
       }
-      if (slot.custom) { slot.custom.position.copy(pos); slot.custom.quaternion.copy(v.quaternion); slot.custom.scale.setScalar(shown); slot.custom.visible = !hidden }
+      if (slot.custom) {
+        slot.custom.position.copy(pos)
+        slot.custom.quaternion.copy(v.quaternion)
+        slot.custom.scale.setScalar(shown)
+        slot.custom.visible = !hidden
+      }
       if (bodies && slot.instance >= 0) {
         bodies.getAttribute('aPos').array.set([pos.x, pos.y, pos.z], slot.instance * 3)
-        bodies.getAttribute('aQuat').array.set([v.quaternion.x, v.quaternion.y, v.quaternion.z, v.quaternion.w], slot.instance * 4)
+        bodies
+          .getAttribute('aQuat')
+          .array.set([v.quaternion.x, v.quaternion.y, v.quaternion.z, v.quaternion.w], slot.instance * 4)
         bodies.getAttribute('aRadius').array[slot.instance] = shown
       }
       if (rings && slot.ring >= 0) {
@@ -485,21 +645,34 @@ export class SolarSystem {
         glows.getAttribute('aRadius').array[slot.glow] = shown
       }
     }
-    for (const g of [bodies, rings, glows]) if (g) for (const a of Object.values(g.attributes)) if ((a as any).isInstancedBufferAttribute) (a as InstancedBufferAttribute).needsUpdate = true
+    for (const g of [bodies, rings, glows])
+      if (g)
+        for (const a of Object.values(g.attributes))
+          if ((a as any).isInstancedBufferAttribute) (a as InstancedBufferAttribute).needsUpdate = true
 
     // Orbit lines and apsis markers, around each parent's drawn (uncompressed) position.
     if (parts.orbits) {
       const lines = parts.orbits.geometry.getAttribute('position') as Float32BufferAttribute
       const arr = lines.array as Float32Array
-      const marks = (parts.markers!.geometry as InstancedBufferGeometry).getAttribute('aPos') as InstancedBufferAttribute
+      const marks = (parts.markers!.geometry as InstancedBufferGeometry).getAttribute(
+        'aPos'
+      ) as InstancedBufferAttribute
       this.orbitPaths.forEach(({ slot, path }, i) => {
-        const b = slot.body, parent = this.toRender(this.slots[b.parentIndex].drawn, tmp)
+        const b = slot.body,
+          parent = this.toRender(this.slots[b.parentIndex].drawn, tmp)
         const k = s.scale * (b.parentIndex > 0 ? spread : 1)
-        const n = path.length / 3, base = i * n * 6
+        const n = path.length / 3,
+          base = i * n * 6
         for (let j = 0; j < n; j++) {
-          const a = j * 3, c = ((j + 1) % n) * 3, w = base + j * 6
-          arr[w] = parent.x + path[a] * k; arr[w + 1] = parent.y + path[a + 1] * k; arr[w + 2] = parent.z + path[a + 2] * k
-          arr[w + 3] = parent.x + path[c] * k; arr[w + 4] = parent.y + path[c + 1] * k; arr[w + 5] = parent.z + path[c + 2] * k
+          const a = j * 3,
+            c = ((j + 1) % n) * 3,
+            w = base + j * 6
+          arr[w] = parent.x + path[a] * k
+          arr[w + 1] = parent.y + path[a + 1] * k
+          arr[w + 2] = parent.z + path[a + 2] * k
+          arr[w + 3] = parent.x + path[c] * k
+          arr[w + 4] = parent.y + path[c + 1] * k
+          arr[w + 5] = parent.z + path[c + 2] * k
         }
         // Periapsis is the first path point (E = 0), apoapsis the middle one (E = π).
         const h = (n / 2) * 3

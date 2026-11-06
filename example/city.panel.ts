@@ -1,5 +1,14 @@
 import {
-  ARCHITECTURES, DEFAULT_CITY, generateNetworks, generatePopulation, nearestOnPolyline, planCities, SETTLEMENT_SIZES, type CityInput, type CitySite, type SettlementSize,
+  ARCHITECTURES,
+  DEFAULT_CITY,
+  generateNetworks,
+  generatePopulation,
+  nearestOnPolyline,
+  planCities,
+  SETTLEMENT_SIZES,
+  type CityInput,
+  type CitySite,
+  type SettlementSize
 } from 'threejs-city'
 import type { World } from 'threejs-biomes'
 import type { PanelSpec } from './panel'
@@ -20,12 +29,21 @@ export function demoSites(world: World): (size: SettlementSize) => CitySite {
   const cell = (s: CitySite) => data.cells[data.index.get(s.settlement.cell)!]
   const road = (s: CitySite) => (s.road ? nearestOnPolyline(s.road.points, s.x, s.z).distance : 0)
   const score = (s: CitySite) => cell(s).slope + (s.size === 'farmstead' ? cell(s).water * 0.3 : 0)
-  return (size) => sites.filter((s) => s.size === size).sort((a, b) => road(a) - road(b)).slice(0, size === 'farmstead' ? 16 : 8).sort((a, b) => score(a) - score(b))[0] ?? sites.at(-1)!
+  return (size) =>
+    sites
+      .filter((s) => s.size === size)
+      .sort((a, b) => road(a) - road(b))
+      .slice(0, size === 'farmstead' ? 16 : 8)
+      .sort((a, b) => score(a) - score(b))[0] ?? sites.at(-1)!
 }
 
 /** The site's own settings for a `City` there: centre, radius and (farms) the road the driveway joins. */
 export function siteInput(site: CitySite): CityInput {
-  return { center: [site.x, site.z], radius: site.radius, ...(site.road ? { farm: { road: site.road.points, roadType: site.road.type } } : {}) }
+  return {
+    center: [site.x, site.z],
+    radius: site.radius,
+    ...(site.road ? { farm: { road: site.road.points, roadType: site.road.type } } : {})
+  }
 }
 
 export const panels: PanelSpec = {
@@ -37,7 +55,7 @@ export const panels: PanelSpec = {
         center: 'set from a site of that class planCities finds (`demoSites`; keys 1–6 or `size`)',
         climate: 'null = read from the world at the centre; pick an `architecture` instead',
         oldTown: 'null (no old-town core) in every default size class; the panel cannot edit null',
-        'farm.road': 'a polyline: set from the population\'s road network for the farm site (`siteInput`)',
+        'farm.road': "a polyline: set from the population's road network for the farm site (`siteInput`)"
       },
       choices: {
         size: [...SETTLEMENT_SIZES],
@@ -45,16 +63,36 @@ export const panels: PanelSpec = {
         variant: ['rail', 'picket', 'stone', 'adobe'],
         style: ['auto', 'grid', 'radial', 'organic'],
         architecture: ['auto', ...Object.keys(ARCHITECTURES)],
-        primary: surfaces, secondary: surfaces, minor: surfaces,
+        primary: surfaces,
+        secondary: surfaces,
+        minor: surfaces
       },
       ranges: {
-        seed: [0, 1000, 1], radius: [0, 2500, 1], siteResolution: [0, 50, 1], arms: [0, 8, 1], delay: [0, 20, 1], gridAngle: [-3.14, 3.14, 0.01],
-        lotJitter: unit, night: unit, lit: unit, wear: unit, variation: unit, through: unit, branchChance: unit,
-        wetness: unit, snow: unit, burn: unit, damage: unit, buildBudget: [1, 50, 1],
-        gambrel: unit, tractorWorking: unit, fieldOffset: [0, 1, 0.01], fieldStep: [2, 20, 1],
-      },
-    },
-  },
+        seed: [0, 1000, 1],
+        radius: [0, 2500, 1],
+        siteResolution: [0, 50, 1],
+        arms: [0, 8, 1],
+        delay: [0, 20, 1],
+        gridAngle: [-3.14, 3.14, 0.01],
+        lotJitter: unit,
+        night: unit,
+        lit: unit,
+        wear: unit,
+        variation: unit,
+        through: unit,
+        branchChance: unit,
+        wetness: unit,
+        snow: unit,
+        burn: unit,
+        damage: unit,
+        buildBudget: [1, 50, 1],
+        gambrel: unit,
+        tractorWorking: unit,
+        fieldOffset: [0, 1, 0.01],
+        fieldStep: [2, 20, 1]
+      }
+    }
+  }
 }
 
 /** The classes city-r3f.tsx shows (with `useSpec`, from this manifest); checked the same way. */

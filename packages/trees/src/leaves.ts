@@ -14,7 +14,13 @@ const ASPECT: Record<LeafShape, number> = { broad: 1, needle: 0.62, palm: 1, fer
  *
  * @param detail 1 = full; lower values place fewer, larger cards (for simplified levels of detail).
  */
-export function addLeafCards(out: MeshArrays, sk: TreeSkeleton, params: TreeParams, rand: () => number, detail = 1): void {
+export function addLeafCards(
+  out: MeshArrays,
+  sk: TreeSkeleton,
+  params: TreeParams,
+  rand: () => number,
+  detail = 1
+): void {
   if (params.leafShape === 'none' || params.leafDensity <= 0) return
   const keep = Math.min(1, Math.max(0.2, detail))
   const size = params.leafSize / Math.min(1.8, Math.sqrt(keep))
@@ -49,7 +55,11 @@ export function addLeafCards(out: MeshArrays, sk: TreeSkeleton, params: TreePara
         normal = normalize(sub(up, scale(axis, dot(up, axis))))
       } else {
         // Clusters hang outward from the twig, turned randomly about it.
-        axis = normalize([outward[0] * 0.8 + along[0] * 0.6 + r3[0] * 0.7, outward[1] * 0.5 + along[1] * 0.6 + r3[1] * 0.7 - 0.15, outward[2] * 0.8 + along[2] * 0.6 + r3[2] * 0.7])
+        axis = normalize([
+          outward[0] * 0.8 + along[0] * 0.6 + r3[0] * 0.7,
+          outward[1] * 0.5 + along[1] * 0.6 + r3[1] * 0.7 - 0.15,
+          outward[2] * 0.8 + along[2] * 0.6 + r3[2] * 0.7
+        ])
         const r = normalize([rand() * 2 - 1, rand() * 2 - 1 + 0.6, rand() * 2 - 1])
         normal = normalize(sub(r, scale(axis, dot(r, axis))))
       }
@@ -60,11 +70,16 @@ export function addLeafCards(out: MeshArrays, sk: TreeSkeleton, params: TreePara
       const origin: Vec3 = [p[0] + axis[0] * startAlong, p[1] + axis[1] * startAlong, p[2] + axis[2] * startAlong]
       const vary = 1 + (rand() * 2 - 1) * params.leafColorVariation
       const warm = (rand() * 2 - 1) * params.leafColorVariation * 0.6
-      const ao = 0.5 + 0.5 * Math.pow(depth, 1.5)
+      const ao = 0.5 + 0.5 * depth ** 1.5
       const card = rand()
       const color: Vec3 = [base[0] * vary * ao * (1 + warm), base[1] * vary * ao, base[2] * vary * ao * (1 - warm)]
       // Needle sprays get a second card crossed at 90° so they don't vanish when seen edge-on.
-      for (const [cardSide, cardNormal] of needle ? [[side, normal], [normal, side]] : [[side, normal]]) {
+      for (const [cardSide, cardNormal] of needle
+        ? [
+            [side, normal],
+            [normal, side]
+          ]
+        : [[side, normal]]) {
         const v0 = out.positions.length / 3
         for (let corner = 0; corner < 4; corner++) {
           const u = corner === 1 || corner === 2 ? 1 : 0
@@ -96,15 +111,25 @@ const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const scale = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s]
 
 /** Hangs fruit (apples, berries) under the outer twigs: `fruit` per node within two steps of a tip. */
-export function addTreeFruit(out: MeshArrays, sk: TreeSkeleton, params: TreeParams, rand: () => number, detail = 1): void {
+export function addTreeFruit(
+  out: MeshArrays,
+  sk: TreeSkeleton,
+  params: TreeParams,
+  rand: () => number,
+  detail = 1
+): void {
   if (params.fruit <= 0) return
   const P = sk.positions
   const keep = Math.min(1, Math.max(0.3, detail))
   for (let i = 1; i < sk.count; i++) {
     if (sk.tipDistance[i] > Math.min(2, params.leafDepth)) continue
     if (rand() > params.fruit * keep) continue
-    const r = params.fruitSize / 2 * (0.8 + 0.4 * rand())
-    const center: Vec3 = [P[i * 3] + (rand() - 0.5) * params.leafSize * 0.4, P[i * 3 + 1] - r * 1.6, P[i * 3 + 2] + (rand() - 0.5) * params.leafSize * 0.4]
+    const r = (params.fruitSize / 2) * (0.8 + 0.4 * rand())
+    const center: Vec3 = [
+      P[i * 3] + (rand() - 0.5) * params.leafSize * 0.4,
+      P[i * 3 + 1] - r * 1.6,
+      P[i * 3 + 2] + (rand() - 0.5) * params.leafSize * 0.4
+    ]
     const palette = params.fruitColors.length ? params.fruitColors : ['#b3261e']
     const c = linearColor(palette[Math.floor(rand() * palette.length) % palette.length])
     const v = 0.85 + 0.3 * rand()

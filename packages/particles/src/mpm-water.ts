@@ -2,7 +2,23 @@
 // shear stiffness) with clear and muddy presets, a CPU puddle height field, and a splash emitter that turns rain
 // impacts into MPM splashes and feeds the puddles.
 import type { ComputeNode } from 'three/webgpu'
-import { Fn, If, clamp, float, floor, instanceIndex, ivec2, ivec3, min, pow, transpose, uniform, vec2, vec3, vec4 } from 'three/tsl'
+import {
+  Fn,
+  If,
+  clamp,
+  float,
+  floor,
+  instanceIndex,
+  ivec2,
+  ivec3,
+  min,
+  pow,
+  transpose,
+  uniform,
+  vec2,
+  vec3,
+  vec4
+} from 'three/tsl'
 import { particleRandom } from './emitter.ts'
 import type { FluidSurfaceInput } from './fluid-surface.ts'
 import { mpmIdentity, registerMPMMaterial, type Mat3 } from './mpm-materials.ts'
@@ -47,7 +63,9 @@ export const WATER = registerMPMMaterial<WaterParams>({
   defaults: { density: 1000, bulk: 20000, gamma: 7, viscosity: 0.05 },
   stress: ({ J, C, params: p }) => {
     const pressure = p.bulk.mul(pow(clamp(J, WATER_MIN_J, 1), p.gamma.negate()).sub(1))
-    return mpmIdentity().mul(J.mul(pressure).negate()).add(C.add(transpose(C)).mul(p.viscosity.mul(J)))
+    return mpmIdentity()
+      .mul(J.mul(pressure).negate())
+      .add(C.add(transpose(C)).mul(p.viscosity.mul(J)))
   },
   plasticity: ({ J }) => ({ F: mpmIdentity().mul(pow(clamp(J, WATER_MIN_J, 1), float(1 / 3))) }),
   cpu: {
@@ -59,10 +77,10 @@ export const WATER = registerMPMMaterial<WaterParams>({
     plasticity: ({ J }) => {
       const s = Math.cbrt(Math.min(1, Math.max(WATER_MIN_J, J)))
       return { F: [s, 0, 0, 0, s, 0, 0, 0, s] as Mat3 }
-    },
+    }
   },
   soundSpeed: (p) => Math.sqrt((Math.max(0, p.bulk) * Math.max(1, p.gamma)) / p.density),
-  viscosity: (p) => Math.max(0, p.viscosity) / p.density,
+  viscosity: (p) => Math.max(0, p.viscosity) / p.density
 })
 
 /** A water preset: `water` material parameters plus the matching {@link FluidSurface} look. */
@@ -82,12 +100,12 @@ export interface WaterPreset {
 export const WATER_PRESETS: Record<'clear' | 'muddy', WaterPreset> = {
   clear: {
     material: { density: 1000, bulk: 20000, gamma: 7, viscosity: 0.05 },
-    surface: { absorption: [0.45, 0.07, 0.03], turbidity: 0.4, scatterColor: '#9fc4c8', foamColor: '#f4f7f8' },
+    surface: { absorption: [0.45, 0.07, 0.03], turbidity: 0.4, scatterColor: '#9fc4c8', foamColor: '#f4f7f8' }
   },
   muddy: {
     material: { density: 1150, bulk: 23000, gamma: 7, viscosity: 0.6 },
-    surface: { absorption: [2.2, 3.2, 5.5], turbidity: 45, scatterColor: '#8a6a44', foamColor: '#d9ccb4' },
-  },
+    surface: { absorption: [2.2, 3.2, 5.5], turbidity: 45, scatterColor: '#8a6a44', foamColor: '#d9ccb4' }
+  }
 }
 
 // ---- puddles ----
@@ -117,7 +135,14 @@ export type PuddleInput = DeepPartial<PuddleOptions>
 
 /** Default puddles: 64 × 64 cells of 10 cm, rain-time drying (an hour), a few cm/s of sheet flow. */
 export const DEFAULT_PUDDLES: PuddleOptions = {
-  resolution: [64, 64], cellSize: 0.1, origin: [-3.2, -3.2], flowSpeed: 0.05, infiltration: 2, evaporation: 0.5, wetTime: 60, dryTime: 3600,
+  resolution: [64, 64],
+  cellSize: 0.1,
+  origin: [-3.2, -3.2],
+  flowSpeed: 0.05,
+  infiltration: 2,
+  evaporation: 0.5,
+  wetTime: 60,
+  dryTime: 3600
 }
 
 /** Most flow steps one {@link PuddleField.update} runs (a longer `dt` takes longer steps). */
@@ -172,7 +197,8 @@ export class PuddleField {
     this.options = resolvePuddleOptions(merge(structuredClone(prev), input))
     this.options.resolution = [...prev.resolution]
     this.options.cellSize = prev.cellSize
-    if (height !== undefined || String(prev.origin) !== String(this.options.origin)) this.setHeight(height === undefined ? this.height : height)
+    if (height !== undefined || String(prev.origin) !== String(this.options.origin))
+      this.setHeight(height === undefined ? this.height : height)
     return this
   }
 
@@ -180,10 +206,11 @@ export class PuddleField {
   setHeight(height: MPMHeightFn | null): this {
     this.height = height
     const { cellSize: c, origin } = this.options
-    for (let k = 0; k < this.nz; k++) for (let i = 0; i < this.nx; i++) {
-      const h = height ? height(origin[0] + (i + 0.5) * c, origin[1] + (k + 0.5) * c) : 0
-      this.ground[k * this.nx + i] = Number.isFinite(h) ? h : 0
-    }
+    for (let k = 0; k < this.nz; k++)
+      for (let i = 0; i < this.nx; i++) {
+        const h = height ? height(origin[0] + (i + 0.5) * c, origin[1] + (k + 0.5) * c) : 0
+        this.ground[k * this.nx + i] = Number.isFinite(h) ? h : 0
+      }
     return this
   }
 
@@ -197,7 +224,8 @@ export class PuddleField {
    * 64 steps (fast-forward) the steps lengthen instead: water and time stay exact, levelling lags.
    */
   update(dt: number, rain = 0): this {
-    const step = this.stepTime, total = this.carry + Math.max(0, dt)
+    const step = this.stepTime,
+      total = this.carry + Math.max(0, dt)
     const n = Math.floor(total / step)
     this.raining = rain > 0
     if (n > PUDDLE_MAX_STEPS) {
@@ -214,38 +242,44 @@ export class PuddleField {
   step(dt: number, rain = 0): void {
     const { nx, nz, depth: d, ground: g, next } = this
     const o = this.options
-    const add = (Math.max(0, rain) / 3.6e6) * dt, loss = ((o.infiltration + o.evaporation) / 3.6e6) * dt
+    const add = (Math.max(0, rain) / 3.6e6) * dt,
+      loss = ((o.infiltration + o.evaporation) / 3.6e6) * dt
     for (let i = 0; i < d.length; i++) d[i] += add
     next.set(d)
     // Each cell sends a share of its surface-height lead to each lower neighbour, scaled so it never sends more than it has.
     // Out of the field the ground is extrapolated linearly and dry: water leaves where the terrain falls away.
     const out = [0, 0, 0, 0]
-    for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
-      const c = k * nx + i
-      if (d[c] <= 0) continue
-      const s = g[c] + d[c]
-      let total = 0
-      for (let e = 0; e < 4; e++) {
-        const ii = i + (e === 0 ? 1 : e === 1 ? -1 : 0), kk = k + (e === 2 ? 1 : e === 3 ? -1 : 0)
-        let sn: number
-        if (ii >= 0 && ii < nx && kk >= 0 && kk < nz) sn = g[kk * nx + ii] + d[kk * nx + ii]
-        else {
-          const ib = Math.min(nx - 1, Math.max(0, 2 * i - ii)), kb = Math.min(nz - 1, Math.max(0, 2 * k - kk))
-          sn = 2 * g[c] - g[kb * nx + ib]
+    for (let k = 0; k < nz; k++)
+      for (let i = 0; i < nx; i++) {
+        const c = k * nx + i
+        if (d[c] <= 0) continue
+        const s = g[c] + d[c]
+        let total = 0
+        for (let e = 0; e < 4; e++) {
+          const ii = i + (e === 0 ? 1 : e === 1 ? -1 : 0),
+            kk = k + (e === 2 ? 1 : e === 3 ? -1 : 0)
+          let sn: number
+          if (ii >= 0 && ii < nx && kk >= 0 && kk < nz) sn = g[kk * nx + ii] + d[kk * nx + ii]
+          else {
+            const ib = Math.min(nx - 1, Math.max(0, 2 * i - ii)),
+              kb = Math.min(nz - 1, Math.max(0, 2 * k - kk))
+            sn = 2 * g[c] - g[kb * nx + ib]
+          }
+          out[e] = Math.max(0, s - sn) * PUDDLE_RELAX
+          total += out[e]
         }
-        out[e] = Math.max(0, s - sn) * PUDDLE_RELAX
-        total += out[e]
+        const scale = total > d[c] ? d[c] / total : 1
+        for (let e = 0; e < 4; e++) {
+          const q = out[e] * scale
+          if (!q) continue
+          next[c] -= q
+          const ii = i + (e === 0 ? 1 : e === 1 ? -1 : 0),
+            kk = k + (e === 2 ? 1 : e === 3 ? -1 : 0)
+          if (ii >= 0 && ii < nx && kk >= 0 && kk < nz) next[kk * nx + ii] += q
+        }
       }
-      const scale = total > d[c] ? d[c] / total : 1
-      for (let e = 0; e < 4; e++) {
-        const q = out[e] * scale
-        if (!q) continue
-        next[c] -= q
-        const ii = i + (e === 0 ? 1 : e === 1 ? -1 : 0), kk = k + (e === 2 ? 1 : e === 3 ? -1 : 0)
-        if (ii >= 0 && ii < nx && kk >= 0 && kk < nz) next[kk * nx + ii] += q
-      }
-    }
-    const wet = 1 - Math.exp(-dt / Math.max(1e-6, o.wetTime)), dry = Math.exp(-dt / Math.max(1e-6, o.dryTime))
+    const wet = 1 - Math.exp(-dt / Math.max(1e-6, o.wetTime)),
+      dry = Math.exp(-dt / Math.max(1e-6, o.dryTime))
     for (let i = 0; i < d.length; i++) {
       d[i] = Math.max(0, next[i] - loss)
       const w = this.wetness[i]
@@ -260,19 +294,33 @@ export class PuddleField {
   }
 
   /** Standing water and wetness at world (x, z), bilinear between cell centres (0 outside the field). */
-  sample(x: number, z: number, out = { depth: 0, wetness: 0 }): {
+  sample(
+    x: number,
+    z: number,
+    out = { depth: 0, wetness: 0 }
+  ): {
     /** Standing water depth at the sample point, metres (0 outside the field). */
     depth: number
     /** Surface wetness at the sample point, 0…1 (0 outside the field). */
     wetness: number
   } {
     const { cellSize: c, origin } = this.options
-    const gx = (x - origin[0]) / c - 0.5, gz = (z - origin[1]) / c - 0.5
+    const gx = (x - origin[0]) / c - 0.5,
+      gz = (z - origin[1]) / c - 0.5
     out.depth = out.wetness = 0
     if (!(gx > -1 && gz > -1 && gx < this.nx && gz < this.nz)) return out
-    const i = Math.floor(gx), k = Math.floor(gz), fx = gx - i, fz = gz - k
-    for (const [di, dk, w] of [[0, 0, (1 - fx) * (1 - fz)], [1, 0, fx * (1 - fz)], [0, 1, (1 - fx) * fz], [1, 1, fx * fz]] as const) {
-      const ii = i + di, kk = k + dk
+    const i = Math.floor(gx),
+      k = Math.floor(gz),
+      fx = gx - i,
+      fz = gz - k
+    for (const [di, dk, w] of [
+      [0, 0, (1 - fx) * (1 - fz)],
+      [1, 0, fx * (1 - fz)],
+      [0, 1, (1 - fx) * fz],
+      [1, 1, fx * fz]
+    ] as const) {
+      const ii = i + di,
+        kk = k + dk
       if (ii < 0 || kk < 0 || ii >= this.nx || kk >= this.nz) continue
       out.depth += this.depth[kk * this.nx + ii] * w
       out.wetness += this.wetness[kk * this.nx + ii] * w
@@ -300,7 +348,8 @@ export class PuddleField {
 export function resolvePuddleOptions(input: unknown): PuddleOptions {
   const o = merge(structuredClone(DEFAULT_PUDDLES), input)
   const d = DEFAULT_PUDDLES
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
+  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
   o.resolution = [0, 1].map((a) => Math.round(num(o.resolution?.[a], d.resolution[a], 2, 2048))) as [number, number]
   o.cellSize = num(o.cellSize, d.cellSize, 1e-3)
   o.origin = [0, 1].map((a) => num(o.origin?.[a], d.origin[a])) as [number, number]
@@ -350,8 +399,18 @@ export type SplashInput = DeepPartial<SplashOptions>
 
 /** Default splashes: moderate rain (8 mm/h), 3 visible splashes per m²·s per mm/h within 3 m. */
 export const DEFAULT_SPLASHES: SplashOptions = {
-  seed: 1, rain: 8, splashes: 3, radius: 3, center: [0, 0], particles: [3, 4], speed: 1.2, puddleDepth: 0.002, maxPerFrame: 64, material: 'water', retireOutside: true,
-  soak: 0.1,
+  seed: 1,
+  rain: 8,
+  splashes: 3,
+  radius: 3,
+  center: [0, 0],
+  particles: [3, 4],
+  speed: 1.2,
+  puddleDepth: 0.002,
+  maxPerFrame: 64,
+  material: 'water',
+  retireOutside: true,
+  soak: 0.1
 }
 
 /** `buffers.state.z` of splash particles: the retire pass removes them when they land on the ground. */
@@ -416,7 +475,11 @@ export class SplashEmitter {
   private readonly soak = uniform(0.1)
 
   /** An emitter into `target` (an {@link MPMSolver}, or an `MPMReference` for tests) over `height`. */
-  constructor(target: SplashTarget, input: SplashInput = {}, { height = null, puddles = null }: { height?: MPMHeightFn | null; puddles?: PuddleField | null } = {}) {
+  constructor(
+    target: SplashTarget,
+    input: SplashInput = {},
+    { height = null, puddles = null }: { height?: MPMHeightFn | null; puddles?: PuddleField | null } = {}
+  ) {
     this.target = target
     this.height = height
     this.puddles = puddles
@@ -448,27 +511,33 @@ export class SplashEmitter {
     if (!count) return 0
     const seed = seedOf(o.seed)
     const h = this.target.options.cellSize / 2 // particle spacing
-    const pos: number[] = [], vel: number[] = []
+    const pos: number[] = [],
+      vel: number[] = []
     const sample = { depth: 0, wetness: 0 }
     for (let s = 0; s < count; s++) {
       const serial = this.spawned + s
       const r = (k: number) => particleRandom(serial, k, seed)
       // Uniform in the disc.
-      const rho = o.radius * Math.sqrt(r(0)), phi = r(1) * Math.PI * 2
-      const x = o.center[0] + rho * Math.cos(phi), z = o.center[1] + rho * Math.sin(phi)
+      const rho = o.radius * Math.sqrt(r(0)),
+        phi = r(1) * Math.PI * 2
+      const x = o.center[0] + rho * Math.cos(phi),
+        z = o.center[1] + rho * Math.sin(phi)
       const g = this.height ? this.height(x, z) : 0
       const depth = this.puddles ? this.puddles.sample(x, z, sample).depth : 0
       const wet = depth >= o.puddleDepth
       const y = g + depth
       this.impacts.push({ x, z, y, wet })
       const n = Math.max(1, Math.round(wet ? o.particles[1] : o.particles[0]))
-      const spin = r(2) * Math.PI * 2, energy = 0.75 + 0.5 * r(3)
+      const spin = r(2) * Math.PI * 2,
+        energy = 0.75 + 0.5 * r(3)
       const ring = wet ? n - 1 : n
       for (let k = 0; k < ring; k++) {
         const a = spin + (k / ring) * Math.PI * 2 + (r(4 + k) - 0.5) * 0.6
-        const ca = Math.cos(a), sa = Math.sin(a)
+        const ca = Math.cos(a),
+          sa = Math.sin(a)
         // On water a crown: steep and tall; on dry ground the drop shatters into a low, wide scatter.
-        const out = o.speed * energy * (wet ? 0.45 : 0.8) * (0.8 + 0.4 * r(12 + k)), up = o.speed * energy * (wet ? 0.85 : 0.4) * (0.8 + 0.4 * r(20 + k))
+        const out = o.speed * energy * (wet ? 0.45 : 0.8) * (0.8 + 0.4 * r(12 + k)),
+          up = o.speed * energy * (wet ? 0.85 : 0.4) * (0.8 + 0.4 * r(20 + k))
         // Droplets start a particle spacing apart: closer, they would share grid nodes and move as one blob.
         pos.push(x + ca * h, y + h * 0.5, z + sa * h)
         vel.push(ca * out, up, sa * out)
@@ -503,7 +572,8 @@ export class SplashEmitter {
   }
 
   private buildRetire(solver: MPMSolver): ComputeNode {
-    const b = solver.buffers, u = solver.uniforms
+    const b = solver.buffers,
+      u = solver.uniforms
     const [nx, ny, nz] = solver.resolution
     return Fn(() => {
       const i = instanceIndex
@@ -511,19 +581,35 @@ export class SplashEmitter {
       If(V.w.greaterThan(0), () => {
         const P = b.position.element(i).toVar()
         const base: any = floor(P.xyz.mul(u.invDx).sub(0.5)).toVar()
-        const outside = base.x.lessThan(0).or(base.y.lessThan(0)).or(base.z.lessThan(0))
-          .or(base.x.greaterThan(nx - 3)).or(base.y.greaterThan(ny - 3)).or(base.z.greaterThan(nz - 3))
+        const outside = base.x
+          .lessThan(0)
+          .or(base.y.lessThan(0))
+          .or(base.z.lessThan(0))
+          .or(base.x.greaterThan(nx - 3))
+          .or(base.y.greaterThan(ny - 3))
+          .or(base.z.greaterThan(nz - 3))
         // Bilinear ground under the particle, as the solver collides with it.
         const gp: any = clamp(P.xz.mul(u.invDx), vec2(0), vec2(nx - 1, nz - 1)).toVar()
         const i0: any = (min as any)(ivec2(floor(gp) as any), ivec2(nx - 2, nz - 2)).toVar()
         const f: any = gp.sub(vec2(i0)).toVar()
         const at = (di: number, dk: number) => b.heights.element(i0.y.add(dk).mul(nx).add(i0.x.add(di)))
-        const ground = at(0, 0).mul(f.x.oneMinus()).add(at(1, 0).mul(f.x)).mul(f.y.oneMinus()).add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
+        const ground = at(0, 0)
+          .mul(f.x.oneMinus())
+          .add(at(1, 0).mul(f.x))
+          .mul(f.y.oneMinus())
+          .add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
         const onGround = P.y.lessThan(ground.add(u.dx.mul(0.5)))
         const landed = b.state.element(i).z.equal(SPLASH_TAG).and(V.y.lessThanEqual(0)).and(onGround)
         // Stray water at rest on the ground, alone at its grid node: soaks in.
-        const node: any = (ivec3 as any)(clamp(floor(P.xyz.mul(u.invDx).add(0.5)), vec3(0), vec3(nx - 1, ny - 1, nz - 1))).toVar()
-        const mass = b.grid.element(node.z.mul(nx * ny).add(node.y.mul(nx)).add(node.x)).w
+        const node: any = (ivec3 as any)(
+          clamp(floor(P.xyz.mul(u.invDx).add(0.5)), vec3(0), vec3(nx - 1, ny - 1, nz - 1))
+        ).toVar()
+        const mass = b.grid.element(
+          node.z
+            .mul(nx * ny)
+            .add(node.y.mul(nx))
+            .add(node.x)
+        ).w
         const stray = onGround.and(mass.lessThan(this.soak)).and(V.xyz.length().lessThan(0.3))
         If(landed.or(stray).or(outside.and(this.retireOutside.greaterThan(0))), () => {
           b.velocity.element(i).assign(vec4(0))
@@ -537,7 +623,8 @@ export class SplashEmitter {
 export function resolveSplashOptions(input: unknown): SplashOptions {
   const o = merge(structuredClone(DEFAULT_SPLASHES), input)
   const d = DEFAULT_SPLASHES
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
+  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
   if (typeof o.seed !== 'number' && typeof o.seed !== 'string') o.seed = d.seed
   o.rain = num(o.rain, d.rain, 0)
   o.splashes = num(o.splashes, d.splashes, 0)

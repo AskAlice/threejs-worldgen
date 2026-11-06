@@ -1,6 +1,13 @@
 import {
-  BufferGeometry, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3,
-  type MeshPhysicalNodeMaterial, type Object3D,
+  BufferGeometry,
+  Float32BufferAttribute,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
+  Sphere,
+  Vector3,
+  type MeshPhysicalNodeMaterial,
+  type Object3D
 } from 'three/webgpu'
 import type { GrassSettings } from './grass-settings.ts'
 import type { CellCache } from './grass-tiles.ts'
@@ -19,7 +26,7 @@ export function createBladeGeometry(segments: number): BufferGeometry {
   for (let r = 0; r < segments; r++) {
     const y = r / segments
     // Pinched at the base, widest around a quarter of the way up, tapering to a sharp tip.
-    const half = 0.5 * Math.pow(1 - y, 0.75) * (0.72 + 0.28 * Math.min(1, y / 0.25))
+    const half = 0.5 * (1 - y) ** 0.75 * (0.72 + 0.28 * Math.min(1, y / 0.25))
     pos.push(-half, y, 0, 0, y, 0, half, y, 0)
     uv.push(0, y, 0.5, y, 1, y)
     if (r > 0) {
@@ -122,7 +129,13 @@ export class TileGeometryStore {
    * Fills a tile's instance buffers with its cells' blades, growing the buffers only when needed:
    * reusing them across LOD changes is what keeps camera moves from stuttering.
    */
-  write(target: TileGeometry, cells: (CellCache | undefined)[], take: Int32Array, segments: number, billboard: boolean): void {
+  write(
+    target: TileGeometry,
+    cells: (CellCache | undefined)[],
+    take: Int32Array,
+    segments: number,
+    billboard: boolean
+  ): void {
     const written = take.reduce((a, b) => a + b, 0)
 
     let geometry = target.mesh.geometry
@@ -191,7 +204,7 @@ export class TileGeometryStore {
     const reach = s.bladeHeight * (1 + s.heightVariation) * 2 + s.clumpSize // map can double height; tufts spill over edges
     mesh.geometry.boundingSphere = new Sphere(
       new Vector3(size / 2, (target.minY + target.maxY) / 2, size / 2),
-      Math.hypot(size / Math.SQRT2, (target.maxY - target.minY) / 2) + reach,
+      Math.hypot(size / Math.SQRT2, (target.maxY - target.minY) / 2) + reach
     )
   }
 

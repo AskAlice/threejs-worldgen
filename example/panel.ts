@@ -65,7 +65,10 @@ export interface PanelPackage {
  * (and opens the folders that match), a reset button per class, and share-by-URL (changed options are
  * kept in the URL hash and re-applied on load).
  */
-export function createPanel(packages: PanelPackage[], { title = 'threejs-worldgen', container }: { title?: string; container?: HTMLElement } = {}): GUI {
+export function createPanel(
+  packages: PanelPackage[],
+  { title = 'threejs-worldgen', container }: { title?: string; container?: HTMLElement } = {}
+): GUI {
   const gui = new GUI({ title, container, width: 320 })
   const shared: Record<string, Record<string, unknown>> = readHash()
 
@@ -73,7 +76,8 @@ export function createPanel(packages: PanelPackage[], { title = 'threejs-worldge
   const search = document.createElement('input')
   search.placeholder = 'search options…'
   search.className = 'worldgen-panel-search'
-  search.style.cssText = 'width: calc(100% - 12px); margin: 6px; padding: 4px 6px; background: #222; color: #eee; border: 1px solid #444; border-radius: 3px; font: inherit'
+  search.style.cssText =
+    'width: calc(100% - 12px); margin: 6px; padding: 4px 6px; background: #222; color: #eee; border: 1px solid #444; border-radius: 3px; font: inherit'
   gui.$children.prepend(search)
 
   for (const pkg of packages) {
@@ -88,20 +92,30 @@ export function createPanel(packages: PanelPackage[], { title = 'threejs-worldge
         entry[path.join('.')] = value
         writeHash(shared)
       }
-      addOptions(cf, cls.target, apply, { ranges: cls.ranges, choices: cls.choices, skip: cls.skip, arrays: cls.arrays })
-      cf.add({ reset: () => {
-        for (const [p, v] of Object.entries(shared[key] ?? {})) {
-          const path = p.split('.')
-          const def = path.reduce<any>((o, k) => o?.[k], defaults)
-          if (def !== undefined && def !== v) {
-            setPath(cls.target, path, structuredClone(def))
-            cls.onChange(path, def)
+      addOptions(cf, cls.target, apply, {
+        ranges: cls.ranges,
+        choices: cls.choices,
+        skip: cls.skip,
+        arrays: cls.arrays
+      })
+      cf.add(
+        {
+          reset: () => {
+            for (const [p, v] of Object.entries(shared[key] ?? {})) {
+              const path = p.split('.')
+              const def = path.reduce<any>((o, k) => o?.[k], defaults)
+              if (def !== undefined && def !== v) {
+                setPath(cls.target, path, structuredClone(def))
+                cls.onChange(path, def)
+              }
+            }
+            delete shared[key]
+            writeHash(shared)
+            cf.controllersRecursive().forEach((c) => c.updateDisplay())
           }
-        }
-        delete shared[key]
-        writeHash(shared)
-        cf.controllersRecursive().forEach((c) => c.updateDisplay())
-      } }, 'reset').name(`↺ reset ${cls.name}`)
+        },
+        'reset'
+      ).name(`↺ reset ${cls.name}`)
       cf.close()
       // Re-apply shared options from the URL — untrusted input: only existing options, same value type.
       for (const [p, v] of Object.entries(shared[key] ?? {})) {
@@ -128,8 +142,18 @@ export function createPanel(packages: PanelPackage[], { title = 'threejs-worldge
 }
 
 /** Convenience: a `PanelClass` whose changes call `instance.set(patch(path, value))`. */
-export function classOf(name: string, instance: { set: (input: any) => unknown }, options: Record<string, any>, extra: Partial<PanelClass> = {}): PanelClass {
-  return { name, target: structuredClone(options), onChange: (path, value) => instance.set(patch(path, value)), ...extra }
+export function classOf(
+  name: string,
+  instance: { set: (input: any) => unknown },
+  options: Record<string, any>,
+  extra: Partial<PanelClass> = {}
+): PanelClass {
+  return {
+    name,
+    target: structuredClone(options),
+    onChange: (path, value) => instance.set(patch(path, value)),
+    ...extra
+  }
 }
 
 function folderPath(f: GUI | undefined): string {
@@ -178,10 +202,13 @@ function readHash(): Record<string, Record<string, unknown>> {
     const parsed = h ? JSON.parse(decodeURIComponent(atob(h))) : {}
     // Plain objects only, without prototype keys (values are checked again by setPath).
     const clean: Record<string, Record<string, unknown>> = Object.create(null)
-    if (parsed && typeof parsed === 'object') for (const [k, v] of Object.entries(parsed)) {
-      if (FORBIDDEN.has(k) || !v || typeof v !== 'object') continue
-      clean[k] = Object.fromEntries(Object.entries(v as object).filter(([p]) => !p.split('.').some((s) => FORBIDDEN.has(s))))
-    }
+    if (parsed && typeof parsed === 'object')
+      for (const [k, v] of Object.entries(parsed)) {
+        if (FORBIDDEN.has(k) || !v || typeof v !== 'object') continue
+        clean[k] = Object.fromEntries(
+          Object.entries(v as object).filter(([p]) => !p.split('.').some((s) => FORBIDDEN.has(s)))
+        )
+      }
     return clean
   } catch {
     return {}
@@ -190,5 +217,9 @@ function readHash(): Record<string, Record<string, unknown>> {
 
 function writeHash(state: Record<string, Record<string, unknown>>) {
   const json = JSON.stringify(state)
-  history.replaceState(null, '', json === '{}' ? location.pathname + location.search : `#${btoa(encodeURIComponent(json))}`)
+  history.replaceState(
+    null,
+    '',
+    json === '{}' ? location.pathname + location.search : `#${btoa(encodeURIComponent(json))}`
+  )
 }

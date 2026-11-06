@@ -1,12 +1,30 @@
 import * as THREE from 'three/webgpu'
-import { Fn, attribute, instancedBufferAttribute, modelWorldMatrix, pass, positionWorld, uniform, vec4 } from 'three/tsl'
+import {
+  Fn,
+  attribute,
+  instancedBufferAttribute,
+  modelWorldMatrix,
+  pass,
+  positionWorld,
+  uniform,
+  vec4
+} from 'three/tsl'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { World, WorldTerrain, createSample } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
 import type { Scatter } from 'threejs-scatter'
 import type { VegetationSpecies } from 'threejs-trees'
 import { Sky } from 'threejs-sky'
-import { Lightning, Precipitation, StateField, StateLook, StormDamage, Weather, Wildfire, applyMaterialStatesTo } from 'threejs-weathering'
+import {
+  Lightning,
+  Precipitation,
+  StateField,
+  StateLook,
+  StormDamage,
+  Weather,
+  Wildfire,
+  applyMaterialStatesTo
+} from 'threejs-weathering'
 import { classOf, createPanel } from './panel'
 import { keepAboveGround } from './shared'
 
@@ -45,22 +63,48 @@ controls.enableDamping = true
 controls.maxDistance = 4000
 
 hud.textContent = 'building terrain and sky…'
-const terrain = await WorldTerrain.create({ world, camera, scene, createWorker: () => new TerrainWorker(), castShadow: true })
-const sky = await Sky.create({ renderer, scene, camera, world, clock: { date: '2026-07-20T12:00:00Z', paused: true }, observer: { latitude: 44, longitude: 0 }, lighting: { autoExposure: true },
+const terrain = await WorldTerrain.create({
+  world,
+  camera,
+  scene,
+  createWorker: () => new TerrainWorker(),
+  castShadow: true
+})
+const sky = await Sky.create({
+  renderer,
+  scene,
+  camera,
+  world,
+  clock: { date: '2026-07-20T12:00:00Z', paused: true },
+  observer: { latitude: 44, longitude: 0 },
+  lighting: { autoExposure: true },
   // Fire weather: a few fair-weather cumulus, no cirrus, little stratus (the weather sets the coverage).
-  clouds: { cirrus: { amount: 0 }, stratus: { amount: 0.15 } } })
+  clouds: { cirrus: { amount: 0 }, stratus: { amount: 0.15 } }
+})
 sky.follow(controls.target)
 
 const fire = new Wildfire({
-  world, weather, field, renderer, camera, center: [0, 0], size: SIZE, cellSize: 8, startTime: clock.time,
-  look: { haze: { enabled: true }, bloom: { enabled: true } },
+  world,
+  weather,
+  field,
+  renderer,
+  camera,
+  center: [0, 0],
+  size: SIZE,
+  cellSize: 8,
+  startTime: clock.time,
+  look: { haze: { enabled: true }, bloom: { enabled: true } }
 })
 scene.add(fire.object)
 
 // The ground: the terrain's own material, weathered by the state field (wet, snow) and the fire (char, ash, glow).
 const fireNodes = fire.node()
 const fieldNodes = field.node()
-applyMaterialStatesTo(terrain.material, { wetness: fieldNodes.wetness, snow: fieldNodes.snow, ...fireNodes }, { look, time: shaderTime, streaks: false })
+applyMaterialStatesTo(
+  terrain.material,
+  { wetness: fieldNodes.wetness, snow: fieldNodes.snow, ...fireNodes },
+  { look, time: shaderTime, streaks: false }
+)
 
 // The forest: threejs-trees species where the biomes say they grow, wet / snowy / burnt / damaged from the same states.
 const species: VegetationSpecies[] = [
@@ -71,11 +115,12 @@ const species: VegetationSpecies[] = [
   { name: 'shrub', density: 0.3, cluster: { scale: 40, threshold: 0.5, strength: 0.7 } },
   { name: 'fern', density: 0.45, cluster: { scale: 25, threshold: 0.45, strength: 0.8 } },
   { name: 'boulder', density: 0.12 },
-  { name: 'rock', density: 0.15 },
+  { name: 'rock', density: 0.15 }
 ]
 const sample = createSample(8)
 const best: Record<string, number> = {}
-for (const b of world.options.biomes) for (const e of b.scatter) best[e.species] = Math.max(best[e.species] ?? 0, e.probability)
+for (const b of world.options.biomes)
+  for (const e of b.scatter) best[e.species] = Math.max(best[e.species] ?? 0, e.probability)
 const biomeDensity = (name: string, x: number, z: number) => {
   world.sample(x, z, sample)
   if (sample.waterLevel > sample.elevation - 0.3) return 0
@@ -92,7 +137,8 @@ const origins = new WeakMap<THREE.BufferAttribute, THREE.InstancedInterleavedBuf
 const instanceOriginXZ = Fn((builder: any) => {
   const object = builder.object
   // Impostors carry their position in an instanced attribute; mesh levels in the instance matrix.
-  if (builder.geometry?.hasAttribute('scatterPosition')) return modelWorldMatrix.mul(vec4(attribute('scatterPosition', 'vec4').xyz, 1)).xz
+  if (builder.geometry?.hasAttribute('scatterPosition'))
+    return modelWorldMatrix.mul(vec4(attribute('scatterPosition', 'vec4').xyz, 1)).xz
   const im = object?.instanceMatrix as THREE.InstancedBufferAttribute | undefined
   if (!im || im.array.length === 0) return positionWorld.xz
   let ib = origins.get(im)
@@ -100,7 +146,10 @@ const instanceOriginXZ = Fn((builder: any) => {
   const data = ib
   let seen = -1
   const sync = uniform(0).onObjectUpdate(() => {
-    if (im.version !== seen) { seen = im.version; data.needsUpdate = true }
+    if (im.version !== seen) {
+      seen = im.version
+      data.needsUpdate = true
+    }
     return 0
   })
   return modelWorldMatrix.mul(vec4((instancedBufferAttribute(data as any, 'vec3', 16, 12) as any).add(sync), 1)).xz
@@ -113,11 +162,25 @@ if (!params.has('notrees')) {
   const [{ Scatter, disposeLayers }, trees] = await Promise.all([import('threejs-scatter'), import('threejs-trees')])
   setTreeEnvironment = trees.setTreeEnvironment
   const layers = await trees.createVegetationLayers({
-    species, variants: 2, seed: 7, simplifiedDetail: 0.35, castShadow: true, renderer: params.has('noimpostors') ? null : renderer, density: biomeDensity,
-    weather: { wetness: fieldNodes.wetness, snow: fieldNodes.snow, burn: fire.node(instanceOriginXZ() as any).burn, damage: fieldNodes.damage },
+    species,
+    variants: 2,
+    seed: 7,
+    simplifiedDetail: 0.35,
+    castShadow: true,
+    renderer: params.has('noimpostors') ? null : renderer,
+    density: biomeDensity,
+    weather: {
+      wetness: fieldNodes.wetness,
+      snow: fieldNodes.snow,
+      burn: fire.node(instanceOriginXZ() as any).burn,
+      damage: fieldNodes.damage
+    }
   })
   scatter = Scatter.create({ camera, scene, terrain: height, layers, seed: 7, maxDistance: 1400 })
-  addEventListener('beforeunload', () => { scatter?.dispose(); disposeLayers(layers) })
+  addEventListener('beforeunload', () => {
+    scatter?.dispose()
+    disposeLayers(layers)
+  })
 }
 // Water: threejs-water rivers and sea (on demand; ?nowater skips them).
 if (!params.has('nowater')) {
@@ -129,7 +192,9 @@ const storms = new StormDamage(weather, { field })
 
 const rain = new Precipitation({ weather, camera })
 const lightning = new Lightning({ weather, camera, radius: 4000 })
-lightning.onStrike((s) => { if (Math.abs(s.x) < SIZE / 2 && Math.abs(s.z) < SIZE / 2) hud.dataset.strike = `${s.x.toFixed(0)}, ${s.z.toFixed(0)}` })
+lightning.onStrike((s) => {
+  if (Math.abs(s.x) < SIZE / 2 && Math.abs(s.z) < SIZE / 2) hud.dataset.strike = `${s.x.toFixed(0)}, ${s.z.toFixed(0)}`
+})
 scene.add(rain.object, lightning.object)
 
 // Post: the fire's optional bloom on the scene pass. Minimal on purpose, so a shared pipeline can replace it.
@@ -139,17 +204,39 @@ const buildPipeline = () => {
   pipeline.needsUpdate = true
 }
 buildPipeline()
-Object.assign(window, { world, weather, field, fire, rain, lightning, storms, clock, scene, camera, controls, renderer, pipeline, sky, terrain, scatter }) // for the console
+Object.assign(window, {
+  world,
+  weather,
+  field,
+  fire,
+  rain,
+  lightning,
+  storms,
+  clock,
+  scene,
+  camera,
+  controls,
+  renderer,
+  pipeline,
+  sky,
+  terrain,
+  scatter
+}) // for the console
 
 // Shift-click: ignite where the cursor ray meets the ground (marched against the world's height).
-const ray = new THREE.Raycaster(), pointer = new THREE.Vector2(), at = new THREE.Vector3()
+const ray = new THREE.Raycaster(),
+  pointer = new THREE.Vector2(),
+  at = new THREE.Vector3()
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (!e.shiftKey) return
   pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1)
   ray.setFromCamera(pointer, camera)
   for (let d = 0; d < 6000; d += 2) {
     at.copy(ray.ray.direction).multiplyScalar(d).add(ray.ray.origin)
-    if (at.y <= height(at.x, at.z)) { fire.ignite(at.x, at.z, 6); break }
+    if (at.y <= height(at.x, at.z)) {
+      fire.ignite(at.x, at.z, 6)
+      break
+    }
   }
 })
 
@@ -158,30 +245,57 @@ const gui = createPanel([
   {
     name: 'threejs-weathering',
     classes: [
-      classOf('Weather', weather, weather.options, { skip: ['seed', 'direction'], ranges: { coverage: [-1, 1, 0.01], temperatureOffset: [-30, 30, 0.5], chance: [0, 1, 0.01] } }),
+      classOf('Weather', weather, weather.options, {
+        skip: ['seed', 'direction'],
+        ranges: { coverage: [-1, 1, 0.01], temperatureOffset: [-30, 30, 0.5], chance: [0, 1, 0.01] }
+      }),
       classOf('Precipitation', rain, rain.options, { skip: ['override', 'seed'] }),
       classOf('Lightning', lightning, lightning.options),
       {
-        ...classOf('Wildfire', fire, { ...fire.options, look: fire.look }, { skip: ['ignitions', 'species', 'grassPresets', 'lines', 'center', 'size', 'cellSize', 'startTime', 'seed', 'resolution'] }),
+        ...classOf(
+          'Wildfire',
+          fire,
+          { ...fire.options, look: fire.look },
+          {
+            skip: [
+              'ignitions',
+              'species',
+              'grassPresets',
+              'lines',
+              'center',
+              'size',
+              'cellSize',
+              'startTime',
+              'seed',
+              'resolution'
+            ]
+          }
+        ),
         onChange: (path, value) => {
           fire.set(path.reduceRight<any>((v, k) => ({ [k]: v }), value))
           if (path.join('.') === 'look.bloom.enabled') buildPipeline()
-        },
+        }
       },
       classOf('StateLook', look, look.options),
-      classOf('StormDamage', storms, storms.options),
-    ],
-  },
+      classOf('StormDamage', storms, storms.options)
+    ]
+  }
 ])
 const sandbox = gui.addFolder('sandbox')
 sandbox.add(clock, 'scale', 0, 3600, 1).name('time scale (s per s)')
 sandbox.add(clock, 'paused')
-sandbox.add(clock, 'time', 0, 30 * 86400, 60).name('time (scrub)').listen()
+sandbox
+  .add(clock, 'time', 0, 30 * 86400, 60)
+  .name('time (scrub)')
+  .listen()
 const preset = (input: Parameters<Weather['set']>[0]) => () => weather.set(input)
 sandbox.add({ clear: preset({ fronts: { coverage: -0.8 }, temperatureOffset: 0 }) }, 'clear')
 sandbox.add({ rain: preset({ fronts: { coverage: 0.9 }, temperatureOffset: 0 }) }, 'rain')
 sandbox.add({ snow: preset({ fronts: { coverage: 0.9 }, temperatureOffset: -16 }) }, 'snow')
-sandbox.add({ thunderstorm: preset({ fronts: { coverage: 0.2 }, temperatureOffset: 12, storms: { chance: 1 } }) }, 'thunderstorm')
+sandbox.add(
+  { thunderstorm: preset({ fronts: { coverage: 0.2 }, temperatureOffset: 12, storms: { chance: 1 } }) },
+  'thunderstorm'
+)
 sandbox.add({ gale: preset({ wind: { speed: 28, gustiness: 0.8 } }) }, 'gale')
 sandbox.add({ 'ignite centre': () => fire.ignite(0, 0, 10) }, 'ignite centre')
 
@@ -193,7 +307,10 @@ addEventListener('resize', () => {
 
 let last = performance.now()
 let fps = 60
-let skyHour = -1, skyCloud = -1, skyFog = -1, slow = 0
+let skyHour = -1,
+  skyCloud = -1,
+  skyFog = -1,
+  slow = 0
 const tint: [number, number, number] = [1, 1, 1]
 const tintColor = new THREE.Color()
 renderer.setAnimationLoop(() => {
@@ -216,12 +333,22 @@ renderer.setAnimationLoop(() => {
   // Sky time follows the sandbox clock; clouds and fog follow the weather (throttled: they rebuild a little).
   const w = rain.sample
   const hour = (clock.time % 86400) / 3600
-  if (Math.abs(hour - skyHour) > 0.01) { sky.setTimeOfDay(hour); skyHour = hour }
+  if (Math.abs(hour - skyHour) > 0.01) {
+    sky.setTimeOfDay(hour)
+    skyHour = hour
+  }
   if (now - slow > 2000) {
     slow = now
-    const cover = Math.round(w.cloudCover * 20) / 20, fog = Math.round((0.00015 + w.fog * 0.01 + Math.min(1, w.precipitation / 10) * 0.003) * 1e5) / 1e5
-    if (cover !== skyCloud) { sky.set({ clouds: { coverage: cover } }); skyCloud = cover }
-    if (fog !== skyFog) { sky.set({ lighting: { fogDensity: fog } }); skyFog = fog }
+    const cover = Math.round(w.cloudCover * 20) / 20,
+      fog = Math.round((0.00015 + w.fog * 0.01 + Math.min(1, w.precipitation / 10) * 0.003) * 1e5) / 1e5
+    if (cover !== skyCloud) {
+      sky.set({ clouds: { coverage: cover } })
+      skyCloud = cover
+    }
+    if (fog !== skyFog) {
+      sky.set({ lighting: { fogDensity: fog } })
+      skyFog = fog
+    }
   }
   sky.update(0)
   // The fire lights its smoke with the clear sun (its own self-shadowing does the rest)...
@@ -234,7 +361,9 @@ renderer.setAnimationLoop(() => {
   pipeline.render()
 
   const s = fire.sim.stats
-  const day = Math.floor(clock.time / 86400), hh = Math.floor(hour), mm = Math.floor((clock.time % 3600) / 60)
+  const day = Math.floor(clock.time / 86400),
+    hh = Math.floor(hour),
+    mm = Math.floor((clock.time % 3600) / 60)
   hud.textContent = `${fps.toFixed(0)} fps · day ${day} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ×${clock.scale}
 ${w.type} ${w.precipitation.toFixed(1)} mm/h · cloud ${(w.cloudCover * 100).toFixed(0)}% · ${w.temperature.toFixed(1)} °C · humidity ${(w.humidity * 100).toFixed(0)}%
 wind ${w.windSpeed.toFixed(1)} m/s (gust ${w.gust.toFixed(1)}) · storm ${w.storm.toFixed(2)} · fog ${w.fog.toFixed(2)}${hud.dataset.strike ? ` · last strike ${hud.dataset.strike}` : ''}

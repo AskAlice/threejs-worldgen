@@ -1,11 +1,37 @@
-import { BufferGeometry, DynamicDrawUsage, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, Sphere, Vector3, type Camera, type Material, type Object3D } from 'three/webgpu'
+import {
+  BufferGeometry,
+  DynamicDrawUsage,
+  Euler,
+  Group,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
+  Sphere,
+  Vector3,
+  type Camera,
+  type Material,
+  type Object3D
+} from 'three/webgpu'
 import { hash4, mulberry32, seedOf, type LocalFrame, type World } from 'threejs-biomes'
 import { DEFAULT_BOIDS, Flock, type BoidParams, type PredatorPoint } from './boids.ts'
-import { Clock, DEFAULT_STATES, hookScene, mergeInput, placeInFrame, worldToFrame, type FaunaRenderer, type MaterialStates, type Predator } from './common.ts'
+import {
+  Clock,
+  DEFAULT_STATES,
+  hookScene,
+  mergeInput,
+  placeInFrame,
+  worldToFrame,
+  type FaunaRenderer,
+  type MaterialStates,
+  type Predator
+} from './common.ts'
 import { spawnTile, type GroupSpawn, type Habitat } from './placement.ts'
 
 /** Boid weights shared by every group of a layer (each species sets its own distances and speeds). */
-export type BoidWeights = Pick<BoidParams, 'separation' | 'alignment' | 'cohesion' | 'wander' | 'wanderRate' | 'avoid' | 'flee' | 'verticalDamping' | 'lookAhead'>
+export type BoidWeights = Pick<
+  BoidParams,
+  'separation' | 'alignment' | 'cohesion' | 'wander' | 'wanderRate' | 'avoid' | 'flee' | 'verticalDamping' | 'lookAhead'
+>
 
 /** Settings every fauna layer has. All JSON except `predators`. */
 export interface FaunaLayerSettings {
@@ -57,13 +83,20 @@ export const DEFAULT_LAYER: FaunaLayerSettings = {
   stepRate: 30,
   reframeDistance: 20_000,
   boids: {
-    separation: DEFAULT_BOIDS.separation, alignment: DEFAULT_BOIDS.alignment, cohesion: DEFAULT_BOIDS.cohesion, wander: DEFAULT_BOIDS.wander,
-    wanderRate: DEFAULT_BOIDS.wanderRate, avoid: DEFAULT_BOIDS.avoid, flee: DEFAULT_BOIDS.flee, verticalDamping: DEFAULT_BOIDS.verticalDamping, lookAhead: DEFAULT_BOIDS.lookAhead,
+    separation: DEFAULT_BOIDS.separation,
+    alignment: DEFAULT_BOIDS.alignment,
+    cohesion: DEFAULT_BOIDS.cohesion,
+    wander: DEFAULT_BOIDS.wander,
+    wanderRate: DEFAULT_BOIDS.wanderRate,
+    avoid: DEFAULT_BOIDS.avoid,
+    flee: DEFAULT_BOIDS.flee,
+    verticalDamping: DEFAULT_BOIDS.verticalDamping,
+    lookAhead: DEFAULT_BOIDS.lookAhead
   },
   states: { ...DEFAULT_STATES },
   castShadow: false,
   receiveShadow: true,
-  predators: [],
+  predators: []
 }
 
 /** Options for a layer's `create()`. */
@@ -108,7 +141,14 @@ export interface FaunaGroup {
   dist: number
 }
 
-interface Tile { ix: number; iz: number; built: string; groups: FaunaGroup[]; seen: number; dist: number }
+interface Tile {
+  ix: number
+  iz: number
+  built: string
+  groups: FaunaGroup[]
+  seen: number
+  dist: number
+}
 
 /** What a layer draws for one species: one instanced mesh and its per-instance buffers. */
 export interface SpeciesView {
@@ -189,9 +229,22 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
   /** Boid parameters for a group of a species. */
   protected abstract boidParams(species: S): BoidParams
   /** Sets member `i`'s scale (xyz into `scale`) and look (4 into `look`) from `rand`. */
-  protected abstract initMember(species: S, rand: () => number, scale: Float32Array, look: Float32Array, i: number): void
+  protected abstract initMember(
+    species: S,
+    rand: () => number,
+    scale: Float32Array,
+    look: Float32Array,
+    i: number
+  ): void
   /** Advances member `i`'s animation (`motion`, 4 floats) and returns its roll (bank) angle. */
-  protected abstract animate(species: S, group: FaunaGroup, i: number, dt: number, speed: number, turnRate: number): number
+  protected abstract animate(
+    species: S,
+    group: FaunaGroup,
+    i: number,
+    dt: number,
+    speed: number,
+    turnRate: number
+  ): number
   /** Steepest pitch, radians. */
   protected abstract maxPitch(species: S): number
   /** Creates the geometry for a species (called when `geometryKey` changes). */
@@ -244,13 +297,25 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
     this.habitatCache = null
     const table = this.species()
     const ids = Object.keys(table).sort()
-    this.layoutKey = JSON.stringify([s.seed, s.tileSize, s.density, s.gridResolution, s.minWavelength, ids.map((id) => [id, this.placementOf(table[id])]), this.layoutExtra()])
+    this.layoutKey = JSON.stringify([
+      s.seed,
+      s.tileSize,
+      s.density,
+      s.gridResolution,
+      s.minWavelength,
+      ids.map((id) => [id, this.placementOf(table[id])]),
+      this.layoutExtra()
+    ])
     for (const [id, view] of this.views) {
       const sp = table[id]
       if (!sp) {
         const mesh = view.mesh
         mesh.removeFromParent()
-        this.later(() => { mesh.geometry.dispose(); (mesh.material as Material).dispose(); mesh.dispose() })
+        this.later(() => {
+          mesh.geometry.dispose()
+          ;(mesh.material as Material).dispose()
+          mesh.dispose()
+        })
         this.views.delete(id)
         continue
       }
@@ -310,7 +375,9 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
     const frameNo = ++this.frameCount
     const [ox, oy, oz] = s.origin
     const cam = this.camera.getWorldPosition(_v)
-    const px = cam.x + ox, py = cam.y + oy, pz = cam.z + oz
+    const px = cam.x + ox,
+      py = cam.y + oy,
+      pz = cam.z + oz
 
     const sphere = this.world.options.surface === 'sphere'
     if (sphere !== this.sphere) {
@@ -338,14 +405,19 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
     const ts = s.tileSize
     const key = `${this.layoutKey}|${this.world.version}|${this.frameId}`
     const pending: Tile[] = []
-    if (!(Math.hypot(cx - this.groundAt[0], cz - this.groundAt[1]) < 8)) this.groundAt = [cx, cz, this.frame.height(cx, cz)]
+    if (!(Math.hypot(cx - this.groundAt[0], cz - this.groundAt[1]) < 8))
+      this.groundAt = [cx, cz, this.frame.height(cx, cz)]
     const ground = this.groundAt[2]
     if (!(Math.abs(cy - ground) > s.maxDistance)) {
       const r = Math.ceil(s.maxDistance / ts)
-      const ci = Math.floor(cx / ts), cj = Math.floor(cz / ts)
+      const ci = Math.floor(cx / ts),
+        cj = Math.floor(cz / ts)
       for (let i = ci - r; i <= ci + r; i++) {
         for (let j = cj - r; j <= cj + r; j++) {
-          const dist = Math.hypot(Math.max(i * ts - cx, 0, cx - (i + 1) * ts), Math.max(j * ts - cz, 0, cz - (j + 1) * ts))
+          const dist = Math.hypot(
+            Math.max(i * ts - cx, 0, cx - (i + 1) * ts),
+            Math.max(j * ts - cz, 0, cz - (j + 1) * ts)
+          )
           if (dist >= s.maxDistance) continue
           const id = `${i},${j}`
           let tile = this.tiles.get(id)
@@ -372,7 +444,14 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
         while (tile && tile.built === key) tile = pending[next++]
         if (!tile) break
         this.habitatCache ??= this.habitat()
-        const o = { seed: seedOf(s.seed), salt: this.salt, tileSize: ts, density: s.density, gridResolution: s.gridResolution, minWavelength: s.minWavelength }
+        const o = {
+          seed: seedOf(s.seed),
+          salt: this.salt,
+          tileSize: ts,
+          density: s.density,
+          gridResolution: s.gridResolution,
+          minWavelength: s.minWavelength
+        }
         this.job = { tile, key, steps: spawnTile(tile.ix, tile.iz, this.species(), this.habitatCache, this.frame, o) }
       }
       const step = this.job.steps.next()
@@ -388,7 +467,10 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
     this.accumulator += delta
     const dt = 1 / Math.max(1, s.stepRate)
     let steps = Math.floor(this.accumulator / dt)
-    if (steps > 4) { steps = 4; this.accumulator = 0 } else this.accumulator -= steps * dt
+    if (steps > 4) {
+      steps = 4
+      this.accumulator = 0
+    } else this.accumulator -= steps * dt
     const predators = this.predatorPoints()
     const table = this.species()
     let groups = 0
@@ -430,9 +512,23 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
 
   private createGroup(spawn: GroupSpawn): FaunaGroup {
     const sp = this.species()[spawn.species]
-    const flock = new Flock(spawn.seed, spawn.count, spawn.home, { ...this.boidParams(sp), ...this.settings.boids }, spawn.environment)
+    const flock = new Flock(
+      spawn.seed,
+      spawn.count,
+      spawn.home,
+      { ...this.boidParams(sp), ...this.settings.boids },
+      spawn.environment
+    )
     const n = spawn.count
-    const g: FaunaGroup = { spawn, flock, scale: new Float32Array(n * 3), look: new Float32Array(n * 4), motion: new Float32Array(n * 4), turn: new Float32Array(n * 2), dist: 0 }
+    const g: FaunaGroup = {
+      spawn,
+      flock,
+      scale: new Float32Array(n * 3),
+      look: new Float32Array(n * 4),
+      motion: new Float32Array(n * 4),
+      turn: new Float32Array(n * 2),
+      dist: 0
+    }
     const rand = mulberry32(hash4(spawn.seed, 17, 0, 0))
     for (let i = 0; i < n; i++) {
       this.initMember(sp, rand, g.scale, g.look, i)
@@ -455,7 +551,10 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
       obj.getWorldPosition(_v)
       worldToFrame(this.frame, _v.x + o[0], _v.y + o[1], _v.z + o[2], _l)
       const q = (out[n++] ??= { x: 0, y: 0, z: 0, radius: 0 })
-      q.x = _l[0]; q.y = _l[1]; q.z = _l[2]; q.radius = p.radius
+      q.x = _l[0]
+      q.y = _l[1]
+      q.z = _l[2]
+      q.radius = p.radius
     }
     out.length = n
     return out
@@ -464,10 +563,18 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
   /** Writes every member's transform and animation straight into the species' instance buffers. */
   private draw(table: Readonly<Record<string, S>>, cx: number, cy: number, cz: number, delta: number) {
     // Anchor near the camera: instance positions stay small numbers on the GPU.
-    const ax = Math.round(cx / 64) * 64, ay = Math.round(cy / 64) * 64, az = Math.round(cz / 64) * 64
+    const ax = Math.round(cx / 64) * 64,
+      ay = Math.round(cy / 64) * 64,
+      az = Math.round(cz / 64) * 64
     this.local.position.set(ax, ay, az)
     this.local.updateMatrixWorld()
-    for (const v of this.views.values()) { v.need = 0; v.written = 0; v.min.set(Infinity, Infinity, Infinity); v.max.set(-Infinity, -Infinity, -Infinity); v.reach = 0 }
+    for (const v of this.views.values()) {
+      v.need = 0
+      v.written = 0
+      v.min.set(Infinity, Infinity, Infinity)
+      v.max.set(-Infinity, -Infinity, -Infinity)
+      v.reach = 0
+    }
     for (const t of this.tiles.values()) {
       for (const g of t.groups) {
         const sp = table[g.spawn.species]
@@ -483,10 +590,13 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
         const mat = view.mesh.instanceMatrix.array as Float32Array
         const motion = view.motion.array as Float32Array
         const look = view.look.array as Float32Array
-        const f = g.flock, maxPitch = this.maxPitch(sp)
+        const f = g.flock,
+          maxPitch = this.maxPitch(sp)
         let w = view.written
         for (let i = 0; i < f.count; i++, w++) {
-          const vx = f.velocity[i * 3], vy = f.velocity[i * 3 + 1], vz = f.velocity[i * 3 + 2]
+          const vx = f.velocity[i * 3],
+            vy = f.velocity[i * 3 + 1],
+            vz = f.velocity[i * 3 + 2]
           const speed = Math.hypot(vx, vy, vz)
           const yaw = Math.atan2(vx, vz)
           let dy = yaw - g.turn[i * 2]
@@ -495,9 +605,16 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
           const rate = delta > 0 ? dy / delta : 0
           g.turn[i * 2 + 1] += (rate - g.turn[i * 2 + 1]) * Math.min(1, delta * 4)
           const roll = this.animate(sp, g, i, delta, speed, g.turn[i * 2 + 1])
-          const pitch = Math.max(-maxPitch, Math.min(maxPitch, -Math.asin(Math.max(-1, Math.min(1, vy / Math.max(speed, 1e-6))))))
-          const px = f.position[i * 3] - ax, py = f.position[i * 3 + 1] - ay, pz = f.position[i * 3 + 2] - az
-          const sx = g.scale[i * 3], sy = g.scale[i * 3 + 1], sz = g.scale[i * 3 + 2]
+          const pitch = Math.max(
+            -maxPitch,
+            Math.min(maxPitch, -Math.asin(Math.max(-1, Math.min(1, vy / Math.max(speed, 1e-6)))))
+          )
+          const px = f.position[i * 3] - ax,
+            py = f.position[i * 3 + 1] - ay,
+            pz = f.position[i * 3 + 2] - az
+          const sx = g.scale[i * 3],
+            sy = g.scale[i * 3 + 1],
+            sz = g.scale[i * 3 + 2]
           _m.makeRotationFromEuler(_e.set(pitch, yaw, roll, 'YXZ'))
           _m.scale(_s.set(sx, sy, sz))
           _m.setPosition(px, py, pz)
@@ -539,7 +656,7 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
    * geometry shares the species' static attributes; only the old instance buffers are freed, a while later.
    */
   private view(id: string, sp: S, n: number): SpeciesView {
-    let view = this.views.get(id)
+    const view = this.views.get(id)
     if (view && view.capacity >= n) return view
     const capacity = Math.ceil(n * 1.5) + 8
     const geometry = view ? shareStatic(view.mesh.geometry) : this.createGeometry(sp)
@@ -560,10 +677,25 @@ export abstract class FaunaLayer<S, T extends FaunaLayerSettings> {
       const old = view.mesh
       old.removeFromParent()
       // WebGPU may still be building a pipeline with it: free its instance buffers later, never the shared ones.
-      this.later(() => { detachStatic(old.geometry); old.geometry.dispose(); old.dispose() })
+      this.later(() => {
+        detachStatic(old.geometry)
+        old.geometry.dispose()
+        old.dispose()
+      })
     }
     this.local.add(mesh)
-    const next: SpeciesView = { mesh, key: view?.key ?? this.geometryKey(sp), capacity, motion, look, need: view?.need ?? 0, written: 0, min: new Vector3(), max: new Vector3(), reach: 0 }
+    const next: SpeciesView = {
+      mesh,
+      key: view?.key ?? this.geometryKey(sp),
+      capacity,
+      motion,
+      look,
+      need: view?.need ?? 0,
+      written: 0,
+      min: new Vector3(),
+      max: new Vector3(),
+      reach: 0
+    }
     this.views.set(id, next)
     if (!view) this.applyLook(id, sp, geometry)
     return next

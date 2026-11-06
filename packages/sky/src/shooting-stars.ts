@@ -4,8 +4,31 @@
  * same meteors at the same moments. Sporadic meteors come from random directions; a shower radiates
  * from one point.
  */
-import { AdditiveBlending, Color, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, NodeMaterial, PlaneGeometry, Sphere, Vector3 } from 'three/webgpu'
-import { attribute, cross, float, max, mix, normalize, pow, positionLocal, smoothstep, uniform, varying, vec4 } from 'three/tsl'
+import {
+  AdditiveBlending,
+  Color,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
+  NodeMaterial,
+  PlaneGeometry,
+  Sphere,
+  Vector3
+} from 'three/webgpu'
+import {
+  attribute,
+  cross,
+  float,
+  max,
+  mix,
+  normalize,
+  pow,
+  positionLocal,
+  smoothstep,
+  uniform,
+  varying,
+  vec4
+} from 'three/tsl'
 import { farDomePosition } from './atmosphere.ts'
 import { defaultSkyState, type SkyState } from './observer.ts'
 import { DEG, clamp, hash3, hexToLinear, mulberry32, seedOf, type Vec3 } from './util.ts'
@@ -51,7 +74,7 @@ export const DEFAULT_SHOOTING_STARS: ShootingStarsOptions = {
   trail: 0.45,
   width: 0.09,
   brightness: 1,
-  color: '#dfe8ff',
+  color: '#dfe8ff'
 }
 
 /** One scheduled meteor. Directions are unit vectors in the horizon frame (x east, y up, z south). */
@@ -75,7 +98,8 @@ const DEFAULT_STATE = defaultSkyState()
 
 /** Unit horizon-frame vector from azimuth (from north through east) and elevation, degrees. */
 export function horizonVector(azimuth: number, elevation: number): Vec3 {
-  const a = azimuth * DEG, e = elevation * DEG
+  const a = azimuth * DEG,
+    e = elevation * DEG
   return [Math.cos(e) * Math.sin(a), Math.sin(e), -Math.cos(e) * Math.cos(a)]
 }
 
@@ -86,10 +110,14 @@ export function seededRadiant(seed: number | string): [number, number] {
 }
 
 const rotate = (p: Vec3, t: Vec3, a: number): Vec3 => {
-  const c = Math.cos(a), s = Math.sin(a)
+  const c = Math.cos(a),
+    s = Math.sin(a)
   return [p[0] * c + t[0] * s, p[1] * c + t[1] * s, p[2] * c + t[2] * s]
 }
-const unit = (v: Vec3): Vec3 => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l] }
+const unit = (v: Vec3): Vec3 => {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1
+  return [v[0] / l, v[1] / l, v[2] / l]
+}
 
 /** The meteors of one schedule slot (deterministic). */
 function slot(o: ShootingStarsOptions, seed: number, k: number): Meteor[] {
@@ -98,31 +126,57 @@ function slot(o: ShootingStarsOptions, seed: number, k: number): Meteor[] {
   const lambda = (total * SLOT) / 3600
   // Poisson sample of how many meteors start in this slot.
   let n = 0
-  for (let p = Math.exp(-lambda), F = p, u = rand(); u > F && n < 200; ) { n++; p *= lambda / n; F += p }
+  for (let p = Math.exp(-lambda), F = p, u = rand(); u > F && n < 200; ) {
+    n++
+    p *= lambda / n
+    F += p
+  }
   const radiant = horizonVector(...(o.radiant ?? seededRadiant(o.seed)))
   const out: Meteor[] = []
   for (let i = 0; i < n; i++) {
     const shower = rand() * total < o.shower
     const sinMin = Math.sin(clamp(o.minElevation, 0, 85) * DEG)
-    let P: Vec3 = [0, 1, 0], t: Vec3 = [1, 0, 0]
+    let P: Vec3 = [0, 1, 0],
+      t: Vec3 = [1, 0, 0]
     for (let tries = 0; tries < 6; tries++) {
       if (shower) {
         // 8–60° from the radiant, in a random direction around it.
-        const d = (8 + rand() * 52) * DEG, spin = rand() * 2 * Math.PI
+        const d = (8 + rand() * 52) * DEG,
+          spin = rand() * 2 * Math.PI
         const ref: Vec3 = Math.abs(radiant[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0]
-        const e1 = unit([radiant[1] * ref[2] - radiant[2] * ref[1], radiant[2] * ref[0] - radiant[0] * ref[2], radiant[0] * ref[1] - radiant[1] * ref[0]])
-        const e2: Vec3 = [radiant[1] * e1[2] - radiant[2] * e1[1], radiant[2] * e1[0] - radiant[0] * e1[2], radiant[0] * e1[1] - radiant[1] * e1[0]]
-        const side: Vec3 = [e1[0] * Math.cos(spin) + e2[0] * Math.sin(spin), e1[1] * Math.cos(spin) + e2[1] * Math.sin(spin), e1[2] * Math.cos(spin) + e2[2] * Math.sin(spin)]
+        const e1 = unit([
+          radiant[1] * ref[2] - radiant[2] * ref[1],
+          radiant[2] * ref[0] - radiant[0] * ref[2],
+          radiant[0] * ref[1] - radiant[1] * ref[0]
+        ])
+        const e2: Vec3 = [
+          radiant[1] * e1[2] - radiant[2] * e1[1],
+          radiant[2] * e1[0] - radiant[0] * e1[2],
+          radiant[0] * e1[1] - radiant[1] * e1[0]
+        ]
+        const side: Vec3 = [
+          e1[0] * Math.cos(spin) + e2[0] * Math.sin(spin),
+          e1[1] * Math.cos(spin) + e2[1] * Math.sin(spin),
+          e1[2] * Math.cos(spin) + e2[2] * Math.sin(spin)
+        ]
         P = rotate(radiant, side, d)
         t = rotate(side, [-radiant[0], -radiant[1], -radiant[2]], d) // away from the radiant along the great circle
       } else {
         // Uniform over the sky above minElevation.
-        const y = sinMin + rand() * (0.97 - sinMin), az = rand() * 2 * Math.PI, c = Math.sqrt(1 - y * y)
+        const y = sinMin + rand() * (0.97 - sinMin),
+          az = rand() * 2 * Math.PI,
+          c = Math.sqrt(1 - y * y)
         P = [c * Math.sin(az), y, -c * Math.cos(az)]
         // Random heading in the tangent plane, mostly downwards (meteors fall into the atmosphere).
-        const east: Vec3 = [Math.cos(az), 0, Math.sin(az)], rise: Vec3 = [-y * Math.sin(az), c, y * Math.cos(az)]
-        const h = rand() * 2 * Math.PI, down = rand() < 0.8 ? -Math.abs(Math.sin(h)) : Math.sin(h)
-        t = unit([east[0] * Math.cos(h) + rise[0] * down, east[1] * Math.cos(h) + rise[1] * down, east[2] * Math.cos(h) + rise[2] * down])
+        const east: Vec3 = [Math.cos(az), 0, Math.sin(az)],
+          rise: Vec3 = [-y * Math.sin(az), c, y * Math.cos(az)]
+        const h = rand() * 2 * Math.PI,
+          down = rand() < 0.8 ? -Math.abs(Math.sin(h)) : Math.sin(h)
+        t = unit([
+          east[0] * Math.cos(h) + rise[0] * down,
+          east[1] * Math.cos(h) + rise[1] * down,
+          east[2] * Math.cos(h) + rise[2] * down
+        ])
       }
       if (P[1] >= sinMin) break
     }
@@ -133,7 +187,7 @@ function slot(o: ShootingStarsOptions, seed: number, k: number): Meteor[] {
       from: rotate(P, t, -len / 2),
       to: rotate(P, t, len / 2),
       brightness: rand() < 0.04 ? 1.5 : 0.3 + rand() * 0.7,
-      shower,
+      shower
     })
   }
   return out
@@ -188,7 +242,9 @@ export class ShootingStars {
     g.instanceCount = 0
     g.boundingSphere = new Sphere(new Vector3(), Infinity) // drawn on the far dome around any camera
 
-    const head = attribute('aHead', 'vec3'), tail = attribute('aTail', 'vec3'), params = attribute('aParams', 'vec2')
+    const head = attribute('aHead', 'vec3'),
+      tail = attribute('aTail', 'vec3'),
+      params = attribute('aParams', 'vec2')
     const s = positionLocal.x.add(0.5) // 0 at the tail, 1 at the head
     const dir = normalize(mix(tail, head, s))
     const side = normalize(cross(dir, head.sub(tail)))
@@ -201,7 +257,9 @@ export class ShootingStars {
     material.vertexNode = farDomePosition(dir.add(side.mul(positionLocal.y.mul(2)).mul(halfWidth)))
     const vIntensity = varying(params.x)
     const across = float(1).sub(positionLocal.y.abs().mul(2))
-    const glow = pow(max(s, 0), 2.2).mul(across.mul(across)).add(smoothstep(0.93, 1, s).mul(across).mul(2))
+    const glow = pow(max(s, 0), 2.2)
+      .mul(across.mul(across))
+      .add(smoothstep(0.93, 1, s).mul(across).mul(2))
     material.colorNode = vec4(this.color.mul(glow).mul(vIntensity).mul(this.brightness), 1)
     this.object = new Mesh(g, material)
     this.object.name = 'ShootingStars'
@@ -251,19 +309,22 @@ export class ShootingStars {
       const along = (q: number): Vec3 => {
         // Slerp from→to.
         const c = clamp(m.from[0] * m.to[0] + m.from[1] * m.to[1] + m.from[2] * m.to[2], -1, 1)
-        const w = Math.acos(c), sw = Math.sin(w) || 1
-        const a = Math.sin((1 - q) * w) / sw, b = Math.sin(q * w) / sw
+        const w = Math.acos(c),
+          sw = Math.sin(w) || 1
+        const a = Math.sin((1 - q) * w) / sw,
+          b = Math.sin(q * w) / sw
         return [m.from[0] * a + m.to[0] * b, m.from[1] * a + m.to[1] * b, m.from[2] * a + m.to[2] * b]
       }
       toRender(along(p), this.head, count)
       toRender(along(Math.max(0, p - this.settings.trail) - 1e-4), this.tail, count)
-      this.params[count * 2] = m.brightness * Math.pow(Math.sin(Math.PI * p), 0.6) * visible
+      this.params[count * 2] = m.brightness * Math.sin(Math.PI * p) ** 0.6 * visible
       this.params[count * 2 + 1] = this.settings.width
       count++
     }
     const g = this.object.geometry
     g.instanceCount = count
-    for (const name of ['aHead', 'aTail', 'aParams']) (g.getAttribute(name) as InstancedBufferAttribute).needsUpdate = true
+    for (const name of ['aHead', 'aTail', 'aParams'])
+      (g.getAttribute(name) as InstancedBufferAttribute).needsUpdate = true
   }
 
   /** Frees GPU resources. */
@@ -273,4 +334,3 @@ export class ShootingStars {
     this.object.material.dispose()
   }
 }
-

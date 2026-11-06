@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal, useFrame } from '@react-three/fiber'
 import { World } from 'threejs-biomes'
-import { City, DEFAULT_CITY, mergeOptions, type CityImpl, type CityInput, type SettlementSize } from 'threejs-city/react'
+import {
+  City,
+  DEFAULT_CITY,
+  mergeOptions,
+  type CityImpl,
+  type CityInput,
+  type SettlementSize
+} from 'threejs-city/react'
 import { Props } from 'threejs-props/react'
 import { demoSites, panels, siteInput } from './city.panel'
 import { changed } from './leva-options'
@@ -35,13 +42,20 @@ function Scene() {
     const s = impl?.stats
     if (!s?.ready) return 'generating…'
     const farm = impl!.plan?.farm
-    const crops = farm ? `\n${farm.fields.length} fields (${[...new Set(farm.fields.map((f) => f.crop))].join(', ')}) · tractor ${farm.vehicleSpots[0]?.working ? 'working' : 'parked'}` : ''
+    const crops = farm
+      ? `\n${farm.fields.length} fields (${[...new Set(farm.fields.map((f) => f.crop))].join(', ')}) · tractor ${farm.vehicleSpots[0]?.working ? 'working' : 'parked'}`
+      : ''
     return `threejs-city · <City> (${impl!.plan?.architecture}, ${impl!.plan?.style})\n${s.buildings} buildings · ${s.roadKm.toFixed(1)} km roads · ${s.bridges} bridges · pop ≈ ${s.population.toLocaleString()}${crops}\n${s.detailed} at full detail · generated in ${s.generationMs.toFixed(0)} ms`
   })
 
   return (
     <>
-      <Daylight night={options.facade?.night ?? 0} target={[site.x, y, site.z]} extent={Math.max(300, r * 1.2)} fog={[1500, 9000]} />
+      <Daylight
+        night={options.facade?.night ?? 0}
+        target={[site.x, y, site.z]}
+        extent={Math.max(300, r * 1.2)}
+        fog={[1500, 9000]}
+      />
       <Ground world={world} center={[site.x, site.z]} size={r * 3.2} segments={256} />
       {/* The site's centre, radius and farm road; radius 0 (the default) = the site's own radius, as in city.ts */}
       <City ref={setImpl} world={world} {...mergeOptions(options, siteInput(site))} radius={options.radius || r} />

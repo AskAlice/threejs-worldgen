@@ -5,7 +5,8 @@ import * as THREE from 'three/webgpu'
 import { GrassMap, pointInPolygon, type Corn, type CornField, type CornInput } from 'threejs-grass'
 
 /** Gently rolling farmland. */
-export const farm = (x: number, z: number) => Math.sin(x * 0.006) * 3 + Math.cos(z * 0.0045) * 2.5 + Math.sin((x - z) * 0.013) * 0.8
+export const farm = (x: number, z: number) =>
+  Math.sin(x * 0.006) * 3 + Math.cos(z * 0.0045) * 2.5 + Math.sin((x - z) * 0.013) * 0.8
 
 export function farmGeometry(size = 1400, segments = 280) {
   const geo = new THREE.PlaneGeometry(size, size, segments, segments).rotateX(-Math.PI / 2)
@@ -22,9 +23,43 @@ const field = (polygon: [number, number][], rowSpacing = 0.76, rowDirection?: nu
 
 /** Three fields at different stages, each one Corn instance: mature (with the tractor), harvested, young. */
 export const FIELDS: { name: string; field: CornField; input: CornInput }[] = [
-  { name: 'mature', field: field([[-120, -90], [140, -100], [150, 85], [-110, 95]]), input: { growth: 0.8 } },
-  { name: 'harvested', field: field([[165, -100], [330, -112], [342, 88], [172, 84]], 0.76, Math.PI / 2 - 0.05), input: { growth: 1, harvested: true, seed: 2 } },
-  { name: 'young', field: field([[-108, 112], [152, 102], [162, 262], [-96, 270]], 0.76), input: { growth: 0.38, seed: 3 } },
+  {
+    name: 'mature',
+    field: field([
+      [-120, -90],
+      [140, -100],
+      [150, 85],
+      [-110, 95]
+    ]),
+    input: { growth: 0.8 }
+  },
+  {
+    name: 'harvested',
+    field: field(
+      [
+        [165, -100],
+        [330, -112],
+        [342, 88],
+        [172, 84]
+      ],
+      0.76,
+      Math.PI / 2 - 0.05
+    ),
+    input: { growth: 1, harvested: true, seed: 2 }
+  },
+  {
+    name: 'young',
+    field: field(
+      [
+        [-108, 112],
+        [152, 102],
+        [162, 262],
+        [-96, 270]
+      ],
+      0.76
+    ),
+    input: { growth: 0.38, seed: 3 }
+  }
 ]
 
 /** Grass everywhere except the fields (with a 1.5 m headland of grass) and the farm track between them. */
@@ -37,7 +72,8 @@ export function farmGrassMap() {
       const x = map.minX + (i + 0.5) * texel
       const z = map.minZ + (j + 0.5) * texel
       const inField = FIELDS.some(({ field }) => pointInPolygon(field.polygon, x, z))
-      const track = Math.abs(x - 157 - Math.sin(z * 0.02) * 1.5) < 2.2 || Math.abs(z - 98 - Math.sin(x * 0.015) * 1.2) < 2
+      const track =
+        Math.abs(x - 157 - Math.sin(z * 0.02) * 1.5) < 2.2 || Math.abs(z - 98 - Math.sin(x * 0.015) * 1.2) < 2
       if (inField || track) map.data[(j * r + i) * 4] = 0
     }
   }
@@ -53,7 +89,7 @@ const lap = 2 * (LANES.x1 - LANES.x0) + 2 * turn
 /** Tractor position (XZ) and heading (unit XZ) at time `t` seconds. */
 export function tractorAt(t: number): { x: number; z: number; dx: number; dz: number } {
   const { x0, x1, z, gap } = LANES
-  let s = ((t * LANES.speed) % lap + lap) % lap
+  let s = (((t * LANES.speed) % lap) + lap) % lap
   const straight = x1 - x0
   const r = gap / 2
   if (s < straight) return { x: x0 + s, z, dx: 1, dz: 0 }
@@ -88,7 +124,10 @@ export function createTractor() {
   add(new THREE.BoxGeometry(3.6, 1.1, 1.3), paint, 0.3, 1.25, 0)
   add(new THREE.BoxGeometry(1.5, 1.5, 1.5), glass, -0.7, 2.5, 0)
   add(new THREE.BoxGeometry(1.6, 0.08, 1.6), paint, -0.7, 3.28, 0)
-  for (const [x, r, w] of [[-1, 0.85, 0.55], [1.4, 0.55, 0.4]]) {
+  for (const [x, r, w] of [
+    [-1, 0.85, 0.55],
+    [1.4, 0.55, 0.4]
+  ]) {
     for (const z of [-1, 1]) add(new THREE.CylinderGeometry(r, r, w, 24).rotateX(Math.PI / 2), dark, x, r, z * 1.05)
   }
   return g
@@ -117,7 +156,7 @@ export const VIEWS: Record<string, { position: [number, number, number]; target:
   2: { position: [-6, 1.7, -97.2], target: [8, 1.5, -91] },
   20: { position: [-34, 20, -112], target: [0, 0, -62] },
   200: { position: [-90, 200, -270], target: [40, 0, 10] },
-  path: { position: [2, 26, -48], target: [12, 0, -2] },
+  path: { position: [2, 26, -48], target: [12, 0, -2] }
 }
 
 /** A view's camera position and target, with heights measured from the ground. */
@@ -125,5 +164,8 @@ export function view(name: string) {
   const v = VIEWS[name] ?? VIEWS[20]
   const [px, py, pz] = v.position
   const [tx, ty, tz] = v.target
-  return { position: [px, farm(px, pz) + py, pz] as [number, number, number], target: [tx, farm(tx, tz) + ty, tz] as [number, number, number] }
+  return {
+    position: [px, farm(px, pz) + py, pz] as [number, number, number],
+    target: [tx, farm(tx, tz) + ty, tz] as [number, number, number]
+  }
 }

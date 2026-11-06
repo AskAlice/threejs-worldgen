@@ -73,7 +73,7 @@ export const DEFAULT_MPM: MPMOptions = {
   walls: true,
   friction: 0.5,
   materials: { jelly: { density: 1000, youngs: 100000, poisson: 0.3, viscosity: 1000 } },
-  render: { size: 1.8, colors: ['#5a0f1e', '#b3243a', '#f06a78'], strainScale: 4, opacity: 1 },
+  render: { size: 1.8, colors: ['#5a0f1e', '#b3243a', '#f06a78'], strainScale: 4, opacity: 1 }
 }
 
 /**
@@ -107,8 +107,10 @@ export function toFixed(v: number): number {
 /** Fixes anything out of range in place (counts become integers, enums and booleans fall back) and returns it. */
 export function sanitizeMPMOptions(o: MPMOptions): MPMOptions {
   const d = DEFAULT_MPM
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
-  const vec = (v: unknown, def: number[], lo = -Infinity, hi = Infinity) => def.map((x, i) => num(Array.isArray(v) ? v[i] : undefined, x, lo, hi))
+  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
+  const vec = (v: unknown, def: number[], lo = -Infinity, hi = Infinity) =>
+    def.map((x, i) => num(Array.isArray(v) ? v[i] : undefined, x, lo, hi))
   if (typeof o.seed !== 'number' && typeof o.seed !== 'string') o.seed = d.seed
   o.capacity = Math.round(num(o.capacity, d.capacity, 1, 1 << 22))
   o.resolution = vec(o.resolution, d.resolution, 8, 160).map(Math.round) as [number, number, number]
@@ -125,12 +127,19 @@ export function sanitizeMPMOptions(o: MPMOptions): MPMOptions {
   for (const [name, params] of Object.entries(o.materials && typeof o.materials === 'object' ? o.materials : {})) {
     const m = mpmMaterial(name)
     if (!m) continue
-    mats[name] = Object.fromEntries(Object.entries(m.defaults).map(([k, def]) => [k, num((params as Record<string, unknown>)?.[k], def, k === 'density' ? 1e-3 : -Infinity)]))
+    mats[name] = Object.fromEntries(
+      Object.entries(m.defaults).map(([k, def]) => [
+        k,
+        num((params as Record<string, unknown>)?.[k], def, k === 'density' ? 1e-3 : -Infinity)
+      ])
+    )
   }
   o.materials = Object.keys(mats).length ? mats : structuredClone(d.materials)
   const r = (o.render ??= structuredClone(d.render))
   r.size = num(r.size, d.render.size, 0)
-  const colors = Array.isArray(r.colors) ? r.colors.filter((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8) : []
+  const colors = Array.isArray(r.colors)
+    ? r.colors.filter((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8)
+    : []
   r.colors = colors.length ? colors : [...d.render.colors]
   r.strainScale = num(r.strainScale, d.render.strainScale, 0)
   r.opacity = num(r.opacity, d.render.opacity, 0, 1)
@@ -150,7 +159,8 @@ export function resolveMPMOptions(input: unknown, defaults: MPMOptions = DEFAULT
  * and `Δx² / (6ν)` for the most viscous one.
  */
 export function mpmStableStep(o: MPMOptions): number {
-  let c = 0, nu = 0
+  let c = 0,
+    nu = 0
   for (const [name, p] of Object.entries(o.materials)) {
     const m = mpmMaterial(name)
     c = Math.max(c, m?.soundSpeed(p) ?? 0)
@@ -163,7 +173,10 @@ export function mpmStableStep(o: MPMOptions): number {
  * Substeps and substep length for a frame of `frameDt` seconds (capped at 0.1 s): at least `substeps`, as many
  * more as {@link mpmStableStep} needs, at most `maxSubsteps` (then `dt` is the stable step and the frame runs slow).
  */
-export function mpmTimeStep(o: MPMOptions, frameDt: number): {
+export function mpmTimeStep(
+  o: MPMOptions,
+  frameDt: number
+): {
   /** Substeps this frame runs (integer, at least `substeps`, at most `maxSubsteps`). */
   substeps: number
   /** Length of each substep, seconds (≤ the stable step). */
@@ -203,8 +216,18 @@ export interface MPMEmit {
  * World positions of an {@link MPMEmit} block: a lattice of `Δx/2` spacing (8 particles per cell) clipped
  * to the shape, jittered from `seed` and the particle serials starting at `firstSerial`.
  */
-export function mpmEmitPositions(spec: MPMEmit, cellSize: number, seed: number | string, firstSerial = 0, max = Infinity): Float32Array {
-  if (spec.positions) return Float32Array.from(spec.positions).subarray(0, Math.min(spec.positions.length - (spec.positions.length % 3), max * 3))
+export function mpmEmitPositions(
+  spec: MPMEmit,
+  cellSize: number,
+  seed: number | string,
+  firstSerial = 0,
+  max = Infinity
+): Float32Array {
+  if (spec.positions)
+    return Float32Array.from(spec.positions).subarray(
+      0,
+      Math.min(spec.positions.length - (spec.positions.length % 3), max * 3)
+    )
   const h = cellSize / MPM_PPC_AXIS
   const c = spec.center ?? [0, 0, 0]
   const sphere = spec.shape === 'sphere'
@@ -214,14 +237,18 @@ export function mpmEmitPositions(spec: MPMEmit, cellSize: number, seed: number |
   const s = seedOf(seed)
   const out: number[] = []
   let serial = firstSerial
-  for (let k = 0; k < n[2]; k++) for (let j = 0; j < n[1]; j++) for (let i = 0; i < n[0]; i++) {
-    if (out.length >= max * 3) break
-    const lx = (i + 0.5) * h - n[0] * h / 2, ly = (j + 0.5) * h - n[1] * h / 2, lz = (k + 0.5) * h - n[2] * h / 2
-    if (sphere && lx * lx + ly * ly + lz * lz > half[0] * half[0]) continue
-    const r = (q: number) => (particleRandom(serial, q, s) - 0.5) * jitter * h
-    out.push(c[0] + lx + r(0), c[1] + ly + r(1), c[2] + lz + r(2))
-    serial++
-  }
+  for (let k = 0; k < n[2]; k++)
+    for (let j = 0; j < n[1]; j++)
+      for (let i = 0; i < n[0]; i++) {
+        if (out.length >= max * 3) break
+        const lx = (i + 0.5) * h - (n[0] * h) / 2,
+          ly = (j + 0.5) * h - (n[1] * h) / 2,
+          lz = (k + 0.5) * h - (n[2] * h) / 2
+        if (sphere && lx * lx + ly * ly + lz * lz > half[0] * half[0]) continue
+        const r = (q: number) => (particleRandom(serial, q, s) - 0.5) * jitter * h
+        out.push(c[0] + lx + r(0), c[1] + ly + r(1), c[2] + lz + r(2))
+        serial++
+      }
   return Float32Array.from(out)
 }
 
@@ -229,12 +256,17 @@ export function mpmEmitPositions(spec: MPMEmit, cellSize: number, seed: number |
  * Terrain heights at the grid's node columns, relative to `origin[1]` (what the GPU and the reference collide
  * with). `-1e30` everywhere without a height function; non-finite heights count as no ground.
  */
-export function bakeMPMHeights(height: MPMHeightFn | null, o: Pick<MPMOptions, 'resolution' | 'cellSize' | 'origin'>, out: Float32Array = new Float32Array(o.resolution[0] * o.resolution[2])): Float32Array {
+export function bakeMPMHeights(
+  height: MPMHeightFn | null,
+  o: Pick<MPMOptions, 'resolution' | 'cellSize' | 'origin'>,
+  out: Float32Array = new Float32Array(o.resolution[0] * o.resolution[2])
+): Float32Array {
   const [nx, , nz] = o.resolution
-  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
-    const y = height ? height(o.origin[0] + i * o.cellSize, o.origin[2] + k * o.cellSize) : NaN
-    out[k * nx + i] = Number.isFinite(y) ? y - o.origin[1] : -1e30
-  }
+  for (let k = 0; k < nz; k++)
+    for (let i = 0; i < nx; i++) {
+      const y = height ? height(o.origin[0] + i * o.cellSize, o.origin[2] + k * o.cellSize) : NaN
+      out[k * nx + i] = Number.isFinite(y) ? y - o.origin[1] : -1e30
+    }
   return out
 }
 
@@ -242,29 +274,51 @@ export function bakeMPMHeights(height: MPMHeightFn | null, o: Pick<MPMOptions, '
  * Terrain friction multipliers at the grid's node columns (`x + z·nx`), written into `out` from `offset`: `friction(x, z)`
  * clamped to ≥ 0, or 1 everywhere without a function.
  */
-export function bakeMPMFriction(friction: MPMFrictionFn | null, o: Pick<MPMOptions, 'resolution' | 'cellSize' | 'origin'>, out: Float32Array = new Float32Array(o.resolution[0] * o.resolution[2]), offset = 0): Float32Array {
+export function bakeMPMFriction(
+  friction: MPMFrictionFn | null,
+  o: Pick<MPMOptions, 'resolution' | 'cellSize' | 'origin'>,
+  out: Float32Array = new Float32Array(o.resolution[0] * o.resolution[2]),
+  offset = 0
+): Float32Array {
   const [nx, , nz] = o.resolution
-  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
-    const m = friction ? friction(o.origin[0] + i * o.cellSize, o.origin[2] + k * o.cellSize) : 1
-    out[offset + k * nx + i] = Number.isFinite(m) ? Math.max(0, m) : 1
-  }
+  for (let k = 0; k < nz; k++)
+    for (let i = 0; i < nx; i++) {
+      const m = friction ? friction(o.origin[0] + i * o.cellSize, o.origin[2] + k * o.cellSize) : 1
+      out[offset + k * nx + i] = Number.isFinite(m) ? Math.max(0, m) : 1
+    }
   return out
 }
 
 /** Index of the node column nearest local (x, z), clamped to the grid (where a particle reads the friction map). */
 export function nearestColumn(nx: number, nz: number, dx: number, x: number, z: number): number {
-  return Math.min(nz - 1, Math.max(0, Math.floor(z / dx + 0.5))) * nx + Math.min(nx - 1, Math.max(0, Math.floor(x / dx + 0.5)))
+  return (
+    Math.min(nz - 1, Math.max(0, Math.floor(z / dx + 0.5))) * nx +
+    Math.min(nx - 1, Math.max(0, Math.floor(x / dx + 0.5)))
+  )
 }
 
 /**
  * Ground height and slope under a local position, bilinear between the baked node heights (the same surface
  * the GPU keeps particles above). Returns [height, dh/dx, dh/dz].
  */
-export function groundAt(heights: ArrayLike<number>, nx: number, nz: number, dx: number, x: number, z: number): [number, number, number] {
-  const gx = Math.min(Math.max(x / dx, 0), nx - 1), gz = Math.min(Math.max(z / dx, 0), nz - 1)
-  const i = Math.min(Math.floor(gx), nx - 2), k = Math.min(Math.floor(gz), nz - 2)
-  const fx = gx - i, fz = gz - k
-  const h00 = heights[k * nx + i], h10 = heights[k * nx + i + 1], h01 = heights[(k + 1) * nx + i], h11 = heights[(k + 1) * nx + i + 1]
+export function groundAt(
+  heights: ArrayLike<number>,
+  nx: number,
+  nz: number,
+  dx: number,
+  x: number,
+  z: number
+): [number, number, number] {
+  const gx = Math.min(Math.max(x / dx, 0), nx - 1),
+    gz = Math.min(Math.max(z / dx, 0), nz - 1)
+  const i = Math.min(Math.floor(gx), nx - 2),
+    k = Math.min(Math.floor(gz), nz - 2)
+  const fx = gx - i,
+    fz = gz - k
+  const h00 = heights[k * nx + i],
+    h10 = heights[k * nx + i + 1],
+    h01 = heights[(k + 1) * nx + i],
+    h11 = heights[(k + 1) * nx + i + 1]
   const h = (h00 * (1 - fx) + h10 * fx) * (1 - fz) + (h01 * (1 - fx) + h11 * fx) * fz
   return [h, ((h10 - h00) * (1 - fz) + (h11 - h01) * fz) / dx, ((h01 - h00) * (1 - fx) + (h11 - h10) * fx) / dx]
 }
@@ -308,11 +362,34 @@ export const MPM_MAX_COLLIDERS = 8
  * Packs colliders into 12 floats each (a.xyz radius, b.xyz friction, velocity.xyz 0), positions local to `origin`
  * (what the GPU reads and {@link collideMPM} takes). Returns how many (at most {@link MPM_MAX_COLLIDERS}).
  */
-export function packMPMColliders(colliders: readonly MPMCollider[], origin: readonly number[], friction: number, out: Float32Array | Float64Array): number {
+export function packMPMColliders(
+  colliders: readonly MPMCollider[],
+  origin: readonly number[],
+  friction: number,
+  out: Float32Array | Float64Array
+): number {
   const n = Math.min(colliders.length, MPM_MAX_COLLIDERS, Math.floor(out.length / 12))
   for (let c = 0; c < n; c++) {
-    const k = colliders[c], b = k.b ?? k.a, v = k.velocity ?? [0, 0, 0]
-    out.set([k.a[0] - origin[0], k.a[1] - origin[1], k.a[2] - origin[2], Math.max(0, k.radius), b[0] - origin[0], b[1] - origin[1], b[2] - origin[2], k.friction ?? friction, v[0], v[1], v[2], 0], c * 12)
+    const k = colliders[c],
+      b = k.b ?? k.a,
+      v = k.velocity ?? [0, 0, 0]
+    out.set(
+      [
+        k.a[0] - origin[0],
+        k.a[1] - origin[1],
+        k.a[2] - origin[2],
+        Math.max(0, k.radius),
+        b[0] - origin[0],
+        b[1] - origin[1],
+        b[2] - origin[2],
+        k.friction ?? friction,
+        v[0],
+        v[1],
+        v[2],
+        0
+      ],
+      c * 12
+    )
   }
   return n
 }
@@ -327,9 +404,16 @@ export function collideMPM(packed: ArrayLike<number>, count: number, x: number[]
     const o = c * 12
     const ab = [packed[o + 4] - packed[o], packed[o + 5] - packed[o + 1], packed[o + 6] - packed[o + 2]]
     const ax = [x[0] - packed[o], x[1] - packed[o + 1], x[2] - packed[o + 2]]
-    const t = Math.min(1, Math.max(0, (ax[0] * ab[0] + ax[1] * ab[1] + ax[2] * ab[2]) / Math.max(ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2], 1e-12)))
+    const t = Math.min(
+      1,
+      Math.max(
+        0,
+        (ax[0] * ab[0] + ax[1] * ab[1] + ax[2] * ab[2]) / Math.max(ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2], 1e-12)
+      )
+    )
     const d = [ax[0] - t * ab[0], ax[1] - t * ab[1], ax[2] - t * ab[2]]
-    const len = Math.hypot(d[0], d[1], d[2]), r = packed[o + 3]
+    const len = Math.hypot(d[0], d[1], d[2]),
+      r = packed[o + 3]
     if (len >= r) continue
     const n = len > 1e-9 ? [d[0] / len, d[1] / len, d[2] / len] : [0, 1, 0]
     const vc = [packed[o + 8], packed[o + 9], packed[o + 10]]
@@ -395,8 +479,14 @@ export class MPMReference {
     const [nx, ny, nz] = this.options.resolution
     this.materials = Object.keys(this.options.materials)
     this.data = {
-      count: 0, position: new Float64Array(n * 3), velocity: new Float64Array(n * 3), affine: new Float64Array(n * 9),
-      deformation: new Float64Array(n * 9), Jp: new Float64Array(n), temperature: new Float64Array(n), material: new Int32Array(n),
+      count: 0,
+      position: new Float64Array(n * 3),
+      velocity: new Float64Array(n * 3),
+      affine: new Float64Array(n * 9),
+      deformation: new Float64Array(n * 9),
+      Jp: new Float64Array(n),
+      temperature: new Float64Array(n),
+      material: new Int32Array(n)
     }
     this.heights = bakeMPMHeights(height, this.options)
     this.frictionMap = bakeMPMFriction(null, this.options)
@@ -442,14 +532,19 @@ export class MPMReference {
 
   /** One P2G → grid → G2P substep of `dt` seconds. */
   substep(dt: number): void {
-    const o = this.options, d = this.data
+    const o = this.options,
+      d = this.data
     const [nx, ny, nz] = o.resolution
-    const dx = o.cellSize, inv = 1 / dx
+    const dx = o.cellSize,
+      inv = 1 / dx
     const acc = (this.acc ??= new Int32Array(nx * ny * nz * 4)).fill(0)
     const params = this.materials.map((m) => o.materials[m])
     this.colliderCount = packMPMColliders(this.colliders, o.origin, o.friction, this.packed)
-    const packed = this.packed, colliders = this.colliderCount
-    const base = [0, 0, 0], fx = [0, 0, 0], w = new Float64Array(9) // w[i * 3 + axis]
+    const packed = this.packed,
+      colliders = this.colliderCount
+    const base = [0, 0, 0],
+      fx = [0, 0, 0],
+      w = new Float64Array(9) // w[i * 3 + axis]
     // Quadratic B-spline weights of particle p; false when its 3×3×3 stencil leaves the grid (frozen).
     const kernel = (p: number) => {
       for (let a = 0; a < 3; a++) {
@@ -464,61 +559,102 @@ export class MPMReference {
     }
 
     // P2G: mass and momentum (with the stress and APIC terms) into the grid, fixed point.
-    const scale = -dt / ((MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3 / 4) * dx * dx) // −dt·Vp·(4/Δx²) / (1000·Δx³), Vp = Δx³/8
+    const scale = -dt / (((MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3) / 4) * dx * dx) // −dt·Vp·(4/Δx²) / (1000·Δx³), Vp = Δx³/8
     for (let p = 0; p < d.count; p++) {
       if (!kernel(p)) continue
       const id = d.material[p]
       const F = Array.from(d.deformation.subarray(p * 9, p * 9 + 9))
       const C = Array.from(d.affine.subarray(p * 9, p * 9 + 9))
-      const tau = mpmMaterial(this.materials[id])!.cpu.stress({ F, J: det3(F), Jp: d.Jp[p], C, temperature: d.temperature[p], dt, params: params[id] })
+      const tau = mpmMaterial(this.materials[id])!.cpu.stress({
+        F,
+        J: det3(F),
+        Jp: d.Jp[p],
+        C,
+        temperature: d.temperature[p],
+        dt,
+        params: params[id]
+      })
       const mass = params[id].density / (MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3)
       const A = tau.map((t, k) => t * scale + C[k] * mass)
-      const vx = d.velocity[p * 3] * mass, vy = d.velocity[p * 3 + 1] * mass, vz = d.velocity[p * 3 + 2] * mass
-      for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
-        const weight = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
-        const px = (i - fx[0]) * dx, py = (j - fx[1]) * dx, pz = (k - fx[2]) * dx
-        const n = (((base[2] + k) * ny + base[1] + j) * nx + base[0] + i) * 4
-        acc[n] = (acc[n] + toFixed((vx + A[0] * px + A[3] * py + A[6] * pz) * weight)) | 0
-        acc[n + 1] = (acc[n + 1] + toFixed((vy + A[1] * px + A[4] * py + A[7] * pz) * weight)) | 0
-        acc[n + 2] = (acc[n + 2] + toFixed((vz + A[2] * px + A[5] * py + A[8] * pz) * weight)) | 0
-        acc[n + 3] = (acc[n + 3] + toFixed(weight * mass)) | 0
-      }
+      const vx = d.velocity[p * 3] * mass,
+        vy = d.velocity[p * 3 + 1] * mass,
+        vz = d.velocity[p * 3 + 2] * mass
+      for (let k = 0; k < 3; k++)
+        for (let j = 0; j < 3; j++)
+          for (let i = 0; i < 3; i++) {
+            const weight = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
+            const px = (i - fx[0]) * dx,
+              py = (j - fx[1]) * dx,
+              pz = (k - fx[2]) * dx
+            const n = (((base[2] + k) * ny + base[1] + j) * nx + base[0] + i) * 4
+            acc[n] = (acc[n] + toFixed((vx + A[0] * px + A[3] * py + A[6] * pz) * weight)) | 0
+            acc[n + 1] = (acc[n + 1] + toFixed((vy + A[1] * px + A[4] * py + A[7] * pz) * weight)) | 0
+            acc[n + 2] = (acc[n + 2] + toFixed((vz + A[2] * px + A[5] * py + A[8] * pz) * weight)) | 0
+            acc[n + 3] = (acc[n + 3] + toFixed(weight * mass)) | 0
+          }
     }
 
     // Grid update: momentum / mass, gravity, walls and terrain.
     const g = this.grid
-    for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
-      const n = ((z * ny + y) * nx + x) * 4
-      const m = acc[n + 3]
-      let v = [0, 0, 0]
-      if (m > 0) v = this.boundary([acc[n] / m + dt * o.gravity[0], acc[n + 1] / m + dt * o.gravity[1], acc[n + 2] / m + dt * o.gravity[2]], x, y, z)
-      g[n] = v[0]; g[n + 1] = v[1]; g[n + 2] = v[2]; g[n + 3] = m / MPM_FIXED
-    }
+    for (let z = 0; z < nz; z++)
+      for (let y = 0; y < ny; y++)
+        for (let x = 0; x < nx; x++) {
+          const n = ((z * ny + y) * nx + x) * 4
+          const m = acc[n + 3]
+          let v = [0, 0, 0]
+          if (m > 0)
+            v = this.boundary(
+              [acc[n] / m + dt * o.gravity[0], acc[n + 1] / m + dt * o.gravity[1], acc[n + 2] / m + dt * o.gravity[2]],
+              x,
+              y,
+              z
+            )
+          g[n] = v[0]
+          g[n + 1] = v[1]
+          g[n + 2] = v[2]
+          g[n + 3] = m / MPM_FIXED
+        }
 
     // G2P: velocity and C = (4/Δx²)·Σ w·v·dposᵀ, F ← (I + dt·C)·F, plasticity, advection.
-    const v = [0, 0, 0], C = new Array<number>(9)
+    const v = [0, 0, 0],
+      C = new Array<number>(9)
     for (let p = 0; p < d.count; p++) {
       if (!kernel(p)) continue
       v[0] = v[1] = v[2] = 0
       C.fill(0)
-      for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
-        const weight = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
-        const px = (i - fx[0]) * dx, py = (j - fx[1]) * dx, pz = (k - fx[2]) * dx
-        const n = (((base[2] + k) * ny + base[1] + j) * nx + base[0] + i) * 4
-        for (let r = 0; r < 3; r++) {
-          const gv = g[n + r] * weight
-          v[r] += gv
-          C[r] += gv * px
-          C[3 + r] += gv * py
-          C[6 + r] += gv * pz
-        }
-      }
+      for (let k = 0; k < 3; k++)
+        for (let j = 0; j < 3; j++)
+          for (let i = 0; i < 3; i++) {
+            const weight = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
+            const px = (i - fx[0]) * dx,
+              py = (j - fx[1]) * dx,
+              pz = (k - fx[2]) * dx
+            const n = (((base[2] + k) * ny + base[1] + j) * nx + base[0] + i) * 4
+            for (let r = 0; r < 3; r++) {
+              const gv = g[n + r] * weight
+              v[r] += gv
+              C[r] += gv * px
+              C[3 + r] += gv * py
+              C[6 + r] += gv * pz
+            }
+          }
       for (let k = 0; k < 9; k++) C[k] *= 4 * inv * inv
       const id = d.material[p]
       const mat = mpmMaterial(this.materials[id])!
-      let F = mul3(identity3().map((e, k) => e + dt * C[k]), Array.from(d.deformation.subarray(p * 9, p * 9 + 9)))
+      let F = mul3(
+        identity3().map((e, k) => e + dt * C[k]),
+        Array.from(d.deformation.subarray(p * 9, p * 9 + 9))
+      )
       if (mat.cpu.plasticity) {
-        const r = mat.cpu.plasticity({ F, J: det3(F), Jp: d.Jp[p], C, temperature: d.temperature[p], dt, params: params[id] })
+        const r = mat.cpu.plasticity({
+          F,
+          J: det3(F),
+          Jp: d.Jp[p],
+          C,
+          temperature: d.temperature[p],
+          dt,
+          params: params[id]
+        })
         if (r.F) F = r.F
         if (r.Jp !== undefined) d.Jp[p] = r.Jp
         if (r.temperature !== undefined) d.temperature[p] = r.temperature
@@ -532,7 +668,9 @@ export class MPMReference {
       if (x[1] < h + MPM_CONTACT_SKIN * dx) {
         const len = Math.hypot(hx, 1, hz)
         const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], mu, true)
-        v[0] = vf[0]; v[1] = vf[1]; v[2] = vf[2]
+        v[0] = vf[0]
+        v[1] = vf[1]
+        v[2] = vf[2]
       }
       collideMPM(packed, colliders, x, v)
       for (let a = 0; a < 3; a++) x[a] += dt * v[a]
@@ -540,11 +678,15 @@ export class MPMReference {
       ;[h, hx, hz] = groundAt(this.heights, nx, nz, dx, x[0], x[2])
       if (x[1] < h) {
         // Out along the ground normal (exact for a plane), not straight up, which would also slide it along a slope.
-        const l2 = hx * hx + 1 + hz * hz, depth = (h - x[1]) / l2, n = [-hx, 1, -hz]
+        const l2 = hx * hx + 1 + hz * hz,
+          depth = (h - x[1]) / l2,
+          n = [-hx, 1, -hz]
         for (let a = 0; a < 3; a++) x[a] += n[a] * depth
         const len = Math.sqrt(l2)
         const vf = projectFriction(v, [-hx / len, 1 / len, -hz / len], mu)
-        v[0] = vf[0]; v[1] = vf[1]; v[2] = vf[2]
+        v[0] = vf[0]
+        v[1] = vf[1]
+        v[2] = vf[2]
       }
       d.position.set(x, p * 3)
       d.velocity.set(v, p * 3)
@@ -556,7 +698,8 @@ export class MPMReference {
 
   /** Total particle momentum, kg·m/s. */
   momentum(): [number, number, number] {
-    const d = this.data, out: [number, number, number] = [0, 0, 0]
+    const d = this.data,
+      out: [number, number, number] = [0, 0, 0]
     for (let p = 0; p < d.count; p++) {
       const m = this.particleMass(p)
       for (let a = 0; a < 3; a++) out[a] += m * d.velocity[p * 3 + a]
@@ -581,17 +724,23 @@ export class MPMReference {
     const o = this.options
     const [nx, ny, nz] = o.resolution
     if (o.walls) {
-      const idx = [x, y, z], n = [nx, ny, nz]
+      const idx = [x, y, z],
+        n = [nx, ny, nz]
       for (let a = 0; a < 3; a++) {
         if (idx[a] < 2 && v[a] < 0) v[a] = 0
         if (idx[a] > n[a] - 3 && v[a] > 0) v[a] = 0
       }
     }
-    const H = this.heights, dx = o.cellSize
+    const H = this.heights,
+      dx = o.cellSize
     const h = H[z * nx + x]
     if (y * dx <= h) {
-      const x0 = Math.max(x - 1, 0), x1 = Math.min(x + 1, nx - 1), z0 = Math.max(z - 1, 0), z1 = Math.min(z + 1, nz - 1)
-      const hx = (H[z * nx + x1] - H[z * nx + x0]) / ((x1 - x0) * dx), hz = (H[z1 * nx + x] - H[z0 * nx + x]) / ((z1 - z0) * dx)
+      const x0 = Math.max(x - 1, 0),
+        x1 = Math.min(x + 1, nx - 1),
+        z0 = Math.max(z - 1, 0),
+        z1 = Math.min(z + 1, nz - 1)
+      const hx = (H[z * nx + x1] - H[z * nx + x0]) / ((x1 - x0) * dx),
+        hz = (H[z1 * nx + x] - H[z0 * nx + x]) / ((z1 - z0) * dx)
       const len = Math.hypot(hx, 1, hz)
       v = projectFriction(v, [-hx / len, 1 / len, -hz / len], o.friction * this.frictionMap[z * nx + x])
     }

@@ -11,7 +11,20 @@
  */
 import type { StarSystem } from './bodies.ts'
 import type { LayerName } from './layers.ts'
-import { DEG, clamp, fromColumns, identity, mulMat, mulVec, mulVecT, normalize, sub, transpose, type Mat3, type Vec3 } from './util.ts'
+import {
+  DEG,
+  clamp,
+  fromColumns,
+  identity,
+  mulMat,
+  mulVec,
+  mulVecT,
+  normalize,
+  sub,
+  transpose,
+  type Mat3,
+  type Vec3
+} from './util.ts'
 
 /** How render space maps onto the home planet; see the module docs. */
 export type SkyFrame = 'local' | 'planet'
@@ -98,31 +111,68 @@ export interface SkyState {
 /** A neutral state: noon-ish sun, no moon, identity rotation, full night for stars. Used by standalone layers. */
 export function defaultSkyState(): SkyState {
   return {
-    time: 0, frame: 'local', latitude: 45, longitude: 0, altitude: 0, planetRadius: 6.371e6, cameraToPlanet: [0, 6.371e6, 0],
-    up: [0, 1, 0], east: [1, 0, 0], north: [0, 0, -1], sunDirection: [0, 1, 0], moonDirection: [0, -1, 0],
-    sunElevation: 90, sunAzimuth: 0, moonElevation: -90, moonAzimuth: 0, sunDistance: 1.496e11, moonDistance: Infinity,
-    sunAngularRadius: 0.00465, moonAngularRadius: 0, moonIllumination: 0, moonPhaseAngle: 180, moonPhase: 0, solarTime: 12,
-    celestialMatrix: identity(), bodyMatrix: identity(), moonMatrix: identity(), night: 1, skyLuminance: 0, layer: 'troposphere',
+    time: 0,
+    frame: 'local',
+    latitude: 45,
+    longitude: 0,
+    altitude: 0,
+    planetRadius: 6.371e6,
+    cameraToPlanet: [0, 6.371e6, 0],
+    up: [0, 1, 0],
+    east: [1, 0, 0],
+    north: [0, 0, -1],
+    sunDirection: [0, 1, 0],
+    moonDirection: [0, -1, 0],
+    sunElevation: 90,
+    sunAzimuth: 0,
+    moonElevation: -90,
+    moonAzimuth: 0,
+    sunDistance: 1.496e11,
+    moonDistance: Infinity,
+    sunAngularRadius: 0.00465,
+    moonAngularRadius: 0,
+    moonIllumination: 0,
+    moonPhaseAngle: 180,
+    moonPhase: 0,
+    solarTime: 12,
+    celestialMatrix: identity(),
+    bodyMatrix: identity(),
+    moonMatrix: identity(),
+    night: 1,
+    skyLuminance: 0,
+    layer: 'troposphere'
   }
 }
 
 /** Body-frame up/east/north at a latitude/longitude (same convention as `threejs-biomes`). */
 export function surfaceFrame(latitude: number, longitude: number): { up: Vec3; east: Vec3; north: Vec3 } {
-  const la = latitude * DEG, lo = longitude * DEG
+  const la = latitude * DEG,
+    lo = longitude * DEG
   const up: Vec3 = [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)]
   const east: Vec3 = [Math.cos(lo), 0, -Math.sin(lo)]
   const north: Vec3 = [-Math.sin(la) * Math.sin(lo), Math.cos(la), -Math.sin(la) * Math.cos(lo)]
   return { up, east, north }
 }
 
-const _a: Vec3 = [0, 0, 0], _b: Vec3 = [0, 0, 0], _c: Vec3 = [0, 0, 0]
-const _sun: Vec3 = [0, 0, 0], _moon: Vec3 = [0, 0, 0], _home: Vec3 = [0, 0, 0], _obs: Vec3 = [0, 0, 0]
+const _a: Vec3 = [0, 0, 0],
+  _b: Vec3 = [0, 0, 0],
+  _c: Vec3 = [0, 0, 0]
+const _sun: Vec3 = [0, 0, 0],
+  _moon: Vec3 = [0, 0, 0],
+  _home: Vec3 = [0, 0, 0],
+  _obs: Vec3 = [0, 0, 0]
 
 /**
  * Computes the sky as seen from the camera at `time`.
  * @param camera Camera position in render space (metres). In the local frame its y is the altitude.
  */
-export function observe(system: StarSystem, time: number, observer: ObserverOptions, camera: Vec3 = [0, 0, 0], out: SkyState = defaultSkyState()): SkyState {
+export function observe(
+  system: StarSystem,
+  time: number,
+  observer: ObserverOptions,
+  camera: Vec3 = [0, 0, 0],
+  out: SkyState = defaultSkyState()
+): SkyState {
   const home = system.home
   const R = home.radius
   out.time = time
@@ -138,7 +188,9 @@ export function observe(system: StarSystem, time: number, observer: ObserverOpti
     out.latitude = Math.asin(clamp(rel[1] / r, -1, 1)) / DEG
     out.longitude = Math.atan2(rel[0], rel[2]) / DEG
     const f = surfaceFrame(out.latitude, out.longitude)
-    out.up = f.up; out.east = f.east; out.north = f.north
+    out.up = f.up
+    out.east = f.east
+    out.north = f.north
     out.altitude = r - R
     out.cameraToPlanet = [rel[0], rel[1], rel[2]]
     renderToBody = identity()
@@ -147,7 +199,9 @@ export function observe(system: StarSystem, time: number, observer: ObserverOpti
     out.latitude = observer.latitude
     out.longitude = observer.longitude
     const f = surfaceFrame(observer.latitude, observer.longitude)
-    out.up = [0, 1, 0]; out.east = [1, 0, 0]; out.north = [0, 0, -1]
+    out.up = [0, 1, 0]
+    out.east = [1, 0, 0]
+    out.north = [0, 0, -1]
     out.altitude = camera[1]
     out.cameraToPlanet = [0, R + camera[1], 0] // a virtual planet right under the camera
     renderToBody = fromColumns(f.east, f.up, [-f.north[0], -f.north[1], -f.north[2]])
@@ -161,7 +215,9 @@ export function observe(system: StarSystem, time: number, observer: ObserverOpti
 
   const homePos = system.position(home.index, time, _home)
   const obs = mulVec(bodyToStar, obsBody, _obs)
-  obs[0] += homePos[0]; obs[1] += homePos[1]; obs[2] += homePos[2]
+  obs[0] += homePos[0]
+  obs[1] += homePos[1]
+  obs[2] += homePos[2]
 
   // Sun.
   const sunPos = system.position(0, time, _sun)
@@ -200,11 +256,14 @@ export function observe(system: StarSystem, time: number, observer: ObserverOpti
 }
 
 /** Elevation and azimuth (degrees) of a render-space direction in the observer's horizon frame. */
-export function horizontal(state: Pick<SkyState, 'up' | 'east' | 'north'>, dir: Vec3): [elevation: number, azimuth: number] {
+export function horizontal(
+  state: Pick<SkyState, 'up' | 'east' | 'north'>,
+  dir: Vec3
+): [elevation: number, azimuth: number] {
   const u = dir[0] * state.up[0] + dir[1] * state.up[1] + dir[2] * state.up[2]
   const e = dir[0] * state.east[0] + dir[1] * state.east[1] + dir[2] * state.east[2]
   const n = dir[0] * state.north[0] + dir[1] * state.north[1] + dir[2] * state.north[2]
-  return [Math.asin(clamp(u, -1, 1)) / DEG, ((Math.atan2(e, n) / DEG) + 360) % 360]
+  return [Math.asin(clamp(u, -1, 1)) / DEG, (Math.atan2(e, n) / DEG + 360) % 360]
 }
 
 /** Moon phase quantities from positions (any common frame, y-up ecliptic for `cycle`). */
@@ -233,7 +292,16 @@ export function moonPhase(sun: Vec3, moon: Vec3, observer: Vec3, planet: Vec3 = 
 
 /** Common names of the moon's phases for a cycle value 0..1. */
 export function moonPhaseName(cycle: number): string {
-  const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent']
+  const names = [
+    'New moon',
+    'Waxing crescent',
+    'First quarter',
+    'Waxing gibbous',
+    'Full moon',
+    'Waning gibbous',
+    'Last quarter',
+    'Waning crescent'
+  ]
   return names[Math.round((((cycle % 1) + 1) % 1) * 8) % 8]
 }
 
@@ -254,25 +322,40 @@ export interface SunTimes {
  * Next sunrise and sunset within one solar day after `from`, by scanning the sun's elevation and
  * bisecting the crossings. `horizon` defaults to −0.833° (upper limb plus standard refraction).
  */
-export function sunTimes(system: StarSystem, from: number, latitude: number, longitude: number, horizon = -0.833): SunTimes {
+export function sunTimes(
+  system: StarSystem,
+  from: number,
+  latitude: number,
+  longitude: number,
+  horizon = -0.833
+): SunTimes {
   const day = system.solarDay()
   const steps = 96
   const f = (t: number) => sunElevationAt(system, t, latitude, longitude) - horizon
   const out: SunTimes = { sunrise: null, sunset: null }
-  let t0 = from, f0 = f(t0)
+  let t0 = from,
+    f0 = f(t0)
   for (let i = 1; i <= steps && (out.sunrise === null || out.sunset === null); i++) {
-    const t1 = from + (day * i) / steps, f1 = f(t1)
+    const t1 = from + (day * i) / steps,
+      f1 = f(t1)
     if (f0 <= 0 !== f1 <= 0) {
-      let lo = t0, hi = t1, flo = f0
+      let lo = t0,
+        hi = t1,
+        flo = f0
       for (let k = 0; k < 50; k++) {
-        const mid = 0.5 * (lo + hi), fm = f(mid)
-        if (fm <= 0 === flo <= 0) { lo = mid; flo = fm } else hi = mid
+        const mid = 0.5 * (lo + hi),
+          fm = f(mid)
+        if (fm <= 0 === flo <= 0) {
+          lo = mid
+          flo = fm
+        } else hi = mid
       }
       const t = 0.5 * (lo + hi)
       if (f0 <= 0) out.sunrise ??= t
       else out.sunset ??= t
     }
-    t0 = t1; f0 = f1
+    t0 = t1
+    f0 = f1
   }
   return out
 }

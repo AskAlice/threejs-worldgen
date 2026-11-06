@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useImperativeHandle, useMemo, typ
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Renderer, Texture } from 'three/webgpu'
 import { ParticleGrid as ParticleGridImpl, type GridOptions } from './grid.ts'
-import { ParticleLighting, ParticleSystem as ParticleSystemImpl } from './system.ts'
+import { type ParticleLighting, ParticleSystem as ParticleSystemImpl } from './system.ts'
 import { MPMSolver as MPMSolverImpl } from './mpm.ts'
 import { MPMSnowSurface as MPMSnowSurfaceImpl, type SnowSurfaceOptions } from './mpm-snow.ts'
 import { FluidSurface as FluidSurfaceImpl, type FluidSource, type FluidSurfaceInput } from './fluid-surface.ts'
@@ -78,8 +78,19 @@ export function Particles({ lighting, sources, maxSources, ref, ...options }: Pa
   const { gl, scene, camera } = useThree()
   const grid = useContext(GridContext)
   const r = options.render
-  const structure = JSON.stringify([options.capacity, r?.shading, r?.blending, r?.sort, r?.shadowSteps, r?.lightSteps, maxSources])
-  const impl = useMemo(() => new ParticleSystemImpl({ ...options, grid, lighting, maxSources }), [structure, grid, lighting])
+  const structure = JSON.stringify([
+    options.capacity,
+    r?.shading,
+    r?.blending,
+    r?.sort,
+    r?.shadowSteps,
+    r?.lightSteps,
+    maxSources
+  ])
+  const impl = useMemo(
+    () => new ParticleSystemImpl({ ...options, grid, lighting, maxSources }),
+    [structure, grid, lighting]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.reset(options))
   useEffect(() => void (sources && impl.setSources(sources)), [impl, sources])
@@ -112,12 +123,19 @@ export interface MPMProps extends MPMInput {
  */
 export function MPM({ height = null, emit, timeStep, ref, ...options }: MPMProps): React.JSX.Element {
   const { gl } = useThree()
-  const structure = JSON.stringify([options.capacity, options.resolution, options.cellSize, Object.keys(options.materials ?? {})])
+  const structure = JSON.stringify([
+    options.capacity,
+    options.resolution,
+    options.cellSize,
+    Object.keys(options.materials ?? {})
+  ])
   const impl = useMemo(() => new MPMSolverImpl(gl as unknown as Renderer, { ...options, height }), [structure, gl])
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.set(options))
   useEffect(() => void impl.setHeight(height), [impl, height])
-  useEffect(() => { for (const e of emit ?? []) impl.emit(e) }, [impl])
+  useEffect(() => {
+    for (const e of emit ?? []) impl.emit(e)
+  }, [impl])
   useFrame((_, dt) => void ((timeStep ?? dt) > 0 && impl.step(timeStep ?? dt)))
   useImperativeHandle(ref, () => impl, [impl])
   return <primitive object={impl.object} />
@@ -137,7 +155,10 @@ export interface MPMSnowSurfaceProps extends Partial<SnowSurfaceOptions> {
  */
 export function MPMSnowSurface({ solver, ref, ...options }: MPMSnowSurfaceProps): React.JSX.Element {
   const { gl } = useThree()
-  const impl = useMemo(() => new MPMSnowSurfaceImpl(gl as unknown as Renderer, solver, options), [gl, solver, options.detail])
+  const impl = useMemo(
+    () => new MPMSnowSurfaceImpl(gl as unknown as Renderer, solver, options),
+    [gl, solver, options.detail]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.set(options))
   useFrame(() => impl.update())
@@ -164,7 +185,11 @@ export interface FluidSurfaceProps extends FluidSurfaceInput, SurfaceLight {
 /** A screen-space water surface over a solver's particles, its offscreen passes drawn every frame. Props merge into its settings. */
 export function FluidSurface({ source, lighting, envMap, ref, ...options }: FluidSurfaceProps): React.JSX.Element {
   const { gl, scene, camera } = useThree()
-  const impl = useMemo(() => new FluidSurfaceImpl(source, { ...options, lighting, envMap: envMap === undefined ? scene.environment : envMap }), [source, lighting])
+  const impl = useMemo(
+    () =>
+      new FluidSurfaceImpl(source, { ...options, lighting, envMap: envMap === undefined ? scene.environment : envMap }),
+    [source, lighting]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.set(options))
   useFrame(() => {
@@ -192,7 +217,10 @@ export interface MPMLavaProps extends LavaInput, SurfaceLight {
  */
 export function MPMLava({ solver, lighting, envMap, timeStep, ref, ...options }: MPMLavaProps): React.JSX.Element {
   const { gl, scene, camera } = useThree()
-  const impl = useMemo(() => new MPMLavaImpl(solver, { ...options, lighting, envMap: envMap === undefined ? scene.environment : envMap }), [solver, lighting, options.material])
+  const impl = useMemo(
+    () => new MPMLavaImpl(solver, { ...options, lighting, envMap: envMap === undefined ? scene.environment : envMap }),
+    [solver, lighting, options.material]
+  )
   useEffect(() => () => impl.dispose(), [impl])
   useEffect(() => void impl.set(options))
   useFrame((_, dt) => {

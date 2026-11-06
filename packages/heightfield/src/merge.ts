@@ -19,7 +19,8 @@ export function merge<T>(target: T, input: unknown): T {
     if (v === undefined || UNSAFE.has(k)) continue
     const t = target as Record<string, unknown>
     const cur = t[k]
-    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur)) t[k] = merge({ ...(cur as object) }, v)
+    if (v && typeof v === 'object' && !Array.isArray(v) && cur && typeof cur === 'object' && !Array.isArray(cur))
+      t[k] = merge({ ...(cur as object) }, v)
     else t[k] = Array.isArray(v) ? structuredClone(v) : v
   }
   return target

@@ -49,8 +49,8 @@ export const DEFAULT_DISTRICTS: DistrictOptions = {
     residential: { blockSize: 145, lotArea: 520, lotWidth: 13, setback: 4, coverage: 0.85, floors: [1, 7] },
     industrial: { blockSize: 250, lotArea: 3200, lotWidth: 34, setback: 6, coverage: 0.8, floors: [1, 2] },
     park: { blockSize: 0, lotArea: 6000, lotWidth: 30, setback: 0, coverage: 0, floors: [0, 0] },
-    farmland: { blockSize: 0, lotArea: 14000, lotWidth: 60, setback: 18, coverage: 0.12, floors: [1, 2] },
-  },
+    farmland: { blockSize: 0, lotArea: 14000, lotWidth: 60, setback: 18, coverage: 0.12, floors: [1, 2] }
+  }
 }
 
 /** District shares for one settlement (from its size class). */
@@ -88,17 +88,35 @@ export class DistrictMap {
    * District layout around (`cx`, `cz`) for a settlement of `radius` metres. With `mainStreet` > 0, downtown is a
    * strip that wide either side of a street through the centre along `axis` (a town's high street) instead of a disc.
    */
-  constructor(options: DistrictOptions, shares: DistrictShares, cx: number, cz: number, radius: number, seed: number, mainStreet = 0, axis = 0) {
+  constructor(
+    options: DistrictOptions,
+    shares: DistrictShares,
+    cx: number,
+    cz: number,
+    radius: number,
+    seed: number,
+    mainStreet = 0,
+    axis = 0
+  ) {
     this.options = options
     this.shares = shares
-    this.cx = cx; this.cz = cz; this.radius = radius; this.seed = seed
-    this.mainStreet = mainStreet; this.axis = axis
+    this.cx = cx
+    this.cz = cz
+    this.radius = radius
+    this.seed = seed
+    this.mainStreet = mainStreet
+    this.axis = axis
   }
 
   /** Distance from the centre as a fraction of the radius, with boundary noise. */
   private reach(x: number, z: number): number {
     const d = Math.hypot(x - this.cx, z - this.cz) / this.radius
-    return d + fbm(this.seed + 41, x, 3.3, z, { frequency: 1.5 / this.radius, octaves: 3, lacunarity: 2, gain: 0.5 }) * 2 * this.options.noise
+    return (
+      d +
+      fbm(this.seed + 41, x, 3.3, z, { frequency: 1.5 / this.radius, octaves: 3, lacunarity: 2, gain: 0.5 }) *
+        2 *
+        this.options.noise
+    )
   }
 
   /** The district at (x, z). */
@@ -106,13 +124,23 @@ export class DistrictMap {
     const s = this.shares
     const d = this.reach(x, z)
     if (this.mainStreet > 0) {
-      const dx = x - this.cx, dz = z - this.cz, ux = Math.cos(this.axis), uz = Math.sin(this.axis)
-      if (Math.abs(dx * ux + dz * uz) < s.downtown * this.radius && Math.abs(dz * ux - dx * uz) < this.mainStreet) return 'downtown'
+      const dx = x - this.cx,
+        dz = z - this.cz,
+        ux = Math.cos(this.axis),
+        uz = Math.sin(this.axis)
+      if (Math.abs(dx * ux + dz * uz) < s.downtown * this.radius && Math.abs(dz * ux - dx * uz) < this.mainStreet)
+        return 'downtown'
     } else if (d < s.downtown) return 'downtown'
     if (d > s.farmland) return 'farmland'
     const o = this.options
-    if (s.park > 0 && cellular(this.seed + 43, x / o.parkSize, 1.7, z / o.parkSize, 0.9, this.cell).random < s.park) return 'park'
-    if (s.industrial > 0 && d > s.downtown + 0.12 && cellular(this.seed + 47, x / o.patchSize, 2.9, z / o.patchSize, 0.9, this.cell).random < s.industrial) return 'industrial'
+    if (s.park > 0 && cellular(this.seed + 43, x / o.parkSize, 1.7, z / o.parkSize, 0.9, this.cell).random < s.park)
+      return 'park'
+    if (
+      s.industrial > 0 &&
+      d > s.downtown + 0.12 &&
+      cellular(this.seed + 47, x / o.patchSize, 2.9, z / o.patchSize, 0.9, this.cell).random < s.industrial
+    )
+      return 'industrial'
     return 'residential'
   }
 

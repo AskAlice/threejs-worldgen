@@ -1,10 +1,29 @@
 import {
-  DepthTexture, FloatType, HalfFloatType, LinearFilter, MeshBasicNodeMaterial, RenderTarget, Vector2,
-  type Camera, type Scene, type WebGPURenderer,
+  DepthTexture,
+  FloatType,
+  HalfFloatType,
+  LinearFilter,
+  MeshBasicNodeMaterial,
+  RenderTarget,
+  Vector2,
+  type Camera,
+  type Scene,
+  type WebGPURenderer
 } from 'three/webgpu'
 import {
-  Fn, cameraFar, cameraNear, logarithmicDepthToViewZ, normalize, normalView, perspectiveDepthToViewZ, screenUV, texture, vec4,
-  viewZToPerspectiveDepth, viewZToReversedPerspectiveDepth, viewportSharedTexture,
+  Fn,
+  cameraFar,
+  cameraNear,
+  logarithmicDepthToViewZ,
+  normalize,
+  normalView,
+  perspectiveDepthToViewZ,
+  screenUV,
+  texture,
+  vec4,
+  viewZToPerspectiveDepth,
+  viewZToReversedPerspectiveDepth,
+  viewportSharedTexture
 } from 'three/tsl'
 
 /** Options for {@link WaterPrepass}. */
@@ -64,7 +83,7 @@ export class WaterPrepass {
       minFilter: LinearFilter,
       generateMipmaps: false,
       // 32-bit float depth works with and without `reversedDepthBuffer` (three's PassNode does the same).
-      depthTexture: new DepthTexture(1, 1, FloatType),
+      depthTexture: new DepthTexture(1, 1, FloatType)
     })
     this.target.texture.name = 'Water prepass (view normals)'
     this.target.depthTexture!.name = 'Water prepass (depth)'

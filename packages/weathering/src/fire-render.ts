@@ -1,10 +1,31 @@
-import { ClampToEdgeWrapping, DataTexture, Group, LinearFilter, PointLight, RGBAFormat, UnsignedByteType, Vector3, Vector4, type Camera, type ComputeNode, type Node, type Object3D, type Renderer } from 'three/webgpu'
+import {
+  ClampToEdgeWrapping,
+  DataTexture,
+  Group,
+  LinearFilter,
+  PointLight,
+  RGBAFormat,
+  UnsignedByteType,
+  Vector3,
+  Vector4,
+  type Camera,
+  type ComputeNode,
+  type Node,
+  type Object3D,
+  type Renderer
+} from 'three/webgpu'
 import { positionWorld, step, uniform } from 'three/tsl'
 import { bloom as bloomNode } from 'three/addons/tsl/display/BloomNode.js'
 import { ParticleGrid, ParticleLighting, ParticleSystem, blackbodyColor, type ParticleInput } from 'threejs-particles'
 import type { DeepPartial } from 'threejs-biomes'
 import { FireSim, type FireEnvironment, type FireInput, type FireOptions } from './fire-sim.ts'
-import { collectFireSources, createFireSources, plumeOcclusion, smokeTransmittance, type FireSources } from './fire-front.ts'
+import {
+  collectFireSources,
+  createFireSources,
+  plumeOcclusion,
+  smokeTransmittance,
+  type FireSources
+} from './fire-front.ts'
 import { smoothSample } from './sampling.ts'
 import type { StateField } from './state-field.ts'
 import { merge, resolve } from 'threejs-heightfield'
@@ -127,14 +148,40 @@ export interface WildfireLook {
 
 /** Default wildfire look (about 30k GPU particles in total). */
 export const DEFAULT_WILDFIRE_LOOK: WildfireLook = {
-  flames: { max: 10000, rate: 10, size: 1.6, height: 2.6, life: [0.5, 1.2], temperature: [1750, 2100], intensity: 0.45, flaming: 25, crownHeight: 10, turbulence: 7 },
-  smoke: { max: 10000, rate: 2.5, size: 40, life: [45, 90], rise: 0.4, opacity: 0.6, clean: '#e6e3de', dirty: '#5a4d42', linger: 240, shadowSteps: 2, lightSteps: 4, detail: 1, capHeight: 300, capIntensity: 40 },
+  flames: {
+    max: 10000,
+    rate: 10,
+    size: 1.6,
+    height: 2.6,
+    life: [0.5, 1.2],
+    temperature: [1750, 2100],
+    intensity: 0.45,
+    flaming: 25,
+    crownHeight: 10,
+    turbulence: 7
+  },
+  smoke: {
+    max: 10000,
+    rate: 2.5,
+    size: 40,
+    life: [45, 90],
+    rise: 0.4,
+    opacity: 0.6,
+    clean: '#e6e3de',
+    dirty: '#5a4d42',
+    linger: 240,
+    shadowSteps: 2,
+    lightSteps: 4,
+    detail: 1,
+    capHeight: 300,
+    capIntensity: 40
+  },
   embers: { max: 5000, rate: 6, size: 0.05, life: [2, 7], intensity: 5 },
   haze: { enabled: false, max: 1500, strength: 0.006 },
   glow: { front: 0.9, smoulder: 0.35 },
   light: { intensity: 40, distance: 500, flicker: 0.35 },
   grid: { enabled: true, resolution: [40, 24, 40], height: 900 },
-  bloom: { enabled: false, strength: 0.35, radius: 0.4, threshold: 1.2 },
+  bloom: { enabled: false, strength: 0.35, radius: 0.4, threshold: 1.2 }
 }
 
 /** Partial settings for {@link Wildfire}: simulation settings plus the look. */
@@ -212,7 +259,8 @@ export class Wildfire {
   readonly uniforms = {
     /** Grid minimum relative to render zero (xy) and size (zw). */ bounds: uniform(new Vector4()),
     /** Mean wind over the front, (x, 0, z) m/s. */ wind: uniform(new Vector3()),
-    /** How much the plume dims the sun at the camera, 0…1 (see {@link Wildfire.smokeOcclusionAt}). */ smokeOcclusion: uniform(0),
+    /** How much the plume dims the sun at the camera, 0…1 (see {@link Wildfire.smokeOcclusionAt}). */ smokeOcclusion:
+      uniform(0)
   }
   /** The particle systems (rebuilt when counts or quality change). */
   systems!: WildfireSystems
@@ -303,7 +351,15 @@ export class Wildfire {
   smokeOcclusionAt(x: number, z: number): number {
     const s = this.sources
     if (s.front <= 0) return 0
-    return plumeOcclusion(x, z, s.center[0] + this.sim.minX, s.center[2] + this.sim.minZ, s.wind[0], s.wind[1], s.smokeTotal)
+    return plumeOcclusion(
+      x,
+      z,
+      s.center[0] + this.sim.minX,
+      s.center[2] + this.sim.minZ,
+      s.wind[0],
+      s.wind[1],
+      s.smokeTotal
+    )
   }
 
   /** Sunlight transmittance (linear RGB) through the plume at (x, z): dims and reddens. */
@@ -365,7 +421,17 @@ export class Wildfire {
   }
 
   private rebuild() {
-    const s = collectFireSources(this.sim, { flaming: this.look.flames.flaming, crownHeight: this.look.flames.crownHeight, linger: this.look.smoke.linger, frontGlow: this.look.glow.front, smoulderGlow: this.look.glow.smoulder }, this.sources)
+    const s = collectFireSources(
+      this.sim,
+      {
+        flaming: this.look.flames.flaming,
+        crownHeight: this.look.flames.crownHeight,
+        linger: this.look.smoke.linger,
+        frontGlow: this.look.glow.front,
+        smoulderGlow: this.look.glow.smoulder
+      },
+      this.sources
+    )
     this.texture.needsUpdate = true
     const sys = this.systems
     sys.flames.setSources(s.flames, s.flameCount)
@@ -381,12 +447,20 @@ export class Wildfire {
   }
 
   private animate(dt: number) {
-    const s = this.sources, L = this.look
+    const s = this.sources,
+      L = this.look
     // Flickering light at the front, coloured by the flames' mean blackbody temperature.
     const t = this.clock
-    const flicker = 1 + L.light.flicker * (0.5 * Math.sin(t * 11.3) + 0.3 * Math.sin(t * 17.9 + 1.3) + 0.2 * Math.sin(t * 29.1 + 2.1)) * 0.6
+    const flicker =
+      1 +
+      L.light.flicker *
+        (0.5 * Math.sin(t * 11.3) + 0.3 * Math.sin(t * 17.9 + 1.3) + 0.2 * Math.sin(t * 29.1 + 2.1)) *
+        0.6
     if (s.front > 0) this.light.position.set(s.center[0], s.center[1] + 6, s.center[2])
-    const kelvin = L.flames.temperature[0] + (L.flames.temperature[1] - L.flames.temperature[0]) * Math.min(1, s.front / Math.max(1, this.sources.flameCount) * 1.5)
+    const kelvin =
+      L.flames.temperature[0] +
+      (L.flames.temperature[1] - L.flames.temperature[0]) *
+        Math.min(1, (s.front / Math.max(1, this.sources.flameCount)) * 1.5)
     const [r, g, b] = blackbodyColor(kelvin * 0.85)
     this.light.color.setRGB(r, g, b)
     this.light.intensity = L.light.intensity * Math.sqrt(s.front) * flicker
@@ -407,7 +481,8 @@ export class Wildfire {
     // One batched compute submission: every system's emit + update, then the grid's splats and resolve.
     const sys = this.systems
     const nodes: ComputeNode[] = []
-    for (const p of [sys.haze, sys.smoke, sys.flames, sys.embers]) if (p) nodes.push(...p.prepare(renderer, dt, this.camera))
+    for (const p of [sys.haze, sys.smoke, sys.flames, sys.embers])
+      if (p) nodes.push(...p.prepare(renderer, dt, this.camera))
     if (this.grid) nodes.push(...this.splats, ...this.grid.resolvePasses(dt))
     if (nodes.length) renderer.compute(nodes)
     sys.smoke.sort(renderer)
@@ -417,26 +492,47 @@ export class Wildfire {
   private writeField() {
     const field = this.field!
     const sim = this.sim
-    const fn = field.options.resolution, t = field.texel
-    const x1 = sim.minX + sim.cols * sim.options.cellSize, z1 = sim.minZ + sim.rows * sim.options.cellSize
-    const i0 = Math.max(0, Math.floor((sim.minX - field.minX) / t)), i1 = Math.min(fn - 1, Math.floor((x1 - field.minX) / t))
-    const j0 = Math.max(0, Math.floor((sim.minZ - field.minZ) / t)), j1 = Math.min(fn - 1, Math.floor((z1 - field.minZ) / t))
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const k = sim.index(field.minX + (i + 0.5) * t, field.minZ + (j + 0.5) * t)
-      if (k >= 0) field.data[(j * fn + i) * 4 + 2] = sim.scar(k)
-    }
+    const fn = field.options.resolution,
+      t = field.texel
+    const x1 = sim.minX + sim.cols * sim.options.cellSize,
+      z1 = sim.minZ + sim.rows * sim.options.cellSize
+    const i0 = Math.max(0, Math.floor((sim.minX - field.minX) / t)),
+      i1 = Math.min(fn - 1, Math.floor((x1 - field.minX) / t))
+    const j0 = Math.max(0, Math.floor((sim.minZ - field.minZ) / t)),
+      j1 = Math.min(fn - 1, Math.floor((z1 - field.minZ) / t))
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) {
+        const k = sim.index(field.minX + (i + 0.5) * t, field.minZ + (j + 0.5) * t)
+        if (k >= 0) field.data[(j * fn + i) * 4 + 2] = sim.scar(k)
+      }
     field.touch()
   }
 
   private placeGroup() {
     this.object.position.set(this.sim.minX - this.origin[0], -this.origin[1], this.sim.minZ - this.origin[2])
-    this.uniforms.bounds.value.set(this.sim.minX - this.origin[0], this.sim.minZ - this.origin[2], this.sim.cols * this.sim.options.cellSize, this.sim.rows * this.sim.options.cellSize)
+    this.uniforms.bounds.value.set(
+      this.sim.minX - this.origin[0],
+      this.sim.minZ - this.origin[2],
+      this.sim.cols * this.sim.options.cellSize,
+      this.sim.rows * this.sim.options.cellSize
+    )
   }
 
   private applyLook(): this {
     const L = this.look
     this.light.distance = L.light.distance
-    const key = JSON.stringify([L.flames.max, L.smoke.max, L.embers.max, L.haze.enabled, L.haze.max, L.smoke.shadowSteps, L.smoke.lightSteps, L.grid, this.sim.options.seed, this.sim.cols])
+    const key = JSON.stringify([
+      L.flames.max,
+      L.smoke.max,
+      L.embers.max,
+      L.haze.enabled,
+      L.haze.max,
+      L.smoke.shadowSteps,
+      L.smoke.lightSteps,
+      L.grid,
+      this.sim.options.seed,
+      this.sim.cols
+    ])
     if (key !== this.structureKey) {
       this.structureKey = key
       this.build()
@@ -458,25 +554,69 @@ export class Wildfire {
 
   private build() {
     this.disposeSystems()
-    const L = this.look, sim = this.sim
+    const L = this.look,
+      sim = this.sim
     const span = sim.cols * sim.options.cellSize
     this.grid = null
     if (L.grid.enabled) {
-      let lo = Infinity, hi = -Infinity
-      for (let i = 0; i < sim.elevation.length; i++) { lo = Math.min(lo, sim.elevation[i]); hi = Math.max(hi, sim.elevation[i]) }
+      let lo = Infinity,
+        hi = -Infinity
+      for (let i = 0; i < sim.elevation.length; i++) {
+        lo = Math.min(lo, sim.elevation[i])
+        hi = Math.max(hi, sim.elevation[i])
+      }
       if (!Number.isFinite(lo)) lo = hi = 0
       const pad = span * 0.6
       this.grid = new ParticleGrid({
-        resolution: L.grid.resolution, min: [-pad, lo - 10, -pad], size: [span + pad * 2, hi - lo + 10 + L.grid.height, span + pad * 2],
-        advect: [1, 0, 0, 0], decay: [0.012, 0, 0, 0], rise: 5,
+        resolution: L.grid.resolution,
+        min: [-pad, lo - 10, -pad],
+        size: [span + pad * 2, hi - lo + 10 + L.grid.height, span + pad * 2],
+        advect: [1, 0, 0, 0],
+        decay: [0.012, 0, 0, 0],
+        rise: 5
       })
     }
-    const base = { seed: sim.options.seed, grid: this.grid, lighting: this.lighting, maxSources: Math.min(8192, sim.cols * sim.rows) }
+    const base = {
+      seed: sim.options.seed,
+      grid: this.grid,
+      lighting: this.lighting,
+      maxSources: Math.min(8192, sim.cols * sim.rows)
+    }
     const sys: WildfireSystems = {
-      flames: new ParticleSystem({ ...base, ...this.flameOptions(), capacity: L.flames.max, render: { ...this.flameOptions().render, shading: 'flame', blending: 'premultiplied' } }),
-      smoke: new ParticleSystem({ ...base, ...this.smokeOptions(), capacity: L.smoke.max, render: { ...this.smokeOptions().render, shading: 'smoke', blending: 'alpha', sort: true, shadowSteps: L.smoke.shadowSteps, lightSteps: L.smoke.lightSteps } }),
-      embers: new ParticleSystem({ ...base, ...this.emberOptions(), capacity: L.embers.max, render: { ...this.emberOptions().render, shading: 'spark', blending: 'additive' } }),
-      haze: L.haze.enabled ? new ParticleSystem({ ...base, grid: null, ...this.hazeOptions(), capacity: L.haze.max, render: { ...this.hazeOptions().render, shading: 'haze', blending: 'alpha' } }) : null,
+      flames: new ParticleSystem({
+        ...base,
+        ...this.flameOptions(),
+        capacity: L.flames.max,
+        render: { ...this.flameOptions().render, shading: 'flame', blending: 'premultiplied' }
+      }),
+      smoke: new ParticleSystem({
+        ...base,
+        ...this.smokeOptions(),
+        capacity: L.smoke.max,
+        render: {
+          ...this.smokeOptions().render,
+          shading: 'smoke',
+          blending: 'alpha',
+          sort: true,
+          shadowSteps: L.smoke.shadowSteps,
+          lightSteps: L.smoke.lightSteps
+        }
+      }),
+      embers: new ParticleSystem({
+        ...base,
+        ...this.emberOptions(),
+        capacity: L.embers.max,
+        render: { ...this.emberOptions().render, shading: 'spark', blending: 'additive' }
+      }),
+      haze: L.haze.enabled
+        ? new ParticleSystem({
+            ...base,
+            grid: null,
+            ...this.hazeOptions(),
+            capacity: L.haze.max,
+            render: { ...this.hazeOptions().render, shading: 'haze', blending: 'alpha' }
+          })
+        : null
     }
     // Draw order: haze refracts the opaque scene, then smoke, then additive flames and embers on top.
     sys.haze && (sys.haze.object.renderOrder = 1)
@@ -496,54 +636,183 @@ export class Wildfire {
       this.splats.push(g.splat(sys.flames, 0, (p) => p.temperature.sub(400).max(0).div(1200).mul(0.0015))) // heat per second
       const cell = g.cellSize()
       const cellVolume = cell.x * cell.y * cell.z
-      this.splats.push(g.splat(sys.smoke, 1, (p) => p.size.mul(p.size).mul(p.size).mul(0.12 / cellVolume).mul(p.t.oneMinus())))
+      this.splats.push(
+        g.splat(sys.smoke, 1, (p) =>
+          p.size
+            .mul(p.size)
+            .mul(p.size)
+            .mul(0.12 / cellVolume)
+            .mul(p.t.oneMinus())
+        )
+      )
     }
   }
 
   private flameOptions(): ParticleInput {
-    const F = this.look.flames, c = this.sim.options.cellSize
+    const F = this.look.flames,
+      c = this.sim.options.cellSize
     return {
-      seed: this.sim.options.seed, rate: F.rate, maxPerFrame: 4096, life: F.life,
-      emitter: { shape: 'sources', size: [c * 0.5, 0.2, c * 0.5], velocity: [0, 1.5, 0], spread: 0.8, temperature: F.temperature },
-      forces: { gravity: 0, buoyancy: 0.32, ambientTemperature: 300, cooling: 1.1, windShear: 0.2, drag: 2.4, turbulence: F.turbulence, turbulenceScale: 2.5, turbulenceSpeed: 1.4, gridLift: 0 },
+      seed: this.sim.options.seed,
+      rate: F.rate,
+      maxPerFrame: 4096,
+      life: F.life,
+      emitter: {
+        shape: 'sources',
+        size: [c * 0.5, 0.2, c * 0.5],
+        velocity: [0, 1.5, 0],
+        spread: 0.8,
+        temperature: F.temperature
+      },
+      forces: {
+        gravity: 0,
+        buoyancy: 0.32,
+        ambientTemperature: 300,
+        cooling: 1.1,
+        windShear: 0.2,
+        drag: 2.4,
+        turbulence: F.turbulence,
+        turbulenceScale: 2.5,
+        turbulenceSpeed: 1.4,
+        gridLift: 0
+      },
       curves: { size: [0.55, 1, 0.9, 0.6], opacity: [0, 1, 0.9, 0.5, 0], color: ['#ffffff'] },
-      render: { size: F.size, sizeRandom: [0.45, 1.7], aspect: F.height, stretch: 0.12, intensity: F.intensity, blackbody: true, softness: 1.5, detail: 1, detailDistance: 900 },
+      render: {
+        size: F.size,
+        sizeRandom: [0.45, 1.7],
+        aspect: F.height,
+        stretch: 0.12,
+        intensity: F.intensity,
+        blackbody: true,
+        softness: 1.5,
+        detail: 1,
+        detailDistance: 900
+      }
     }
   }
 
   private smokeOptions(): ParticleInput {
-    const S = this.look.smoke, c = this.sim.options.cellSize
+    const S = this.look.smoke,
+      c = this.sim.options.cellSize
     return {
-      seed: `${this.sim.options.seed}-smoke`, rate: S.rate, maxPerFrame: 1024, life: S.life,
-      emitter: { shape: 'sources', size: [c * 0.5, 1, c * 0.5], velocity: [0, 2.5, 0], spread: 0.8, temperature: [520, 620] },
-      forces: { gravity: 0, buoyancy: S.rise, ambientTemperature: 290, cooling: 0.018, windShear: 0.5, drag: 0.18, turbulence: 2.2, turbulenceScale: 45, turbulenceSpeed: 0.05, gridLift: 3 },
+      seed: `${this.sim.options.seed}-smoke`,
+      rate: S.rate,
+      maxPerFrame: 1024,
+      life: S.life,
+      emitter: {
+        shape: 'sources',
+        size: [c * 0.5, 1, c * 0.5],
+        velocity: [0, 2.5, 0],
+        spread: 0.8,
+        temperature: [520, 620]
+      },
+      forces: {
+        gravity: 0,
+        buoyancy: S.rise,
+        ambientTemperature: 290,
+        cooling: 0.018,
+        windShear: 0.5,
+        drag: 0.18,
+        turbulence: 2.2,
+        turbulenceScale: 45,
+        turbulenceSpeed: 0.05,
+        gridLift: 3
+      },
       curves: { size: [0.5, 0.9, 1.4, 2, 2.7, 3.4], opacity: [0, 0.75, 0.9, 0.8, 0.5, 0], color: ['#ffffff'] },
       render: {
-        size: S.size, sizeRandom: [0.75, 1.3], aspect: 1, stretch: 0, opacity: S.opacity, softness: 6, detail: S.detail, detailDistance: 1600,
-        absorption: 1.6, anisotropy: 0.5, silverLining: 0.35, albedo: [S.clean, S.dirty], glow: '#ff6420', glowStrength: 1.6,
-      },
+        size: S.size,
+        sizeRandom: [0.75, 1.3],
+        aspect: 1,
+        stretch: 0,
+        opacity: S.opacity,
+        softness: 6,
+        detail: S.detail,
+        detailDistance: 1600,
+        absorption: 1.6,
+        anisotropy: 0.5,
+        silverLining: 0.35,
+        albedo: [S.clean, S.dirty],
+        glow: '#ff6420',
+        glowStrength: 1.6
+      }
     }
   }
 
   private emberOptions(): ParticleInput {
-    const E = this.look.embers, c = this.sim.options.cellSize
+    const E = this.look.embers,
+      c = this.sim.options.cellSize
     return {
-      seed: `${this.sim.options.seed}-embers`, rate: E.rate, maxPerFrame: 2048, life: E.life,
-      emitter: { shape: 'sources', size: [c * 0.5, 1, c * 0.5], velocity: [0, 5, 0], spread: 4.5, temperature: [1500, 1900] },
-      forces: { gravity: 3.2, buoyancy: 0.05, ambientTemperature: 300, cooling: 0.32, windShear: 0.7, drag: 0.9, turbulence: 10, turbulenceScale: 7, turbulenceSpeed: 0.6, gridLift: 2.5 },
+      seed: `${this.sim.options.seed}-embers`,
+      rate: E.rate,
+      maxPerFrame: 2048,
+      life: E.life,
+      emitter: {
+        shape: 'sources',
+        size: [c * 0.5, 1, c * 0.5],
+        velocity: [0, 5, 0],
+        spread: 4.5,
+        temperature: [1500, 1900]
+      },
+      forces: {
+        gravity: 3.2,
+        buoyancy: 0.05,
+        ambientTemperature: 300,
+        cooling: 0.32,
+        windShear: 0.7,
+        drag: 0.9,
+        turbulence: 10,
+        turbulenceScale: 7,
+        turbulenceSpeed: 0.6,
+        gridLift: 2.5
+      },
       curves: { size: [1], opacity: [0, 1, 1, 0.7, 0], color: ['#ffffff'] },
-      render: { size: E.size, sizeRandom: [0.6, 1.4], aspect: 1, stretch: 0.07, intensity: E.intensity, blackbody: true, softness: 0.3, detail: 0 },
+      render: {
+        size: E.size,
+        sizeRandom: [0.6, 1.4],
+        aspect: 1,
+        stretch: 0.07,
+        intensity: E.intensity,
+        blackbody: true,
+        softness: 0.3,
+        detail: 0
+      }
     }
   }
 
   private hazeOptions(): ParticleInput {
-    const H = this.look.haze, c = this.sim.options.cellSize
+    const H = this.look.haze,
+      c = this.sim.options.cellSize
     return {
-      seed: `${this.sim.options.seed}-haze`, rate: 0.8, maxPerFrame: 512, life: [0.8, 1.8],
-      emitter: { shape: 'sources', size: [c * 0.5, 0, c * 0.5], velocity: [0, 3, 0], spread: 0.5, temperature: [300, 300] },
-      forces: { gravity: 0, buoyancy: 0, drag: 0.5, turbulence: 2, turbulenceScale: 4, turbulenceSpeed: 0.5, gridLift: 0 },
+      seed: `${this.sim.options.seed}-haze`,
+      rate: 0.8,
+      maxPerFrame: 512,
+      life: [0.8, 1.8],
+      emitter: {
+        shape: 'sources',
+        size: [c * 0.5, 0, c * 0.5],
+        velocity: [0, 3, 0],
+        spread: 0.5,
+        temperature: [300, 300]
+      },
+      forces: {
+        gravity: 0,
+        buoyancy: 0,
+        drag: 0.5,
+        turbulence: 2,
+        turbulenceScale: 4,
+        turbulenceSpeed: 0.5,
+        gridLift: 0
+      },
       curves: { size: [0.8, 1.2], opacity: [0, 1, 0.8, 0], color: ['#ffffff'] },
-      render: { size: 7, sizeRandom: [0.8, 1.2], aspect: 1.6, stretch: 0, refraction: H.strength, softness: 2, detail: 1, detailDistance: 250 },
+      render: {
+        size: 7,
+        sizeRandom: [0.8, 1.2],
+        aspect: 1.6,
+        stretch: 0,
+        refraction: H.strength,
+        softness: 2,
+        detail: 1,
+        detailDistance: 250
+      }
     }
   }
 

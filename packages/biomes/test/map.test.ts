@@ -4,18 +4,27 @@ import { GROUND_MATERIALS } from '../src/biomes.ts'
 import { renderWorldMap } from '../src/map.ts'
 import { World } from '../src/world.ts'
 
-const flat = (landBias: number) => new World({
-  seed: 3, continents: { landBias }, mountains: { height: 0 }, hills: { height: 0 },
-  detail: { height: 0 }, micro: { height: 0 }, rivers: { enabled: false },
-})
+const flat = (landBias: number) =>
+  new World({
+    seed: 3,
+    continents: { landBias },
+    mountains: { height: 0 },
+    hills: { height: 0 },
+    detail: { height: 0 },
+    micro: { height: 0 },
+    rivers: { enabled: false }
+  })
 
 // The map must derive land colour from the same palette the 3D ground does, not from the saturated
 // debug biome colours; water must use the ocean's deep sea colour.
 test('biome map land matches the 3D ground palette', () => {
   const world = flat(1)
-  const n = 8, size = 2000, cell = size / n
+  const n = 8,
+    size = 2000,
+    cell = size / n
   const px = renderWorldMap(world, { mode: 'biomes', center: [0, 0], size, resolution: n, shade: false })
-  const i = 3, j = 5
+  const i = 3,
+    j = 5
   const s = world.sampleAt((i + 0.5 - n / 2) * cell, 0, (j + 0.5 - n / 2) * cell)
   assert.ok(s.elevation > world.options.seaLevel, 'test point is land')
   const { color } = world.ground(s, 0, new Float32Array(GROUND_MATERIALS.length), new Float32Array(3))

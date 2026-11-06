@@ -1,13 +1,54 @@
 import { StorageBufferAttribute, Vector3, Vector4, type ComputeNode, type Renderer } from 'three/webgpu'
 import {
-  Fn, If, Loop, atomicAdd, atomicLoad, atomicStore, clamp, determinant, dot, float, floor, instanceIndex, instancedArray, int, ivec2, ivec3, length,
-  mat3, max, min, select, storage, uniform, uniformArray, vec2, vec3, vec4,
+  Fn,
+  If,
+  Loop,
+  atomicAdd,
+  atomicLoad,
+  atomicStore,
+  clamp,
+  determinant,
+  dot,
+  float,
+  floor,
+  instanceIndex,
+  instancedArray,
+  int,
+  ivec2,
+  ivec3,
+  length,
+  mat3,
+  max,
+  min,
+  select,
+  storage,
+  uniform,
+  uniformArray,
+  vec2,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { particleRandom } from './emitter.ts'
 import { mpmMaterial, type MPMMaterial } from './mpm-materials.ts'
 import {
-  MPM_CONTACT_SKIN, MPM_DENSITY_UNIT, MPM_FIXED, MPM_MAX_COLLIDERS, MPM_PPC_AXIS, bakeMPMFriction, bakeMPMHeights, mpmEmitPositions, mpmTimeStep, packMPMColliders, resolveMPMOptions,
-  type MPMCollider, type MPMEmit, type MPMFrictionFn, type MPMHeightFn, type MPMInput, type MPMOptions, type MPMParticleData,
+  MPM_CONTACT_SKIN,
+  MPM_DENSITY_UNIT,
+  MPM_FIXED,
+  MPM_MAX_COLLIDERS,
+  MPM_PPC_AXIS,
+  bakeMPMFriction,
+  bakeMPMHeights,
+  mpmEmitPositions,
+  mpmTimeStep,
+  packMPMColliders,
+  resolveMPMOptions,
+  type MPMCollider,
+  type MPMEmit,
+  type MPMFrictionFn,
+  type MPMHeightFn,
+  type MPMInput,
+  type MPMOptions,
+  type MPMParticleData
 } from './mpm-reference.ts'
 import { merge, seedOf } from './options.ts'
 import { ParticleSystem } from './system.ts'
@@ -75,7 +116,9 @@ export class MPMSolver {
   /** Live particles (at most `capacity`; the oldest are overwritten when full). */
   count = 0
   /** Ring slot the next {@link MPMSolver.emit} writes, 0…`capacity` − 1: the first particle of that emit. */
-  get writeHead(): number { return this.head }
+  get writeHead(): number {
+    return this.head
+  }
   /** Simulated seconds. */
   time = 0
   /** Substeps of the last {@link MPMSolver.step}. */
@@ -92,7 +135,7 @@ export class MPMSolver {
     /** Domain walls on (1) or off (0). */ walls: uniform(1),
     /** Domain move, metres (applied by the shift pass). */ shift: uniform(new Vector3()),
     /** Colour ramp: key = 0.5 + (J − 1) × strainScale. */ strainScale: uniform(4),
-    /** Colliders in use (see {@link MPMSolver.setColliders}). */ colliders: uniform(0, 'int'),
+    /** Colliders in use (see {@link MPMSolver.setColliders}). */ colliders: uniform(0, 'int')
   }
   /** Per material: its parameters as uniforms, and particle mass in normalised units. */
   readonly params: {
@@ -114,7 +157,10 @@ export class MPMSolver {
   private colliderList: MPMCollider[] = []
   private readonly colliderData = new Float32Array(MPM_MAX_COLLIDERS * 12)
   // A uniform array, not a storage buffer: G2P already binds 8 storage buffers, WebGPU's default per-stage limit.
-  private readonly colliderNode = uniformArray(Array.from({ length: MPM_MAX_COLLIDERS * 3 }, () => new Vector4()), 'vec4')
+  private readonly colliderNode = uniformArray(
+    Array.from({ length: MPM_MAX_COLLIDERS * 3 }, () => new Vector4()),
+    'vec4'
+  )
   private head = 0
   private serial = 0
   private shiftPending = false
@@ -133,12 +179,18 @@ export class MPMSolver {
     this.height = height
     this.materials = Object.keys(o.materials)
     const mats = this.materials.map((name) => mpmMaterial(name) as MPMMaterial)
-    this.params = mats.map((m) => ({ values: Object.fromEntries(Object.keys(m.defaults).map((k) => [k, uniform(0)])), mass: uniform(0) }))
+    this.params = mats.map((m) => ({
+      values: Object.fromEntries(Object.keys(m.defaults).map((k) => [k, uniform(0)])),
+      mass: uniform(0)
+    }))
 
     this.particles = new ParticleSystem({
-      capacity: o.capacity, rate: 0, life: [1, 1], seed: o.seed,
+      capacity: o.capacity,
+      rate: 0,
+      life: [1, 1],
+      seed: o.seed,
       curves: { size: [1], opacity: [1], color: o.render.colors },
-      render: { shading: 'unlit', blending: 'alpha', sizeRandom: [1, 1], detail: 0, softness: o.cellSize / 4 },
+      render: { shading: 'unlit', blending: 'alpha', sizeRandom: [1, 1], detail: 0, softness: o.cellSize / 4 }
     })
     this.object = this.particles.object
     this.object.name = 'MPM particles'
@@ -149,9 +201,14 @@ export class MPMSolver {
     this.heightData = new Float32Array(nx * nz * 2) // heights, then friction multipliers (one binding: G2P is at 8)
     const pb = this.particles.buffers
     this.buffers = {
-      position: pb.position, velocity: pb.velocity, props: pb.props,
-      affine: instancedArray(n * 3, 'vec4'), deformation: instancedArray(n * 3, 'vec4'), state: instancedArray(n, 'vec4'),
-      grid: instancedArray(cells, 'vec4'), heights: instancedArray(this.heightData, 'float'),
+      position: pb.position,
+      velocity: pb.velocity,
+      props: pb.props,
+      affine: instancedArray(n * 3, 'vec4'),
+      deformation: instancedArray(n * 3, 'vec4'),
+      state: instancedArray(n, 'vec4'),
+      grid: instancedArray(cells, 'vec4'),
+      heights: instancedArray(this.heightData, 'float')
     }
     this.gridAtomic = storage(new StorageBufferAttribute(new Int32Array(cells * 4), 1), 'int', cells * 4).toAtomic()
     this.p2gNode = this.buildP2G(mats)
@@ -166,8 +223,15 @@ export class MPMSolver {
     const prev = this.options
     const next = resolveMPMOptions(merge(structuredClone(prev), input), prev)
     const keys = Object.keys(next.materials)
-    if (next.capacity !== prev.capacity || next.cellSize !== prev.cellSize || String(next.resolution) !== String(prev.resolution) || String(keys) !== String(this.materials)) {
-      console.warn('threejs-particles: MPM capacity, resolution, cellSize and the set of materials are fixed at construction')
+    if (
+      next.capacity !== prev.capacity ||
+      next.cellSize !== prev.cellSize ||
+      String(next.resolution) !== String(prev.resolution) ||
+      String(keys) !== String(this.materials)
+    ) {
+      console.warn(
+        'threejs-particles: MPM capacity, resolution, cellSize and the set of materials are fixed at construction'
+      )
     }
     next.capacity = prev.capacity
     next.cellSize = prev.cellSize
@@ -222,16 +286,24 @@ export class MPMSolver {
     const k = pos.length / 3
     if (!k) return 0
     const id = Math.max(0, this.materials.indexOf(spec.material ?? this.materials[0]))
-    if (spec.material && !this.materials.includes(spec.material)) console.warn(`threejs-particles: MPM material '${spec.material}' is not compiled in; using '${this.materials[id]}'`)
+    if (spec.material && !this.materials.includes(spec.material))
+      console.warn(
+        `threejs-particles: MPM material '${spec.material}' is not compiled in; using '${this.materials[id]}'`
+      )
     const b = this.buffers
-    const P = b.position.value.array as Float32Array, V = b.velocity.value.array as Float32Array, Q = b.props.value.array as Float32Array
-    const A = b.affine.value.array as Float32Array, F = b.deformation.value.array as Float32Array, S = b.state.value.array as Float32Array
+    const P = b.position.value.array as Float32Array,
+      V = b.velocity.value.array as Float32Array,
+      Q = b.props.value.array as Float32Array
+    const A = b.affine.value.array as Float32Array,
+      F = b.deformation.value.array as Float32Array,
+      S = b.state.value.array as Float32Array
     const seed = seedOf(o.seed)
     const vel = spec.velocity ?? [0, 0, 0]
     for (let p = 0; p < k; p++) {
       const s = (this.head + p) % this.capacity
       P.set([pos[p * 3] - o.origin[0], pos[p * 3 + 1] - o.origin[1], pos[p * 3 + 2] - o.origin[2], 0.5], s * 4)
-      const pv = spec.velocities, q = p * 3
+      const pv = spec.velocities,
+        q = p * 3
       V.set(pv ? [pv[q] ?? 0, pv[q + 1] ?? 0, pv[q + 2] ?? 0, 1] : [vel[0], vel[1], vel[2], 1], s * 4)
       Q.set([spec.temperature ?? 293, 1, particleRandom(this.serial + p, 15, seed), 0], s * 4)
       A.fill(0, s * 12, s * 12 + 12)
@@ -241,7 +313,14 @@ export class MPMSolver {
     // Upload only the slots written (one or two runs around the ring).
     const runs: [number, number][] = [[this.head, Math.min(k, this.capacity - this.head)]]
     if (runs[0][1] < k) runs.push([0, k - runs[0][1]])
-    for (const [node, stride] of [[b.position, 4], [b.velocity, 4], [b.props, 4], [b.affine, 12], [b.deformation, 12], [b.state, 4]] as const) {
+    for (const [node, stride] of [
+      [b.position, 4],
+      [b.velocity, 4],
+      [b.props, 4],
+      [b.affine, 12],
+      [b.deformation, 12],
+      [b.state, 4]
+    ] as const) {
       for (const [start, count] of runs) node.value.addUpdateRange(start * stride, count * stride)
       node.value.needsUpdate = true
     }
@@ -277,7 +356,7 @@ export class MPMSolver {
     this.substeps = sub > 0 ? substeps : 0
     if (!this.substeps || !this.count) return nodes
     this.uniforms.dt.value = sub
-    this.uniforms.stressScale.value = -sub / ((MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3 / 4) * this.options.cellSize ** 2)
+    this.uniforms.stressScale.value = -sub / (((MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3) / 4) * this.options.cellSize ** 2)
     const colliders = packMPMColliders(this.colliderList, this.options.origin, this.options.friction, this.colliderData)
     for (let k = 0; k < colliders * 3; k++) (this.colliderNode.array[k] as Vector4).fromArray(this.colliderData, k * 4)
     this.uniforms.colliders.value = colliders
@@ -288,13 +367,22 @@ export class MPMSolver {
 
   /** Reads the particle state back from the GPU (slow; for tests, debugging and tools). */
   async read(): Promise<MPMParticleData> {
-    const b = this.buffers, r = this.renderer
+    const b = this.buffers,
+      r = this.renderer
     const get = async (node: any) => new Float32Array(await r.getArrayBufferAsync(node.value))
-    const [P, V, Q, A, F, S] = await Promise.all([b.position, b.velocity, b.props, b.affine, b.deformation, b.state].map(get))
+    const [P, V, Q, A, F, S] = await Promise.all(
+      [b.position, b.velocity, b.props, b.affine, b.deformation, b.state].map(get)
+    )
     const n = this.count
     const out: MPMParticleData = {
-      count: n, position: new Float32Array(n * 3), velocity: new Float32Array(n * 3), affine: new Float32Array(n * 9), deformation: new Float32Array(n * 9),
-      Jp: new Float32Array(n), temperature: new Float32Array(n), material: new Int32Array(n),
+      count: n,
+      position: new Float32Array(n * 3),
+      velocity: new Float32Array(n * 3),
+      affine: new Float32Array(n * 9),
+      deformation: new Float32Array(n * 9),
+      Jp: new Float32Array(n),
+      temperature: new Float32Array(n),
+      material: new Int32Array(n)
     }
     for (let p = 0; p < n; p++) {
       for (let a = 0; a < 3; a++) {
@@ -314,7 +402,9 @@ export class MPMSolver {
 
   /** Removes every particle. */
   clear(): this {
-    const kill = Fn(() => { this.buffers.velocity.element(instanceIndex).assign(vec4(0)) })().compute(this.capacity, [64])
+    const kill = Fn(() => {
+      this.buffers.velocity.element(instanceIndex).assign(vec4(0))
+    })().compute(this.capacity, [64])
     this.renderer.compute(kill)
     kill.dispose()
     this.count = this.head = 0
@@ -328,7 +418,8 @@ export class MPMSolver {
   }
 
   private applyOptions(prev: MPMOptions | null): this {
-    const o = this.options, u = this.uniforms
+    const o = this.options,
+      u = this.uniforms
     u.gravity.value.fromArray(o.gravity)
     u.dx.value = o.cellSize
     u.invDx.value = 1 / o.cellSize
@@ -341,7 +432,10 @@ export class MPMSolver {
       for (const [k, node] of Object.entries(this.params[i].values)) node.value = p[k]
       this.params[i].mass.value = p.density / (MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3)
     })
-    this.particles.set({ curves: { color: o.render.colors }, render: { size: (o.render.size * o.cellSize) / MPM_PPC_AXIS, opacity: o.render.opacity } })
+    this.particles.set({
+      curves: { color: o.render.colors },
+      render: { size: (o.render.size * o.cellSize) / MPM_PPC_AXIS, opacity: o.render.opacity }
+    })
     if (!prev || String(prev.origin) !== String(o.origin)) {
       // Snap the move to whole cells so the grid and the particles stay aligned.
       const from = prev?.origin ?? o.origin
@@ -374,11 +468,27 @@ export class MPMSolver {
     const xg: any = x.mul(this.uniforms.invDx).toVar()
     const base: any = floor(xg.sub(0.5)).toVar()
     const fx: any = xg.sub(base).toVar()
-    const w = [fx.sub(1.5).mul(fx.sub(1.5)).mul(0.5).toVar(), float(0.75).sub(fx.sub(1).mul(fx.sub(1))).toVar(), fx.sub(0.5).mul(fx.sub(0.5)).mul(0.5).toVar()]
-    const active = base.x.greaterThanEqual(0).and(base.y.greaterThanEqual(0)).and(base.z.greaterThanEqual(0))
-      .and(base.x.lessThanEqual(nx - 3)).and(base.y.lessThanEqual(ny - 3)).and(base.z.lessThanEqual(nz - 3))
+    const w = [
+      fx.sub(1.5).mul(fx.sub(1.5)).mul(0.5).toVar(),
+      float(0.75)
+        .sub(fx.sub(1).mul(fx.sub(1)))
+        .toVar(),
+      fx.sub(0.5).mul(fx.sub(0.5)).mul(0.5).toVar()
+    ]
+    const active = base.x
+      .greaterThanEqual(0)
+      .and(base.y.greaterThanEqual(0))
+      .and(base.z.greaterThanEqual(0))
+      .and(base.x.lessThanEqual(nx - 3))
+      .and(base.y.lessThanEqual(ny - 3))
+      .and(base.z.lessThanEqual(nz - 3))
     const ib: any = ivec3(base).toVar()
-    const node = (i: number, j: number, k: number) => ib.z.add(k).mul(nx * ny).add(ib.y.add(j).mul(nx)).add(ib.x.add(i))
+    const node = (i: number, j: number, k: number) =>
+      ib.z
+        .add(k)
+        .mul(nx * ny)
+        .add(ib.y.add(j).mul(nx))
+        .add(ib.x.add(i))
     const weight = (i: number, j: number, k: number) => w[i].x.mul(w[j].y).mul(w[k].z)
     const dpos = (i: number, j: number, k: number) => vec3(i, j, k).sub(fx).mul(this.uniforms.dx)
     return { active, node, weight, dpos }
@@ -390,7 +500,9 @@ export class MPMSolver {
   }
 
   private buildP2G(mats: MPMMaterial[]): ComputeNode {
-    const u = this.uniforms, b = this.buffers, acc = this.gridAtomic
+    const u = this.uniforms,
+      b = this.buffers,
+      acc = this.gridAtomic
     const fixed = (v: any) => int(floor(v.mul(MPM_FIXED).add(0.5))) // saturating i32 conversion in WGSL
     return Fn(() => {
       const i = instanceIndex
@@ -400,7 +512,8 @@ export class MPMSolver {
         const k = this.kernel(P.xyz)
         If(k.active, () => {
           const S = b.state.element(i).toVar()
-          const F = this.matrix(b.deformation, i), C = this.matrix(b.affine, i)
+          const F = this.matrix(b.deformation, i),
+            C = this.matrix(b.affine, i)
           const T = b.props.element(i).x.toVar()
           const J = determinant(F).toVar()
           const tau: any = (mat3 as any)(vec3(0), vec3(0), vec3(0)).toVar()
@@ -415,26 +528,35 @@ export class MPMSolver {
           })
           const A = tau.mul(u.stressScale).add(C.mul(mass)).toVar()
           const mv = V.xyz.mul(mass).toVar()
-          for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            const weight = k.weight(x, y, z).toVar()
-            const val = mv.add(A.mul(k.dpos(x, y, z))).mul(weight).toVar()
-            const n = k.node(x, y, z).mul(4).toVar()
-            atomicAdd(acc.element(n), fixed(val.x))
-            atomicAdd(acc.element(n.add(1)), fixed(val.y))
-            atomicAdd(acc.element(n.add(2)), fixed(val.z))
-            atomicAdd(acc.element(n.add(3)), fixed(weight.mul(mass)))
-          }
+          for (let z = 0; z < 3; z++)
+            for (let y = 0; y < 3; y++)
+              for (let x = 0; x < 3; x++) {
+                const weight = k.weight(x, y, z).toVar()
+                const val = mv
+                  .add(A.mul(k.dpos(x, y, z)))
+                  .mul(weight)
+                  .toVar()
+                const n = k.node(x, y, z).mul(4).toVar()
+                atomicAdd(acc.element(n), fixed(val.x))
+                atomicAdd(acc.element(n.add(1)), fixed(val.y))
+                atomicAdd(acc.element(n.add(2)), fixed(val.z))
+                atomicAdd(acc.element(n.add(3)), fixed(weight.mul(mass)))
+              }
         })
       })
     })().compute(this.capacity, [64])
   }
 
   private buildGrid(): ComputeNode {
-    const u = this.uniforms, acc = this.gridAtomic, H = this.buffers.heights
+    const u = this.uniforms,
+      acc = this.gridAtomic,
+      H = this.buffers.heights
     const [nx, ny, nz] = this.resolution
     return Fn(() => {
       const n: any = int(instanceIndex).toVar()
-      const x: any = n.mod(nx).toVar(), y: any = n.div(nx).mod(ny).toVar(), z: any = n.div(nx * ny).toVar()
+      const x: any = n.mod(nx).toVar(),
+        y: any = n.div(nx).mod(ny).toVar(),
+        z: any = n.div(nx * ny).toVar()
       const load = (c: number): any => float(atomicLoad(acc.element(n.mul(4).add(c))) as any)
       const m: any = load(3).toVar()
       const p: any = vec3(load(0), load(1), load(2)).toVar()
@@ -444,20 +566,63 @@ export class MPMSolver {
         v.assign(p.div(m).add(u.gravity.mul(u.dt)))
         // Domain walls: no velocity out through the 2-node border.
         const wall = u.walls.greaterThan(0)
-        const lo = (i: any) => wall.and(i.lessThan(int(2))), hi = (i: any, size: number) => wall.and(i.greaterThan(int(size - 3)))
-        v.assign(vec3(
-          select(lo(x).and(v.x.lessThan(0)).or(hi(x, nx).and(v.x.greaterThan(0))), float(0), v.x),
-          select(lo(y).and(v.y.lessThan(0)).or(hi(y, ny).and(v.y.greaterThan(0))), float(0), v.y),
-          select(lo(z).and(v.z.lessThan(0)).or(hi(z, nz).and(v.z.greaterThan(0))), float(0), v.z),
-        ))
+        const lo = (i: any) => wall.and(i.lessThan(int(2))),
+          hi = (i: any, size: number) => wall.and(i.greaterThan(int(size - 3)))
+        v.assign(
+          vec3(
+            select(
+              lo(x)
+                .and(v.x.lessThan(0))
+                .or(hi(x, nx).and(v.x.greaterThan(0))),
+              float(0),
+              v.x
+            ),
+            select(
+              lo(y)
+                .and(v.y.lessThan(0))
+                .or(hi(y, ny).and(v.y.greaterThan(0))),
+              float(0),
+              v.y
+            ),
+            select(
+              lo(z)
+                .and(v.z.lessThan(0))
+                .or(hi(z, nz).and(v.z.greaterThan(0))),
+              float(0),
+              v.z
+            )
+          )
+        )
         // Terrain: nodes in the ground lose their inward velocity, with Coulomb friction.
         const h = H.element(z.mul(nx).add(x))
         If(float(y).mul(u.dx).lessThanEqual(h), () => {
-          const imax = max as any, imin = min as any
-          const x0 = imax(x.sub(1), int(0)), x1 = imin(x.add(1), int(nx - 1)), z0 = imax(z.sub(1), int(0)), z1 = imin(z.add(1), int(nz - 1))
-          const hx = H.element(z.mul(nx).add(x1)).sub(H.element(z.mul(nx).add(x0))).div(float(x1.sub(x0)).mul(u.dx))
-          const hz = H.element(z1.mul(nx).add(x)).sub(H.element(z0.mul(nx).add(x))).div(float(z1.sub(z0)).mul(u.dx))
-          v.assign(friction(v, vec3(hx.negate(), 1, hz.negate()).normalize(), u.friction.mul(H.element(z.mul(nx).add(x).add(nx * nz))), false))
+          const imax = max as any,
+            imin = min as any
+          const x0 = imax(x.sub(1), int(0)),
+            x1 = imin(x.add(1), int(nx - 1)),
+            z0 = imax(z.sub(1), int(0)),
+            z1 = imin(z.add(1), int(nz - 1))
+          const hx = H.element(z.mul(nx).add(x1))
+            .sub(H.element(z.mul(nx).add(x0)))
+            .div(float(x1.sub(x0)).mul(u.dx))
+          const hz = H.element(z1.mul(nx).add(x))
+            .sub(H.element(z0.mul(nx).add(x)))
+            .div(float(z1.sub(z0)).mul(u.dx))
+          v.assign(
+            friction(
+              v,
+              vec3(hx.negate(), 1, hz.negate()).normalize(),
+              u.friction.mul(
+                H.element(
+                  z
+                    .mul(nx)
+                    .add(x)
+                    .add(nx * nz)
+                )
+              ),
+              false
+            )
+          )
         })
         this.collide(vec3(float(x), float(y), float(z)).mul(u.dx), v, false)
       })
@@ -466,7 +631,9 @@ export class MPMSolver {
   }
 
   private buildG2P(mats: MPMMaterial[]): ComputeNode {
-    const u = this.uniforms, b = this.buffers, G = b.grid
+    const u = this.uniforms,
+      b = this.buffers,
+      G = b.grid
     return Fn(() => {
       const i = instanceIndex
       const V = b.velocity.element(i).toVar()
@@ -474,27 +641,44 @@ export class MPMSolver {
         const P = b.position.element(i).toVar()
         const k = this.kernel(P.xyz)
         If(k.active, () => {
-          const v = vec3(0).toVar(), c0 = vec3(0).toVar(), c1 = vec3(0).toVar(), c2 = vec3(0).toVar()
-          for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            const wv = G.element(k.node(x, y, z)).xyz.mul(k.weight(x, y, z)).toVar()
-            const d = k.dpos(x, y, z)
-            v.addAssign(wv)
-            c0.addAssign(wv.mul(d.x))
-            c1.addAssign(wv.mul(d.y))
-            c2.addAssign(wv.mul(d.z))
-          }
+          const v = vec3(0).toVar(),
+            c0 = vec3(0).toVar(),
+            c1 = vec3(0).toVar(),
+            c2 = vec3(0).toVar()
+          for (let z = 0; z < 3; z++)
+            for (let y = 0; y < 3; y++)
+              for (let x = 0; x < 3; x++) {
+                const wv = G.element(k.node(x, y, z))
+                  .xyz.mul(k.weight(x, y, z))
+                  .toVar()
+                const d = k.dpos(x, y, z)
+                v.addAssign(wv)
+                c0.addAssign(wv.mul(d.x))
+                c1.addAssign(wv.mul(d.y))
+                c2.addAssign(wv.mul(d.z))
+              }
           const s4 = u.invDx.mul(u.invDx).mul(4)
           const C: any = (mat3 as any)(c0.mul(s4), c1.mul(s4), c2.mul(s4)).toVar()
           // F ← (I + dt·C)·F, column by column.
           const F0 = this.matrix(b.deformation, i)
           const col = (c: number) => F0.element(c).add(C.mul(F0.element(c)).mul(u.dt))
           const F: any = (mat3 as any)(col(0), col(1), col(2)).toVar()
-          const S = b.state.element(i).toVar(), Q = b.props.element(i).toVar()
-          const Jp = S.y.toVar(), T = Q.x.toVar()
+          const S = b.state.element(i).toVar(),
+            Q = b.props.element(i).toVar()
+          const Jp = S.y.toVar(),
+            T = Q.x.toVar()
           mats.forEach((m, id) => {
             if (!m.plasticity) return
             const run = () => {
-              const r = m.plasticity!({ F, J: determinant(F), Jp, C, temperature: T, dt: u.dt, params: this.params[id].values })
+              const r = m.plasticity!({
+                F,
+                J: determinant(F),
+                Jp,
+                C,
+                temperature: T,
+                dt: u.dt,
+                params: this.params[id].values
+              })
               if (r.F) F.assign(r.F)
               if (r.Jp) Jp.assign(r.Jp)
               if (r.temperature) T.assign(r.temperature)
@@ -537,20 +721,37 @@ export class MPMSolver {
   // Friction multiplier of the node column nearest local (x, z), as `nearestColumn` on the CPU.
   private frictionAt(xz: any): any {
     const [nx, , nz] = this.resolution
-    const c: any = (clamp as any)(ivec2(floor(xz.mul(this.uniforms.invDx).add(0.5)) as any), ivec2(0, 0), ivec2(nx - 1, nz - 1)).toVar()
-    return this.buffers.heights.element(c.y.mul(nx).add(c.x).add(nx * nz))
+    const c: any = (clamp as any)(
+      ivec2(floor(xz.mul(this.uniforms.invDx).add(0.5)) as any),
+      ivec2(0, 0),
+      ivec2(nx - 1, nz - 1)
+    ).toVar()
+    return this.buffers.heights.element(
+      c.y
+        .mul(nx)
+        .add(c.x)
+        .add(nx * nz)
+    )
   }
 
   // Bilinear ground under local (x, z): vec3(height, dh/dx, dh/dz), as `groundAt` on the CPU.
   private ground(xz: any): any {
     const [nx, , nz] = this.resolution
-    const H = this.buffers.heights, u = this.uniforms
+    const H = this.buffers.heights,
+      u = this.uniforms
     const g: any = clamp(xz.mul(u.invDx), vec2(0), vec2(nx - 1, nz - 1)).toVar()
     const i0: any = (min as any)(ivec2(floor(g) as any), ivec2(nx - 2, nz - 2)).toVar()
     const f: any = g.sub(vec2(i0)).toVar()
     const at = (di: number, dk: number) => H.element(i0.y.add(dk).mul(nx).add(i0.x.add(di)))
-    const h00 = at(0, 0).toVar(), h10 = at(1, 0).toVar(), h01 = at(0, 1).toVar(), h11 = at(1, 1).toVar()
-    const h = h00.mul(f.x.oneMinus()).add(h10.mul(f.x)).mul(f.y.oneMinus()).add(h01.mul(f.x.oneMinus()).add(h11.mul(f.x)).mul(f.y))
+    const h00 = at(0, 0).toVar(),
+      h10 = at(1, 0).toVar(),
+      h01 = at(0, 1).toVar(),
+      h11 = at(1, 1).toVar()
+    const h = h00
+      .mul(f.x.oneMinus())
+      .add(h10.mul(f.x))
+      .mul(f.y.oneMinus())
+      .add(h01.mul(f.x.oneMinus()).add(h11.mul(f.x)).mul(f.y))
     const hx = h10.sub(h00).mul(f.y.oneMinus()).add(h11.sub(h01).mul(f.y)).mul(u.invDx)
     const hz = h01.sub(h00).mul(f.x.oneMinus()).add(h11.sub(h10).mul(f.x)).mul(u.invDx)
     return vec3(h, hx, hz)
@@ -561,8 +762,11 @@ export class MPMSolver {
   private collide(x: any, v: any, push: boolean): void {
     const K: any = this.colliderNode
     Loop(this.uniforms.colliders, ({ i }: { i: any }) => {
-      const A = K.element(i.mul(3)).toVar(), B = K.element(i.mul(3).add(1)).toVar(), vc = K.element(i.mul(3).add(2)).xyz.toVar()
-      const ab = B.xyz.sub(A.xyz).toVar(), ax = x.sub(A.xyz).toVar()
+      const A = K.element(i.mul(3)).toVar(),
+        B = K.element(i.mul(3).add(1)).toVar(),
+        vc = K.element(i.mul(3).add(2)).xyz.toVar()
+      const ab = B.xyz.sub(A.xyz).toVar(),
+        ax = x.sub(A.xyz).toVar()
       const t = clamp(dot(ax, ab).div(max(dot(ab, ab), 1e-12)), 0, 1)
       const d = ax.sub(ab.mul(t)).toVar()
       const len = length(d).toVar()

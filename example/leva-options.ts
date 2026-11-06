@@ -31,7 +31,13 @@ export function specSchema({ skip = {}, ranges, choices, arrays }: PanelClassSpe
  * folders; null and (without `arrays`) arrays are left out. Keys are `/`-joined paths (leva wants keys unique
  * even across folders), labels the names.
  */
-export function levaSchema(target: object, folder: Folder, opts: SchemaOptions = {}, path: string[] = [], arrayName?: string): Record<string, unknown> {
+export function levaSchema(
+  target: object,
+  folder: Folder,
+  opts: SchemaOptions = {},
+  path: string[] = [],
+  arrayName?: string
+): Record<string, unknown> {
   const { ranges = {}, choices = {}, skip = [], arrays = false } = opts
   const schema: Record<string, unknown> = {}
   for (const [name, value] of Object.entries(target)) {
@@ -45,7 +51,8 @@ export function levaSchema(target: object, folder: Folder, opts: SchemaOptions =
       if (Object.keys(inner).length) schema[name] = folder(inner, { collapsed: true })
     } else if (typeof value === 'number') {
       const [min, max, step] = ranges[key] ?? ranges[lookup] ?? guessRange(value)
-      const lo = Math.min(min, value), hi = Math.max(max, value)
+      const lo = Math.min(min, value),
+        hi = Math.max(max, value)
       schema[key] = { value, min: lo, max: hi, step: step ?? niceStep(lo, hi), label }
     } else if (typeof value === 'boolean' || (typeof value === 'string' && !(choices[key] ?? choices[lookup]))) {
       schema[key] = { value, label }

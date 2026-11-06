@@ -25,8 +25,17 @@ function GalleryFish({ id, i, all }: { id: string; i: number; all: { speed: numb
   const settings = useSpec('Fish', { ...spec.Fish, target: START[i] }, { collapsed: true, folder: `Fish: ${id}` })
   return (
     // Each fish shown about 0.6 m long so small and large species compare by shape.
-    <group position={[(i % 4) * 0.9 - 1.35, 1.4 - Math.floor(i / 4) * 0.7, 0]} rotation-y={Math.PI / 2} scale={0.6 / FISH_SPECIES[id].length}>
-      <Fish {...settings} preset={id} speed={settings.speed * all.speed} turn={Math.max(-1, Math.min(1, settings.turn + all.turn))} />
+    <group
+      position={[(i % 4) * 0.9 - 1.35, 1.4 - Math.floor(i / 4) * 0.7, 0]}
+      rotation-y={Math.PI / 2}
+      scale={0.6 / FISH_SPECIES[id].length}
+    >
+      <Fish
+        {...settings}
+        preset={id}
+        speed={settings.speed * all.speed}
+        turn={Math.max(-1, Math.min(1, settings.turn + all.turn))}
+      />
     </group>
   )
 }
@@ -37,7 +46,9 @@ function Gallery() {
   return (
     <>
       <Daylight target={[0, 0.7, 0]} extent={4} />
-      {IDS.map((id, i) => <GalleryFish key={id} id={id} i={i} all={all} />)}
+      {IDS.map((id, i) => (
+        <GalleryFish key={id} id={id} i={i} all={all} />
+      ))}
       <View position={[0, 0.7, 3.4]} target={[0, 0.7, 0]} />
     </>
   )
@@ -50,9 +61,15 @@ const ORIGIN: [number, number, number] = [CENTER[0], 0, CENTER[1]]
 const s = createSample(8)
 
 function RiverMouth() {
-  const { camera, controls } = useThree() as unknown as { camera: import('three/webgpu').Camera; controls: { target: { x: number; z: number } } | null }
+  const { camera, controls } = useThree() as unknown as {
+    camera: import('three/webgpu').Camera
+    controls: { target: { x: number; z: number } } | null
+  }
   const [fauna, setFauna] = useState<FaunaImpl | null>(null)
-  const { fishOn, birdsOn } = useControls('Fauna', { fishOn: { value: true, label: 'fish' }, birdsOn: { value: true, label: 'birds' } })
+  const { fishOn, birdsOn } = useControls('Fauna', {
+    fishOn: { value: true, label: 'fish' },
+    birdsOn: { value: true, label: 'birds' }
+  })
   // Each layer's seed and states are in its own folder (Fauna's shared ones are just those).
   const fish = useSpec('FishSchools', spec.FishSchools, { collapsed: true })
   const birds = useSpec('BirdFlocks', spec.BirdFlocks, { collapsed: true })
@@ -60,12 +77,13 @@ function RiverMouth() {
   useHud(() => {
     const t = controls?.target ?? { x: 0, z: 0 }
     world.frame.sample(CENTER[0] + t.x, CENTER[1] + t.z, s, 1)
-    const f = fauna?.layers.fish?.stats, b = fauna?.layers.birds?.stats
+    const f = fauna?.layers.fish?.stats,
+      b = fauna?.layers.birds?.stats
     return [
       'threejs-fauna · <Fauna> (fish schools + bird flocks)',
       `fish: ${f?.animals ?? 0} in ${f?.groups ?? 0} schools · ${f?.pending ?? 0} tiles pending`,
       `birds: ${b?.animals ?? 0} in ${b?.groups ?? 0} flocks`,
-      `target: ${s.waterLevel === s.waterLevel ? `${(s.waterLevel - s.elevation).toFixed(1)} m of ${s.river > 0.25 ? 'river' : 'sea'} water` : 'dry'} · ${s.temperature.toFixed(1)} °C`,
+      `target: ${s.waterLevel === s.waterLevel ? `${(s.waterLevel - s.elevation).toFixed(1)} m of ${s.river > 0.25 ? 'river' : 'sea'} water` : 'dry'} · ${s.temperature.toFixed(1)} °C`
     ].join('\n')
   })
   return (
@@ -74,7 +92,14 @@ function RiverMouth() {
       <group position={[-CENTER[0], 0, -CENTER[1]]}>
         <Ground world={world} center={CENTER} size={700} segments={220} waterOpacity={0.35} />
       </group>
-      <Fauna ref={setFauna} world={world} origin={ORIGIN} predators={[{ object: camera, radius: 3 }]} fish={fishOn && fish} birds={birdsOn && birds} />
+      <Fauna
+        ref={setFauna}
+        world={world}
+        origin={ORIGIN}
+        predators={[{ object: camera, radius: 3 }]}
+        fish={fishOn && fish}
+        birds={birdsOn && birds}
+      />
       <View position={[-40, 25, 60]} target={[0, -1, 0]} />
     </>
   )

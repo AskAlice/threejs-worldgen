@@ -18,7 +18,7 @@ function plane() {
       slopes.push(slope)
       color.fill(0.5)
       return { weights, color }
-    },
+    }
   }
   return { world, slopes, samples: () => samples }
 }
@@ -31,7 +31,8 @@ test('worldGround samples each vertex once and colours it at the right slope', (
   assert.equal(p.samples(), count)
   assert.equal(p.slopes.length, count)
   for (const s of p.slopes) assert.ok(Math.abs(s - 0.5) < 1e-6, `slope ${s}`) // edges too (one-sided differences)
-  const pos = terrain.attributes.position, wpos = water.attributes.position
+  const pos = terrain.attributes.position,
+    wpos = water.attributes.position
   for (let i = 0; i < count; i++) {
     const x = pos.getX(i)
     assert.ok(Math.abs(pos.getY(i) - x / 2) < 1e-4)

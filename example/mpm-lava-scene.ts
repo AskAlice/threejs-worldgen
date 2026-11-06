@@ -1,9 +1,23 @@
-import * as THREE from 'three/webgpu'
+import type * as THREE from 'three/webgpu'
 import { World, createSample } from 'threejs-biomes'
 import { DEFAULT_LIGHTING } from 'threejs-sky'
 import {
-  LAVA_GLOW_1400, LAVA_PRESETS, MPMLava, MPMReference, MPMSolver, lavaCrust, lavaHeatSources, lavaThermalStep, mpmStableStep, resolveMPMOptions,
-  type LavaInput, type LavaParams, type MPMEmit, type MPMInput, type ParticleInput, type ParticleSystem,
+  LAVA_GLOW_1400,
+  LAVA_PRESETS,
+  MPMLava,
+  MPMReference,
+  MPMSolver,
+  lavaCrust,
+  lavaHeatSources,
+  lavaThermalStep,
+  mpmStableStep,
+  resolveMPMOptions,
+  type LavaInput,
+  type LavaParams,
+  type MPMEmit,
+  type MPMInput,
+  type ParticleInput,
+  type ParticleSystem
 } from 'threejs-particles'
 
 // The scene of the MPM lava sandboxes (mpm-lava.ts and mpm-lava-r3f.tsx): a vent on the flank of a volcano in a
@@ -11,7 +25,10 @@ import {
 // statistics, and the GPU vs CPU check behind `?check`.
 
 /** A vent: where it is (world) and the downhill direction it pours in. */
-export interface Vent { at: number[]; dir: number[] }
+export interface Vent {
+  at: number[]
+  dir: number[]
+}
 
 /**
  * The world (biomes volcanoes are rare cones, so every region gets one here), the solver domain on the gentlest volcanic
@@ -21,13 +38,21 @@ export interface Vent { at: number[]; dir: number[] }
  */
 export function lavaScene(close: boolean) {
   const world = new World({ seed: 7, volcanoes: { chance: 1 } } as any)
-  const DX = 0.125, NXZ = 128
+  const DX = 0.125,
+    NXZ = 128
   const span = NXZ * DX
   const site = findFlank(world, span, [-4000, 31250])
-  const ground = Array.from({ length: 33 * 33 }, (_, k) => world.height(site[0] + ((k % 33) / 32 - 0.5) * span, site[1] + (Math.floor(k / 33) / 32 - 0.5) * span))
-  const lo = Math.min(...ground), hi = Math.max(...ground)
+  const ground = Array.from({ length: 33 * 33 }, (_, k) =>
+    world.height(site[0] + ((k % 33) / 32 - 0.5) * span, site[1] + (Math.floor(k / 33) / 32 - 0.5) * span)
+  )
+  const lo = Math.min(...ground),
+    hi = Math.max(...ground)
   const RES: [number, number, number] = [NXZ, Math.min(160, Math.ceil((hi - lo + 2.5) / DX)), NXZ]
-  const origin: [number, number, number] = [Math.round((site[0] - span / 2) / DX) * DX, Math.floor(lo - 0.5), Math.round((site[1] - span / 2) / DX) * DX]
+  const origin: [number, number, number] = [
+    Math.round((site[0] - span / 2) / DX) * DX,
+    Math.floor(lo - 0.5),
+    Math.round((site[1] - span / 2) / DX) * DX
+  ]
   const v = vent(world, origin, span)
   const look = [v.at[0] + v.dir[0] * 2, 0, v.at[2] + v.dir[2] * 2]
   look[1] = world.height(look[0], look[2])
@@ -45,11 +70,22 @@ export function lavaScene(close: boolean) {
 }
 
 /** The solver settings for a preset. */
-export function lavaConfig(RES: [number, number, number], DX: number, origin: [number, number, number], preset: keyof typeof LAVA_PRESETS): MPMInput {
+export function lavaConfig(
+  RES: [number, number, number],
+  DX: number,
+  origin: [number, number, number],
+  preset: keyof typeof LAVA_PRESETS
+): MPMInput {
   return {
-    capacity: 200000, resolution: RES, cellSize: DX, origin,
-    substeps: 2, maxSubsteps: 12, maxSpeed: 5, friction: 0.6,
-    materials: { lava: { viscosityMax: 2000, ...LAVA_PRESETS[preset].material } },
+    capacity: 200000,
+    resolution: RES,
+    cellSize: DX,
+    origin,
+    substeps: 2,
+    maxSubsteps: 12,
+    maxSpeed: 5,
+    friction: 0.6,
+    materials: { lava: { viscosityMax: 2000, ...LAVA_PRESETS[preset].material } }
   }
 }
 
@@ -65,14 +101,22 @@ export function lavaInput(preset: keyof typeof LAVA_PRESETS): LavaInput {
 // Heat haze and sparks over the hottest lava (sources refreshed from the read-back; rates are per unit of source weight,
 // i.e. per particle glowing like 1400 K lava).
 export const HAZE: ParticleInput = {
-  capacity: 1500, rate: 0.05, life: [1.2, 2.2], emitter: { shape: 'sources', size: [0.2, 0.05, 0.2], velocity: [0, 0.8, 0], spread: 0.2 },
+  capacity: 1500,
+  rate: 0.05,
+  life: [1.2, 2.2],
+  emitter: { shape: 'sources', size: [0.2, 0.05, 0.2], velocity: [0, 0.8, 0], spread: 0.2 },
   forces: { gravity: 0, drag: 0.5, turbulence: 0.6, turbulenceScale: 1.5, turbulenceSpeed: 0.4 },
-  curves: { size: [0.6, 1, 1.4], opacity: [0, 1, 0.6, 0] }, render: { shading: 'haze', blending: 'alpha', size: 1.4, refraction: 0.006, softness: 0.4 },
+  curves: { size: [0.6, 1, 1.4], opacity: [0, 1, 0.6, 0] },
+  render: { shading: 'haze', blending: 'alpha', size: 1.4, refraction: 0.006, softness: 0.4 }
 }
 export const SPARKS: ParticleInput = {
-  capacity: 400, rate: 0.004, life: [0.6, 1.4], emitter: { shape: 'sources', size: [0.05, 0, 0.05], velocity: [0, 2.5, 0], spread: 1.2, temperature: [1350, 1450] },
-  forces: { gravity: 9.81, cooling: 1.2, drag: 0.3 }, curves: { size: [1], opacity: [0, 1, 1, 0], color: ['#ffffff'] },
-  render: { shading: 'spark', blending: 'additive', size: 0.012, stretch: 0.03, intensity: 3, blackbody: true },
+  capacity: 400,
+  rate: 0.004,
+  life: [0.6, 1.4],
+  emitter: { shape: 'sources', size: [0.05, 0, 0.05], velocity: [0, 2.5, 0], spread: 1.2, temperature: [1350, 1450] },
+  forces: { gravity: 9.81, cooling: 1.2, drag: 0.3 },
+  curves: { size: [1], opacity: [0, 1, 1, 0], color: ['#ffffff'] },
+  render: { shading: 'spark', blending: 'additive', size: 0.012, stretch: 0.03, intensity: 3, blackbody: true }
 }
 
 /**
@@ -81,14 +125,17 @@ export const SPARKS: ParticleInput = {
  * moved one particle spacing.
  */
 export function emitLayer(lava: MPMLava, world: World, v: Vent, radius: number, speed: number) {
-  const h = lava.solver.options.cellSize / 2, r = radius
+  const h = lava.solver.options.cellSize / 2,
+    r = radius
   const side = [-v.dir[2], 0, v.dir[0]]
   const pos: number[] = []
-  for (let a = -r; a <= r + 1e-6; a += h) for (let b = h / 2; b <= r; b += h) {
-    if (a * a + b * b > r * r) continue
-    const x = v.at[0] + side[0] * a, z = v.at[2] + side[2] * a
-    pos.push(x, world.height(x, z) + b, z)
-  }
+  for (let a = -r; a <= r + 1e-6; a += h)
+    for (let b = h / 2; b <= r; b += h) {
+      if (a * a + b * b > r * r) continue
+      const x = v.at[0] + side[0] * a,
+        z = v.at[2] + side[2] * a
+      pos.push(x, world.height(x, z) + b, z)
+    }
   return lava.emit({ positions: pos, velocity: [v.dir[0] * speed, -0.1, v.dir[2] * speed] })
 }
 
@@ -96,24 +143,46 @@ export function emitLayer(lava: MPMLava, world: World, v: Vent, radius: number, 
  * Read-back of the lava (every 1.5 s in the sandboxes): heat haze and spark sources over the hottest lava, a light over
  * each of the brightest clusters of glowing surface (`glows`), and flow statistics for the HUD (`hud(fps, label)`).
  */
-export function lavaStats(renderer: THREE.WebGPURenderer, mpm: MPMSolver, lava: MPMLava, haze: ParticleSystem, sparks: ParticleSystem, glows: THREE.PointLight[], v: Vent) {
+export function lavaStats(
+  renderer: THREE.WebGPURenderer,
+  mpm: MPMSolver,
+  lava: MPMLava,
+  haze: ParticleSystem,
+  sparks: ParticleSystem,
+  glows: THREE.PointLight[],
+  v: Vent
+) {
   const DX = mpm.options.cellSize
   const stats = { crust: NaN, molten: NaN, front: NaN, frontSpeed: NaN, interiorSpeed: NaN, hottest: NaN }
-  let lastFront = NaN, lastFrontTime = 0
+  let lastFront = NaN,
+    lastFrontTime = 0
   const measure = async () => {
     const d = await mpm.read()
     const S = new Float32Array(await renderer.getArrayBufferAsync(mpm.buffers.state.value))
     const ages = Float32Array.from({ length: d.count }, (_, q) => S[q * 4 + 3]) // surface age, for the skin temperature
-    const o = mpm.options.origin, p = mpm.options.materials.lava as LavaParams
+    const o = mpm.options.origin,
+      p = mpm.options.materials.lava as LavaParams
     const src = lavaHeatSources(d, o, { minTemperature: 900, max: 1024, ages, airTemperature: p.airTemperature })
     haze.setSources(src)
     sparks.setSources(src)
-    let crust = 0, surface = 0, molten = 0, front = -Infinity, interior = 0, hottest = 0, gw = 0
+    let crust = 0,
+      surface = 0,
+      molten = 0,
+      front = -Infinity,
+      interior = 0,
+      hottest = 0,
+      gw = 0
     const c = [0, 0, 0]
     for (let q = 0; q < d.count; q++) {
       const s = lavaCrust(d.temperature[q], p)
-      if (ages[q] > 0) { surface++; if (s > 0.5) crust++ } // the surface layer: crusted where it is past the solidus band
-      if (s < 0.01) { molten++; interior += Math.hypot(d.velocity[q * 3], d.velocity[q * 3 + 1], d.velocity[q * 3 + 2]) }
+      if (ages[q] > 0) {
+        surface++
+        if (s > 0.5) crust++
+      } // the surface layer: crusted where it is past the solidus band
+      if (s < 0.01) {
+        molten++
+        interior += Math.hypot(d.velocity[q * 3], d.velocity[q * 3 + 1], d.velocity[q * 3 + 2])
+      }
       front = Math.max(front, d.position[q * 3] * v.dir[0] + d.position[q * 3 + 2] * v.dir[2])
       hottest = Math.max(hottest, d.temperature[q])
     }
@@ -124,7 +193,8 @@ export function lavaStats(renderer: THREE.WebGPURenderer, mpm: MPMSolver, lava: 
     for (let s = 0; s < src.length; s += 8) {
       const key = `${Math.floor(src[s])},${Math.floor(src[s + 2])}`
       const b = bins.get(key) ?? bins.set(key, [0, 0, 0, 0]).get(key)!
-      b[3] += src[s + 3]; for (let a = 0; a < 3; a++) b[a] += src[s + a] * src[s + 3]
+      b[3] += src[s + 3]
+      for (let a = 0; a < 3; a++) b[a] += src[s + a] * src[s + 3]
       gw += src[s + 3]
     }
     const top = [...bins.values()].sort((a, b) => b[3] - a[3]).slice(0, glows.length)
@@ -135,16 +205,27 @@ export function lavaStats(renderer: THREE.WebGPURenderer, mpm: MPMSolver, lava: 
     })
     void c
     const now = mpm.time
-    const frontSpeed = Number.isFinite(lastFront) && now > lastFrontTime ? (front - lastFront) / (now - lastFrontTime) : NaN
-    lastFront = front; lastFrontTime = now
-    Object.assign(stats, { crust: crust / Math.max(1, surface), molten: molten / Math.max(1, d.count), front, frontSpeed, interiorSpeed: interior / Math.max(1, molten), hottest })
+    const frontSpeed =
+      Number.isFinite(lastFront) && now > lastFrontTime ? (front - lastFront) / (now - lastFrontTime) : NaN
+    lastFront = front
+    lastFrontTime = now
+    Object.assign(stats, {
+      crust: crust / Math.max(1, surface),
+      molten: molten / Math.max(1, d.count),
+      front,
+      frontSpeed,
+      interiorSpeed: interior / Math.max(1, molten),
+      hottest
+    })
   }
   const hud = (fps: number, label: string) => {
     const pct = (x: number) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)} %` : '…')
     const ms = (x: number) => (Number.isFinite(x) ? `${(x * 100).toFixed(1)} cm/s` : '…')
-    return `${fps.toFixed(0)} fps · ${mpm.count.toLocaleString()} particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s · ${label}\n` +
+    return (
+      `${fps.toFixed(0)} fps · ${mpm.count.toLocaleString()} particles · ${mpm.substeps} substeps · t ${mpm.time.toFixed(1)} s · ${label}\n` +
       `surface crusted ${pct(stats.crust)}, particles molten ${pct(stats.molten)} · hottest ${Number.isFinite(stats.hottest) ? stats.hottest.toFixed(0) : '…'} K\n` +
       `front ${ms(stats.frontSpeed)} · molten interior ${ms(stats.interiorSpeed)}${mpm.count + 200 >= mpm.capacity ? ' · pool full: vent paused' : ''}`
+    )
   }
   return { stats, measure, hud }
 }
@@ -153,19 +234,29 @@ export function lavaStats(renderer: THREE.WebGPURenderer, mpm: MPMSolver, lava: 
 export function findFlank(world: World, span: number, near: [number, number]): [number, number] {
   const ids = world.options.biomes.map((b) => b.id)
   const s = createSample(8)
-  let best: [number, number] = near, bestScore = Infinity
-  for (let r = 300; r <= 1500; r += 150) for (let a = 0; a < 24; a++) {
-    const x = near[0] + r * Math.cos((a * Math.PI) / 12), z = near[1] + r * Math.sin((a * Math.PI) / 12)
-    world.sample(x, z, s)
-    if (ids[s.biomes[0]] !== 'volcanic' || s.weights[0] < 0.6 || world.height(x, z) < world.options.seaLevel + 5) continue
-    let lo = Infinity, hi = -Infinity
-    for (let i = 0; i <= 4; i++) for (let k = 0; k <= 4; k++) {
-      const h = world.height(x + (i / 4 - 0.5) * span, z + (k / 4 - 0.5) * span)
-      lo = Math.min(lo, h); hi = Math.max(hi, h)
+  let best: [number, number] = near,
+    bestScore = Infinity
+  for (let r = 300; r <= 1500; r += 150)
+    for (let a = 0; a < 24; a++) {
+      const x = near[0] + r * Math.cos((a * Math.PI) / 12),
+        z = near[1] + r * Math.sin((a * Math.PI) / 12)
+      world.sample(x, z, s)
+      if (ids[s.biomes[0]] !== 'volcanic' || s.weights[0] < 0.6 || world.height(x, z) < world.options.seaLevel + 5)
+        continue
+      let lo = Infinity,
+        hi = -Infinity
+      for (let i = 0; i <= 4; i++)
+        for (let k = 0; k <= 4; k++) {
+          const h = world.height(x + (i / 4 - 0.5) * span, z + (k / 4 - 0.5) * span)
+          lo = Math.min(lo, h)
+          hi = Math.max(hi, h)
+        }
+      const score = Math.abs(hi - lo - 6)
+      if (score < bestScore) {
+        bestScore = score
+        best = [x, z]
+      }
     }
-    const score = Math.abs(hi - lo - 6)
-    if (score < bestScore) { bestScore = score; best = [x, z] }
-  }
   return best
 }
 
@@ -178,10 +269,16 @@ export function vent(world: World, origin: [number, number, number], span: numbe
   for (let a = 0; a < 24; a++) {
     const dir = [Math.cos((a * Math.PI) / 12), 0, Math.sin((a * Math.PI) / 12)]
     let score = Infinity // the smallest drop over any 1 m step along the path: no hollows to pond in
-    for (let t = -back; t < back - 2; t += 1) score = Math.min(score, world.height(c[0] + dir[0] * t, c[1] + dir[2] * t) - world.height(c[0] + dir[0] * (t + 1), c[1] + dir[2] * (t + 1)))
+    for (let t = -back; t < back - 2; t += 1)
+      score = Math.min(
+        score,
+        world.height(c[0] + dir[0] * t, c[1] + dir[2] * t) -
+          world.height(c[0] + dir[0] * (t + 1), c[1] + dir[2] * (t + 1))
+      )
     if (score > best.score) best = { score, dir }
   }
-  const x = c[0] - best.dir[0] * back, z = c[1] - best.dir[2] * back
+  const x = c[0] - best.dir[0] * back,
+    z = c[1] - best.dir[2] * back
   return { at: [x, world.height(x, z), z], dir: best.dir }
 }
 
@@ -192,12 +289,25 @@ export async function check(renderer: THREE.WebGPURenderer): Promise<string> {
   const slope: [number, number, number] = [0.6, 0.25, 0.1]
   const height = (x: number, z: number) => slope[0] + slope[1] * x + slope[2] * z
   const options: MPMInput = {
-    capacity: 512, resolution: [16, 16, 16], cellSize: 0.125, origin: [0, 0, 0], friction: 0.5, maxSpeed: 5, substeps: 2, maxSubsteps: 2,
-    materials: { lava: { viscosity: 300, viscosityMax: 2000, eruption: 1340, skin: 0.0005 } },
+    capacity: 512,
+    resolution: [16, 16, 16],
+    cellSize: 0.125,
+    origin: [0, 0, 0],
+    friction: 0.5,
+    maxSpeed: 5,
+    substeps: 2,
+    maxSubsteps: 2,
+    materials: { lava: { viscosity: 300, viscosityMax: 2000, eruption: 1340, skin: 0.0005 } }
   }
   const dt = mpmStableStep(resolveMPMOptions(options))
   const substeps = 2
-  const emit: MPMEmit = { center: [1, height(1.1875, 1) + 0.2, 1], size: [0.1875, 0.1875, 0.1875], velocity: [0.3, -0.5, 0.1], material: 'lava', temperature: 1290 }
+  const emit: MPMEmit = {
+    center: [1, height(1.1875, 1) + 0.2, 1],
+    size: [0.1875, 0.1875, 0.1875],
+    velocity: [0.3, -0.5, 0.1],
+    material: 'lava',
+    temperature: 1290
+  }
   const runs = []
   const report: string[] = []
   for (const frames of [1, 24]) {
@@ -214,13 +324,27 @@ export async function check(renderer: THREE.WebGPURenderer): Promise<string> {
       for (let s = 0; s < substeps; s++) cpu.substep(dt)
       lavaThermalStep(cpu, substeps * dt)
     }
-    const err = (a: ArrayLike<number>, b: ArrayLike<number>) => { let e = 0; for (let i = 0; i < b.length; i++) e = Math.max(e, Math.abs(a[i] - b[i])); return e }
+    const err = (a: ArrayLike<number>, b: ArrayLike<number>) => {
+      let e = 0
+      for (let i = 0; i < b.length; i++) e = Math.max(e, Math.abs(a[i] - b[i]))
+      return e
+    }
     let crust = 0
-    for (let q = 0; q < g.count; q++) crust += lavaCrust(g.temperature[q], cpu.options.materials.lava as LavaParams) > 0.5 ? 1 : 0
-    report.push(`${frames} frame(s): max |Δ| position ${err(cpu.data.position, g.position).toExponential(2)}, velocity ${err(cpu.data.velocity, g.velocity).toExponential(2)}, ` +
-      `F ${err(cpu.data.deformation, g.deformation).toExponential(2)}, T ${err(cpu.data.temperature, g.temperature).toExponential(2)} K · ${crust}/${g.count} crust`)
+    for (let q = 0; q < g.count; q++)
+      crust += lavaCrust(g.temperature[q], cpu.options.materials.lava as LavaParams) > 0.5 ? 1 : 0
+    report.push(
+      `${frames} frame(s): max |Δ| position ${err(cpu.data.position, g.position).toExponential(2)}, velocity ${err(cpu.data.velocity, g.velocity).toExponential(2)}, ` +
+        `F ${err(cpu.data.deformation, g.deformation).toExponential(2)}, T ${err(cpu.data.temperature, g.temperature).toExponential(2)} K · ${crust}/${g.count} crust`
+    )
     const f32 = (a: ArrayLike<number>) => Array.from(a, (x) => Number(x.toPrecision(8)))
-    runs.push({ frames, count: g.count, position: f32(g.position), velocity: f32(g.velocity), deformation: f32(g.deformation), temperature: f32(g.temperature) })
+    runs.push({
+      frames,
+      count: g.count,
+      position: f32(g.position),
+      velocity: f32(g.velocity),
+      deformation: f32(g.deformation),
+      temperature: f32(g.temperature)
+    })
   }
   const result = { options, slope, emit, dt, substeps, runs }
   Object.assign(window, { lavaCheck: result, lavaCheckReport: report })

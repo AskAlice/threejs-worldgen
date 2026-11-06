@@ -52,9 +52,11 @@ export function Scatter({ ref, terrain, camera, ...options }: ScatterProps): Rea
   useEffect(() => {
     const t = terrainRef.current
     const resolved: Terrain | undefined =
-      typeof t === 'function' ? (x, z) => (terrainRef.current as HeightFn)(x, z)
-      : t && 'current' in t ? t.current ?? undefined
-      : t
+      typeof t === 'function'
+        ? (x, z) => (terrainRef.current as HeightFn)(x, z)
+        : t && 'current' in t
+          ? (t.current ?? undefined)
+          : t
     const s = ScatterImpl.create({ camera: activeCamera, terrain: resolved, ...latest.current })
     setScatter(s)
     return () => {

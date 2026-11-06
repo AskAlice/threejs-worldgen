@@ -1,7 +1,27 @@
-import { BufferGeometry, Float32BufferAttribute, Matrix4, Mesh, Sphere, Vector3, type Camera, type MeshBasicNodeMaterial, type Object3D } from 'three/webgpu'
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  Matrix4,
+  Mesh,
+  Sphere,
+  Vector3,
+  type Camera,
+  type MeshBasicNodeMaterial,
+  type Object3D
+} from 'three/webgpu'
 import type { World } from 'threejs-biomes'
 import { Clock, hookScene, mergeInput, prepareRenderer, type WaterRenderer } from './common.ts'
-import { DEFAULT_APPEARANCE, applyAppearance, applyWaves, createWaterMaterial, createWaterUniforms, setWavePhases, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
+import {
+  DEFAULT_APPEARANCE,
+  applyAppearance,
+  applyWaves,
+  createWaterMaterial,
+  createWaterUniforms,
+  setWavePhases,
+  updateSun,
+  type WaterAppearance,
+  type WaterUniforms
+} from './material.ts'
 import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, createWaves, sampleWaves, type Wave, type WaveOptions, type WaveSample } from './waves.ts'
 
@@ -82,13 +102,22 @@ export const DEFAULT_OCEAN: OceanSettings = {
   seaLevel: 0,
   radius: 0,
   origin: [0, 0, 0],
-  waves: { count: 12, seed: 1, amplitude: 0.45, wavelength: [0.6, 42], direction: [1, 0.35], spread: 0.55, choppiness: 0.75, speed: 1 },
+  waves: {
+    count: 12,
+    seed: 1,
+    amplitude: 0.45,
+    wavelength: [0.6, 42],
+    direction: [1, 0.35],
+    spread: 0.55,
+    choppiness: 0.75,
+    speed: 1
+  },
   whitecaps: 0.3,
   segments: 128,
   range: 1e7,
   innerRadius: 0.01,
   altitudeFactor: 0.02,
-  reanchorDistance: 10_000,
+  reanchorDistance: 10_000
 }
 
 /**
@@ -137,7 +166,14 @@ export class Ocean {
   private sunCache = { light: null, searched: false } as Parameters<typeof updateSun>[3]
   private unhook = () => {}
   /** Wave-phase frame on planets: a tangent plane re-anchored as the camera travels. */
-  private anchor = { valid: false, radius: 0, point: [0, 0, 0], east: [1, 0, 0], south: [0, 0, 1], phase: new Float64Array(MAX_WAVES) }
+  private anchor = {
+    valid: false,
+    radius: 0,
+    point: [0, 0, 0],
+    east: [1, 0, 0],
+    south: [0, 0, 1],
+    phase: new Float64Array(MAX_WAVES)
+  }
   private phases = new Float64Array(MAX_WAVES)
   private grid = { u: 0, v: 0, sphere: false, rs: 0, sea: 0, east: [1, 0, 0], up: [0, 1, 0], south: [0, 0, 1] }
 
@@ -183,7 +219,10 @@ export class Ocean {
   }
 
   private apply(): this {
-    const s = mergeInput(structuredClone({ ...DEFAULT_OCEAN, sun: null, environment: null }), this.input) as OceanSettings
+    const s = mergeInput(
+      structuredClone({ ...DEFAULT_OCEAN, sun: null, environment: null }),
+      this.input
+    ) as OceanSettings
     this.settings = s
     const u = this.uniforms
     applyAppearance(u, s)
@@ -235,9 +274,13 @@ export class Ocean {
     const rs = sphere ? (w ? w.radius : s.radius) + sea : 0
     const [ox, oy, oz] = s.origin
     const cam = this.camera.getWorldPosition(_v)
-    const px = cam.x + ox, py = cam.y + oy, pz = cam.z + oz
+    const px = cam.x + ox,
+      py = cam.y + oy,
+      pz = cam.z + oz
     const g = this.grid
-    g.sphere = sphere; g.rs = rs; g.sea = sea
+    g.sphere = sphere
+    g.rs = rs
+    g.sea = sea
 
     let altitude: number
     const a = this.anchor
@@ -247,12 +290,15 @@ export class Ocean {
       const up = [px / len, py / len, pz / len]
       if (!a.valid || a.radius !== rs) this.reanchor(up, rs, false)
       // The sub-camera point in the anchor's tangent plane.
-      let du = dot3(up, a.east) * rs - dot3(a.point, a.east), dv = dot3(up, a.south) * rs - dot3(a.point, a.south)
+      let du = dot3(up, a.east) * rs - dot3(a.point, a.east),
+        dv = dot3(up, a.south) * rs - dot3(a.point, a.south)
       if (Math.hypot(du, dv) > s.reanchorDistance) {
         this.reanchor(up, rs, true, du, dv)
-        du = 0; dv = 0
+        du = 0
+        dv = 0
       }
-      g.u = du; g.v = dv
+      g.u = du
+      g.v = dv
       // Grid axes: the anchor's east carried onto this tangent plane, so wave directions stay put.
       const e = sub3(a.east, scale3(up, dot3(a.east, up)))
       const el = Math.hypot(e[0], e[1], e[2]) || 1
@@ -263,17 +309,23 @@ export class Ocean {
       _m.makeBasis(_x.fromArray(g.east), _y.fromArray(up), _z.fromArray(g.south))
       this.object.quaternion.setFromRotationMatrix(_m)
     } else {
-      if (a.valid) { a.valid = false; a.phase.fill(0) }
+      if (a.valid) {
+        a.valid = false
+        a.phase.fill(0)
+      }
       altitude = py - sea
-      g.u = px; g.v = pz
-      g.east = [1, 0, 0]; g.up = [0, 1, 0]; g.south = [0, 0, 1]
+      g.u = px
+      g.v = pz
+      g.east = [1, 0, 0]
+      g.up = [0, 1, 0]
+      g.south = [0, 0, 1]
       this.object.position.set(px - ox, sea - oy, pz - oz)
       this.object.quaternion.identity()
     }
     this.object.updateMatrix()
 
     // Ring scale: a power of two, so rings map onto rings when it changes (no popping).
-    const inner = Math.pow(2, Math.floor(Math.log2(Math.max(s.innerRadius, Math.abs(altitude) * s.altitudeFactor, 1e-6))))
+    const inner = 2 ** Math.floor(Math.log2(Math.max(s.innerRadius, Math.abs(altitude) * s.altitudeFactor, 1e-6)))
     const angle = (2 * Math.PI) / Math.max(3, Math.floor(s.segments))
     u.gridScale.value = inner
     u.gridAngle.value = angle
@@ -307,7 +359,8 @@ export class Ocean {
     const a = this.anchor
     if (keepPhase) {
       // Carry the phase at the new anchor point over, so waves don't jump.
-      for (let i = 0; i < this.waves.length; i++) a.phase[i] = wrap(a.phase[i] + this.waves[i].k * (this.waves[i].dirX * du + this.waves[i].dirZ * dv))
+      for (let i = 0; i < this.waves.length; i++)
+        a.phase[i] = wrap(a.phase[i] + this.waves[i].k * (this.waves[i].dirX * du + this.waves[i].dirZ * dv))
       const e = sub3(a.east, scale3(up, dot3(a.east, up)))
       const l = Math.hypot(e[0], e[1], e[2]) || 1
       a.east = [e[0] / l, e[1] / l, e[2] / l]
@@ -328,11 +381,18 @@ export class Ocean {
    * under the surface, the surface point and its normal. Uses every wave (no distance fade), at the
    * current {@link Ocean.time}.
    */
-  waterAt(x: number, y: number, z: number, out: OceanSample = { depth: 0, height: 0, surface: [0, 0, 0], normal: [0, 1, 0] }): OceanSample {
+  waterAt(
+    x: number,
+    y: number,
+    z: number,
+    out: OceanSample = { depth: 0, height: 0, surface: [0, 0, 0], normal: [0, 1, 0] }
+  ): OceanSample {
     const g = this.grid
     const a = this.anchor
     const [ox, oy, oz] = this.settings.origin
-    const px = x + ox, py = y + oy, pz = z + oz
+    const px = x + ox,
+      py = y + oy,
+      pz = z + oz
     const extra = _extra
     for (let i = 0; i < this.waves.length; i++) extra[i] = a.phase[i] - this.waves[i].omega * this.time
     if (!g.sphere) {
@@ -345,7 +405,8 @@ export class Ocean {
     }
     const len = Math.hypot(px, py, pz) || 1
     const up = [px / len, py / len, pz / len]
-    const u = dot3(up, a.east) * g.rs - dot3(a.point, a.east), v = dot3(up, a.south) * g.rs - dot3(a.point, a.south)
+    const u = dot3(up, a.east) * g.rs - dot3(a.point, a.east),
+      v = dot3(up, a.south) * g.rs - dot3(a.point, a.south)
     const ws = sampleWaves(this.waves, u, v, 0, _ws, extra)
     const e = sub3(a.east, scale3(up, dot3(a.east, up)))
     const el = Math.hypot(e[0], e[1], e[2]) || 1
@@ -375,11 +436,11 @@ export class Ocean {
 export function createRingGeometry(segments: number, range: number): BufferGeometry {
   const seg = Math.max(3, Math.floor(segments))
   const m = Math.max(1, Math.round((seg * Math.LN2) / (2 * Math.PI)))
-  const growth = Math.pow(2, 1 / m)
+  const growth = 2 ** (1 / m)
   const rings = Math.max(1, Math.ceil(Math.log(Math.max(range, 1.0001)) / Math.log(growth)) + 1)
   const pos = new Float32Array((1 + rings * seg) * 3)
   for (let i = 0; i < rings; i++) {
-    const r = Math.pow(growth, i)
+    const r = growth ** i
     for (let j = 0; j < seg; j++) {
       const t = (j / seg) * Math.PI * 2
       const k = (1 + i * seg + j) * 3
@@ -391,8 +452,10 @@ export function createRingGeometry(segments: number, range: number): BufferGeome
   for (let j = 0; j < seg; j++) index.push(0, 1 + ((j + 1) % seg), 1 + j)
   for (let i = 0; i < rings - 1; i++) {
     for (let j = 0; j < seg; j++) {
-      const a = 1 + i * seg + j, b = 1 + i * seg + ((j + 1) % seg)
-      const c = a + seg, d = b + seg
+      const a = 1 + i * seg + j,
+        b = 1 + i * seg + ((j + 1) % seg)
+      const c = a + seg,
+        d = b + seg
       index.push(a, b, c, b, d, c)
     }
   }
@@ -409,7 +472,11 @@ function wrap(a: number): number {
 const dot3 = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const sub3 = (a: number[], b: number[]) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const scale3 = (a: number[], k: number) => [a[0] * k, a[1] * k, a[2] * k]
-const cross3 = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const cross3 = (a: number[], b: number[]) => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0]
+]
 
 const _v = new Vector3()
 const _x = new Vector3()

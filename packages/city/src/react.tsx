@@ -152,7 +152,12 @@ export interface PopulationOverlayProps extends OverlayInput {
  * }
  * ```
  */
-export function PopulationOverlay({ population, ref, camera, ...options }: PopulationOverlayProps): React.JSX.Element | null {
+export function PopulationOverlay({
+  population,
+  ref,
+  camera,
+  ...options
+}: PopulationOverlayProps): React.JSX.Element | null {
   const { camera: defaultCamera } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [overlay, setOverlay] = useState<PopulationOverlayImpl | null>(null)

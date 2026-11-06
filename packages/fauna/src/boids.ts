@@ -65,7 +65,7 @@ export const DEFAULT_BOIDS: BoidParams = {
   avoid: 4,
   lookAhead: 1.2,
   verticalDamping: 0.6,
-  flee: 6,
+  flee: 6
 }
 
 /** Something flocks flee from: a position (in the flock's coordinates) and a radius of fear. */
@@ -143,7 +143,15 @@ export class GridEnvironment implements Environment {
    * @param tops Top at each sample; NaN where unusable.
    * @param minThickness Thinnest usable band.
    */
-  constructor(x0: number, z0: number, cell: number, n: number, floors: ArrayLike<number>, tops: ArrayLike<number>, minThickness: number) {
+  constructor(
+    x0: number,
+    z0: number,
+    cell: number,
+    n: number,
+    floors: ArrayLike<number>,
+    tops: ArrayLike<number>,
+    minThickness: number
+  ) {
     this.x0 = x0
     this.z0 = z0
     this.cell = cell
@@ -153,7 +161,8 @@ export class GridEnvironment implements Environment {
     for (let j = 0; j < c; j++) {
       for (let i = 0; i < c; i++) {
         const k = [j * n + i, j * n + i + 1, (j + 1) * n + i, (j + 1) * n + i + 1]
-        let f = -Infinity, t = Infinity
+        let f = -Infinity,
+          t = Infinity
         for (const q of k) {
           f = Math.max(f, floors[q])
           t = Math.min(t, tops[q])
@@ -220,7 +229,14 @@ export class Flock {
    * Creates `count` members around `home`, each placed where the environment is usable (else at home),
    * swimming in random horizontal directions. Everything is drawn from `seed`.
    */
-  constructor(seed: number, count: number, home: [number, number, number], params: BoidParams, environment: Environment, spread = params.separationDistance * Math.cbrt(count) * 1.5) {
+  constructor(
+    seed: number,
+    count: number,
+    home: [number, number, number],
+    params: BoidParams,
+    environment: Environment,
+    spread = params.separationDistance * Math.cbrt(count) * 1.5
+  ) {
     this.count = count
     this.home = [home[0], home[1], home[2]]
     this.params = params
@@ -233,11 +249,18 @@ export class Flock {
     const r = this.rand
     const mainHeading = r() * Math.PI * 2
     for (let i = 0; i < count; i++) {
-      let x = home[0], z = home[2]
+      let x = home[0],
+        z = home[2]
       for (let tries = 0; tries < 6; tries++) {
-        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * spread
-        const tx = home[0] + Math.cos(a) * d, tz = home[2] + Math.sin(a) * d
-        if (environment.band(tx, tz, _b)) { x = tx; z = tz; break }
+        const a = r() * Math.PI * 2,
+          d = Math.sqrt(r()) * spread
+        const tx = home[0] + Math.cos(a) * d,
+          tz = home[2] + Math.sin(a) * d
+        if (environment.band(tx, tz, _b)) {
+          x = tx
+          z = tz
+          break
+        }
       }
       const y = home[1] + (r() - 0.5) * spread * 0.4
       this.position.set([x, y, z], i * 3)
@@ -251,29 +274,54 @@ export class Flock {
 
   /** Advances the flock by one fixed step of `dt` seconds. `predators` are fled from. */
   step(dt: number, predators: readonly PredatorPoint[] = []): void {
-    const p = this.params, pos = this.position, vel = this.velocity, acc = this.acc, n = this.count
+    const p = this.params,
+      pos = this.position,
+      vel = this.velocity,
+      acc = this.acc,
+      n = this.count
     const env = this.environment
     const nr2 = p.neighborRadius * p.neighborRadius
     const sd2 = p.separationDistance * p.separationDistance
     const r = this.rand
 
     for (let i = 0; i < n; i++) {
-      const ix = pos[i * 3], iy = pos[i * 3 + 1], iz = pos[i * 3 + 2]
-      let sx = 0, sy = 0, sz = 0, ax = 0, ay = 0, az = 0, cx = 0, cy = 0, cz = 0, k = 0
+      const ix = pos[i * 3],
+        iy = pos[i * 3 + 1],
+        iz = pos[i * 3 + 2]
+      let sx = 0,
+        sy = 0,
+        sz = 0,
+        ax = 0,
+        ay = 0,
+        az = 0,
+        cx = 0,
+        cy = 0,
+        cz = 0,
+        k = 0
       for (let j = 0; j < n; j++) {
         if (j === i) continue
-        const dx = ix - pos[j * 3], dy = iy - pos[j * 3 + 1], dz = iz - pos[j * 3 + 2]
+        const dx = ix - pos[j * 3],
+          dy = iy - pos[j * 3 + 1],
+          dz = iz - pos[j * 3 + 2]
         const d2 = dx * dx + dy * dy + dz * dz
         if (d2 > nr2) continue
         if (d2 < sd2) {
           const w = 1 / Math.max(d2, 1e-6)
-          sx += dx * w; sy += dy * w; sz += dz * w
+          sx += dx * w
+          sy += dy * w
+          sz += dz * w
         }
-        ax += vel[j * 3]; ay += vel[j * 3 + 1]; az += vel[j * 3 + 2]
-        cx += pos[j * 3]; cy += pos[j * 3 + 1]; cz += pos[j * 3 + 2]
+        ax += vel[j * 3]
+        ay += vel[j * 3 + 1]
+        az += vel[j * 3 + 2]
+        cx += pos[j * 3]
+        cy += pos[j * 3 + 1]
+        cz += pos[j * 3 + 2]
         k++
       }
-      let fx = sx * p.separation * p.separationDistance, fy = sy * p.separation * p.separationDistance, fz = sz * p.separation * p.separationDistance
+      let fx = sx * p.separation * p.separationDistance,
+        fy = sy * p.separation * p.separationDistance,
+        fz = sz * p.separation * p.separationDistance
       if (k > 0) {
         fx += (ax / k - vel[i * 3]) * p.alignment + (cx / k - ix) * p.cohesion
         fy += (ay / k - vel[i * 3 + 1]) * p.alignment + (cy / k - iy) * p.cohesion
@@ -286,42 +334,54 @@ export class Flock {
       fy += (r() - 0.5) * p.wander * 0.3
 
       // Home leash.
-      const hx = this.home[0] - ix, hz = this.home[2] - iz
+      const hx = this.home[0] - ix,
+        hz = this.home[2] - iz
       const hd = Math.hypot(hx, hz)
       if (hd > p.homeRadius * 0.6) {
         const s = (p.homeStrength * (hd / p.homeRadius - 0.6)) / hd
-        fx += hx * s; fz += hz * s
+        fx += hx * s
+        fz += hz * s
       }
 
       // Vertical band: soft push inside the margins.
       if (env.band(ix, iz, _b)) {
-        const lo = _b.floor + p.margin * 2, hi = _b.top - p.margin * 2
+        const lo = _b.floor + p.margin * 2,
+          hi = _b.top - p.margin * 2
         if (lo < hi) {
           if (iy < lo) fy += p.avoid * Math.min(1, (lo - iy) / p.margin)
           else if (iy > hi) fy -= p.avoid * Math.min(1, (iy - hi) / p.margin)
         } else fy += p.avoid * Math.sign((_b.floor + _b.top) * 0.5 - iy)
       }
       // Look ahead: turn back towards home before reaching an obstacle.
-      const px = ix + vel[i * 3] * p.lookAhead, pz = iz + vel[i * 3 + 2] * p.lookAhead
+      const px = ix + vel[i * 3] * p.lookAhead,
+        pz = iz + vel[i * 3 + 2] * p.lookAhead
       if (!env.band(px, pz, _b) || iy < _b.floor + p.margin || iy > _b.top - p.margin) {
         const s = p.avoid / Math.max(hd, 1e-6)
-        fx += hx * s; fz += hz * s
+        fx += hx * s
+        fz += hz * s
         // and away from the blocked direction
-        fx -= vel[i * 3] * p.avoid * 0.5; fz -= vel[i * 3 + 2] * p.avoid * 0.5
+        fx -= vel[i * 3] * p.avoid * 0.5
+        fz -= vel[i * 3 + 2] * p.avoid * 0.5
       }
 
       for (const q of predators) {
-        const dx = ix - q.x, dy = iy - q.y, dz = iz - q.z
+        const dx = ix - q.x,
+          dy = iy - q.y,
+          dz = iz - q.z
         const d = Math.hypot(dx, dy, dz)
         if (d < q.radius && d > 1e-6) {
           const s = (p.flee * (1 - d / q.radius)) / d
-          fx += dx * s; fy += dy * s * 0.5; fz += dz * s
+          fx += dx * s
+          fy += dy * s * 0.5
+          fz += dz * s
         }
       }
 
       const fl = Math.hypot(fx, fy, fz)
       const lim = fl > p.maxAccel ? p.maxAccel / fl : 1
-      acc[i * 3] = fx * lim; acc[i * 3 + 1] = fy * lim; acc[i * 3 + 2] = fz * lim
+      acc[i * 3] = fx * lim
+      acc[i * 3 + 1] = fy * lim
+      acc[i * 3 + 2] = fz * lim
     }
 
     // Integrate (all accelerations were computed from the same state, so member order doesn't matter).
@@ -331,17 +391,25 @@ export class Flock {
       let vz = vel[i * 3 + 2] + acc[i * 3 + 2] * dt
       const s = Math.hypot(vx, vy, vz)
       const t = s > p.maxSpeed ? p.maxSpeed / s : s < p.minSpeed ? p.minSpeed / Math.max(s, 1e-9) : 1
-      vx *= t; vy *= t; vz *= t
-      const ox = pos[i * 3], oz = pos[i * 3 + 2]
-      const nx = ox + vx * dt, nz = oz + vz * dt
+      vx *= t
+      vy *= t
+      vz *= t
+      const ox = pos[i * 3],
+        oz = pos[i * 3 + 2]
+      const nx = ox + vx * dt,
+        nz = oz + vz * dt
       if (env.band(nx, nz, _b)) {
-        pos[i * 3] = nx; pos[i * 3 + 2] = nz
+        pos[i * 3] = nx
+        pos[i * 3 + 2] = nz
       } else {
         // Hard wall: stay, and turn around.
-        vx = -vx; vz = -vz
+        vx = -vx
+        vz = -vz
       }
       pos[i * 3 + 1] += vy * dt
-      vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz
+      vel[i * 3] = vx
+      vel[i * 3 + 1] = vy
+      vel[i * 3 + 2] = vz
       this.clampVertical(i)
     }
     if (p.minDistance > 0) this.separate()
@@ -350,15 +418,29 @@ export class Flock {
 
   /** Hard constraint: pushes apart members closer than `minDistance` (two Gauss–Seidel passes). */
   private separate() {
-    const pos = this.position, n = this.count, md = this.params.minDistance, md2 = md * md
+    const pos = this.position,
+      n = this.count,
+      md = this.params.minDistance,
+      md2 = md * md
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < n; i++) {
         for (let j = i + 1; j < n; j++) {
-          let dx = pos[j * 3] - pos[i * 3], dy = pos[j * 3 + 1] - pos[i * 3 + 1], dz = pos[j * 3 + 2] - pos[i * 3 + 2]
+          let dx = pos[j * 3] - pos[i * 3],
+            dy = pos[j * 3 + 1] - pos[i * 3 + 1],
+            dz = pos[j * 3 + 2] - pos[i * 3 + 2]
           const d2 = dx * dx + dy * dy + dz * dz
           if (d2 >= md2) continue
           let d = Math.sqrt(d2)
-          if (d < 1e-9) { dx = 1; dy = 0; dz = 0; d = 1e-9 } else { dx /= d; dy /= d; dz /= d }
+          if (d < 1e-9) {
+            dx = 1
+            dy = 0
+            dz = 0
+            d = 1e-9
+          } else {
+            dx /= d
+            dy /= d
+            dz /= d
+          }
           const push = (md - d) * 0.5
           this.nudge(i, -dx * push, -dy * push, -dz * push)
           this.nudge(j, dx * push, dy * push, dz * push)
@@ -370,8 +452,12 @@ export class Flock {
   /** Moves a member, but never into an obstacle or out of its band. */
   private nudge(i: number, dx: number, dy: number, dz: number) {
     const pos = this.position
-    const nx = pos[i * 3] + dx, nz = pos[i * 3 + 2] + dz
-    if (this.environment.band(nx, nz, _b)) { pos[i * 3] = nx; pos[i * 3 + 2] = nz }
+    const nx = pos[i * 3] + dx,
+      nz = pos[i * 3 + 2] + dz
+    if (this.environment.band(nx, nz, _b)) {
+      pos[i * 3] = nx
+      pos[i * 3 + 2] = nz
+    }
     pos[i * 3 + 1] += dy
     this.clampVertical(i)
   }
@@ -381,7 +467,8 @@ export class Flock {
     const pos = this.position
     if (!this.environment.band(pos[i * 3], pos[i * 3 + 2], _b)) return
     const m = this.params.margin
-    const lo = _b.floor + m, hi = _b.top - m
+    const lo = _b.floor + m,
+      hi = _b.top - m
     const y = pos[i * 3 + 1]
     pos[i * 3 + 1] = lo <= hi ? Math.min(hi, Math.max(lo, y)) : (_b.floor + _b.top) * 0.5
     if (pos[i * 3 + 1] !== y) this.velocity[i * 3 + 1] *= 0.3

@@ -1,13 +1,30 @@
 import {
-  Group, Vector3,
-  type Camera, type DirectionalLight, type MeshPhysicalNodeMaterial, type Node, type Object3D,
+  Group,
+  Vector3,
+  type Camera,
+  type DirectionalLight,
+  type MeshPhysicalNodeMaterial,
+  type Node,
+  type Object3D
 } from 'three/webgpu'
-import { createGrassMaterial, createGrassUniforms, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material.ts'
+import {
+  createGrassMaterial,
+  createGrassUniforms,
+  sampleGrassMap,
+  type GrassMapSample,
+  type GrassUniforms
+} from './material.ts'
 import { createHeightSampler, type HeightFn, type Terrain } from 'threejs-heightfield'
 import type { GrassMap } from './grass-map.ts'
 import {
-  layoutKey as computeLayoutKey, materialKey as computeMaterialKey, resolveSettings, writeSettings,
-  type GrassInput, type GrassSettings, type ObjectRef, type WindOptions,
+  layoutKey as computeLayoutKey,
+  materialKey as computeMaterialKey,
+  resolveSettings,
+  writeSettings,
+  type GrassInput,
+  type GrassSettings,
+  type ObjectRef,
+  type WindOptions
 } from './grass-settings.ts'
 import { TileGeometryStore } from './grass-geometry.ts'
 import { TileStream } from './grass-tiles.ts'
@@ -80,11 +97,14 @@ export class Grass {
   private resolvedTerrain: Terrain | undefined
   private material: MeshPhysicalNodeMaterial | null = null
   private readonly retirement = new Retirement()
-  private readonly geometry = new TileGeometryStore({
-    object: this.object,
-    settings: () => this.settings,
-    material: () => this.material,
-  }, this.retirement)
+  private readonly geometry = new TileGeometryStore(
+    {
+      object: this.object,
+      settings: () => this.settings,
+      material: () => this.material
+    },
+    this.retirement
+  )
   private readonly stream = new TileStream({
     object: this.object,
     settings: () => this.settings,
@@ -92,7 +112,7 @@ export class Grass {
     height: () => this.sampleHeight,
     densityAt: (dist) => this.densityAt(dist),
     geometry: this.geometry,
-    retirement: this.retirement,
+    retirement: this.retirement
   })
   private layoutKey = ''
   private layoutTileSize = 0
@@ -109,7 +129,9 @@ export class Grass {
   static async create(options: GrassOptions): Promise<Grass> {
     const { renderer } = options
     if (renderer && !renderer.isWebGPURenderer) {
-      throw new Error('Grass requires WebGPURenderer from "three/webgpu" (it uses WebGL2 automatically when WebGPU is unavailable).')
+      throw new Error(
+        'Grass requires WebGPURenderer from "three/webgpu" (it uses WebGL2 automatically when WebGPU is unavailable).'
+      )
     }
     if (renderer?.hasInitialized?.() === false) await renderer.init?.()
     const grass = new Grass(options)
@@ -226,7 +248,7 @@ export class Grass {
     const { tiles, instances } = this.stream.update(cam, budget)
 
     this.uniforms.viewPosition.value.copy(cam)
-    let sun = s.sun
+    const sun = s.sun
     if (!sun && !this.sunSearched && this.object.parent) {
       this.sunSearched = true
       this.autoSun = findSun(this.object)
@@ -258,7 +280,15 @@ export class Grass {
     const l = this.settings.lods
     const seg = (a: number, b: number) => Math.min(1, Math.max(0, (dist - a) / Math.max(b - a, 1e-3)))
     const mix = (a: number, b: number, t: number) => a + (b - a) * t
-    return mix(mix(mix(l[0].density, l[1].density, seg(l[0].distance, l[1].distance)), l[2].density, seg(l[1].distance, l[2].distance)), l[3].density, seg(l[2].distance, l[3].distance))
+    return mix(
+      mix(
+        mix(l[0].density, l[1].density, seg(l[0].distance, l[1].distance)),
+        l[2].density,
+        seg(l[1].distance, l[2].distance)
+      ),
+      l[3].density,
+      seg(l[2].distance, l[3].distance)
+    )
   }
 
   /** The coverage/height map grass is painted through, or `null`. Shorthand for `settings.grassMap`. */

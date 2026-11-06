@@ -32,7 +32,13 @@ interface Updatable {
 }
 
 /** Creates `create()` once per `deps`, resets it with `props` on every render and updates it every frame. */
-function useFaunaObject<T extends Updatable>(create: () => Promise<T>, props: object, deps: unknown[], ref: Ref<T | null> | undefined, sync?: (obj: T) => void) {
+function useFaunaObject<T extends Updatable>(
+  create: () => Promise<T>,
+  props: object,
+  deps: unknown[],
+  ref: Ref<T | null> | undefined,
+  sync?: (obj: T) => void
+) {
   const [obj, setObj] = useState<T | null>(null)
   const latest = useRef(create)
   latest.current = create
@@ -76,7 +82,12 @@ export interface FishProps extends FishInput {
  */
 export function Fish({ ref, ...options }: FishProps): React.JSX.Element | null {
   const { gl } = useThree()
-  const fish = useFaunaObject(() => FishImpl.create({ renderer: gl as unknown as FaunaRenderer, ...options }), options, [gl], ref)
+  const fish = useFaunaObject(
+    () => FishImpl.create({ renderer: gl as unknown as FaunaRenderer, ...options }),
+    options,
+    [gl],
+    ref
+  )
   return fish ? <primitive object={fish.object} /> : null
 }
 
@@ -101,7 +112,15 @@ export interface FishSchoolsProps extends FishSchoolsInput {
 export function FishSchools({ ref, world, camera, ...options }: FishSchoolsProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const cam = camera ?? defaultCamera
-  const fish = useFaunaObject(() => FishSchoolsImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }), options, [gl, world], ref, (f) => { f.camera = cam })
+  const fish = useFaunaObject(
+    () => FishSchoolsImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }),
+    options,
+    [gl, world],
+    ref,
+    (f) => {
+      f.camera = cam
+    }
+  )
   return fish ? <primitive object={fish.object} /> : null
 }
 
@@ -126,7 +145,15 @@ export interface BirdFlocksProps extends BirdFlocksInput {
 export function BirdFlocks({ ref, world, camera, ...options }: BirdFlocksProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const cam = camera ?? defaultCamera
-  const birds = useFaunaObject(() => BirdFlocksImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }), options, [gl, world], ref, (b) => { b.camera = cam })
+  const birds = useFaunaObject(
+    () => BirdFlocksImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }),
+    options,
+    [gl, world],
+    ref,
+    (b) => {
+      b.camera = cam
+    }
+  )
   return birds ? <primitive object={birds.object} /> : null
 }
 
@@ -151,6 +178,14 @@ export interface FaunaProps extends FaunaInput {
 export function Fauna({ ref, world, camera, ...options }: FaunaProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const cam = camera ?? defaultCamera
-  const fauna = useFaunaObject(() => FaunaImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }), options, [gl, world], ref, (f) => { f.camera = cam })
+  const fauna = useFaunaObject(
+    () => FaunaImpl.create({ camera: cam, world, renderer: gl as unknown as FaunaRenderer, ...options }),
+    options,
+    [gl, world],
+    ref,
+    (f) => {
+      f.camera = cam
+    }
+  )
   return fauna ? <primitive object={fauna.object} /> : null
 }

@@ -1,8 +1,53 @@
-import { Color, DataTexture, DoubleSide, MeshPhysicalNodeMaterial, Vector2, Vector3, Vector4, type Node } from 'three/webgpu'
 import {
-  Fn, Loop, abs, floor, attribute, cameraPosition, clamp, color, cos, dot, faceDirection, float, fract, fwidth, int, length, max, min, mix,
-  modelWorldMatrix, mx_noise_float, normalGeometry, normalize, positionGeometry, positionWorld, pow, sin, smoothstep, step,
-  texture, time, transformNormalToView, uniform, uniformArray, uv, varyingProperty, vec2, vec3, vec4,
+  Color,
+  DataTexture,
+  DoubleSide,
+  MeshPhysicalNodeMaterial,
+  Vector2,
+  Vector3,
+  Vector4,
+  type Node
+} from 'three/webgpu'
+import {
+  Fn,
+  Loop,
+  abs,
+  floor,
+  attribute,
+  cameraPosition,
+  clamp,
+  color,
+  cos,
+  dot,
+  faceDirection,
+  float,
+  fract,
+  fwidth,
+  int,
+  length,
+  max,
+  min,
+  mix,
+  modelWorldMatrix,
+  mx_noise_float,
+  normalGeometry,
+  normalize,
+  positionGeometry,
+  positionWorld,
+  pow,
+  sin,
+  smoothstep,
+  step,
+  texture,
+  time,
+  transformNormalToView,
+  uniform,
+  uniformArray,
+  uv,
+  varyingProperty,
+  vec2,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { MAX_INTERACTORS, windGust } from './material.ts'
 
@@ -68,7 +113,10 @@ export function createCornUniforms() {
     /** Global multiplier on interactor push (and flattening). */
     interactionStrength: uniform(1),
     /** xyz = world position, w = radius (0 = unused slot). */
-    interactors: uniformArray(Array.from({ length: MAX_INTERACTORS }, () => new Vector4()), 'vec4'),
+    interactors: uniformArray(
+      Array.from({ length: MAX_INTERACTORS }, () => new Vector4()),
+      'vec4'
+    ),
     /** Number of active entries in `interactors`. */
     interactorCount: uniform(0, 'int'),
     /** Where corn was flattened (see `FlattenMap`). */
@@ -76,7 +124,7 @@ export function createCornUniforms() {
     /** minX, minZ, sizeX, sizeZ of the flatten map in world space. */
     flattenBounds: uniform(new Vector4(-1e6, -1e6, 2e6, 2e6)),
     /** 1 tints corn by level of detail. */
-    debugLods: uniform(0),
+    debugLods: uniform(0)
   }
 }
 
@@ -87,7 +135,11 @@ export type CornUniforms = ReturnType<typeof createCornUniforms>
 function lodDensity(u: CornUniforms, dist: Node<'float'>) {
   const d = u.lodDistances
   const k = u.lodDensities
-  const seg = (a: any, b: any) => dist.sub(a).div(max(b.sub(a), 1e-3)).clamp(0, 1)
+  const seg = (a: any, b: any) =>
+    dist
+      .sub(a)
+      .div(max(b.sub(a), 1e-3))
+      .clamp(0, 1)
   return mix(mix(mix(k.x, k.y, seg(d.x, d.y)), k.z, seg(d.y, d.z)), k.w, seg(d.z, d.w))
 }
 
@@ -96,7 +148,10 @@ function sampleFlatten(u: CornUniforms, xz: Node<'vec2'>) {
   const p = xz.sub(u.flattenBounds.xy).div(u.flattenBounds.zw)
   const inside = step(0, p.x).mul(step(p.x, 1)).mul(step(0, p.y)).mul(step(p.y, 1))
   const s = u.flatten.sample(p).level(float(0))
-  return { amount: s.r.mul(inside).mul(clamp(u.interactionStrength, 0, 1)), dir: normalize(s.gb.mul(2).sub(1).add(vec2(1e-4, 0))) }
+  return {
+    amount: s.r.mul(inside).mul(clamp(u.interactionStrength, 0, 1)),
+    dir: normalize(s.gb.mul(2).sub(1).add(vec2(1e-4, 0)))
+  }
 }
 
 /** Growth-derived shape and colour factors shared by stalks and canopy. */
@@ -113,14 +168,16 @@ function growthState(u: CornUniforms) {
     /** Tassels out. */
     tassel: smoothstep(0.45, 0.56, g),
     /** Leaf colour before drying. */
-    green: mix(u.youngColor, u.leafColor, smoothstep(0.15, 0.55, g)),
+    green: mix(u.youngColor, u.leafColor, smoothstep(0.15, 0.55, g))
   }
 }
 
 /** Field-scale variation at a world XZ position: x = brightness (−1..1), y = dryness (0..1). Very low frequency
  *  (soil and moisture differences across a field), never thresholded. */
 function fieldVariation(u: CornUniforms, xz: Node<'vec2'>) {
-  const bright = mx_noise_float(xz.mul(0.011)).add(mx_noise_float(xz.mul(0.037).add(7.3)).mul(0.5)).add(mx_noise_float(xz.mul(0.11).add(3.1)).mul(0.25))
+  const bright = mx_noise_float(xz.mul(0.011))
+    .add(mx_noise_float(xz.mul(0.037).add(7.3)).mul(0.5))
+    .add(mx_noise_float(xz.mul(0.11).add(3.1)).mul(0.25))
   const dryness = smoothstep(0.05, 0.75, mx_noise_float(xz.mul(0.006).add(vec2(31.7, -12.3))))
   return vec2(bright.mul(u.patchiness), dryness.mul(u.patchiness))
 }
@@ -175,7 +232,9 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
   // Fewer plants far away: spread the survivors a little wider, so the rows don't look thinned.
   const spread = clamp(pow(density.max(0.05), -0.4), 1, 2)
 
-  const plantHeight = u.height.mul(float(1).add(fract(seed.mul(7.31)).mul(2).sub(1).mul(u.heightVariation))).mul(mix(0.06, 1, st.grow))
+  const plantHeight = u.height
+    .mul(float(1).add(fract(seed.mul(7.31)).mul(2).sub(1).mul(u.heightVariation)))
+    .mul(mix(0.06, 1, st.grow))
   const vScale = plantHeight.div(CORN_MODEL_HEIGHT)
   const hScale = pow(vScale, 0.7).mul(spread) // seedlings are leafier than a shrunk adult
   const harvested = u.harvested
@@ -183,7 +242,12 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
   const earOut = smoothstep(0.5, 0.62, st.g)
   const partVisible = isStalk
     .add(isLeaf.mul(float(1).sub(harvested)))
-    .add(isTassel.mul(st.tassel).mul(float(1).sub(harvested)).mul(float(1).sub(smoothstep(14, 24, dist))))
+    .add(
+      isTassel
+        .mul(st.tassel)
+        .mul(float(1).sub(harvested))
+        .mul(float(1).sub(smoothstep(14, 24, dist)))
+    )
     .add(is(3).add(isSilk).mul(earOut).mul(float(1).sub(harvested)))
     .add(is(4).mul(earOut).mul(secondEar).mul(float(1).sub(harvested)))
   // Lower leaves dry first once the plant matures; everything dries towards harvest.
@@ -193,7 +257,10 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
   const flat = sampleFlatten(u, root.xz)
   // Fallen stalks splay a little around the fall direction.
   const spin = fract(seed.mul(5.7)).sub(0.5).mul(0.9)
-  const fallDir = vec2(flat.dir.x.mul(cos(spin)).sub(flat.dir.y.mul(sin(spin))), flat.dir.x.mul(sin(spin)).add(flat.dir.y.mul(cos(spin))))
+  const fallDir = vec2(
+    flat.dir.x.mul(cos(spin)).sub(flat.dir.y.mul(sin(spin))),
+    flat.dir.x.mul(sin(spin)).add(flat.dir.y.mul(cos(spin)))
+  )
   const fallAngle = flat.amount.mul(fract(seed.mul(2.9)).mul(0.22).add(1.3))
 
   const interaction = Fn(() => {
@@ -204,7 +271,9 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
       const delta = root.xz.sub(it.xz)
       // Neighbours of the flattened strip are pushed aside, out to almost twice the radius.
       const falloff = float(1).sub(smoothstep(radius.mul(0.6), radius.mul(1.8), length(delta)))
-      const gate = step(1e-4, it.w).mul(float(1).sub(smoothstep(radius.add(plantHeight), radius.mul(2).add(plantHeight), abs(root.y.sub(it.y)))))
+      const gate = step(1e-4, it.w).mul(
+        float(1).sub(smoothstep(radius.add(plantHeight), radius.mul(2).add(plantHeight), abs(root.y.sub(it.y))))
+      )
       push.addAssign(normalize(delta.add(1e-5)).mul(falloff.mul(gate)))
     })
     return push.mul(u.interactionStrength).mul(0.7)
@@ -217,8 +286,16 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
   const position = Fn(() => {
     const flutterRate = fract(seed.mul(13.1)).mul(2).add(2)
     const flutter = sin(time.mul(flutterRate).add(seed.mul(40))).mul(gust.mul(0.1).add(0.05))
-    const wind = u.windDirection.mul(gust.add(0.15).add(flutter)).add(swirl).mul(u.windStrength).mul(0.3).div(u.stiffness)
-    const bend = fallDir.mul(fallAngle).add(wind.add(interaction().div(u.stiffness)).mul(float(1).sub(flat.amount))).toVar()
+    const wind = u.windDirection
+      .mul(gust.add(0.15).add(flutter))
+      .add(swirl)
+      .mul(u.windStrength)
+      .mul(0.3)
+      .div(u.stiffness)
+    const bend = fallDir
+      .mul(fallAngle)
+      .add(wind.add(interaction().div(u.stiffness)).mul(float(1).sub(flat.amount)))
+      .toVar()
     const amount = min(length(bend), 1.5).toVar()
     const bendDir = bend.div(max(length(bend), 1e-4)).toVar()
 
@@ -226,7 +303,13 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
     const s = uv().y
     // Dry leaves hang lower; all leaves flutter a little in gusts.
     const droop = isLeaf.mul(leafDry).mul(0.35).mul(s).mul(length(base.xz))
-    const leafFlutter = isLeaf.mul(sin(time.mul(flutterRate.add(1.3)).add(seed.mul(40)).add(node.mul(11))).mul(0.03).mul(s).mul(vScale).mul(gust.mul(u.windStrength).add(0.1)))
+    const leafFlutter = isLeaf.mul(
+      sin(time.mul(flutterRate.add(1.3)).add(seed.mul(40)).add(node.mul(11)))
+        .mul(0.03)
+        .mul(s)
+        .mul(vScale)
+        .mul(gust.mul(u.windStrength).add(0.1))
+    )
     const grownY = base.y.sub(droop).add(leafFlutter)
     // Harvest: cut every stalk at stubble height (a little uneven); leaves, tassels and ears are gone.
     const stub = u.stubbleHeight.mul(fract(seed.mul(5.1)).mul(0.5).add(0.75))
@@ -261,7 +344,13 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
     const tassel = mix(mix(u.tasselColor, u.dryColor.mul(0.8), st.dry.mul(0.5)), green, farness.mul(0.7))
     const husk = mix(green.mul(vec3(1.15, 1.2, 0.9)), u.dryColor.mul(1.05), smoothstep(0.84, 0.97, st.g))
     const silk = mix(vec3(0.62, 0.6, 0.3), vec3(0.32, 0.19, 0.1), smoothstep(0.58, 0.72, st.g))
-    const c = leaf.mul(isLeaf).add(stalk.mul(isStalk)).add(tassel.mul(isTassel)).add(husk.mul(isEar)).add(silk.mul(isSilk)).toVar()
+    const c = leaf
+      .mul(isLeaf)
+      .add(stalk.mul(isStalk))
+      .add(tassel.mul(isTassel))
+      .add(husk.mul(isEar))
+      .add(silk.mul(isSilk))
+      .toVar()
     // Per-plant and field-scale variation.
     c.mulAssign(float(1).add(vField.z.mul(u.colorVariation).mul(float(1).sub(farness.mul(0.6)))))
     c.mulAssign(float(1).add(vField.x.mul(0.16)))
@@ -271,7 +360,18 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
     const underside = step(dot(normalize(vNormal), viewDir), 0).mul(isLeaf)
     c.assign(mix(c, c.mul(vec3(1.2, 1.28, 1.3)).add(0.012), underside.mul(0.55)))
     // Far away the thin tassels are gone; their tan haze tints the top leaves instead.
-    c.assign(mix(c, u.tasselColor.mul(0.75), isLeaf.mul(smoothstep(0.75, 1, t)).mul(farness).mul(st.tassel).mul(float(1).sub(st.dry)).mul(0.25)))
+    c.assign(
+      mix(
+        c,
+        u.tasselColor.mul(0.75),
+        isLeaf
+          .mul(smoothstep(0.75, 1, t))
+          .mul(farness)
+          .mul(st.tassel)
+          .mul(float(1).sub(st.dry))
+          .mul(0.25)
+      )
+    )
     // Crushed corn: darker, browner, broken.
     c.assign(mix(c, c.mul(vec3(0.62, 0.55, 0.42)).add(u.dryColor.mul(0.12)), vInfo.z.mul(0.75)))
     // A closed canopy is dark inside.
@@ -285,7 +385,10 @@ export function createCornMaterial(u: CornUniforms, detail: number) {
     const viewDir = normalize(cameraPosition.sub(positionWorld))
     const back = pow(max(dot(viewDir, u.sunDirection.negate()), 0), 4)
     const leaf = mix(st.green, u.dryColor, vInfo.y)
-    return leaf.mul(u.sunColor).mul(back.mul(u.translucency).mul(0.15).mul(isLeaf).mul(vInfo.x)).mul(float(1).sub(u.debugLods))
+    return leaf
+      .mul(u.sunColor)
+      .mul(back.mul(u.translucency).mul(0.15).mul(isLeaf).mul(vInfo.x))
+      .mul(float(1).sub(u.debugLods))
   })
 
   const material = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.6, metalness: 0 })
@@ -317,10 +420,18 @@ export function createCanopyMaterial(u: CornUniforms) {
   const density = lodDensity(u, dist)
   // The canopy rises as plants start thinning (so the upper leaves of the survivors poke out of it) and is the
   // whole field past the last plant LOD, where plants sink into it as they fade.
-  const lift = max(smoothstep(u.lodDistances.x, u.lodDistances.y, dist).mul(0.85).mul(float(1).sub(density.mul(0.15))), smoothstep(u.lodDistances.w.mul(0.6), u.lodDistances.w, dist))
+  const lift = max(
+    smoothstep(u.lodDistances.x, u.lodDistances.y, dist)
+      .mul(0.85)
+      .mul(float(1).sub(density.mul(0.15))),
+    smoothstep(u.lodDistances.w.mul(0.6), u.lodDistances.w, dist)
+  )
   const top = mix(u.height.mul(0.8).mul(mix(0.06, 1, st.grow)), float(0.04), u.harvested)
   // Ragged field edge: plants along the outline stand at uneven heights (wall tops and outline vertices).
-  const ragged = mx_noise_float(ground.xz.mul(1.3)).mul(0.14).add(mx_noise_float(ground.xz.mul(4.1)).mul(0.06)).add(0.97)
+  const ragged = mx_noise_float(ground.xz.mul(1.3))
+    .mul(0.14)
+    .add(mx_noise_float(ground.xz.mul(4.1)).mul(0.06))
+    .add(0.97)
 
   const vCanopy = varyingProperty('vec4', 'vCanopy') // lift, flattened, rows, along
   const vFall = varyingProperty('vec2', 'vCanopyFall')
@@ -363,7 +474,10 @@ export function createCanopyMaterial(u: CornUniforms) {
     const streaks = mx_noise_float(leaf1).mul(0.3).mul(fade1).add(mx_noise_float(leaf2).mul(0.2).mul(fade2))
     const foliage = mix(green, u.dryColor, st.dry).mul(float(1).add(streaks)).toVar()
     // Tassels: a tan haze over a mature canopy seen from above, stronger at grazing angles.
-    const haze = st.tassel.mul(float(1).sub(st.dry)).mul(oblique.mul(0.06).add(0.05)).mul(smoothstep(0.7, 1, lifted))
+    const haze = st.tassel
+      .mul(float(1).sub(st.dry))
+      .mul(oblique.mul(0.06).add(0.05))
+      .mul(smoothstep(0.7, 1, lifted))
     foliage.assign(mix(foliage, u.tasselColor.mul(0.6), haze))
 
     // Rows: plants cover `cover` of each row spacing from above, the rest is soil (young or harvested fields) or
@@ -375,9 +489,14 @@ export function createCanopyMaterial(u: CornUniforms) {
     const e = max(w, 0.02)
     const sharp = float(1).sub(smoothstep(cover.mul(0.5).sub(e), cover.mul(0.5).add(e), q))
     const rowMask = mix(sharp, clamp(cover, 0, 1), smoothstep(0.2, 0.55, w))
-    const ridge = cos(fract(rows).sub(0.5).mul(6.2832)).mul(float(1).sub(smoothstep(0.12, 0.45, w))).mul(0.06).mul(st.closure)
+    const ridge = cos(fract(rows).sub(0.5).mul(6.2832))
+      .mul(float(1).sub(smoothstep(0.12, 0.45, w)))
+      .mul(0.06)
+      .mul(st.closure)
     const plants = mix(foliage, mix(u.dryColor, green, 0.15).mul(0.8), u.harvested)
-    const fromAbove = mix(soil, plants.mul(float(1).add(ridge)), rowMask).mul(float(1).sub(alongRows.mul(alongRows).mul(0.16)))
+    const fromAbove = mix(soil, plants.mul(float(1).add(ridge)), rowMask).mul(
+      float(1).sub(alongRows.mul(alongRows).mul(0.16))
+    )
     // Planter passes (12 rows wide): each pass a slightly different shade, with a faint overlap line between
     // passes; both read more strongly looking along the rows. Faded out once a pass shrinks below a pixel.
     const passes = rows.div(12)
@@ -386,7 +505,9 @@ export function createCanopyMaterial(u: CornUniforms) {
     const blend = smoothstep(0, 0.08, fract(passes))
     const shadeOf = (k: any) => fract(sin(k.mul(12.9898).add(aField.z.mul(78.233))).mul(43758.5453)).sub(0.5)
     const passShade = mix(shadeOf(pass.sub(1)), shadeOf(pass), blend).mul(0.12)
-    const overlap = float(1).sub(smoothstep(0.01, 0.04, min(fract(passes), float(1).sub(fract(passes))))).mul(-0.07)
+    const overlap = float(1)
+      .sub(smoothstep(0.01, 0.04, min(fract(passes), float(1).sub(fract(passes)))))
+      .mul(-0.07)
     const passTint = float(1).add(passShade.add(overlap).mul(alongRows.mul(0.6).add(0.4)).mul(passFade))
     // Per-field shade (variety, planting date).
     const fieldShade = float(1).add(aField.z.mul(0.08))
@@ -402,8 +523,12 @@ export function createCanopyMaterial(u: CornUniforms) {
     const leaves = vec2(along.mul(2.2), hgt.mul(2.4)).add(5.7)
     const colFade = float(1).sub(smoothstep(0.2, 0.7, length(fwidth(cols))))
     const leafFade = float(1).sub(smoothstep(0.2, 0.7, length(fwidth(leaves))))
-    const wallTex = float(1).add(mx_noise_float(cols).mul(0.35).mul(colFade)).add(mx_noise_float(leaves).mul(0.3).mul(leafFade))
-    const side = mix(green, u.dryColor, st.dry).mul(mix(float(0.25), float(0.8), pow(aCanopy.w, 0.7))).mul(wallTex)
+    const wallTex = float(1)
+      .add(mx_noise_float(cols).mul(0.35).mul(colFade))
+      .add(mx_noise_float(leaves).mul(0.3).mul(leafFade))
+    const side = mix(green, u.dryColor, st.dry)
+      .mul(mix(float(0.25), float(0.8), pow(aCanopy.w, 0.7)))
+      .mul(wallTex)
     c.assign(mix(c, side, wall))
 
     // Flattened corn: crushed, browner stalks lying along the direction of travel, soil showing between them,
@@ -414,7 +539,16 @@ export function createCanopyMaterial(u: CornUniforms) {
     const tangle = mx_noise_float(stalkCoord).mul(0.5).add(0.5)
     const stalkCover = mix(float(0.6), smoothstep(0.3, 0.6, tangle), stalkFade)
     const crushed = mix(u.soilColor.mul(0.8), mix(green.mul(0.5), u.dryColor.mul(0.55), 0.55), stalkCover)
-    c.assign(mix(c, crushed, flat.mul(smoothstep(0.3, 1, lifted)).mul(noHarvest).mul(float(1).sub(wall))))
+    c.assign(
+      mix(
+        c,
+        crushed,
+        flat
+          .mul(smoothstep(0.3, 1, lifted))
+          .mul(noHarvest)
+          .mul(float(1).sub(wall))
+      )
+    )
     c.mulAssign(float(1).sub(flat.mul(float(1).sub(flat)).mul(4).mul(0.35).mul(lifted)))
     c.mulAssign(float(1).add(vField.x.mul(0.16)))
     c.assign(mix(c, c.mul(vec3(1.18, 1.08, 0.7)), vField.y.mul(0.3)))
@@ -422,7 +556,12 @@ export function createCanopyMaterial(u: CornUniforms) {
     return vec4(mix(c, debug, u.debugLods), 1)
   })
 
-  const material = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.8, metalness: 0, specularIntensity: 0.05 })
+  const material = new MeshPhysicalNodeMaterial({
+    side: DoubleSide,
+    roughness: 0.8,
+    metalness: 0,
+    specularIntensity: 0.05
+  })
   material.positionNode = position()
   material.colorNode = albedo()
   material.normalNode = transformNormalToView(normalize(normalGeometry).mul(faceDirection))

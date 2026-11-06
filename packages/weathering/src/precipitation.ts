@@ -1,5 +1,30 @@
-import { Color, Group, Mesh, MeshBasicNodeMaterial, Vector3, type Camera, type InstancedBufferAttribute, type InstancedBufferGeometry, type Node } from 'three/webgpu'
-import { abs, cos, float, floor, instancedBufferAttribute, length, normalize, positionGeometry, sin, smoothstep, uniform, uv, varying, vec3 } from 'three/tsl'
+import {
+  Color,
+  Group,
+  Mesh,
+  MeshBasicNodeMaterial,
+  Vector3,
+  type Camera,
+  type InstancedBufferAttribute,
+  type InstancedBufferGeometry,
+  type Node
+} from 'three/webgpu'
+import {
+  abs,
+  cos,
+  float,
+  floor,
+  instancedBufferAttribute,
+  length,
+  normalize,
+  positionGeometry,
+  sin,
+  smoothstep,
+  uniform,
+  uv,
+  varying,
+  vec3
+} from 'three/tsl'
 import { hash01, seedOf } from 'threejs-biomes'
 import { createWeatherSample, type Weather, type WeatherSample } from './weather.ts'
 import { axisBillboard, createQuadInstances, sphereBillboard } from './particles.ts'
@@ -108,7 +133,7 @@ export const DEFAULT_PRECIPITATION: PrecipitationOptions = {
   rain: { speed: 8.5, width: 0.012, shutter: 0.06, color: '#c9d3de', opacity: 0.32 },
   snow: { speed: 1.1, size: 0.035, flutter: 0.35, color: '#ffffff', opacity: 0.9 },
   splashes: { enabled: true, count: 700, radius: 16, size: 0.22, lifetime: 0.35, opacity: 0.45 },
-  override: null,
+  override: null
 }
 
 /** Construction options for {@link Precipitation}: settings plus the objects it works with. */
@@ -170,7 +195,7 @@ export class Precipitation {
     /** Snow colour. */ snowColor: uniform(new Color()),
     /** Snow opacity. */ snowOpacity: uniform(0.9),
     /** Splash size. */ splashSize: uniform(0.2),
-    /** Splash opacity. */ splashOpacity: uniform(0.4),
+    /** Splash opacity. */ splashOpacity: uniform(0.4)
   }
 
   private origin: [number, number, number] = [0, 0, 0]
@@ -254,7 +279,9 @@ export class Precipitation {
     const o = this.options
     const u = this.uniforms
     const cam = this.camera.getWorldPosition(_v)
-    const fx = cam.x + this.origin[0], fy = cam.y + this.origin[1], fz = cam.z + this.origin[2]
+    const fx = cam.x + this.origin[0],
+      fy = cam.y + this.origin[1],
+      fz = cam.z + this.origin[2]
     const s = this.sample
     if (o.override) {
       s.precipitation = o.override.precipitation
@@ -297,8 +324,10 @@ export class Precipitation {
       const cycle = Math.floor(t / period)
       if (this.splashCycle[i] !== cycle) {
         this.splashCycle[i] = cycle
-        const a = hash01(i, cycle, seed, 1) * Math.PI * 2, r = Math.sqrt(hash01(i, cycle, seed, 2)) * o.radius
-        const x = fx + Math.cos(a) * r, z = fz + Math.sin(a) * r
+        const a = hash01(i, cycle, seed, 1) * Math.PI * 2,
+          r = Math.sqrt(hash01(i, cycle, seed, 2)) * o.radius
+        const x = fx + Math.cos(a) * r,
+          z = fz + Math.sin(a) * r
         this.splashPos[i * 3] = x
         this.splashPos[i * 3 + 1] = this.ground!(x, z)
         this.splashPos[i * 3 + 2] = z
@@ -316,9 +345,20 @@ export class Precipitation {
   // Box-wrapped particle position relative to the camera, and an edge fade.
   private particle(rand: Node<'vec4'>, velocity: Node<'vec3'>, extra: Node<'vec3'> = vec3(0)) {
     const u = this.uniforms
-    const p = rand.xyz.mul(u.box).add(vec3(0, velocity.y, 0).mul(u.cycle)).add(u.drift).sub(u.anchor)
-    const rel = p.sub(u.box.mul(floor(p.div(u.box)))).sub(u.box.mul(0.5)).add(extra)
-    const fade = varying(smoothstep(u.box.x.mul(0.5), u.box.x.mul(0.3), length(rel.xz)).mul(smoothstep(u.box.y.mul(0.5), u.box.y.mul(0.35), abs(rel.y))))
+    const p = rand.xyz
+      .mul(u.box)
+      .add(vec3(0, velocity.y, 0).mul(u.cycle))
+      .add(u.drift)
+      .sub(u.anchor)
+    const rel = p
+      .sub(u.box.mul(floor(p.div(u.box))))
+      .sub(u.box.mul(0.5))
+      .add(extra)
+    const fade = varying(
+      smoothstep(u.box.x.mul(0.5), u.box.x.mul(0.3), length(rel.xz)).mul(
+        smoothstep(u.box.y.mul(0.5), u.box.y.mul(0.35), abs(rel.y))
+      )
+    )
     return { center: u.camera.add(rel), fade }
   }
 
@@ -326,14 +366,27 @@ export class Precipitation {
     const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
     m.name = 'Rain'
     const u = this.uniforms
-    const rand = instancedBufferAttribute(geometry.getAttribute('aRand') as InstancedBufferAttribute, 'vec4') as Node<'vec4'>
+    const rand = instancedBufferAttribute(
+      geometry.getAttribute('aRand') as InstancedBufferAttribute,
+      'vec4'
+    ) as Node<'vec4'>
     const speed = u.rainSpeed.mul(rand.w.mul(0.3).add(0.85))
     const velocity = vec3(u.wind.x, speed.negate(), u.wind.z)
     const { center, fade } = this.particle(rand, velocity)
-    m.positionNode = axisBillboard(center, normalize(velocity), positionGeometry, u.rainWidth, length(velocity).mul(u.shutter))
+    m.positionNode = axisBillboard(
+      center,
+      normalize(velocity),
+      positionGeometry,
+      u.rainWidth,
+      length(velocity).mul(u.shutter)
+    )
     const across = float(1).sub(abs(uv().x.mul(2).sub(1)))
     m.colorNode = u.rainColor
-    m.opacityNode = u.rainOpacity.mul(fade).mul(across).mul(smoothstep(0, 0.4, uv().y)).mul(smoothstep(1, 0.6, uv().y))
+    m.opacityNode = u.rainOpacity
+      .mul(fade)
+      .mul(across)
+      .mul(smoothstep(0, 0.4, uv().y))
+      .mul(smoothstep(1, 0.6, uv().y))
     return m
   }
 
@@ -341,13 +394,20 @@ export class Precipitation {
     const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
     m.name = 'Snow'
     const u = this.uniforms
-    const rand = instancedBufferAttribute(geometry.getAttribute('aRand') as InstancedBufferAttribute, 'vec4') as Node<'vec4'>
+    const rand = instancedBufferAttribute(
+      geometry.getAttribute('aRand') as InstancedBufferAttribute,
+      'vec4'
+    ) as Node<'vec4'>
     const velocity = vec3(u.wind.x, u.snowSpeed.mul(rand.w.mul(0.6).add(0.7)).negate(), u.wind.z)
-    const flutter = vec3(sin(u.cycle.mul(1.3).add(rand.x.mul(40))), 0, cos(u.cycle.mul(1.1).add(rand.z.mul(40)))).mul(u.flutter)
+    const flutter = vec3(sin(u.cycle.mul(1.3).add(rand.x.mul(40))), 0, cos(u.cycle.mul(1.1).add(rand.z.mul(40)))).mul(
+      u.flutter
+    )
     const { center, fade } = this.particle(rand, velocity, flutter)
     m.positionNode = sphereBillboard(center, positionGeometry, u.snowSize.mul(rand.y.mul(0.8).add(0.6)))
     m.colorNode = u.snowColor
-    m.opacityNode = smoothstep(0.5, 0.15, length(uv().sub(0.5))).mul(u.snowOpacity).mul(fade)
+    m.opacityNode = smoothstep(0.5, 0.15, length(uv().sub(0.5)))
+      .mul(u.snowOpacity)
+      .mul(fade)
     return m
   }
 
@@ -355,10 +415,15 @@ export class Precipitation {
     const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false })
     m.name = 'Splashes'
     const u = this.uniforms
-    const data = instancedBufferAttribute(geometry.getAttribute('aData') as InstancedBufferAttribute, 'vec4') as Node<'vec4'>
+    const data = instancedBufferAttribute(
+      geometry.getAttribute('aData') as InstancedBufferAttribute,
+      'vec4'
+    ) as Node<'vec4'>
     const age = data.w
     const corner = positionGeometry
-    m.positionNode = data.xyz.add(vec3(corner.x, 0, corner.y).mul(u.splashSize.mul(age.mul(0.8).add(0.3)))).add(vec3(0, 0.02, 0))
+    m.positionNode = data.xyz
+      .add(vec3(corner.x, 0, corner.y).mul(u.splashSize.mul(age.mul(0.8).add(0.3))))
+      .add(vec3(0, 0.02, 0))
     const d = length(uv().sub(0.5)).mul(2)
     const ring = smoothstep(0.55, 0.85, d).mul(smoothstep(1, 0.85, d))
     m.colorNode = u.rainColor

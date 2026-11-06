@@ -30,12 +30,18 @@ type TerrainProp = Terrain | RefObject<Object3D | null> | undefined
 function useTerrain(terrain: TerrainProp) {
   const latest = useRef(terrain)
   latest.current = terrain
-  const height: HeightFn = useMemo(() => (x, z) => {
-    const t = latest.current
-    return typeof t === 'function' ? t(x, z) : NaN
-  }, [])
+  const height: HeightFn = useMemo(
+    () => (x, z) => {
+      const t = latest.current
+      return typeof t === 'function' ? t(x, z) : NaN
+    },
+    []
+  )
   // A ref's identity never changes, so key the field on the prop value, not the resolved object.
-  return { source: typeof terrain === 'function' ? height : terrain, key: typeof terrain === 'function' ? null : terrain }
+  return {
+    source: typeof terrain === 'function' ? height : terrain,
+    key: typeof terrain === 'function' ? null : terrain
+  }
 }
 
 /** Props of the `<Grass>` component: every {@link GrassInput} setting plus the ones below. */
@@ -79,7 +85,12 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
   useEffect(() => {
     let created: GrassImpl | null = null
     let cancelled = false
-    GrassImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: terrainSource.source, ...latest.current }).then((g) => {
+    GrassImpl.create({
+      camera: activeCamera,
+      renderer: gl as unknown as GrassRenderer,
+      terrain: terrainSource.source,
+      ...latest.current
+    }).then((g) => {
       if (cancelled) return g.dispose()
       created = g
       setGrass(g)
@@ -149,7 +160,12 @@ export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX
   useEffect(() => {
     let created: CornImpl | null = null
     let cancelled = false
-    CornImpl.create({ camera: activeCamera, renderer: gl as unknown as GrassRenderer, terrain: terrainSource.source, ...latest.current }).then((c) => {
+    CornImpl.create({
+      camera: activeCamera,
+      renderer: gl as unknown as GrassRenderer,
+      terrain: terrainSource.source,
+      ...latest.current
+    }).then((c) => {
       if (cancelled) return c.dispose()
       created = c
       setCorn(c)

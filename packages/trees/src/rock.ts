@@ -37,19 +37,73 @@ export type RockName = 'boulder' | 'rock' | 'pebble' | 'scree' | 'cliffChunk'
 
 /** Parameters every rock starts from. */
 export const DEFAULT_ROCK_PARAMS: RockParams = {
-  size: 1.2, elongation: 1.2, flatness: 0.25, roughness: 0.18, facets: 0.12, noiseScale: 1.6, detail: 3, baseCut: 0.25,
-  color: '#7c776f', colorVariation: 0.2, moss: 0, mossColor: '#56662f', spacing: 6,
+  size: 1.2,
+  elongation: 1.2,
+  flatness: 0.25,
+  roughness: 0.18,
+  facets: 0.12,
+  noiseScale: 1.6,
+  detail: 3,
+  baseCut: 0.25,
+  color: '#7c776f',
+  colorVariation: 0.2,
+  moss: 0,
+  mossColor: '#56662f',
+  spacing: 6
 }
 
 const r = (o: Partial<RockParams>): RockParams => ({ ...DEFAULT_ROCK_PARAMS, ...o })
 
 /** Tuned rock presets. */
 export const rocks: Record<RockName, RockParams> = {
-  boulder: r({ size: 3, elongation: 1.3, flatness: 0.2, roughness: 0.2, facets: 0.14, detail: 4, baseCut: 0.3, moss: 0.35, spacing: 18 }),
+  boulder: r({
+    size: 3,
+    elongation: 1.3,
+    flatness: 0.2,
+    roughness: 0.2,
+    facets: 0.14,
+    detail: 4,
+    baseCut: 0.3,
+    moss: 0.35,
+    spacing: 18
+  }),
   rock: r({}),
-  pebble: r({ size: 0.25, elongation: 1.4, flatness: 0.45, roughness: 0.08, facets: 0.04, detail: 2, baseCut: 0.15, color: '#8a857c', spacing: 0.9 }),
-  scree: r({ size: 0.6, elongation: 1.5, flatness: 0.35, roughness: 0.12, facets: 0.3, noiseScale: 2.2, detail: 2, baseCut: 0.2, color: '#77736d', spacing: 1.6 }),
-  cliffChunk: r({ size: 7, elongation: 1.6, flatness: 0.1, roughness: 0.25, facets: 0.28, noiseScale: 2, detail: 4, baseCut: 0.35, color: '#6e6a63', moss: 0.15, spacing: 30 }),
+  pebble: r({
+    size: 0.25,
+    elongation: 1.4,
+    flatness: 0.45,
+    roughness: 0.08,
+    facets: 0.04,
+    detail: 2,
+    baseCut: 0.15,
+    color: '#8a857c',
+    spacing: 0.9
+  }),
+  scree: r({
+    size: 0.6,
+    elongation: 1.5,
+    flatness: 0.35,
+    roughness: 0.12,
+    facets: 0.3,
+    noiseScale: 2.2,
+    detail: 2,
+    baseCut: 0.2,
+    color: '#77736d',
+    spacing: 1.6
+  }),
+  cliffChunk: r({
+    size: 7,
+    elongation: 1.6,
+    flatness: 0.1,
+    roughness: 0.25,
+    facets: 0.28,
+    noiseScale: 2,
+    detail: 4,
+    baseCut: 0.35,
+    color: '#6e6a63',
+    moss: 0.15,
+    spacing: 30
+  })
 }
 
 /**
@@ -116,7 +170,10 @@ export function generateRock(params: Partial<RockParams>, seed = 1): BufferGeome
     uvs[i * 2] = 0.5 + Math.atan2(unit[i * 3 + 2], unit[i * 3]) / (2 * Math.PI)
     uvs[i * 2 + 1] = 0.5 + Math.asin(Math.max(-1, Math.min(1, unit[i * 3 + 1]))) / Math.PI
     const up = normals[i * 3 + 1]
-    const m = p.moss * smooth(0.35, 0.8, up) * smooth(0.35, 0.65, fbm3(unit[i * 3] * 4, unit[i * 3 + 1] * 4, unit[i * 3 + 2] * 4, salt + 2, 3))
+    const m =
+      p.moss *
+      smooth(0.35, 0.8, up) *
+      smooth(0.35, 0.65, fbm3(unit[i * 3] * 4, unit[i * 3 + 1] * 4, unit[i * 3 + 2] * 4, salt + 2, 3))
     // Darker towards the ground (soil, damp), lighter on top (weathered).
     const ao = 0.7 + 0.3 * Math.min(1, pos[i * 3 + 1] / (p.size * 0.25 + 1e-3))
     for (let k = 0; k < 3; k++) colors[i * 3 + k] = (base[k] * (1 - m) + moss[k] * m) * shade[i] * ao
@@ -147,15 +204,36 @@ export function icosphere(level: number): { positions: number[]; indices: number
     positions.push(x / l, y / l, z / l)
     return positions.length / 3 - 1
   }
-  for (const [x, y, z] of [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]]) add(x, y, z)
-  let faces = [0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1]
+  for (const [x, y, z] of [
+    [-1, t, 0],
+    [1, t, 0],
+    [-1, -t, 0],
+    [1, -t, 0],
+    [0, -1, t],
+    [0, 1, t],
+    [0, -1, -t],
+    [0, 1, -t],
+    [t, 0, -1],
+    [t, 0, 1],
+    [-t, 0, -1],
+    [-t, 0, 1]
+  ])
+    add(x, y, z)
+  let faces = [
+    0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2,
+    3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1
+  ]
   for (let l = 0; l < level; l++) {
     const cache = new Map<number, number>()
     const mid = (a: number, b: number) => {
       const key = a < b ? a * 1e6 + b : b * 1e6 + a
       let m = cache.get(key)
       if (m === undefined) {
-        m = add(positions[a * 3] + positions[b * 3], positions[a * 3 + 1] + positions[b * 3 + 1], positions[a * 3 + 2] + positions[b * 3 + 2])
+        m = add(
+          positions[a * 3] + positions[b * 3],
+          positions[a * 3 + 1] + positions[b * 3 + 1],
+          positions[a * 3 + 2] + positions[b * 3 + 2]
+        )
         cache.set(key, m)
       }
       return m
@@ -179,15 +257,25 @@ function vertexNormals(pos: Float32Array, indices: number[]): Float32Array {
     const a = indices[f] * 3
     const b = indices[f + 1] * 3
     const c = indices[f + 2] * 3
-    const e1x = pos[b] - pos[a], e1y = pos[b + 1] - pos[a + 1], e1z = pos[b + 2] - pos[a + 2]
-    const e2x = pos[c] - pos[a], e2y = pos[c + 1] - pos[a + 1], e2z = pos[c + 2] - pos[a + 2]
+    const e1x = pos[b] - pos[a],
+      e1y = pos[b + 1] - pos[a + 1],
+      e1z = pos[b + 2] - pos[a + 2]
+    const e2x = pos[c] - pos[a],
+      e2y = pos[c + 1] - pos[a + 1],
+      e2z = pos[c + 2] - pos[a + 2]
     // Area-weighted face normal, accumulated on its three corners.
     const nx = e1y * e2z - e1z * e2y
     const ny = e1z * e2x - e1x * e2z
     const nz = e1x * e2y - e1y * e2x
-    nrm[a] += nx; nrm[a + 1] += ny; nrm[a + 2] += nz
-    nrm[b] += nx; nrm[b + 1] += ny; nrm[b + 2] += nz
-    nrm[c] += nx; nrm[c + 1] += ny; nrm[c + 2] += nz
+    nrm[a] += nx
+    nrm[a + 1] += ny
+    nrm[a + 2] += nz
+    nrm[b] += nx
+    nrm[b + 1] += ny
+    nrm[b + 2] += nz
+    nrm[c] += nx
+    nrm[c + 1] += ny
+    nrm[c + 2] += nz
   }
   for (let i = 0; i < nrm.length; i += 3) {
     const l = Math.hypot(nrm[i], nrm[i + 1], nrm[i + 2]) || 1
@@ -214,7 +302,7 @@ function valueNoise3(x: number, y: number, z: number, seed: number): number {
   return lerp(
     lerp(lerp(h(0, 0, 0), h(1, 0, 0), sx), lerp(h(0, 1, 0), h(1, 1, 0), sx), sy),
     lerp(lerp(h(0, 0, 1), h(1, 0, 1), sx), lerp(h(0, 1, 1), h(1, 1, 1), sx), sy),
-    sz,
+    sz
   )
 }
 
@@ -235,7 +323,13 @@ export function fbm3(x: number, y: number, z: number, seed: number, octaves = 4)
 }
 
 /** Seeded 3D Worley (cellular) noise: distances to the nearest and second-nearest feature points (written into `out`). */
-export function worley3(x: number, y: number, z: number, seed: number, out: [number, number] = [0, 0]): [f1: number, f2: number] {
+export function worley3(
+  x: number,
+  y: number,
+  z: number,
+  seed: number,
+  out: [number, number] = [0, 0]
+): [f1: number, f2: number] {
   const xi = Math.floor(x)
   const yi = Math.floor(y)
   const zi = Math.floor(z)

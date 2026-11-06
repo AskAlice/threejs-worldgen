@@ -1,7 +1,22 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { EmitterClock, SOURCE_STRIDE, createSourceTable, fillSourceTable, particleRandom, pcg, pickSource, spawnRate } from '../src/emitter.ts'
-import { DEFAULT_PARTICLES, CURVE_KEYS, resolveParticleOptions, sanitizeParticleOptions, seedOf } from '../src/options.ts'
+import {
+  EmitterClock,
+  SOURCE_STRIDE,
+  createSourceTable,
+  fillSourceTable,
+  particleRandom,
+  pcg,
+  pickSource,
+  spawnRate
+} from '../src/emitter.ts'
+import {
+  DEFAULT_PARTICLES,
+  CURVE_KEYS,
+  resolveParticleOptions,
+  sanitizeParticleOptions,
+  seedOf
+} from '../src/options.ts'
 import { evalCurve, resampleCurve } from '../src/curves.ts'
 import { blackbodyColor, blackbodyRadiance } from '../src/blackbody.ts'
 import { bakeNoiseVolume } from '../src/noise.ts'
@@ -19,7 +34,10 @@ test('emitter clock: same total time, same particles, however the frames split',
   assert.equal(even.head, 240)
   // Serials are contiguous: each batch starts where the last ended.
   let next = 0
-  for (const b of even.batches) { assert.equal(b.first, next); next += b.count }
+  for (const b of even.batches) {
+    assert.equal(b.first, next)
+    next += b.count
+  }
 })
 
 test('emitter clock: the ring wraps, and a capped frame drops its backlog', () => {
@@ -42,9 +60,30 @@ test('spawn rate scales with source weight and never overruns the pool', () => {
 
 test('sources: weighted picks follow the weights; overflow keeps the heaviest', () => {
   const src = new Float32Array([
-    0, 0, 0, 1, 1, 0, 0, 1,
-    5, 0, 0, 0, 1, 0, 0, 1, // zero weight: skipped
-    9, 0, 0, 3, 2, 0, 0, 1,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    1,
+    5,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1, // zero weight: skipped
+    9,
+    0,
+    0,
+    3,
+    2,
+    0,
+    0,
+    1
   ])
   const t = fillSourceTable(createSourceTable(8), src)
   assert.equal(t.count, 2)
@@ -65,14 +104,22 @@ test('sources: weighted picks follow the weights; overflow keeps the heaviest', 
   const motion = new Float32Array([1, 2, 3, 0.5, 0, 0, 0, 0, 4, 5, 6, 0.25])
   const moving = fillSourceTable(createSourceTable(8), src, undefined, motion)
   assert.deepEqual([...moving.motion.subarray(0, 8)], [1, 2, 3, 0.5, 4, 5, 6, 0.25])
-  assert.deepEqual([...fillSourceTable(createSourceTable(1), src, undefined, motion).motion.subarray(0, 4)], [4, 5, 6, 0.25])
+  assert.deepEqual(
+    [...fillSourceTable(createSourceTable(1), src, undefined, motion).motion.subarray(0, 4)],
+    [4, 5, 6, 0.25]
+  )
   // Refreshing every frame reuses the table's scratch list, and overflow still keeps the heaviest in order.
   const order = small.order
   fillSourceTable(small, src)
   assert.equal(small.order, order)
-  const many = new Float32Array(Array.from({ length: 6 }, (_, i) => [i, 0, 0, [1, 5, 2, 5, 3, 0][i], 0, 0, 0, 1]).flat())
+  const many = new Float32Array(
+    Array.from({ length: 6 }, (_, i) => [i, 0, 0, [1, 5, 2, 5, 3, 0][i], 0, 0, 0, 1]).flat()
+  )
   const three = fillSourceTable(createSourceTable(3), many)
-  assert.deepEqual([...three.positions.subarray(0, 12)].filter((_, k) => k % 4 === 0), [1, 3, 4])
+  assert.deepEqual(
+    [...three.positions.subarray(0, 12)].filter((_, k) => k % 4 === 0),
+    [1, 3, 4]
+  )
 })
 
 test('per-particle random numbers are seeded, in [0, 1) and well spread', () => {
@@ -104,10 +151,13 @@ test('lifetime curves: evenly spaced keys, clamped, resampled for the GPU', () =
 
 test('option sanitizing: bad input from a GUI or URL falls back to safe values', () => {
   const o = resolveParticleOptions({
-    capacity: -5, rate: Number.NaN, life: [9, 2], maxPerFrame: 1e9,
+    capacity: -5,
+    rate: Number.NaN,
+    life: [9, 2],
+    maxPerFrame: 1e9,
     emitter: { shape: 'cube' as never, spread: -1, temperature: [0, -4] },
     curves: { size: [], opacity: [1, 'x' as never, 0], color: ['red', '#ff0000'] },
-    render: { shading: 'plasma' as never, blending: 'multiply' as never, shadowSteps: 99, anisotropy: 2 },
+    render: { shading: 'plasma' as never, blending: 'multiply' as never, shadowSteps: 99, anisotropy: 2 }
   })
   assert.equal(o.capacity, 1)
   assert.equal(o.rate, DEFAULT_PARTICLES.rate)
@@ -132,7 +182,9 @@ test('option sanitizing: bad input from a GUI or URL falls back to safe values',
 })
 
 test('blackbody: deep red when cool, near-white at the core, radiance ∝ T⁴', () => {
-  const red = blackbodyColor(900), orange = blackbodyColor(1300), white = blackbodyColor(6500)
+  const red = blackbodyColor(900),
+    orange = blackbodyColor(1300),
+    white = blackbodyColor(6500)
   assert.equal(red[0], 1)
   assert.ok(red[1] < 0.35 && red[2] < 0.05, `900 K ${red}`)
   assert.ok(orange[1] > red[1] && orange[1] < 0.7, `1300 K ${orange}`)
@@ -142,18 +194,26 @@ test('blackbody: deep red when cool, near-white at the core, radiance ∝ T⁴',
 
 test('noise volume: deterministic, tileable, spans the byte range', () => {
   const n = 16
-  const a = bakeNoiseVolume(n, 3, 3, 4), b = bakeNoiseVolume(n, 3, 3, 4)
+  const a = bakeNoiseVolume(n, 3, 3, 4),
+    b = bakeNoiseVolume(n, 3, 3, 4)
   assert.deepEqual(a, b)
   assert.notDeepEqual(a, bakeNoiseVolume(n, 4, 3, 4))
   // Tileable: the lattice wraps, so the last texel is close to its neighbour across the seam.
-  const at = (x: number, y: number, z: number, c: number) => a[((((z + n) % n) * n + ((y + n) % n)) * n + ((x + n) % n)) * 4 + c]
-  let seam = 0, inner = 0
-  for (let y = 0; y < n; y++) for (let z = 0; z < n; z++) {
-    seam += Math.abs(at(n - 1, y, z, 0) - at(0, y, z, 0))
-    inner += Math.abs(at(5, y, z, 0) - at(6, y, z, 0))
-  }
+  const at = (x: number, y: number, z: number, c: number) =>
+    a[((((z + n) % n) * n + ((y + n) % n)) * n + ((x + n) % n)) * 4 + c]
+  let seam = 0,
+    inner = 0
+  for (let y = 0; y < n; y++)
+    for (let z = 0; z < n; z++) {
+      seam += Math.abs(at(n - 1, y, z, 0) - at(0, y, z, 0))
+      inner += Math.abs(at(5, y, z, 0) - at(6, y, z, 0))
+    }
   assert.ok(seam < inner * 1.6, `seam ${seam} vs inner ${inner}`)
-  let lo = 255, hi = 0
-  for (let i = 3; i < a.length; i += 4) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]) }
+  let lo = 255,
+    hi = 0
+  for (let i = 3; i < a.length; i += 4) {
+    lo = Math.min(lo, a[i])
+    hi = Math.max(hi, a[i])
+  }
   assert.ok(hi - lo > 100)
 })

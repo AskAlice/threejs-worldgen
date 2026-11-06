@@ -8,8 +8,28 @@
  */
 import { BackSide, Color, Matrix3, Mesh, NodeMaterial, SphereGeometry, Vector3 } from 'three/webgpu'
 import {
-  Fn, If, Loop, cameraFar, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, dot, exp, float, fwidth, length, max, min, mix,
-  normalize, positionLocal, smoothstep, sqrt, uniform, vec3, vec4,
+  Fn,
+  If,
+  Loop,
+  cameraFar,
+  cameraPosition,
+  cameraProjectionMatrix,
+  cameraViewMatrix,
+  dot,
+  exp,
+  float,
+  fwidth,
+  length,
+  max,
+  min,
+  mix,
+  normalize,
+  positionLocal,
+  smoothstep,
+  sqrt,
+  uniform,
+  vec3,
+  vec4
 } from 'three/tsl'
 import { moonCoverage, moonRadiance } from './moon.ts'
 import { createNightLightUniforms, nightLightsNode } from './night-lights.ts'
@@ -93,7 +113,7 @@ export function createSkyUniforms() {
     /** Minimum light on the night side of the planet seen from altitude (fraction of `sunIntensity`). */
     nightFloor: uniform(0.0015),
     /** City lights on the night side. */
-    nightLights: createNightLightUniforms(),
+    nightLights: createNightLightUniforms()
   }
 }
 
@@ -160,7 +180,8 @@ export interface SkyMaterialOptions {
 /** Builds the sky colour node for view direction `d` from the shared uniforms. */
 export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps }: SkyMaterialOptions): any {
   return Fn(() => {
-    const R = u.planetRadius, Ra = R.add(u.atmosphereHeight)
+    const R = u.planetRadius,
+      Ra = R.add(u.atmosphereHeight)
     const o = u.cameraToPlanet
     const s = u.sunDirection
     const mieExt = u.mie.add(u.mieAbsorption)
@@ -175,18 +196,28 @@ export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps 
 
     // Disc edges need derivatives, which WGSL only allows outside per-pixel branches.
     const sunAng = length(d.sub(s)) // chord ≈ angle, precise for tiny discs
-    const sunCover = discs ? smoothstep(u.sunAngularRadius.add(max(fwidth(sunAng), 1e-6)), u.sunAngularRadius.sub(max(fwidth(sunAng), 1e-6)), sunAng) : float(0)
+    const sunCover = discs
+      ? smoothstep(
+          u.sunAngularRadius.add(max(fwidth(sunAng), 1e-6)),
+          u.sunAngularRadius.sub(max(fwidth(sunAng), 1e-6)),
+          sunAng
+        )
+      : float(0)
     const moon = discs ? moonCoverage(u, d) : null
 
     const color = vec3(0).toVar()
     const viewT = vec3(1).toVar()
-    const sumR = vec3(0).toVar(), sumM = vec3(0).toVar(), moonR = float(0).toVar(), moonM = float(0).toVar()
+    const sumR = vec3(0).toVar(),
+      sumM = vec3(0).toVar(),
+      moonR = float(0).toVar(),
+      moonM = float(0).toVar()
 
-    const extinctionOf = (odR: any, odM: any, odO: any) => exp(u.rayleigh.mul(odR).add(mieExt.mul(odM)).add(u.ozone.mul(odO)).negate())
+    const extinctionOf = (odR: any, odM: any, odO: any) =>
+      exp(u.rayleigh.mul(odR).add(mieExt.mul(odM)).add(u.ozone.mul(odO)).negate())
     const dens = (h: any) => ({
       r: exp(h.div(u.rayleighScaleHeight).negate()).mul(u.density),
       m: exp(h.div(u.mieScaleHeight).negate()).mul(u.density),
-      o: max(float(1).sub(h.sub(u.ozoneCenter).abs().div(u.ozoneWidth)), 0).mul(u.density),
+      o: max(float(1).sub(h.sub(u.ozoneCenter).abs().div(u.ozoneWidth)), 0).mul(u.density)
     })
     // Optical depth towards a light from `pos` (relative to the planet centre); 'lit' = 0 in the planet's shadow.
     const lightDepth = (pos: any, l: any) => {
@@ -194,55 +225,100 @@ export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps 
       const q2 = dot(pos, pos).sub(bl.mul(bl))
       const exitT = bl.negate().add(sqrt(max(Ra.mul(Ra).sub(q2), 0)))
       const lit = smoothstep(R.mul(R).mul(0.9995), R.mul(R), q2).max(bl.greaterThan(0).select(1, 0))
-      const lr = float(0).toVar(), lm = float(0).toVar(), lo = float(0).toVar()
+      const lr = float(0).toVar(),
+        lm = float(0).toVar(),
+        lo = float(0).toVar()
       const lds = exitT.div(lightSteps)
       Loop(lightSteps, ({ i }) => {
         const q = pos.add(l.mul(lds.mul(float(i).add(0.5))))
         const dd = dens(length(q).sub(R))
-        lr.addAssign(dd.r.mul(lds)); lm.addAssign(dd.m.mul(lds)); lo.addAssign(dd.o.mul(lds))
+        lr.addAssign(dd.r.mul(lds))
+        lm.addAssign(dd.m.mul(lds))
+        lo.addAssign(dd.o.mul(lds))
       })
       return { lr, lm, lo, lit }
     }
 
-    If(hA2.greaterThan(0).and(b.negate().add(sqrt(max(hA2, 0))).greaterThan(0)).and(u.density.greaterThan(0)), () => {
-      const hA = sqrt(hA2)
-      const t0 = max(b.negate().sub(hA), 0)
-      const t1 = hitsGround.select(groundT, b.negate().add(hA))
-      const ds = t1.sub(t0).div(steps)
-      const odR = float(0).toVar(), odM = float(0).toVar(), odO = float(0).toVar()
-      const md = u.moonDirection
-      Loop(steps, ({ i }) => {
-        const t = t0.add(ds.mul(float(i).add(0.5)))
-        const pos = p.add(d.mul(t.add(b))) // = o + d·t, measured from the closest point for precision
-        const r = length(pos)
-        const h = r.sub(R)
-        const dd = dens(h)
-        const dr = dd.r.mul(ds), dm = dd.m.mul(ds), dz = dd.o.mul(ds)
-        odR.addAssign(dr.mul(0.5)); odM.addAssign(dm.mul(0.5)); odO.addAssign(dz.mul(0.5))
-        const L = lightDepth(pos, s)
-        const T = extinctionOf(odR.add(L.lr), odM.add(L.lm), odO.add(L.lo)).mul(L.lit)
-        sumR.addAssign(T.mul(dr)); sumM.addAssign(T.mul(dm))
-        // Moonlight: cheap airmass estimate instead of a second light march.
-        const mu = dot(pos, md).div(r)
-        const airmass = float(1).div(max(mu, 0).add(float(0.025).mul(exp(max(mu, 0).mul(-11)))))
-        const mT = exp(u.rayleigh.y.mul(u.rayleighScaleHeight).mul(dd.r).add(mieExt.mul(u.mieScaleHeight).mul(dd.m)).mul(airmass).add(u.rayleigh.y.mul(odR)).negate())
-        const mLit = smoothstep(-0.08, 0.02, mu)
-        moonR.addAssign(mT.mul(mLit).mul(dr)); moonM.addAssign(mT.mul(mLit).mul(dm))
-        odR.addAssign(dr.mul(0.5)); odM.addAssign(dm.mul(0.5)); odO.addAssign(dz.mul(0.5))
-      })
-      const mu = dot(d, s)
-      const g = u.mieG, g2 = g.mul(g)
-      const phase = (c: any) => ({
-        r: float(3 / (16 * PI)).mul(c.mul(c).add(1)),
-        m: float(3 / (8 * PI)).mul(float(1).sub(g2).mul(c.mul(c).add(1))).div(g2.add(2).mul(max(g2.add(1).sub(g.mul(2).mul(c)), 1e-6).pow(1.5))),
-      })
-      const ps = phase(mu)
-      color.assign(u.rayleigh.mul(sumR).mul(ps.r).add(sumM.mul(u.mie).mul(ps.m)).mul(u.sunIntensity))
-      const pm = phase(dot(d, md))
-      const moonI = u.sunIntensity.mul(u.moonSkyIntensity).mul(u.moonIllumination).mul(u.moonAngularRadius.greaterThan(0).select(1, 0))
-      color.addAssign(u.rayleigh.mul(moonR).mul(pm.r).add(vec3(moonM.mul(u.mie).mul(pm.m))).mul(moonI))
-      viewT.assign(extinctionOf(odR, odM, odO))
-    })
+    If(
+      hA2
+        .greaterThan(0)
+        .and(
+          b
+            .negate()
+            .add(sqrt(max(hA2, 0)))
+            .greaterThan(0)
+        )
+        .and(u.density.greaterThan(0)),
+      () => {
+        const hA = sqrt(hA2)
+        const t0 = max(b.negate().sub(hA), 0)
+        const t1 = hitsGround.select(groundT, b.negate().add(hA))
+        const ds = t1.sub(t0).div(steps)
+        const odR = float(0).toVar(),
+          odM = float(0).toVar(),
+          odO = float(0).toVar()
+        const md = u.moonDirection
+        Loop(steps, ({ i }) => {
+          const t = t0.add(ds.mul(float(i).add(0.5)))
+          const pos = p.add(d.mul(t.add(b))) // = o + d·t, measured from the closest point for precision
+          const r = length(pos)
+          const h = r.sub(R)
+          const dd = dens(h)
+          const dr = dd.r.mul(ds),
+            dm = dd.m.mul(ds),
+            dz = dd.o.mul(ds)
+          odR.addAssign(dr.mul(0.5))
+          odM.addAssign(dm.mul(0.5))
+          odO.addAssign(dz.mul(0.5))
+          const L = lightDepth(pos, s)
+          const T = extinctionOf(odR.add(L.lr), odM.add(L.lm), odO.add(L.lo)).mul(L.lit)
+          sumR.addAssign(T.mul(dr))
+          sumM.addAssign(T.mul(dm))
+          // Moonlight: cheap airmass estimate instead of a second light march.
+          const mu = dot(pos, md).div(r)
+          const airmass = float(1).div(max(mu, 0).add(float(0.025).mul(exp(max(mu, 0).mul(-11)))))
+          const mT = exp(
+            u.rayleigh.y
+              .mul(u.rayleighScaleHeight)
+              .mul(dd.r)
+              .add(mieExt.mul(u.mieScaleHeight).mul(dd.m))
+              .mul(airmass)
+              .add(u.rayleigh.y.mul(odR))
+              .negate()
+          )
+          const mLit = smoothstep(-0.08, 0.02, mu)
+          moonR.addAssign(mT.mul(mLit).mul(dr))
+          moonM.addAssign(mT.mul(mLit).mul(dm))
+          odR.addAssign(dr.mul(0.5))
+          odM.addAssign(dm.mul(0.5))
+          odO.addAssign(dz.mul(0.5))
+        })
+        const mu = dot(d, s)
+        const g = u.mieG,
+          g2 = g.mul(g)
+        const phase = (c: any) => ({
+          r: float(3 / (16 * PI)).mul(c.mul(c).add(1)),
+          m: float(3 / (8 * PI))
+            .mul(float(1).sub(g2).mul(c.mul(c).add(1)))
+            .div(g2.add(2).mul(max(g2.add(1).sub(g.mul(2).mul(c)), 1e-6).pow(1.5)))
+        })
+        const ps = phase(mu)
+        color.assign(u.rayleigh.mul(sumR).mul(ps.r).add(sumM.mul(u.mie).mul(ps.m)).mul(u.sunIntensity))
+        const pm = phase(dot(d, md))
+        const moonI = u.sunIntensity
+          .mul(u.moonSkyIntensity)
+          .mul(u.moonIllumination)
+          .mul(u.moonAngularRadius.greaterThan(0).select(1, 0))
+        color.addAssign(
+          u.rayleigh
+            .mul(moonR)
+            .mul(pm.r)
+            .add(vec3(moonM.mul(u.mie).mul(pm.m)))
+            .mul(moonI)
+        )
+        viewT.assign(extinctionOf(odR, odM, odO))
+      }
+    )
 
     // Airglow: a thin emitting shell at the mesopause, brightest where the ray grazes it (a green line on
     // the limb at night, seen from orbit), dark on the day side.
@@ -252,7 +328,8 @@ export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps 
         const h = sqrt(max(r.mul(r).sub(p2), 0))
         return max(min(b.negate().add(h), tEnd).sub(max(b.negate().sub(h), 0)), 0)
       }
-      const r0 = R.add(u.airglowShell.x), r1 = R.add(u.airglowShell.y)
+      const r0 = R.add(u.airglowShell.x),
+        r1 = R.add(u.airglowShell.y)
       const path = chord(r1).sub(chord(r0))
       const mid = normalize(p.add(d.mul(max(b.negate(), 0).add(b))))
       const dark = smoothstep(0.1, -0.15, dot(mid, s))
@@ -268,9 +345,15 @@ export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps 
       const sunT = extinctionOf(L.lr, L.lm, L.lo)
       const lambert = max(dot(n, s), 0).mul(1 / PI)
       const ambient = smoothstep(-0.2, 0.3, dot(n, s)).mul(0.04)
-      const moonLit = max(dot(n, u.moonDirection), 0).mul(u.moonSkyIntensity).mul(u.moonIllumination).mul(1 / PI)
-      color.addAssign(viewT.mul(u.groundColor).mul(u.sunIntensity).mul(sunT.mul(lambert).add(ambient).add(moonLit).add(u.nightFloor)))
-      const bodyN = normalize(u.bodyMatrix.mul(n)), bodyS = normalize(u.bodyMatrix.mul(s))
+      const moonLit = max(dot(n, u.moonDirection), 0)
+        .mul(u.moonSkyIntensity)
+        .mul(u.moonIllumination)
+        .mul(1 / PI)
+      color.addAssign(
+        viewT.mul(u.groundColor).mul(u.sunIntensity).mul(sunT.mul(lambert).add(ambient).add(moonLit).add(u.nightFloor))
+      )
+      const bodyN = normalize(u.bodyMatrix.mul(n)),
+        bodyS = normalize(u.bodyMatrix.mul(s))
       color.addAssign(viewT.mul(nightLightsNode(u.nightLights, bodyN, bodyS)))
     }).Else(() => {
       color.addAssign(u.airglow.mul(smoothstep(-0.1, 0.3, dot(d, u.up)).mul(0.6).add(0.4)))
@@ -278,7 +361,9 @@ export function skyColorNode(u: SkyUniforms, d: any, { discs, steps, lightSteps 
         // Sun disc with limb darkening; the moon passes in front of it (eclipses just happen).
         const r = min(sunAng.div(u.sunAngularRadius), 1)
         const limb = float(1).sub(float(0.6).mul(float(1).sub(sqrt(float(1).sub(r.mul(r))))))
-        color.addAssign(viewT.mul(u.sunColor).mul(u.sunDiscIntensity).mul(limb).mul(sunCover).mul(float(1).sub(moon.coverage)))
+        color.addAssign(
+          viewT.mul(u.sunColor).mul(u.sunDiscIntensity).mul(limb).mul(sunCover).mul(float(1).sub(moon.coverage))
+        )
         If(moon.coverage.greaterThan(0), () => {
           // Sky light scattered in front of the moon stays (that's why a daytime moon looks pale).
           color.addAssign(viewT.mul(moonRadiance(u, d, moon.h2, moon.D)).mul(moon.coverage))

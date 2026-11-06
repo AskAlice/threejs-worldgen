@@ -3,11 +3,36 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { button, useControls } from 'leva'
 import {
-  FluidSurface, MPM, ParticleLighting, Particles, PuddleField, SplashEmitter, WATER_PRESETS, resolveFluidSurfaceOptions, resolveMPMOptions,
-  resolvePuddleOptions, resolveSplashOptions, type MPMSolverImpl, type ParticleSystemImpl,
+  FluidSurface,
+  MPM,
+  ParticleLighting,
+  Particles,
+  PuddleField,
+  SplashEmitter,
+  WATER_PRESETS,
+  resolveFluidSurfaceOptions,
+  resolveMPMOptions,
+  resolvePuddleOptions,
+  resolveSplashOptions,
+  type MPMSolverImpl,
+  type ParticleSystemImpl
 } from 'threejs-particles/react'
 import { panels } from './mpm-water.panel'
-import { RAIN, VIEWS, check, height, puddleOptions, releaseDam, splashOptions, streaks, waterConfig, waterGround, waterLoop, waterStage, waterView } from './mpm-water-scene'
+import {
+  RAIN,
+  VIEWS,
+  check,
+  height,
+  puddleOptions,
+  releaseDam,
+  splashOptions,
+  streaks,
+  waterConfig,
+  waterGround,
+  waterLoop,
+  waterStage,
+  waterView
+} from './mpm-water-scene'
 import { View, mount, useHud, useSpec, type V3 } from './r3f-shared'
 
 // threejs-particles MPM water in React Three Fiber: the water sandbox of mpm-water.ts with <MPM>, <FluidSurface> and
@@ -27,7 +52,7 @@ const specs = {
   solver: { ...panel.MPMSolver, target: resolveMPMOptions(config) },
   surface: { ...panel.FluidSurface, target: resolveFluidSurfaceOptions(preset.surface) },
   splash: { ...panel.SplashEmitter, target: resolveSplashOptions(splashOptions(view)) },
-  puddles: { ...panel.PuddleField, target: resolvePuddleOptions(puddleOptions) },
+  puddles: { ...panel.PuddleField, target: resolvePuddleOptions(puddleOptions) }
 }
 // Puddles over the domain, feeding the ground shader through a texture.
 const puddles = new PuddleField(puddleOptions, height)
@@ -46,14 +71,29 @@ function Stage() {
     lighting.set(sun.position.toArray(), sun.color.clone().multiplyScalar(sun.intensity), skyAvg)
     return remove
   }, [gl, scene])
-  return <>{ground.meshes.map((m, i) => <primitive key={i} object={m} />)}</>
+  return (
+    <>
+      {ground.meshes.map((m, i) => (
+        <primitive key={i} object={m} />
+      ))}
+    </>
+  )
 }
 
 /** One frame of the simulation (splashes, puddles, waterfall, solver step, rain follow), before the surface draws. */
-function Step({ loop, rain }: { loop: ReturnType<typeof waterLoop>; rain: { near: { current: ParticleSystemImpl | null }; far: { current: ParticleSystemImpl | null } } }) {
+function Step({
+  loop,
+  rain
+}: {
+  loop: ReturnType<typeof waterLoop>
+  rain: { near: { current: ParticleSystemImpl | null }; far: { current: ParticleSystemImpl | null } }
+}) {
   useFrame(({ camera, controls }, dt) => {
     const target = (controls as unknown as { target?: THREE.Vector3 } | null)?.target ?? new THREE.Vector3()
-    loop.frame(Math.min(0.1, dt), camera as unknown as THREE.Camera, target, { near: rain.near.current, far: rain.far.current })
+    loop.frame(Math.min(0.1, dt), camera as unknown as THREE.Camera, target, {
+      near: rain.near.current,
+      far: rain.far.current
+    })
   })
   return null
 }
@@ -81,7 +121,7 @@ function Water() {
     damBreak: { value: view.damBreak, label: 'dam break on reset' },
     'reset water (dam break)': button(() => latest.current && releaseDam(latest.current, view)),
     'dry the ground': button(() => puddles.clear()),
-    camera: { value: VIEWS[params.get('view') ?? ''] ? params.get('view')! : 'overview', options: Object.keys(VIEWS) },
+    camera: { value: VIEWS[params.get('view') ?? ''] ? params.get('view')! : 'overview', options: Object.keys(VIEWS) }
   })
   const { camera, ...settings } = demo
   Object.assign(view, settings)
@@ -101,7 +141,15 @@ function Water() {
   return (
     <>
       {/* The solver is stepped with the splashes in one batch (Step), so <MPM> doesn't step itself. */}
-      <MPM ref={setMpm} {...solver} capacity={config.capacity} resolution={config.resolution} cellSize={config.cellSize} height={height} timeStep={0} />
+      <MPM
+        ref={setMpm}
+        {...solver}
+        capacity={config.capacity}
+        resolution={config.resolution}
+        cellSize={config.cellSize}
+        height={height}
+        timeStep={0}
+      />
       {mpm && loop && (
         <>
           <Step loop={loop} rain={rain} />
@@ -123,4 +171,15 @@ function Check() {
   return null
 }
 
-mount(params.has('check') ? <Check /> : <><Stage /><Water /></>, { fov: 50, near: 0.03, far: 1500 }, { toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 })
+mount(
+  params.has('check') ? (
+    <Check />
+  ) : (
+    <>
+      <Stage />
+      <Water />
+    </>
+  ),
+  { fov: 50, near: 0.03, far: 1500 },
+  { toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 }
+)

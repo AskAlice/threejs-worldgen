@@ -56,7 +56,13 @@ export function Ocean({ ref, world = null, camera, prepass = null, ...options }:
   useEffect(() => {
     let created: OceanImpl | null = null
     let cancelled = false
-    OceanImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, prepass, ...latest.current }).then((o) => {
+    OceanImpl.create({
+      camera: activeCamera,
+      world,
+      renderer: gl as unknown as WaterRenderer,
+      prepass,
+      ...latest.current
+    }).then((o) => {
       if (cancelled) return o.dispose()
       created = o
       setOcean(o)
@@ -110,7 +116,13 @@ export function Rivers({ ref, world, camera, prepass = null, ...options }: River
   useEffect(() => {
     let created: RiversImpl | null = null
     let cancelled = false
-    RiversImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, prepass, ...latest.current }).then((r) => {
+    RiversImpl.create({
+      camera: activeCamera,
+      world,
+      renderer: gl as unknown as WaterRenderer,
+      prepass,
+      ...latest.current
+    }).then((r) => {
       if (cancelled) return r.dispose()
       created = r
       setRivers(r)
@@ -157,7 +169,16 @@ export interface WaterProps extends Partial<Pick<WaterAppearance, 'sun' | 'envir
  * <Water world={world} sun={sun} ocean={{ waves: { amplitude: 1 } }} rivers={{ maxDistance: 2500 }} />
  * ```
  */
-export function Water({ world, camera, origin, sun, environment, prepass = null, ocean = {}, rivers = {} }: WaterProps): React.JSX.Element {
+export function Water({
+  world,
+  camera,
+  origin,
+  sun,
+  environment,
+  prepass = null,
+  ocean = {},
+  rivers = {}
+}: WaterProps): React.JSX.Element {
   const shared = { origin, sun, environment, prepass }
   return (
     <>
@@ -190,7 +211,14 @@ export interface LakesProps extends LakesInput {
  * <Lakes hydrology={hydrology} frame={world.frame} />
  * ```
  */
-export function Lakes({ ref, hydrology, frame = null, camera, prepass = null, ...options }: LakesProps): React.JSX.Element | null {
+export function Lakes({
+  ref,
+  hydrology,
+  frame = null,
+  camera,
+  prepass = null,
+  ...options
+}: LakesProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [lakes, setLakes] = useState<LakesImpl | null>(null)
@@ -201,7 +229,14 @@ export function Lakes({ ref, hydrology, frame = null, camera, prepass = null, ..
     let created: LakesImpl | null = null
     let cancelled = false
     const l = latest.current
-    LakesImpl.create({ hydrology: l.hydrology, frame: l.frame, camera: activeCamera, renderer: gl as unknown as WaterRenderer, prepass, ...l.options }).then((x) => {
+    LakesImpl.create({
+      hydrology: l.hydrology,
+      frame: l.frame,
+      camera: activeCamera,
+      renderer: gl as unknown as WaterRenderer,
+      prepass,
+      ...l.options
+    }).then((x) => {
       if (cancelled) return x.dispose()
       created = x
       setLakes(x)

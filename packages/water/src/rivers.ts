@@ -1,8 +1,33 @@
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, Vector3, type Camera, type MeshBasicNodeMaterial, type Object3D } from 'three/webgpu'
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  Group,
+  Mesh,
+  Vector3,
+  type Camera,
+  type MeshBasicNodeMaterial,
+  type Object3D
+} from 'three/webgpu'
 import { createSample, type LocalFrame, type World, type WorldSample } from 'threejs-biomes'
-import { Clock, hookScene, mergeInput, placeInFrame, prepareRenderer, worldToFrame, type WaterRenderer } from './common.ts'
+import {
+  Clock,
+  hookScene,
+  mergeInput,
+  placeInFrame,
+  prepareRenderer,
+  worldToFrame,
+  type WaterRenderer
+} from './common.ts'
 import { createWaterSample, type WaterSample } from './hydrology.ts'
-import { DEFAULT_APPEARANCE, applyAppearance, createWaterMaterial, createWaterUniforms, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
+import {
+  DEFAULT_APPEARANCE,
+  applyAppearance,
+  createWaterMaterial,
+  createWaterUniforms,
+  updateSun,
+  type WaterAppearance,
+  type WaterUniforms
+} from './material.ts'
 import type { WaterPrepass } from './prepass.ts'
 
 /** How river water moves; shared by {@link Rivers} and {@link waterAt}. */
@@ -95,7 +120,7 @@ export const DEFAULT_RIVERS: RiversSettings = {
   minStrength: 0.02,
   flowSpeed: 1,
   minFlowSpeed: 0.15,
-  maxFlowSpeed: 4,
+  maxFlowSpeed: 4
 }
 
 interface Tile {
@@ -191,7 +216,16 @@ export class Rivers {
     applyAppearance(this.uniforms, s)
     this.uniforms.flowPeriod.value = Math.max(0.1, s.flowPeriod)
     this.uniforms.rapids.value = s.rapids
-    this.layoutKey = JSON.stringify([s.tileSize, s.resolution, s.expand, s.surfaceOffset, s.minStrength, s.flowSpeed, s.minFlowSpeed, s.maxFlowSpeed])
+    this.layoutKey = JSON.stringify([
+      s.tileSize,
+      s.resolution,
+      s.expand,
+      s.surfaceOffset,
+      s.minStrength,
+      s.flowSpeed,
+      s.minFlowSpeed,
+      s.maxFlowSpeed
+    ])
     if (s.environment !== this.environment || this.prepass !== this.materialPrepass) {
       this.environment = s.environment
       this.materialPrepass = this.prepass
@@ -233,7 +267,9 @@ export class Rivers {
     this.uniforms.time.value = this.time
     const [ox, oy, oz] = s.origin
     const cam = this.camera.getWorldPosition(_v)
-    const px = cam.x + ox, py = cam.y + oy, pz = cam.z + oz
+    const px = cam.x + ox,
+      py = cam.y + oy,
+      pz = cam.z + oz
 
     // Frame: the world itself on flat worlds; a camera-centred tangent frame on planets.
     const sphere = this.world.options.surface === 'sphere'
@@ -242,7 +278,8 @@ export class Rivers {
       this.setFrame(this.world.frame)
       this.latLon = null
     }
-    if (!sphere) this.frame = this.world.frame // replaced on every world change; same axes
+    if (!sphere)
+      this.frame = this.world.frame // replaced on every world change; same axes
     else if (!this.latLon || Math.hypot(...pick(worldToFrame(this.frame, px, py, pz, _l))) > s.reframeDistance) {
       const len = Math.hypot(px, py, pz) || 1
       this.latLon = [(Math.asin(py / len) * 180) / Math.PI, (Math.atan2(px, pz) * 180) / Math.PI]
@@ -260,7 +297,8 @@ export class Rivers {
     const pending: Tile[] = []
     if (Math.abs(cy) < s.maxDistance) {
       const r = Math.ceil(s.maxDistance / ts)
-      const ci = Math.floor(cx / ts), cj = Math.floor(cz / ts)
+      const ci = Math.floor(cx / ts),
+        cj = Math.floor(cz / ts)
       for (let i = ci - r; i <= ci + r; i++) {
         for (let j = cj - r; j <= cj + r; j++) {
           const dx = Math.max(i * ts - cx, 0, cx - (i + 1) * ts)
@@ -304,8 +342,13 @@ export class Rivers {
     }
 
     updateSun(this.uniforms, s.sun, this.object, this.sunCache)
-    let meshes = 0, triangles = 0
-    for (const t of this.tiles.values()) if (t.mesh) { meshes++; triangles += (t.mesh.geometry.index?.count ?? 0) / 3 }
+    let meshes = 0,
+      triangles = 0
+    for (const t of this.tiles.values())
+      if (t.mesh) {
+        meshes++
+        triangles += (t.mesh.geometry.index?.count ?? 0) / 3
+      }
     this.stats.tiles = this.tiles.size
     this.stats.meshes = meshes
     this.stats.triangles = triangles
@@ -331,7 +374,8 @@ export class Rivers {
     const ts = s.tileSize
     const res = Math.max(2, Math.floor(s.resolution))
     const cs = ts / res
-    const x0 = tile.ix * ts, z0 = tile.iz * ts
+    const x0 = tile.ix * ts,
+      z0 = tile.iz * ts
     const sample = this.scratch
 
     let valley = false
@@ -371,10 +415,15 @@ export class Rivers {
     for (let cb = 0; cb < m - 1; cb++) {
       for (let ca = 0; ca < m - 1; ca++) {
         let near = false
-        for (let db = -1; db <= 2 && !near; db++) for (let da = -1; da <= 2; da++) {
-          const a = ca + da, b = cb + db
-          if (a >= 0 && b >= 0 && a < m && b < m && coarse[b * m + a]) { near = true; break }
-        }
+        for (let db = -1; db <= 2 && !near; db++)
+          for (let da = -1; da <= 2; da++) {
+            const a = ca + da,
+              b = cb + db
+            if (a >= 0 && b >= 0 && a < m && b < m && coarse[b * m + a]) {
+              near = true
+              break
+            }
+          }
         if (!near) continue
         for (let b = node(cb); b <= node(cb + 1); b++) for (let a = node(ca); a <= node(ca + 1); a++) visit(a, b)
       }
@@ -427,13 +476,18 @@ function dilate(level: Float32Array, n: number, steps: number) {
       for (let a = 0; a < n; a++) {
         const i = b * n + a
         if (!Number.isNaN(prev[i])) continue
-        let sum = 0, count = 0
+        let sum = 0,
+          count = 0
         for (let db = -1; db <= 1; db++) {
           for (let da = -1; da <= 1; da++) {
-            const aa = a + da, bb = b + db
+            const aa = a + da,
+              bb = b + db
             if (aa < 0 || bb < 0 || aa >= n || bb >= n) continue
             const v = prev[bb * n + aa]
-            if (!Number.isNaN(v)) { sum += v; count++ }
+            if (!Number.isNaN(v)) {
+              sum += v
+              count++
+            }
           }
         }
         if (count) level[i] = sum / count
@@ -443,19 +497,37 @@ function dilate(level: Float32Array, n: number, steps: number) {
 }
 
 /** Triangulates every grid cell whose four corners have water, with per-vertex flow. */
-function buildSurface(level: Float32Array, strength: Float32Array, n: number, cs: number, x0: number, z0: number, flow: RiverFlowOptions): BufferGeometry | null {
+function buildSurface(
+  level: Float32Array,
+  strength: Float32Array,
+  n: number,
+  cs: number,
+  x0: number,
+  z0: number,
+  flow: RiverFlowOptions
+): BufferGeometry | null {
   const index = new Int32Array(n * n).fill(-1)
-  let y = 0, count = 0
-  for (let i = 0; i < level.length; i++) if (!Number.isNaN(level[i])) { y += level[i]; count++ }
+  let y = 0,
+    count = 0
+  for (let i = 0; i < level.length; i++)
+    if (!Number.isNaN(level[i])) {
+      y += level[i]
+      count++
+    }
   y /= count || 1
-  const pos: number[] = [], flows: number[] = [], local: number[] = []
+  const pos: number[] = [],
+    flows: number[] = [],
+    local: number[] = []
   const at = (a: number, b: number) => {
     const i = b * n + a
     if (index[i] >= 0) return index[i]
     const l = level[i]
     // Central differences where both neighbours are wet, one-sided otherwise.
     const g = (da: number, db: number, f: Float32Array) => {
-      const a1 = a + da, b1 = b + db, a0 = a - da, b0 = b - db
+      const a1 = a + da,
+        b1 = b + db,
+        a0 = a - da,
+        b0 = b - db
       const ok1 = a1 < n && b1 < n && !Number.isNaN(f[b1 * n + a1])
       const ok0 = a0 >= 0 && b0 >= 0 && !Number.isNaN(f[b0 * n + a0])
       const span = (Number(ok1) + Number(ok0)) * cs
@@ -472,8 +544,17 @@ function buildSurface(level: Float32Array, strength: Float32Array, n: number, cs
   for (let b = 0; b < n - 1; b++) {
     for (let a = 0; a < n - 1; a++) {
       const i = b * n + a
-      if (Number.isNaN(level[i]) || Number.isNaN(level[i + 1]) || Number.isNaN(level[i + n]) || Number.isNaN(level[i + n + 1])) continue
-      const p00 = at(a, b), p10 = at(a + 1, b), p01 = at(a, b + 1), p11 = at(a + 1, b + 1)
+      if (
+        Number.isNaN(level[i]) ||
+        Number.isNaN(level[i + 1]) ||
+        Number.isNaN(level[i + n]) ||
+        Number.isNaN(level[i + n + 1])
+      )
+        continue
+      const p00 = at(a, b),
+        p10 = at(a + 1, b),
+        p01 = at(a, b + 1),
+        p11 = at(a + 1, b + 1)
       tris.push(p00, p01, p10, p10, p01, p11)
     }
   }
@@ -493,17 +574,29 @@ function buildSurface(level: Float32Array, strength: Float32Array, n: number, cs
  * channel strength: downhill along the level, with the across-channel part removed (water runs
  * along the channel), at `flowSpeed·√(slope / 1%)`, faster mid-channel.
  */
-export function riverFlow(levelDx: number, levelDz: number, riverDx: number, riverDz: number, strength: number, o: RiverFlowOptions): [number, number] {
-  let fx = -levelDx, fz = -levelDz
+export function riverFlow(
+  levelDx: number,
+  levelDz: number,
+  riverDx: number,
+  riverDz: number,
+  strength: number,
+  o: RiverFlowOptions
+): [number, number] {
+  let fx = -levelDx,
+    fz = -levelDz
   const g = Math.hypot(riverDx, riverDz)
   if (g > 1e-9) {
-    const nx = riverDx / g, nz = riverDz / g
+    const nx = riverDx / g,
+      nz = riverDz / g
     const d = fx * nx + fz * nz
-    fx -= d * nx; fz -= d * nz
+    fx -= d * nx
+    fz -= d * nz
   }
   const slope = Math.hypot(fx, fz)
   if (slope < 1e-9) return [0, 0]
-  const speed = Math.min(o.maxFlowSpeed, Math.max(o.minFlowSpeed, o.flowSpeed * Math.sqrt(slope / 0.01))) * (0.6 + 0.4 * Math.min(1, strength))
+  const speed =
+    Math.min(o.maxFlowSpeed, Math.max(o.minFlowSpeed, o.flowSpeed * Math.sqrt(slope / 0.01))) *
+    (0.6 + 0.4 * Math.min(1, strength))
   return [(fx / slope) * speed, (fz / slope) * speed]
 }
 
@@ -519,15 +612,25 @@ const _n = createSample(8)
  * Water at local (x, z) of a world or frame: sea or river level, depth and (for rivers) surface flow
  * velocity — for gameplay, buoyancy and particles. Waves are not included (see `Ocean.waterAt`).
  */
-export function waterAt(source: WaterSource, x: number, z: number, out: WaterSample = createWaterSample(), flow: Partial<RiverFlowOptions> = {}): WaterSample {
+export function waterAt(
+  source: WaterSource,
+  x: number,
+  z: number,
+  out: WaterSample = createWaterSample(),
+  flow: Partial<RiverFlowOptions> = {}
+): WaterSample {
   const o = { ...DEFAULT_RIVERS, ...flow }
   const s = source.sample(x, z, _s)
-  out.flowX = 0; out.flowZ = 0
+  out.flowX = 0
+  out.flowZ = 0
   if (Number.isNaN(s.waterLevel)) {
-    out.kind = 'none'; out.level = NaN; out.depth = 0
+    out.kind = 'none'
+    out.level = NaN
+    out.depth = 0
     return out
   }
-  const level = s.waterLevel, river = s.river
+  const level = s.waterLevel,
+    river = s.river
   out.level = level
   out.depth = Math.max(0, level - s.elevation)
   if (river < o.minStrength) {
@@ -540,10 +643,20 @@ export function waterAt(source: WaterSource, x: number, z: number, out: WaterSam
     const n = source.sample(px, pz, _n)
     return [Number.isNaN(n.waterLevel) ? level : n.waterLevel, n.river]
   }
-  const [lx1, rx1] = probe(x + e, z), [lx0, rx0] = probe(x - e, z)
-  const [lz1, rz1] = probe(x, z + e), [lz0, rz0] = probe(x, z - e)
-  const [fx, fz] = riverFlow((lx1 - lx0) / (2 * e), (lz1 - lz0) / (2 * e), (rx1 - rx0) / (2 * e), (rz1 - rz0) / (2 * e), river, o)
-  out.flowX = fx; out.flowZ = fz
+  const [lx1, rx1] = probe(x + e, z),
+    [lx0, rx0] = probe(x - e, z)
+  const [lz1, rz1] = probe(x, z + e),
+    [lz0, rz0] = probe(x, z - e)
+  const [fx, fz] = riverFlow(
+    (lx1 - lx0) / (2 * e),
+    (lz1 - lz0) / (2 * e),
+    (rx1 - rx0) / (2 * e),
+    (rz1 - rz0) / (2 * e),
+    river,
+    o
+  )
+  out.flowX = fx
+  out.flowZ = fz
   return out
 }
 

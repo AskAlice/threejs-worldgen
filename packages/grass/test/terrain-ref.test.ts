@@ -10,7 +10,8 @@ import type { ObjectRef } from '../src/grass-settings.ts'
 // rule; these tests pin the behaviour the wrapper relies on.
 
 const camera = () => new PerspectiveCamera()
-const field = (terrain?: ObjectRef) => new Grass({ camera: camera(), terrain, tileSize: 20, maxDistance: 20, density: 10 })
+const field = (terrain?: ObjectRef) =>
+  new Grass({ camera: camera(), terrain, tileSize: 20, maxDistance: 20, density: 10 })
 
 /** A flat 40 m ground plane at height `y` (mounted: world matrix updated). */
 function ground(y: number) {

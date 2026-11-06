@@ -5,9 +5,38 @@
  * limiting magnitude that drops as the sky brightens (so stars come out one by one at dusk).
  */
 import { AdditiveBlending, BackSide, Mesh, NodeMaterial, SphereGeometry, Vector3 } from 'three/webgpu'
-import { abs, dot, exp, float, floor, fract, fwidth, length, log, max, mix, normalize, select, sin, smoothstep, sqrt, step, time, uniform, vec3, vec4 } from 'three/tsl'
+import {
+  abs,
+  dot,
+  exp,
+  float,
+  floor,
+  fract,
+  fwidth,
+  length,
+  log,
+  max,
+  mix,
+  normalize,
+  select,
+  sin,
+  smoothstep,
+  sqrt,
+  step,
+  time,
+  uniform,
+  vec3,
+  vec4
+} from 'three/tsl'
 import { applySkyState, createSkyUniforms, domeDirection, farDomePosition, type SkyUniforms } from './atmosphere.ts'
-import { DEFAULT_MILKY_WAY, applyMilkyWay, createMilkyWayUniforms, milkyWayNode, type MilkyWayOptions, type MilkyWayUniforms } from './milky-way.ts'
+import {
+  DEFAULT_MILKY_WAY,
+  applyMilkyWay,
+  createMilkyWayUniforms,
+  milkyWayNode,
+  type MilkyWayOptions,
+  type MilkyWayUniforms
+} from './milky-way.ts'
 import { moonCoverage } from './moon.ts'
 import type { SkyState } from './observer.ts'
 import { kelvinToRgb, merge, seedOf, type DeepPartial } from './util.ts'
@@ -50,7 +79,7 @@ export const DEFAULT_STARS: StarsOptions = {
   size: 1,
   saturation: 1,
   darkSky: 1e-4,
-  milkyWay: DEFAULT_MILKY_WAY,
+  milkyWay: DEFAULT_MILKY_WAY
 }
 
 /** Input for {@link Stars}: any subset of {@link StarsOptions}. */
@@ -76,7 +105,7 @@ export function createStarUniforms() {
     /** Seed folded into the cell hash. */
     seed: uniform(0),
     /** Black-body colours for 3200, 4300, 5500, 7000, 10000 and 20000 K. */
-    palette: [3200, 4300, 5500, 7000, 10000, 20000].map((k) => uniform(new Vector3(...kelvinToRgb(k)))),
+    palette: [3200, 4300, 5500, 7000, 10000, 20000].map((k) => uniform(new Vector3(...kelvinToRgb(k))))
   }
 }
 
@@ -91,17 +120,34 @@ const hash33 = (p: any): any => {
 }
 
 /** One layer of stars: one candidate per cube-face cell, placed in the cell's centre half so no neighbour checks are needed. */
-function layer(s: StarUniforms, cel: any, face: { uv: any; id: any; isX: any; isY: any; sign: any }, px: any, cells: number, fill: number, mBright: number, mFaint: number, salt: number, boost: any) {
+function layer(
+  s: StarUniforms,
+  cel: any,
+  face: { uv: any; id: any; isX: any; isY: any; sign: any },
+  px: any,
+  cells: number,
+  fill: number,
+  mBright: number,
+  mFaint: number,
+  salt: number,
+  boost: any
+) {
   const g = face.uv.mul(0.5).add(0.5).mul(cells)
   const cell: any = floor(g)
   const h1 = hash33(vec3(cell.x, cell.y, face.id.add(s.seed).add(salt)))
   const h2 = hash33(h1.mul(113.7).add(vec3(cell.y, cell.x, salt + 7)))
   const present = step(h1.x, s.density.mul(fill).mul(boost))
   const suv: any = cell.add(h1.yz.mul(0.5).add(0.25)).div(cells).mul(2).sub(1)
-  const dir = normalize(select(face.isX, vec3(face.sign, suv.x, suv.y), select(face.isY, vec3(suv.x, face.sign, suv.y), vec3(suv.x, suv.y, face.sign))))
+  const dir = normalize(
+    select(
+      face.isX,
+      vec3(face.sign, suv.x, suv.y),
+      select(face.isY, vec3(suv.x, face.sign, suv.y), vec3(suv.x, suv.y, face.sign))
+    )
+  )
   const ang = length(cel.sub(dir))
   // N(<m) ∝ 10^(0.5 m): invert the cumulative distribution between mBright and mFaint.
-  const lo = Math.pow(10, 0.5 * (mBright - mFaint))
+  const lo = 10 ** (0.5 * (mBright - mFaint))
   const m = float(mFaint).add(log(mix(float(lo), float(1), h2.x)).mul(2 / Math.LN10))
   const flux = exp(m.mul(-0.4 * Math.LN10)).mul(smoothstep(s.limit.add(0.5), s.limit.sub(0.5), m))
   const sigma = px.mul(s.size).mul(float(0.5).add(max(float(2).sub(m), 0).mul(0.12)))
@@ -128,10 +174,11 @@ export function starsColorNode(u: SkyUniforms, s: StarUniforms, mw: MilkyWayUnif
   const isX = a.x.greaterThanEqual(a.y).and(a.x.greaterThanEqual(a.z))
   const isY = isX.not().and(a.y.greaterThanEqual(a.z))
   const face = {
-    isX, isY,
+    isX,
+    isY,
     uv: select(isX, cel.yz.div(a.x), select(isY, cel.xz.div(a.y), cel.xy.div(a.z))),
     sign: select(isX, cel.x.sign(), select(isY, cel.y.sign(), cel.z.sign())),
-    id: select(isX, cel.x.sign().add(1), select(isY, cel.y.sign().add(5), cel.z.sign().add(9))),
+    id: select(isX, cel.x.sign().add(1), select(isY, cel.y.sign().add(5), cel.z.sign().add(9)))
   }
   const milky = milkyWayNode(mw, cel)
   const boost = milky.band.mul(3).add(1)
@@ -144,17 +191,45 @@ export function starsColorNode(u: SkyUniforms, s: StarUniforms, mw: MilkyWayUnif
   const b = dot(o, d)
   const p = o.sub(d.mul(b))
   const hG2 = u.planetRadius.mul(u.planetRadius).sub(dot(p, p))
-  const visible = hG2.greaterThan(0).and(b.negate().sub(sqrt(max(hG2, 0))).greaterThan(0)).select(0, 1)
+  const visible = hG2
+    .greaterThan(0)
+    .and(
+      b
+        .negate()
+        .sub(sqrt(max(hG2, 0)))
+        .greaterThan(0)
+    )
+    .select(0, 1)
   const r = length(o)
   const alt = max(r.sub(u.planetRadius), 0)
   const mu = max(dot(d, o.div(r)), 0)
   const airmass = float(1).div(mu.add(float(0.025).mul(exp(mu.mul(-11)))))
-  const column = u.rayleigh.mul(u.rayleighScaleHeight).mul(exp(alt.div(u.rayleighScaleHeight).negate()))
-    .add(u.mie.add(u.mieAbsorption).mul(u.mieScaleHeight).mul(exp(alt.div(u.mieScaleHeight).negate()))).mul(u.density)
+  const column = u.rayleigh
+    .mul(u.rayleighScaleHeight)
+    .mul(exp(alt.div(u.rayleighScaleHeight).negate()))
+    .add(
+      u.mie
+        .add(u.mieAbsorption)
+        .mul(u.mieScaleHeight)
+        .mul(exp(alt.div(u.mieScaleHeight).negate()))
+    )
+    .mul(u.density)
   const ext = exp(column.mul(airmass).negate())
   const scint = s.twinkle.mul(smoothstep(1, 12, airmass).mul(0.85).add(0.15)).mul(column.y.mul(8).clamp(0, 1))
-  const tw = (ph: any) => float(1).add(scint.mul(sin(time.mul(s.twinkleSpeed).mul(7.3).add(ph.mul(40))).mul(0.6).add(sin(time.mul(s.twinkleSpeed).mul(17.1).add(ph.mul(91))).mul(0.4))))
-  const stars = l0.color.mul(tw(l0.phase)).add(l1.color.mul(tw(l1.phase))).add(l2.color).mul(s.brightness).mul(3)
+  const tw = (ph: any) =>
+    float(1).add(
+      scint.mul(
+        sin(time.mul(s.twinkleSpeed).mul(7.3).add(ph.mul(40)))
+          .mul(0.6)
+          .add(sin(time.mul(s.twinkleSpeed).mul(17.1).add(ph.mul(91))).mul(0.4))
+      )
+    )
+  const stars = l0.color
+    .mul(tw(l0.phase))
+    .add(l1.color.mul(tw(l1.phase)))
+    .add(l2.color)
+    .mul(s.brightness)
+    .mul(3)
   const mwVisible = smoothstep(3.5, 6.5, s.limit)
   const total = stars.add(milky.color.mul(mwVisible))
   return total.mul(ext).mul(visible).mul(moonMask)
@@ -228,7 +303,8 @@ export class Stars {
   }
 
   private apply(): this {
-    const o = this.settings, s = this.starUniforms
+    const o = this.settings,
+      s = this.starUniforms
     const seed = seedOf(o.seed)
     s.brightness.value = o.enabled ? o.brightness : 0
     s.density.value = o.density
@@ -246,7 +322,8 @@ export class Stars {
   private updateLimit() {
     const o = this.settings
     // Limiting magnitude drops by 2.5·log10 of how much brighter than a dark sky it is.
-    this.starUniforms.limit.value = o.magnitudeLimit - 2.5 * Math.log10(1 + Math.max(0, this.skyLuminance) / Math.max(o.darkSky, 1e-9))
+    this.starUniforms.limit.value =
+      o.magnitudeLimit - 2.5 * Math.log10(1 + Math.max(0, this.skyLuminance) / Math.max(o.darkSky, 1e-9))
   }
 
   /**

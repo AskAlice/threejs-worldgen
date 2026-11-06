@@ -1,17 +1,100 @@
 import {
-  BufferAttribute, ClampToEdgeWrapping, Color, FloatType, HalfFloatType, InstancedBufferGeometry, LinearFilter, Mesh, MeshBasicNodeMaterial, NearestFilter, PlaneGeometry,
-  QuadMesh, RGBAFormat, RedFormat, RenderTarget, Scene, Sphere, Storage3DTexture, StorageBufferAttribute, Vector2, Vector3,
-  type Camera, type ComputeNode, type PerspectiveCamera, type Renderer, type Texture,
+  BufferAttribute,
+  ClampToEdgeWrapping,
+  Color,
+  FloatType,
+  HalfFloatType,
+  InstancedBufferGeometry,
+  LinearFilter,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NearestFilter,
+  PlaneGeometry,
+  QuadMesh,
+  RGBAFormat,
+  RedFormat,
+  RenderTarget,
+  Scene,
+  Sphere,
+  Storage3DTexture,
+  StorageBufferAttribute,
+  Vector2,
+  Vector3,
+  type Camera,
+  type ComputeNode,
+  type PerspectiveCamera,
+  type Renderer,
+  type Texture
 } from 'three/webgpu'
 import {
-  Discard, Fn, If, Loop, abs, atomicAdd, atomicLoad, atomicStore, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, cameraWorldMatrix, clamp, cross,
-  determinant, dot, exp, float, floor, fwidth, instanceIndex, instancedArray, int, ivec3, length, log, mat3, max, min, mix, normalize,
-  perspectiveDepthToViewZ, pmremTexture, positionGeometry, positionView, pow, reflect, screenUV, select, smoothstep, sqrt, storage, texture, texture3D,
-  textureStore, transpose, uniform, varying, vec2, vec3, vec4, viewZToPerspectiveDepth, viewportDepthTexture, hash,
+  Discard,
+  Fn,
+  If,
+  Loop,
+  abs,
+  atomicAdd,
+  atomicLoad,
+  atomicStore,
+  cameraFar,
+  cameraNear,
+  cameraPosition,
+  cameraViewMatrix,
+  cameraWorldMatrix,
+  clamp,
+  cross,
+  determinant,
+  dot,
+  exp,
+  float,
+  floor,
+  fwidth,
+  instanceIndex,
+  instancedArray,
+  int,
+  ivec3,
+  length,
+  log,
+  mat3,
+  max,
+  min,
+  mix,
+  normalize,
+  perspectiveDepthToViewZ,
+  pmremTexture,
+  positionGeometry,
+  positionView,
+  pow,
+  reflect,
+  screenUV,
+  select,
+  smoothstep,
+  sqrt,
+  storage,
+  texture,
+  texture3D,
+  textureStore,
+  transpose,
+  uniform,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+  viewZToPerspectiveDepth,
+  viewportDepthTexture,
+  hash
 } from 'three/tsl'
 import { blackbodyNode } from './blackbody.ts'
 import { det3, lame, mpmIdentity, mul3, registerMPMMaterial, transpose3, type Mat3 } from './mpm-materials.ts'
-import { MPM_DENSITY_UNIT, MPM_FIXED, MPM_PPC_AXIS, groundAt, toFixed, type MPMEmit, type MPMParticleData, type MPMReference } from './mpm-reference.ts'
+import {
+  MPM_DENSITY_UNIT,
+  MPM_FIXED,
+  MPM_PPC_AXIS,
+  groundAt,
+  toFixed,
+  type MPMEmit,
+  type MPMParticleData,
+  type MPMReference
+} from './mpm-reference.ts'
 import { merge, type DeepPartial } from './options.ts'
 import { ParticleLighting } from './system.ts'
 import type { MPMSolver } from './mpm.ts'
@@ -74,11 +157,26 @@ export interface LavaParams {
 
 /** Default `lava` parameters: a Hawaiian tholeiitic basalt, between the two presets. */
 export const LAVA_DEFAULTS: LavaParams = {
-  density: 2400, youngs: 1e6, poisson: 0.3,
-  viscosity: 600, viscosityMax: 5000, activation: 40000, eruption: 1420, solidus: 1270, crustRange: 40,
-  yieldStress: 10000, meltYield: 2000, crackStrain: 0.01,
-  emissivity: 0.95, convection: 50, groundConductance: 300, airTemperature: 300, groundTemperature: 330, heatCapacity: 1200,
-  skin: 0.004, diffusivity: 1e-4,
+  density: 2400,
+  youngs: 1e6,
+  poisson: 0.3,
+  viscosity: 600,
+  viscosityMax: 5000,
+  activation: 40000,
+  eruption: 1420,
+  solidus: 1270,
+  crustRange: 40,
+  yieldStress: 10000,
+  meltYield: 2000,
+  crackStrain: 0.01,
+  emissivity: 0.95,
+  convection: 50,
+  groundConductance: 300,
+  airTemperature: 300,
+  groundTemperature: 330,
+  heatCapacity: 1200,
+  skin: 0.004,
+  diffusivity: 1e-4
 }
 
 /** Drawing options of {@link MPMLava}. Plain JSON. */
@@ -126,9 +224,20 @@ export type LavaInput = DeepPartial<LavaOptions>
 export const DEFAULT_LAVA: LavaOptions = {
   material: 'lava',
   render: {
-    radius: 1.4, smoothing: 2, iterations: 2, resolution: 1, intensity: 1, crust: '#3e3b39', roughness: 0.5, ropes: 0.4, ropeLength: 0.07,
-    cracks: 1, crackSize: 0.25, crackWidth: 0.006, clasts: 0.2,
-  },
+    radius: 1.4,
+    smoothing: 2,
+    iterations: 2,
+    resolution: 1,
+    intensity: 1,
+    crust: '#3e3b39',
+    roughness: 0.5,
+    ropes: 0.4,
+    ropeLength: 0.07,
+    cracks: 1,
+    crackSize: 0.25,
+    crackWidth: 0.006,
+    clasts: 0.2
+  }
 }
 
 /**
@@ -136,20 +245,64 @@ export const DEFAULT_LAVA: LavaOptions = {
  * runnier and gassier, with a thin ductile glassy crust that stretches and folds into ropes; ʻaʻā is cooler, more viscous
  * and crystal-rich, and its thicker brittle crust tears into dark clinker.
  */
-export const LAVA_PRESETS: Record<'pahoehoe' | 'aa', {
-  /** Material parameters for `materials.lava` (merged over the default lava material). */
-  material: Partial<LavaParams>
-  /** Drawing options for {@link MPMLava} (merged over {@link DEFAULT_LAVA}). */
-  lava: LavaInput
-}> = {
+export const LAVA_PRESETS: Record<
+  'pahoehoe' | 'aa',
+  {
+    /** Material parameters for `materials.lava` (merged over the default lava material). */
+    material: Partial<LavaParams>
+    /** Drawing options for {@link MPMLava} (merged over {@link DEFAULT_LAVA}). */
+    lava: LavaInput
+  }
+> = {
   pahoehoe: {
-    material: { density: 2200, viscosity: 150, eruption: 1430, solidus: 1270, yieldStress: 8000, meltYield: 800, crackStrain: 0.03, skin: 0.002 },
-    lava: { render: { smoothing: 2.5, crust: '#585653', roughness: 0.35, ropes: 0.8, ropeLength: 0.07, cracks: 1, crackSize: 0.3, crackWidth: 0.005, clasts: 0 } },
+    material: {
+      density: 2200,
+      viscosity: 150,
+      eruption: 1430,
+      solidus: 1270,
+      yieldStress: 8000,
+      meltYield: 800,
+      crackStrain: 0.03,
+      skin: 0.002
+    },
+    lava: {
+      render: {
+        smoothing: 2.5,
+        crust: '#585653',
+        roughness: 0.35,
+        ropes: 0.8,
+        ropeLength: 0.07,
+        cracks: 1,
+        crackSize: 0.3,
+        crackWidth: 0.005,
+        clasts: 0
+      }
+    }
   },
   aa: {
-    material: { density: 2600, viscosity: 1200, eruption: 1405, solidus: 1300, yieldStress: 20000, meltYield: 2500, crackStrain: 0.003, skin: 0.003 },
-    lava: { render: { smoothing: 1, crust: '#332e2b', roughness: 0.9, ropes: 0, cracks: 1, crackSize: 0.09, crackWidth: 0.008, clasts: 0.9 } },
-  },
+    material: {
+      density: 2600,
+      viscosity: 1200,
+      eruption: 1405,
+      solidus: 1300,
+      yieldStress: 20000,
+      meltYield: 2500,
+      crackStrain: 0.003,
+      skin: 0.003
+    },
+    lava: {
+      render: {
+        smoothing: 1,
+        crust: '#332e2b',
+        roughness: 0.9,
+        ropes: 0,
+        cracks: 1,
+        crackSize: 0.09,
+        crackWidth: 0.008,
+        clasts: 0.9
+      }
+    }
+  }
 }
 
 /** Stefan–Boltzmann constant, W/(m²·K⁴). */
@@ -165,7 +318,8 @@ const MIN_J = 0.05
 const MELT_STRETCH = 0.2
 /** Wien's c₂/λ at 600 nm, kelvin: the visible glow scales as e^(−c₂/λT) (much steeper than T⁴ below ~1400 K). */
 const WIEN = 23980
-const SKIN_AGE = 312, SKIN_EXPONENT = 0.35
+const SKIN_AGE = 312,
+  SKIN_EXPONENT = 0.35
 /**
  * Emitted radiance of 1400 K lava at `intensity` 1, scene units against a noon sun of intensity 3: ~6× sunlit rock of
  * albedo 0.2. Physically about 2–4× (luminous efficacy of a 1400 K blackbody ~0.1–0.3 lm/W); a little more, as
@@ -255,7 +409,8 @@ function cpuPlasticity(F: Mat3, T: number, p: LavaParams): Mat3 {
 function cholesky(b: Mat3): Mat3 {
   const e = 1e-12
   const l11 = Math.sqrt(Math.max(b[0], e))
-  const l21 = b[1] / l11, l31 = b[2] / l11
+  const l21 = b[1] / l11,
+    l31 = b[2] / l11
   const l22 = Math.sqrt(Math.max(b[4] - l21 * l21, e))
   const l32 = (b[5] - l31 * l21) / l22
   const l33 = Math.sqrt(Math.max(b[8] - l31 * l31 - l32 * l32, e))
@@ -278,17 +433,24 @@ export const LAVA = registerMPMMaterial<LavaParams>({
   stress: ({ F, J, C, temperature: T, params: p }) => {
     const { mu, lambda } = lame(p.youngs, p.poisson)
     const lnJ = log(max(J, MIN_J))
-    return F.mul(transpose(F)).mul(mu).add(mpmIdentity().mul(lambda.mul(lnJ).sub(mu))).add(C.add(transpose(C)).mul(viscosityNode(T, p).mul(J)))
+    return F.mul(transpose(F))
+      .mul(mu)
+      .add(mpmIdentity().mul(lambda.mul(lnJ).sub(mu)))
+      .add(C.add(transpose(C)).mul(viscosityNode(T, p).mul(J)))
   },
   plasticity: ({ F, J, temperature: T, params: p }) => {
     const { mu } = lame(p.youngs, p.poisson)
     const s = crustNode(T, p).toVar()
     const Jc = clamp(J, MIN_J, float(1 + MELT_STRETCH).add(p.crackStrain.sub(MELT_STRETCH).mul(s))).toVar()
     const j23 = pow(Jc, 2 / 3).toVar()
-    const b: any = F.mul(transpose(F)).mul(pow(Jc.div(max(J, 1e-12)), 2 / 3).div(j23)).toVar()
+    const b: any = F.mul(transpose(F))
+      .mul(pow(Jc.div(max(J, 1e-12)), 2 / 3).div(j23))
+      .toVar()
     const tr = b.element(0).x.add(b.element(1).y).add(b.element(2).z).div(3).toVar()
     const dev: any = b.add(mpmIdentity().mul(tr.negate())).toVar()
-    const d0 = dev.element(0), d1 = dev.element(1), d2 = dev.element(2)
+    const d0 = dev.element(0),
+      d1 = dev.element(1),
+      d2 = dev.element(2)
     const norm = sqrt(dot(d0, d0).add(dot(d1, d1)).add(dot(d2, d2)))
     const yieldT = p.meltYield.add(p.yieldStress.sub(p.meltYield).mul(s))
     const k = min(float(1), yieldT.div(mu.mul(j23).mul(norm).add(1e-12)))
@@ -298,19 +460,22 @@ export const LAVA = registerMPMMaterial<LavaParams>({
   },
   cpu: {
     stress: ({ F, J, C, temperature, params }) => cpuStress(F, J, C, temperature, params as LavaParams),
-    plasticity: ({ F, temperature, params }) => ({ F: cpuPlasticity(F, temperature, params as LavaParams) }),
+    plasticity: ({ F, temperature, params }) => ({ F: cpuPlasticity(F, temperature, params as LavaParams) })
   },
   soundSpeed: (p) => {
     const { mu, lambda } = lame(p.youngs, p.poisson)
     return Math.sqrt((lambda + 2 * mu) / p.density)
   },
-  viscosity: (p) => p.viscosityMax / p.density,
+  viscosity: (p) => p.viscosityMax / p.density
 })
 
 function choleskyNode(b: any): any {
-  const c0 = b.element(0), c1 = b.element(1), c2 = b.element(2)
+  const c0 = b.element(0),
+    c1 = b.element(1),
+    c2 = b.element(2)
   const l11 = sqrt(max(c0.x, 1e-12)).toVar()
-  const l21 = c0.y.div(l11).toVar(), l31 = c0.z.div(l11).toVar()
+  const l21 = c0.y.div(l11).toVar(),
+    l31 = c0.z.div(l11).toVar()
   const l22 = sqrt(max(c1.y.sub(l21.mul(l21)), 1e-12)).toVar()
   const l32 = c1.z.sub(l31.mul(l21)).div(l22).toVar()
   const l33 = sqrt(max(c2.z.sub(l31.mul(l31)).sub(l32.mul(l32)), 1e-12))
@@ -324,7 +489,8 @@ function choleskyNode(b: any): any {
  * full node's mass): 0.94…1 inside, ≈0.8 one layer down, 0.59…0.62 on a flat face (by lattice phase), less on edges. 0 at φ ≥ FILL_INSIDE,
  * 1 at φ ≤ FILL_SURFACE, so only the outer layer of particles exchanges heat with the surroundings.
  */
-const FILL_INSIDE = 0.84, FILL_SURFACE = 0.63
+const FILL_INSIDE = 0.84,
+  FILL_SURFACE = 0.63
 const exposureOf = (fill: number) => Math.min(1, Math.max(0, (FILL_INSIDE - fill) / (FILL_INSIDE - FILL_SURFACE)))
 /** Ground contact from the height above the (bilinear) ground: 1 for the bottom layer (≤ half a spacing up), 0 a spacing higher. */
 const contactOf = (above: number, dx: number) => Math.min(1, Math.max(0, 1.5 - above / (dx / MPM_PPC_AXIS)))
@@ -344,23 +510,30 @@ export interface LavaThermalState {
  * mass-weighted temperature at rate 4κ/Δx² (exact exponential, so any `dt` is stable). Writes `ref.data.temperature`.
  */
 export function lavaThermalStep(ref: MPMReference, dt: number, material = 'lava'): LavaThermalState {
-  const o = ref.options, d = ref.data
+  const o = ref.options,
+    d = ref.data
   const [nx, ny, nz] = o.resolution
-  const dx = o.cellSize, inv = 1 / dx
+  const dx = o.cellSize,
+    inv = 1 / dx
   const id = ref.materials.indexOf(material)
   const p = o.materials[material] as LavaParams
   const n = d.count
   const out: LavaThermalState = { fill: new Float64Array(n) }
   if (id < 0) return out
-  const mass = p.density / (MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3), full = p.density / MPM_DENSITY_UNIT
+  const mass = p.density / (MPM_DENSITY_UNIT * MPM_PPC_AXIS ** 3),
+    full = p.density / MPM_DENSITY_UNIT
   const acc = new Int32Array(nx * ny * nz * 2)
-  const base = [0, 0, 0], fx = [0, 0, 0], w = new Float64Array(9)
+  const base = [0, 0, 0],
+    fx = [0, 0, 0],
+    w = new Float64Array(9)
   const kernel = (q: number) => {
     for (let a = 0; a < 3; a++) {
       const xg = d.position[q * 3 + a] * inv
       base[a] = Math.floor(xg - 0.5)
       const f = (fx[a] = xg - base[a])
-      w[a] = 0.5 * (1.5 - f) ** 2; w[3 + a] = 0.75 - (f - 1) ** 2; w[6 + a] = 0.5 * (f - 0.5) ** 2
+      w[a] = 0.5 * (1.5 - f) ** 2
+      w[3 + a] = 0.75 - (f - 1) ** 2
+      w[6 + a] = 0.5 * (f - 0.5) ** 2
     }
     return base[0] >= 0 && base[1] >= 0 && base[2] >= 0 && base[0] <= nx - 3 && base[1] <= ny - 3 && base[2] <= nz - 3
   }
@@ -368,30 +541,39 @@ export function lavaThermalStep(ref: MPMReference, dt: number, material = 'lava'
   for (let q = 0; q < n; q++) {
     if (d.material[q] !== id || !kernel(q)) continue
     const T = d.temperature[q]
-    for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
-      const wm = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2] * mass, c = node(i, j, k)
-      acc[c] = (acc[c] + toFixed(wm)) | 0
-      acc[c + 1] = (acc[c + 1] + toFixed((wm * T) / HEAT_UNIT)) | 0
-    }
+    for (let k = 0; k < 3; k++)
+      for (let j = 0; j < 3; j++)
+        for (let i = 0; i < 3; i++) {
+          const wm = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2] * mass,
+            c = node(i, j, k)
+          acc[c] = (acc[c] + toFixed(wm)) | 0
+          acc[c + 1] = (acc[c + 1] + toFixed((wm * T) / HEAT_UNIT)) | 0
+        }
   }
   const relax = 1 - Math.exp((-4 * p.diffusivity * dt) / (dx * dx))
   for (let q = 0; q < n; q++) {
     if (d.material[q] !== id || !kernel(q)) continue
-    let m = 0, mT = 0
-    for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {
-      const c = node(i, j, k)
-      const mi = acc[c] / MPM_FIXED
-      if (acc[c] <= 0) continue
-      const wt = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
-      m += wt * mi
-      mT += wt * mi * ((acc[c + 1] / acc[c]) * HEAT_UNIT)
-    }
+    let m = 0,
+      mT = 0
+    for (let k = 0; k < 3; k++)
+      for (let j = 0; j < 3; j++)
+        for (let i = 0; i < 3; i++) {
+          const c = node(i, j, k)
+          const mi = acc[c] / MPM_FIXED
+          if (acc[c] <= 0) continue
+          const wt = w[i * 3] * w[j * 3 + 1] * w[k * 3 + 2]
+          m += wt * mi
+          mT += wt * mi * ((acc[c + 1] / acc[c]) * HEAT_UNIT)
+        }
     const fill = m / full
-    const x = d.position[q * 3], y = d.position[q * 3 + 1], z = d.position[q * 3 + 2]
+    const x = d.position[q * 3],
+      y = d.position[q * 3 + 1],
+      z = d.position[q * 3 + 2]
     const above = y - groundAt(ref.heights, nx, nz, dx, x, z)[0]
     const T0 = d.temperature[q]
     const floor = Math.min(p.airTemperature, p.groundTemperature)
-    const open = exposureOf(fill), contact = contactOf(above, dx) // the open side of a bottom particle is the ground
+    const open = exposureOf(fill),
+      contact = contactOf(above, dx) // the open side of a bottom particle is the ground
     let T = Math.max(floor, T0 - dt * lavaCoolingRate(T0, open * (1 - contact), open * contact, p))
     if (m > 0) T += (mT / m - T) * relax
     d.temperature[q] = T
@@ -466,9 +648,12 @@ export class MPMLava {
     /** Projection [0][0] and [1][1]. */ projection: uniform(new Vector2(1, 1)),
     /** One texel of the offscreen passes. */ texel: uniform(new Vector2(1, 1)),
     /** Blur direction. */ direction: uniform(new Vector2(1, 0)),
-    /** First ring slot of the particles {@link MPMLava.emit} added since the last step. */ gateFirst: uniform(0, 'int'),
+    /** First ring slot of the particles {@link MPMLava.emit} added since the last step. */ gateFirst: uniform(
+      0,
+      'int'
+    ),
     /** How many. */ gateCount: uniform(0, 'int'),
-    /** Most lava fill a new particle may land in. */ gateFill: uniform(0.7),
+    /** Most lava fill a new particle may land in. */ gateFill: uniform(0.7)
   }
 
   private readonly acc: any
@@ -494,20 +679,32 @@ export class MPMLava {
    * Lava on `solver` (whose `materials` must include `options.material`, default `lava`). `lighting` is shared with other
    * systems if given; `envMap` (e.g. `scene.environment`) lights the surface instead of the sky colour of `lighting`.
    */
-  constructor(solver: MPMSolver, { lighting, envMap = null, ...input }: LavaInput & { lighting?: ParticleLighting; envMap?: Texture | null } = {}) {
+  constructor(
+    solver: MPMSolver,
+    { lighting, envMap = null, ...input }: LavaInput & { lighting?: ParticleLighting; envMap?: Texture | null } = {}
+  ) {
     this.solver = solver
     this.lighting = lighting ?? new ParticleLighting()
     this.env = envMap
     this.options = resolveLavaOptions(input)
     this.materialIndex = solver.materials.indexOf(this.options.material)
-    if (this.materialIndex < 0) throw new Error(`threejs-particles: MPMLava needs the '${this.options.material}' material compiled into the solver`)
+    if (this.materialIndex < 0)
+      throw new Error(
+        `threejs-particles: MPMLava needs the '${this.options.material}' material compiled into the solver`
+      )
     const [nx, ny, nz] = solver.resolution
     const cells = nx * ny * nz
     this.acc = storage(new StorageBufferAttribute(new Int32Array(cells * 4), 1), 'int', cells * 4).toAtomic()
     this.nodeHeat = instancedArray(cells, 'vec4')
     this.field = Object.assign(new Storage3DTexture(nx, ny, nz), {
-      type: HalfFloatType, format: RGBAFormat, magFilter: LinearFilter, minFilter: LinearFilter, generateMipmaps: false,
-      wrapS: ClampToEdgeWrapping, wrapT: ClampToEdgeWrapping, wrapR: ClampToEdgeWrapping,
+      type: HalfFloatType,
+      format: RGBAFormat,
+      magFilter: LinearFilter,
+      minFilter: LinearFilter,
+      generateMipmaps: false,
+      wrapS: ClampToEdgeWrapping,
+      wrapT: ClampToEdgeWrapping,
+      wrapR: ClampToEdgeWrapping
     })
     this.scatterNode = this.buildScatter()
     this.nodeNode = this.buildNodes()
@@ -516,7 +713,14 @@ export class MPMLava {
     this.lastTime = solver.time
 
     const target = (filter: typeof NearestFilter, depth = false) =>
-      new RenderTarget(1, 1, { type: FloatType, format: RedFormat, depthBuffer: depth, magFilter: filter, minFilter: filter, generateMipmaps: false })
+      new RenderTarget(1, 1, {
+        type: FloatType,
+        format: RedFormat,
+        depthBuffer: depth,
+        magFilter: filter,
+        minFilter: filter,
+        generateMipmaps: false
+      })
     this.depthRT = target(NearestFilter, true)
     this.tempRT = target(NearestFilter)
     this.smoothRT = target(NearestFilter)
@@ -561,15 +765,20 @@ export class MPMLava {
    * Returns how many were added (before the gate).
    */
   emit(spec: MPMEmit, maxFill = 0.7): number {
-    const s = this.solver, u = this.uniforms
+    const s = this.solver,
+      u = this.uniforms
     this.closeGate()
     const head = s.writeHead // ring slot of the first new particle
     const p = s.options.materials[this.options.material]
     const k = s.emit({ material: this.options.material, temperature: p.eruption, ...spec })
     if (!k) return 0
     const pending = u.gateCount.value > 0
-    if (pending && (u.gateFirst.value + u.gateCount.value) % s.capacity === head) u.gateCount.value = Math.min(s.capacity, u.gateCount.value + k)
-    else { u.gateFirst.value = head; u.gateCount.value = k }
+    if (pending && (u.gateFirst.value + u.gateCount.value) % s.capacity === head)
+      u.gateCount.value = Math.min(s.capacity, u.gateCount.value + k)
+    else {
+      u.gateFirst.value = head
+      u.gateCount.value = k
+    }
     u.gateFill.value = maxFill
     return k
   }
@@ -604,9 +813,11 @@ export class MPMLava {
 
   /** Draws the offscreen surface passes for `camera` (each frame, before rendering the scene that holds `object`). */
   render(renderer: Renderer, camera: Camera): this {
-    const o = this.options.render, u = this.uniforms
+    const o = this.options.render,
+      u = this.uniforms
     renderer.getDrawingBufferSize(this.size)
-    const w = Math.max(1, Math.round(this.size.x * o.resolution)), h = Math.max(1, Math.round(this.size.y * o.resolution))
+    const w = Math.max(1, Math.round(this.size.x * o.resolution)),
+      h = Math.max(1, Math.round(this.size.y * o.resolution))
     for (const rt of [this.depthRT, this.tempRT, this.smoothRT]) if (rt.width !== w || rt.height !== h) rt.setSize(w, h)
     u.texel.value.set(1 / w, 1 / h)
     const p = (camera as PerspectiveCamera).projectionMatrix.elements
@@ -619,7 +830,9 @@ export class MPMLava {
     u.origin.value.setFromMatrixPosition(this.solver.object.matrixWorld)
     this.splat.matrix.copy(this.solver.object.matrixWorld)
     this.splat.matrixWorld.copy(this.splat.matrix)
-    const prevTarget = renderer.getRenderTarget(), prevAlpha = renderer.getClearAlpha(), prevAuto = renderer.autoClear
+    const prevTarget = renderer.getRenderTarget(),
+      prevAlpha = renderer.getClearAlpha(),
+      prevAuto = renderer.autoClear
     renderer.getClearColor(this.clearColor)
     renderer.autoClear = false
     renderer.setClearColor(0x000000, 0)
@@ -629,7 +842,10 @@ export class MPMLava {
     let src = this.depthRT
     const passes = o.iterations ? o.iterations : 0
     for (let i = 0; i < passes; i++) {
-      for (const [dir, dst] of [[[1, 0], this.tempRT], [[0, 1], this.smoothRT]] as const) {
+      for (const [dir, dst] of [
+        [[1, 0], this.tempRT],
+        [[0, 1], this.smoothRT]
+      ] as const) {
         this.blurInput.value = src.texture
         u.direction.value.set(dir[0], dir[1])
         renderer.setRenderTarget(dst)
@@ -664,12 +880,15 @@ export class MPMLava {
   // `material` names a material compiled into the solver, and the passes test for its index: it cannot change here.
   private checkMaterial(input: LavaInput): void {
     if (input.material !== undefined && input.material !== this.options.material) {
-      throw new Error(`threejs-particles: MPMLava 'material' is fixed at construction (the solver compiled '${this.options.material}', not '${input.material}')`)
+      throw new Error(
+        `threejs-particles: MPMLava 'material' is fixed at construction (the solver compiled '${this.options.material}', not '${input.material}')`
+      )
     }
   }
 
   private applyOptions(): this {
-    const r = this.options.render, u = this.uniforms
+    const r = this.options.render,
+      u = this.uniforms
     const spacing = this.solver.options.cellSize / MPM_PPC_AXIS
     u.radius.value = r.radius * spacing
     u.smoothing.value = r.smoothing * r.radius * spacing
@@ -696,34 +915,58 @@ export class MPMLava {
     const xg: any = x.mul(su.invDx).toVar()
     const base: any = floor(xg.sub(0.5)).toVar()
     const fx: any = xg.sub(base).toVar()
-    const w = [fx.sub(1.5).mul(fx.sub(1.5)).mul(0.5).toVar(), float(0.75).sub(fx.sub(1).mul(fx.sub(1))).toVar(), fx.sub(0.5).mul(fx.sub(0.5)).mul(0.5).toVar()]
-    const active = base.x.greaterThanEqual(0).and(base.y.greaterThanEqual(0)).and(base.z.greaterThanEqual(0))
-      .and(base.x.lessThanEqual(nx - 3)).and(base.y.lessThanEqual(ny - 3)).and(base.z.lessThanEqual(nz - 3))
+    const w = [
+      fx.sub(1.5).mul(fx.sub(1.5)).mul(0.5).toVar(),
+      float(0.75)
+        .sub(fx.sub(1).mul(fx.sub(1)))
+        .toVar(),
+      fx.sub(0.5).mul(fx.sub(0.5)).mul(0.5).toVar()
+    ]
+    const active = base.x
+      .greaterThanEqual(0)
+      .and(base.y.greaterThanEqual(0))
+      .and(base.z.greaterThanEqual(0))
+      .and(base.x.lessThanEqual(nx - 3))
+      .and(base.y.lessThanEqual(ny - 3))
+      .and(base.z.lessThanEqual(nz - 3))
     const ib: any = ivec3(base).toVar()
-    const node = (i: number, j: number, k: number) => ib.z.add(k).mul(nx * ny).add(ib.y.add(j).mul(nx)).add(ib.x.add(i))
+    const node = (i: number, j: number, k: number) =>
+      ib.z
+        .add(k)
+        .mul(nx * ny)
+        .add(ib.y.add(j).mul(nx))
+        .add(ib.x.add(i))
     return { active, node, w }
   }
 
   private isLava(i: any): any {
     const b = this.solver.buffers
-    return b.velocity.element(i).w.greaterThan(0).and(int(b.state.element(i).x).equal(this.materialIndex))
+    return b.velocity
+      .element(i)
+      .w.greaterThan(0)
+      .and(int(b.state.element(i).x).equal(this.materialIndex))
   }
 
   // The temperature particle i glows at (TSL): its skin, Ta + (T − Ta)·skin(age) from its surface age (state.w), or its
   // bulk temperature where its crust is cracking open (J towards 1 + crackStrain).
   private glowTemperature(i: any): any {
-    const b = this.solver.buffers, p = this.params
+    const b = this.solver.buffers,
+      p = this.params
     const T = b.props.element(i).x
     const col = (c: number) => b.deformation.element(int(i).mul(3).add(c)).xyz
     const J = determinant((mat3 as any)(col(0), col(1), col(2)))
-    const opening = clamp(J.sub(1).div(max(p.crackStrain, 1e-4)).sub(0.5).mul(2), 0, 1).mul(crustNode(T, p)).mul(this.uniforms.cracks)
+    const opening = clamp(J.sub(1).div(max(p.crackStrain, 1e-4)).sub(0.5).mul(2), 0, 1)
+      .mul(crustNode(T, p))
+      .mul(this.uniforms.cracks)
     const skin = float(1).div(pow(b.state.element(i).w.div(SKIN_AGE), SKIN_EXPONENT).add(1))
     const Ta = p.airTemperature
     return mix(Ta.add(T.sub(Ta).mul(skin)), T, opening)
   }
 
   private buildScatter(): ComputeNode {
-    const b = this.solver.buffers, acc = this.acc, p = this.params
+    const b = this.solver.buffers,
+      acc = this.acc,
+      p = this.params
     const fixed = (v: any) => int(floor(v.mul(MPM_FIXED).add(0.5)))
     return Fn(() => {
       const i = instanceIndex
@@ -735,39 +978,60 @@ export class MPMLava {
           // Surface particles (age > 0: open to the air last step) carry the glow.
           const surface = select(b.state.element(i).w.greaterThan(0), float(1), float(0))
           const glow = this.glowTemperature(i).toVar()
-          for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            const wm = k.w[x].x.mul(k.w[y].y).mul(k.w[z].z).mul(mass).toVar()
-            const n = k.node(x, y, z).mul(4).toVar()
-            atomicAdd(acc.element(n), fixed(wm))
-            atomicAdd(acc.element(n.add(1)), fixed(wm.mul(T).div(HEAT_UNIT)))
-            atomicAdd(acc.element(n.add(2)), fixed(wm.mul(surface)))
-            atomicAdd(acc.element(n.add(3)), fixed(wm.mul(surface).mul(glow).div(HEAT_UNIT)))
-          }
+          for (let z = 0; z < 3; z++)
+            for (let y = 0; y < 3; y++)
+              for (let x = 0; x < 3; x++) {
+                const wm = k.w[x].x.mul(k.w[y].y).mul(k.w[z].z).mul(mass).toVar()
+                const n = k.node(x, y, z).mul(4).toVar()
+                atomicAdd(acc.element(n), fixed(wm))
+                atomicAdd(acc.element(n.add(1)), fixed(wm.mul(T).div(HEAT_UNIT)))
+                atomicAdd(acc.element(n.add(2)), fixed(wm.mul(surface)))
+                atomicAdd(acc.element(n.add(3)), fixed(wm.mul(surface).mul(glow).div(HEAT_UNIT)))
+              }
         })
       })
     })().compute(this.solver.capacity, [64])
   }
 
   private buildNodes(): ComputeNode {
-    const acc = this.acc, p = this.params
+    const acc = this.acc,
+      p = this.params
     const [nx, ny, nz] = this.solver.resolution
     return Fn(() => {
       const n: any = int(instanceIndex).toVar()
-      const x: any = n.mod(nx), y: any = n.div(nx).mod(ny), z: any = n.div(nx * ny)
+      const x: any = n.mod(nx),
+        y: any = n.div(nx).mod(ny),
+        z: any = n.div(nx * ny)
       const load = (c: number): any => float(atomicLoad(acc.element(n.mul(4).add(c))) as any)
       const m: any = int(atomicLoad(acc.element(n.mul(4))) as any).toVar()
-      const mT = load(1), ms = load(2), msT = load(3)
+      const mT = load(1),
+        ms = load(2),
+        msT = load(3)
       for (let c = 0; c < 4; c++) atomicStore(acc.element(n.mul(4).add(c)), int(0))
       const has = m.greaterThan(0)
-      const heat = vec4(select(has, float(m).div(MPM_FIXED), float(0)), select(has, mT.div(float(m)).mul(HEAT_UNIT), float(0)), 0, 0).toVar()
+      const heat = vec4(
+        select(has, float(m).div(MPM_FIXED), float(0)),
+        select(has, mT.div(float(m)).mul(HEAT_UNIT), float(0)),
+        0,
+        0
+      ).toVar()
       this.nodeHeat.element(n).assign(heat)
       const full = p.density.div(MPM_DENSITY_UNIT)
-      textureStore(this.field, ivec3(x, y, z), vec4(heat.x.div(full), heat.y, msT.mul(HEAT_UNIT / MPM_FIXED).div(full), ms.div(MPM_FIXED).div(full)))
+      textureStore(
+        this.field,
+        ivec3(x, y, z),
+        vec4(heat.x.div(full), heat.y, msT.mul(HEAT_UNIT / MPM_FIXED).div(full), ms.div(MPM_FIXED).div(full))
+      )
     })().compute(nx * ny * nz, [64])
   }
 
   private buildGather(): ComputeNode {
-    const s = this.solver, b = s.buffers, H = b.heights, p = this.params, u = this.uniforms, su = s.uniforms
+    const s = this.solver,
+      b = s.buffers,
+      H = b.heights,
+      p = this.params,
+      u = this.uniforms,
+      su = s.uniforms
     const [nx, , nz] = s.resolution
     return Fn(() => {
       const i = instanceIndex
@@ -775,30 +1039,54 @@ export class MPMLava {
         const P = b.position.element(i).toVar()
         const k = this.kernel(P.xyz)
         If(k.active, () => {
-          const m = float(0).toVar(), mT = float(0).toVar()
-          for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            const h = this.nodeHeat.element(k.node(x, y, z)).toVar()
-            const wt = k.w[x].x.mul(k.w[y].y).mul(k.w[z].z)
-            m.addAssign(wt.mul(h.x))
-            mT.addAssign(wt.mul(h.x).mul(h.y))
-          }
+          const m = float(0).toVar(),
+            mT = float(0).toVar()
+          for (let z = 0; z < 3; z++)
+            for (let y = 0; y < 3; y++)
+              for (let x = 0; x < 3; x++) {
+                const h = this.nodeHeat.element(k.node(x, y, z)).toVar()
+                const wt = k.w[x].x.mul(k.w[y].y).mul(k.w[z].z)
+                m.addAssign(wt.mul(h.x))
+                mT.addAssign(wt.mul(h.x).mul(h.y))
+              }
           const fill = m.div(p.density.div(MPM_DENSITY_UNIT)).toVar()
           // Ground under the particle, bilinear between the node columns (as `groundAt`).
           const gxz: any = clamp(P.xz.mul(su.invDx), vec2(0), vec2(nx - 1, nz - 1)).toVar()
           const i0: any = min(floor(gxz), vec2(nx - 2, nz - 2)).toVar()
           const f: any = gxz.sub(i0).toVar()
           const at = (di: number, dk: number) => H.element(int(i0.y).add(dk).mul(nx).add(int(i0.x).add(di)))
-          const ground = at(0, 0).mul(f.x.oneMinus()).add(at(1, 0).mul(f.x)).mul(f.y.oneMinus()).add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
-          const exposure = clamp(float(FILL_INSIDE).sub(fill).div(FILL_INSIDE - FILL_SURFACE), 0, 1)
-          const contact = clamp(float(1.5).sub(P.y.sub(ground).div(su.dx.div(MPM_PPC_AXIS))), 0, 1).mul(exposure).toVar()
+          const ground = at(0, 0)
+            .mul(f.x.oneMinus())
+            .add(at(1, 0).mul(f.x))
+            .mul(f.y.oneMinus())
+            .add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
+          const exposure = clamp(
+            float(FILL_INSIDE)
+              .sub(fill)
+              .div(FILL_INSIDE - FILL_SURFACE),
+            0,
+            1
+          )
+          const contact = clamp(float(1.5).sub(P.y.sub(ground).div(su.dx.div(MPM_PPC_AXIS))), 0, 1)
+            .mul(exposure)
+            .toVar()
           const Q = b.props.element(i).toVar()
           const T0 = Q.x
           const Ta = p.airTemperature
-          const air = p.emissivity.mul(SIGMA).mul(pow(T0, 4).sub(pow(Ta, 4))).add(p.convection.mul(T0.sub(Ta)))
-          const rate = exposure.sub(contact).mul(air).add(contact.mul(p.groundConductance.mul(T0.sub(p.groundTemperature)))).div(p.density.mul(p.heatCapacity).mul(p.skin))
+          const air = p.emissivity
+            .mul(SIGMA)
+            .mul(pow(T0, 4).sub(pow(Ta, 4)))
+            .add(p.convection.mul(T0.sub(Ta)))
+          const rate = exposure
+            .sub(contact)
+            .mul(air)
+            .add(contact.mul(p.groundConductance.mul(T0.sub(p.groundTemperature))))
+            .div(p.density.mul(p.heatCapacity).mul(p.skin))
           const T = max(min(Ta, p.groundTemperature), T0.sub(u.dt.mul(rate))).toVar()
           const relax = float(1).sub(exp(p.diffusivity.mul(-4).mul(u.dt).mul(su.invDx).mul(su.invDx)))
-          If(m.greaterThan(0), () => { T.addAssign(mT.div(m).sub(T).mul(relax)) })
+          If(m.greaterThan(0), () => {
+            T.addAssign(mT.div(m).sub(T).mul(relax))
+          })
           b.props.element(i).assign(vec4(T, Q.y, Q.z, Q.w))
           // Surface age (state.w, for the skin glow): grows while the particle is at the surface, 0 once it is inside.
           const S = b.state.element(i).toVar()
@@ -809,7 +1097,11 @@ export class MPMLava {
   }
 
   private buildGate(): ComputeNode {
-    const s = this.solver, b = s.buffers, p = this.params, u = this.uniforms, cap = s.capacity
+    const s = this.solver,
+      b = s.buffers,
+      p = this.params,
+      u = this.uniforms,
+      cap = s.capacity
     return Fn(() => {
       const i = instanceIndex
       const rel = int(i).sub(u.gateFirst).add(cap).mod(cap)
@@ -817,10 +1109,19 @@ export class MPMLava {
         const k = this.kernel(b.position.element(i).xyz)
         If(k.active, () => {
           const m = float(0).toVar()
-          for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            m.addAssign(k.w[x].x.mul(k.w[y].y).mul(k.w[z].z).mul(this.nodeHeat.element(k.node(x, y, z)).x))
-          }
-          If(m.div(p.density.div(MPM_DENSITY_UNIT)).greaterThan(u.gateFill), () => { b.velocity.element(i).assign(vec4(0)) })
+          for (let z = 0; z < 3; z++)
+            for (let y = 0; y < 3; y++)
+              for (let x = 0; x < 3; x++) {
+                m.addAssign(
+                  k.w[x].x
+                    .mul(k.w[y].y)
+                    .mul(k.w[z].z)
+                    .mul(this.nodeHeat.element(k.node(x, y, z)).x)
+                )
+              }
+          If(m.div(p.density.div(MPM_DENSITY_UNIT)).greaterThan(u.gateFill), () => {
+            b.velocity.element(i).assign(vec4(0))
+          })
         })
       })
     })().compute(cap, [64])
@@ -829,13 +1130,22 @@ export class MPMLava {
   // The field at a local position (node i at texel centre i), trilinear.
   private fieldAt(local: any): any {
     const [nx, ny, nz] = this.solver.resolution
-    return texture3D(this.field, local.mul(this.solver.uniforms.invDx).add(0.5).div(vec3(nx, ny, nz)), float(0))
+    return texture3D(
+      this.field,
+      local
+        .mul(this.solver.uniforms.invDx)
+        .add(0.5)
+        .div(vec3(nx, ny, nz)),
+      float(0)
+    )
   }
 
   // Camera-facing quads around the lava particles near the surface (field fill at the centre < 0.9: the top two layers;
   // deeper ones are hidden, and come back as a crack exposes them): sphere-impostor depth, linear, front surface.
   private splatMaterial(): MeshBasicNodeMaterial {
-    const u = this.uniforms, b = this.solver.buffers, i = instanceIndex
+    const u = this.uniforms,
+      b = this.solver.buffers,
+      i = instanceIndex
     const m = new MeshBasicNodeMaterial()
     m.fog = false
     m.toneMapped = false
@@ -847,7 +1157,9 @@ export class MPMLava {
     const r2 = dot(q, q)
     const nz = sqrt(max(float(1).sub(r2), 0))
     m.colorNode = Fn(() => {
-      If(r2.greaterThan(1), () => { Discard() })
+      If(r2.greaterThan(1), () => {
+        Discard()
+      })
       return vec4(positionView.z.add(nz.mul(u.radius)).negate(), 0, 0, 1)
     })()
     m.depthNode = viewZToPerspectiveDepth(positionView.z.add(nz.mul(u.radius)), cameraNear, cameraFar)
@@ -869,17 +1181,26 @@ export class MPMLava {
       If(u.direction.x.add(u.direction.y).greaterThan(0), () => {
         // Kernel size from the depth here, or from the nearest surface for an empty pixel (probed 4 texels out).
         const step = u.direction.mul(u.texel)
-        const near = max(max(this.blurInput.sample(c.add(step.mul(4))).x, this.blurInput.sample(c.sub(step.mul(4))).x), d0)
+        const near = max(
+          max(this.blurInput.sample(c.add(step.mul(4))).x, this.blurInput.sample(c.sub(step.mul(4))).x),
+          d0
+        )
         If(near.greaterThan(0), () => {
           const dref = select(d0.greaterThan(0), d0, near).toVar()
           const px = min(u.smoothing.mul(u.projection.x).div(dref).mul(0.5).div(u.texel.x), 14)
           const sigma = max(px.mul(0.5), 0.5)
           const range = u.radius.mul(3)
           const k = clamp(px.mul(0.5).floor(), 2, 7)
-          const dp = this.blurInput.sample(c.add(step.mul(k))).x, dm = this.blurInput.sample(c.sub(step.mul(k))).x
+          const dp = this.blurInput.sample(c.add(step.mul(k))).x,
+            dm = this.blurInput.sample(c.sub(step.mul(k))).x
           const slope = select(dp.greaterThan(0).and(dm.greaterThan(0)), dp.sub(dm).div(k.mul(2)), float(0)).toVar()
-          If(abs(slope.mul(k)).greaterThan(range.mul(2)), () => { slope.assign(0) })
-          const sum = float(0).toVar(), wsum = float(0).toVar(), occ = float(0).toVar(), all = float(0).toVar()
+          If(abs(slope.mul(k)).greaterThan(range.mul(2)), () => {
+            slope.assign(0)
+          })
+          const sum = float(0).toVar(),
+            wsum = float(0).toVar(),
+            occ = float(0).toVar(),
+            all = float(0).toVar()
           Loop({ start: -14, end: 15, type: 'int', condition: '<' }, ({ i }: { i: any }) => {
             const t = float(i)
             const d = this.blurInput.sample(c.add(step.mul(t))).x
@@ -893,7 +1214,9 @@ export class MPMLava {
             occ.addAssign(g.mul(valid))
             all.addAssign(g)
           })
-          out.assign(select(occ.div(all).greaterThan(0.45).and(wsum.greaterThan(1e-4)), sum.div(max(wsum, 1e-6)), float(0)))
+          out.assign(
+            select(occ.div(all).greaterThan(0.45).and(wsum.greaterThan(1e-4)), sum.div(max(wsum, 1e-6)), float(0))
+          )
         })
       })
       return vec4(out, 0, 0, 1)
@@ -903,28 +1226,39 @@ export class MPMLava {
 
   // Ground height under local (x, z), bilinear between the node columns (as `groundAt` and the solver's collider).
   private groundHeight(xz: any): any {
-    const s = this.solver, H = s.buffers.heights
+    const s = this.solver,
+      H = s.buffers.heights
     const [nx, , nz] = s.resolution
     const g: any = clamp(xz.mul(s.uniforms.invDx), vec2(0), vec2(nx - 1, nz - 1)).toVar()
     const i0: any = min(floor(g), vec2(nx - 2, nz - 2)).toVar()
     const f: any = g.sub(i0).toVar()
     const at = (di: number, dk: number) => H.element(int(i0.y).add(dk).mul(nx).add(int(i0.x).add(di)))
-    return at(0, 0).mul(f.x.oneMinus()).add(at(1, 0).mul(f.x)).mul(f.y.oneMinus()).add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
+    return at(0, 0)
+      .mul(f.x.oneMinus())
+      .add(at(1, 0).mul(f.x))
+      .mul(f.y.oneMinus())
+      .add(at(0, 1).mul(f.x.oneMinus()).add(at(1, 1).mul(f.x)).mul(f.y))
   }
 
   // Crack cells (Voronoi in local x–z, cell units): x the distance to the nearest cell edge, y a random 0…1 per cell.
   private cells(p: any): any {
-    const i: any = floor(p).toVar(), f: any = p.sub(i).toVar()
-    const d1 = float(8).toVar(), d2 = float(8).toVar(), id = float(0).toVar()
+    const i: any = floor(p).toVar(),
+      f: any = p.sub(i).toVar()
+    const d1 = float(8).toVar(),
+      d2 = float(8).toVar(),
+      id = float(0).toVar()
     const rnd = (cell: any, k: number) => hash(cell.x.add(512).mul(1031).add(cell.y.add(512)).mul(4).add(k))
-    for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
-      const cell: any = i.add(vec2(j, k)).toVar()
-      const r: any = vec2(j, k).add(vec2(rnd(cell, 0), rnd(cell, 1))).sub(f)
-      const dd = dot(r, r).toVar()
-      d2.assign(select(dd.lessThan(d1), d1, min(d2, dd)))
-      id.assign(select(dd.lessThan(d1), rnd(cell, 2), id))
-      d1.assign(min(d1, dd))
-    }
+    for (let j = -1; j <= 1; j++)
+      for (let k = -1; k <= 1; k++) {
+        const cell: any = i.add(vec2(j, k)).toVar()
+        const r: any = vec2(j, k)
+          .add(vec2(rnd(cell, 0), rnd(cell, 1)))
+          .sub(f)
+        const dd = dot(r, r).toVar()
+        d2.assign(select(dd.lessThan(d1), d1, min(d2, dd)))
+        id.assign(select(dd.lessThan(d1), rnd(cell, 2), id))
+        d1.assign(min(d1, dd))
+      }
     return vec2(sqrt(d2).sub(sqrt(d1)).mul(0.5), id)
   }
 
@@ -932,19 +1266,28 @@ export class MPMLava {
   // and the sky or environment, contact darkening at the ground, the field's glow and the glowing crack network; around
   // it, a contact shadow on the ground.
   private compositeMaterial(): MeshBasicNodeMaterial {
-    const u: any = this.uniforms, L: any = this.lighting.uniforms, p = this.params
+    const u: any = this.uniforms,
+      L: any = this.lighting.uniforms,
+      p = this.params
     const m = new MeshBasicNodeMaterial({ transparent: true, depthTest: false, depthWrite: false })
     m.fog = false
     m.vertexNode = vec4(positionGeometry.xy, 0, 1)
-    const depthTex = texture(this.smoothRT.texture), rawTex = texture(this.depthRT.texture)
-    const view = (c: any, d: any): any => (vec3 as any)(c.x.mul(2).sub(1).mul(d).div(u.projection.x), float(1).sub(c.y.mul(2)).mul(d).div(u.projection.y), d.negate())
+    const depthTex = texture(this.smoothRT.texture),
+      rawTex = texture(this.depthRT.texture)
+    const view = (c: any, d: any): any =>
+      (vec3 as any)(
+        c.x.mul(2).sub(1).mul(d).div(u.projection.x),
+        float(1).sub(c.y.mul(2)).mul(d).div(u.projection.y),
+        d.negate()
+      )
     const env = this.env
     const color = Fn(() => {
       const c = screenUV
       const out = vec4(0).toVar()
       const d = depthTex.sample(c).x.toVar()
       const sceneZ = perspectiveDepthToViewZ(viewportDepthTexture().x, cameraNear, cameraFar).negate().toVar()
-      const tx = u.texel.x, ty = u.texel.y
+      const tx = u.texel.x,
+        ty = u.texel.y
       If(d.lessThanEqual(0), () => {
         // Ground next to the lava: occluded by it (a soft contact shadow ~20 cm wide), counting only lava in front of
         // this ground pixel and near its depth (not lava far in front of a distant slope).
@@ -954,27 +1297,54 @@ export class MPMLava {
           const o = vec2(Math.cos((a * Math.PI) / 6), Math.sin((a * Math.PI) / 6))
           for (const sc of [0.2, 0.45, 0.7, 1]) {
             const dd = depthTex.sample(c.add(o.mul(rpx.mul(sc)).mul(vec2(tx, ty)))).x
-            occl.addAssign(select(dd.greaterThan(0).and(dd.lessThan(sceneZ.add(u.radius))).and(sceneZ.sub(dd).lessThan(u.radius.mul(10))), float((1.2 - sc) / 12), float(0)))
+            occl.addAssign(
+              select(
+                dd
+                  .greaterThan(0)
+                  .and(dd.lessThan(sceneZ.add(u.radius)))
+                  .and(sceneZ.sub(dd).lessThan(u.radius.mul(10))),
+                float((1.2 - sc) / 12),
+                float(0)
+              )
+            )
           }
         }
-        If(occl.lessThanEqual(0.002), () => { Discard() })
+        If(occl.lessThanEqual(0.002), () => {
+          Discard()
+        })
         out.assign(vec4(0, 0, 0, smoothstep(0, 1.6, occl).mul(0.45)))
       }).Else(() => {
         // Behind the opaque scene (raw spheres, or the smoothed surface where the closing grew it over the ground): hidden.
-        If(rawTex.sample(c).x.greaterThan(sceneZ.add(u.radius)).or(d.greaterThan(sceneZ.add(u.radius.mul(1.5)))), () => { Discard() })
+        If(
+          rawTex
+            .sample(c)
+            .x.greaterThan(sceneZ.add(u.radius))
+            .or(d.greaterThan(sceneZ.add(u.radius.mul(1.5)))),
+          () => {
+            Discard()
+          }
+        )
         const P: any = view(c, d).toVar()
         // Normal: of the two one-sided differences per axis, the smaller (no smearing across silhouettes).
         const side = (dc: any): any => {
           const dd = depthTex.sample(c.add(dc)).x
-          return select(dd.greaterThan(0), view(c.add(dc), dd), P.add(P.sub(view(c.sub(dc), depthTex.sample(c.sub(dc)).x))))
+          return select(
+            dd.greaterThan(0),
+            view(c.add(dc), dd),
+            P.add(P.sub(view(c.sub(dc), depthTex.sample(c.sub(dc)).x)))
+          )
         }
-        const xr = side(vec2(tx, 0)).sub(P), xl = P.sub(side(vec2(tx, 0).negate()))
-        const yu = side(vec2(0, ty)).sub(P), yd = P.sub(side(vec2(0, ty).negate()))
+        const xr = side(vec2(tx, 0)).sub(P),
+          xl = P.sub(side(vec2(tx, 0).negate()))
+        const yu = side(vec2(0, ty)).sub(P),
+          yd = P.sub(side(vec2(0, ty).negate()))
         const ddx: any = select(abs(xr.z).lessThan(abs(xl.z)), xr, xl)
         const ddy: any = select(abs(yu.z).lessThan(abs(yd.z)), yu, yd)
         const nv: any = normalize(cross(ddy, ddx)).toVar()
         const Vv: any = normalize(P.negate()).toVar()
-        If(dot(nv, Vv).lessThan(0), () => { nv.assign(nv.negate()) })
+        If(dot(nv, Vv).lessThan(0), () => {
+          nv.assign(nv.negate())
+        })
         // At the silhouette the surface turns edge-on: keep the normal facing the camera a little (an edge-on or flipped
         // normal there is what draws a black outline).
         nv.assign(normalize(nv.add(Vv.mul(max(float(0.25).sub(dot(nv, Vv)), 0)))))
@@ -987,13 +1357,20 @@ export class MPMLava {
         const Te: any = select(f.w.greaterThan(0.02), f.z.div(max(f.w, 0.02)), f.y).toVar()
         const crusted = smoothstep(1300, 1120, Te).toVar() // the skin has gone dark (cooled)
         // Tangent frame and detail fade: a pattern finer than ~2 px fades out (fwidth), so nothing aliases.
-        const tX: any = normalize(vec3(1, 0, 0).sub(N.mul(N.x))).toVar(), tZ: any = normalize(cross(tX, N)).toVar()
+        const tX: any = normalize(vec3(1, 0, 0).sub(N.mul(N.x))).toVar(),
+          tZ: any = normalize(cross(tX, N)).toVar()
         // Ropy folds across the surface flow (the solver grid's velocity, else downhill once it has stopped), on dark skin.
         const v: any = this.gridVelocity(local).toVar()
         const down: any = vec3(N.x, 0, N.z).mul(0.004)
-        const vt: any = v.add(down).sub(N.mul(dot(v.add(down), N))).toVar()
+        const vt: any = v
+          .add(down)
+          .sub(N.mul(dot(v.add(down), N)))
+          .toVar()
         const dir: any = vt.div(max(length(vt), 1e-6)).toVar()
-        const phase: any = dot(local, dir).mul(Math.PI * 2).div(u.ropeLength).toVar()
+        const phase: any = dot(local, dir)
+          .mul(Math.PI * 2)
+          .div(u.ropeLength)
+          .toVar()
         const ropeFade = clamp(float(1.5).sub(fwidth(phase).div(Math.PI)), 0, 1)
         const wrinkle: any = phase.mul(2.7).add(dot(local, tZ).mul(11)).toVar()
         const wrinkleFade = clamp(float(1.5).sub(fwidth(wrinkle).div(Math.PI)), 0, 1)
@@ -1004,10 +1381,22 @@ export class MPMLava {
         const cell: any = this.cells(q).toVar()
         const cellFade = clamp(float(2).sub(fwidth(q.x).mul(8)), 0, 1).toVar()
         const ta = cell.y.mul(Math.PI * 2)
-        N.assign(normalize(N.add(tX.mul(ta.cos()).add(tZ.mul(ta.sin())).mul(hash(cell.y.mul(7919)).mul(u.clasts).mul(0.9).mul(cellFade)))))
+        N.assign(
+          normalize(
+            N.add(
+              tX
+                .mul(ta.cos())
+                .add(tZ.mul(ta.sin()))
+                .mul(hash(cell.y.mul(7919)).mul(u.clasts).mul(0.9).mul(cellFade))
+            )
+          )
+        )
         const edge = cell.x.mul(u.crackSize) // metres to the nearest crack
         const fe = max(fwidth(edge), 1e-5)
-        const crack = float(1).sub(smoothstep(u.crackWidth.sub(fe), u.crackWidth.add(fe), edge)).mul(cellFade).toVar()
+        const crack = float(1)
+          .sub(smoothstep(u.crackWidth.sub(fe), u.crackWidth.add(fe), edge))
+          .mul(cellFade)
+          .toVar()
         // Contact with the ground: the lava's own underside and toe base are shaded (no sky, little sun).
         const above = W.y.sub(u.origin.y).sub(this.groundHeight(vec2(local.x, local.z)))
         const contact = smoothstep(0, u.radius.mul(1.5), above).mul(0.5).add(0.5)
@@ -1018,12 +1407,17 @@ export class MPMLava {
         const Ls = L.sunDirection
         const H = normalize(Ls.add(Vw))
         const a2 = rough.mul(rough).mul(rough).mul(rough)
-        const NdH = clamp(dot(N, H), 0, 1), NdL = clamp(dot(N, Ls), 0, 1)
+        const NdH = clamp(dot(N, H), 0, 1),
+          NdL = clamp(dot(N, Ls), 0, 1)
         const D = a2.div(NdH.mul(NdH).mul(a2.sub(1)).add(1).pow(2).mul(Math.PI))
         const G = float(0.5).div(max(NdV.add(NdL).mul(rough.mul(0.5).add(0.5)), 0.1))
         const spec = L.sunColor.mul(min(D.mul(F).mul(G).mul(NdL), 2))
-        const ambient: any = env ? pmremTexture(env, N, float(1)).rgb.mul(u.environmentIntensity) : L.ambient.mul(N.y.mul(0.3).add(0.7))
-        const sheen: any = env ? pmremTexture(env, reflect(Vw.negate(), N), rough).rgb.mul(u.environmentIntensity) : L.ambient
+        const ambient: any = env
+          ? pmremTexture(env, N, float(1)).rgb.mul(u.environmentIntensity)
+          : L.ambient.mul(N.y.mul(0.3).add(0.7))
+        const sheen: any = env
+          ? pmremTexture(env, reflect(Vw.negate(), N), rough).rgb.mul(u.environmentIntensity)
+          : L.ambient
         const albedo = u.crust.mul(float(1).sub(crack.mul(crusted).mul(0.6)))
         const diffuse = albedo.mul(L.sunColor.mul(NdL).add(ambient)).div(Math.PI)
         const lit = diffuse.mul(float(1).sub(F)).add(spec).add(sheen.mul(F)).mul(contact)
@@ -1032,10 +1426,28 @@ export class MPMLava {
         // Molten surface: a skin film of plates, each a little cooler than the seams between them (older plates cooler).
         const film = float(1).sub(crusted).mul(float(1).sub(crack)).mul(cell.y.mul(50).add(30)).mul(cellFade)
         const T: any = mix(Te.sub(film), Tc, crack.mul(u.cracks)).toVar()
-        const glow = blackbodyNode(T).mul(exp(float(-WIEN).mul(float(1).div(max(T, MIN_T)).sub(1 / 1400)))).mul(u.intensity.mul(LAVA_GLOW_1400))
+        const glow = blackbodyNode(T)
+          .mul(
+            exp(
+              float(-WIEN).mul(
+                float(1)
+                  .div(max(T, MIN_T))
+                  .sub(1 / 1400)
+              )
+            )
+          )
+          .mul(u.intensity.mul(LAVA_GLOW_1400))
         // Coverage: a soft edge from the neighbourhood (no stair-stepped silhouette).
         let cover: any = float(0)
-        for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) cover = cover.add(select(depthTex.sample(c.add(vec2(tx.mul(ox), ty.mul(oy)))).x.greaterThan(0), float(0.25), float(0)))
+        for (const [ox, oy] of [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1]
+        ])
+          cover = cover.add(
+            select(depthTex.sample(c.add(vec2(tx.mul(ox), ty.mul(oy)))).x.greaterThan(0), float(0.25), float(0))
+          )
         out.assign(vec4(lit.add(glow), cover.mul(0.5).add(0.5)))
         void p
       })
@@ -1048,16 +1460,27 @@ export class MPMLava {
 
   // The solver grid's velocity at a local position (trilinear over the 8 nodes around it; the grid after the last substep).
   private gridVelocity(local: any): any {
-    const s = this.solver, G = s.buffers.grid
+    const s = this.solver,
+      G = s.buffers.grid
     const [nx, ny, nz] = s.resolution
     const g: any = clamp(local.mul(s.uniforms.invDx), vec3(0), vec3(nx - 2, ny - 2, nz - 2)).toVar()
     const i0: any = (ivec3 as any)(floor(g)).toVar()
     const f: any = g.sub(floor(g)).toVar()
     let v: any = vec3(0)
-    for (let k = 0; k < 2; k++) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
-      const w = (i ? f.x : f.x.oneMinus()).mul(j ? f.y : f.y.oneMinus()).mul(k ? f.z : f.z.oneMinus())
-      v = v.add(G.element(i0.z.add(k).mul(nx * ny).add(i0.y.add(j).mul(nx)).add(i0.x.add(i))).xyz.mul(w))
-    }
+    for (let k = 0; k < 2; k++)
+      for (let j = 0; j < 2; j++)
+        for (let i = 0; i < 2; i++) {
+          const w = (i ? f.x : f.x.oneMinus()).mul(j ? f.y : f.y.oneMinus()).mul(k ? f.z : f.z.oneMinus())
+          v = v.add(
+            G.element(
+              i0.z
+                .add(k)
+                .mul(nx * ny)
+                .add(i0.y.add(j).mul(nx))
+                .add(i0.x.add(i))
+            ).xyz.mul(w)
+          )
+        }
     return v
   }
 }
@@ -1065,8 +1488,10 @@ export class MPMLava {
 /** `structuredClone(DEFAULT_LAVA)` merged with `input`, with out-of-range values fixed. */
 export function resolveLavaOptions(input: unknown): LavaOptions {
   const o = merge(structuredClone(DEFAULT_LAVA), input)
-  const d = DEFAULT_LAVA.render, r = o.render
-  const num = (v: unknown, def: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
+  const d = DEFAULT_LAVA.render,
+    r = o.render
+  const num = (v: unknown, def: number, lo: number, hi: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
   if (typeof o.material !== 'string' || !o.material) o.material = DEFAULT_LAVA.material
   r.radius = num(r.radius, d.radius, 0.5, 4)
   r.smoothing = num(r.smoothing, d.smoothing, 0, 8)
@@ -1092,20 +1517,54 @@ export function resolveLavaOptions(input: unknown): LavaOptions {
  * temperature ({@link lavaSkin}); without, every particle at its bulk temperature. At most `max` sources, evenly thinned.
  */
 export function lavaHeatSources(
-  data: MPMParticleData, origin: readonly number[],
-  { material = 0, minTemperature = 1150, max = 2048, lift = 0.3, ages, airTemperature = 300 }: { material?: number; minTemperature?: number; max?: number; lift?: number; ages?: ArrayLike<number>; airTemperature?: number } = {},
+  data: MPMParticleData,
+  origin: readonly number[],
+  {
+    material = 0,
+    minTemperature = 1150,
+    max = 2048,
+    lift = 0.3,
+    ages,
+    airTemperature = 300
+  }: {
+    material?: number
+    minTemperature?: number
+    max?: number
+    lift?: number
+    ages?: ArrayLike<number>
+    airTemperature?: number
+  } = {}
 ): Float32Array {
-  const hot: number[] = [], temps: number[] = []
+  const hot: number[] = [],
+    temps: number[] = []
   for (let q = 0; q < data.count; q++) {
     if (data.material[q] !== material || (ages && !(ages[q] > 0))) continue
     const T = ages ? airTemperature + (data.temperature[q] - airTemperature) * lavaSkin(ages[q]) : data.temperature[q]
-    if (T > minTemperature) { hot.push(q); temps.push(T) }
+    if (T > minTemperature) {
+      hot.push(q)
+      temps.push(T)
+    }
   }
-  const k = Math.min(max, hot.length), stride = hot.length / Math.max(k, 1)
+  const k = Math.min(max, hot.length),
+    stride = hot.length / Math.max(k, 1)
   const out = new Float32Array(k * 8)
   for (let s = 0; s < k; s++) {
-    const j = Math.floor(s * stride), q = hot[j], T = temps[j]
-    out.set([data.position[q * 3] + origin[0], data.position[q * 3 + 1] + origin[1], data.position[q * 3 + 2] + origin[2], lavaGlow(T) * stride, 1, lift, 0, T / 1400], s * 8)
+    const j = Math.floor(s * stride),
+      q = hot[j],
+      T = temps[j]
+    out.set(
+      [
+        data.position[q * 3] + origin[0],
+        data.position[q * 3 + 1] + origin[1],
+        data.position[q * 3 + 2] + origin[2],
+        lavaGlow(T) * stride,
+        1,
+        lift,
+        0,
+        T / 1400
+      ],
+      s * 8
+    )
   }
   return out
 }

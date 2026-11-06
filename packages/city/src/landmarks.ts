@@ -75,9 +75,26 @@ export interface LandmarkOptions {
 
 /** Default landmark shapes. */
 export const DEFAULT_LANDMARKS: LandmarkOptions = {
-  church: { width: [10, 14], length: [22, 32], wallHeight: [8, 11], pitch: 0.95, towerWidth: [4.5, 6.5], towerHeight: [18, 28], spire: 2, setback: 4 },
-  townHall: { width: [18, 26], depth: [14, 20], floors: [2, 3], pitch: 0.45, clockTower: 0.6, towerHeight: 6, setback: 5 },
-  waterTower: { height: [20, 28], columnRadius: 1.4, tankRadius: [4, 5.5], tankHeight: [6, 9], reach: [0.35, 0.7] },
+  church: {
+    width: [10, 14],
+    length: [22, 32],
+    wallHeight: [8, 11],
+    pitch: 0.95,
+    towerWidth: [4.5, 6.5],
+    towerHeight: [18, 28],
+    spire: 2,
+    setback: 4
+  },
+  townHall: {
+    width: [18, 26],
+    depth: [14, 20],
+    floors: [2, 3],
+    pitch: 0.45,
+    clockTower: 0.6,
+    towerHeight: 6,
+    setback: 5
+  },
+  waterTower: { height: [20, 28], columnRadius: 1.4, tankRadius: [4, 5.5], tankHeight: [6, 9], reach: [0.35, 0.7] }
 }
 
 /** What a landmark needs besides its lot: the regional architecture and storey heights. */
@@ -95,7 +112,15 @@ export interface LandmarkContext {
  * @param counts How many of each (a fraction is the chance of one more).
  * @returns Landmark buildings by lot id (`id` −1: the caller numbers them).
  */
-export function planLandmarks(lots: PlannedLot[], counts: Record<Landmark, number>, o: LandmarkOptions, ctx: LandmarkContext, center: Vec2, radius: number, seed: number): Map<number, Building> {
+export function planLandmarks(
+  lots: PlannedLot[],
+  counts: Record<Landmark, number>,
+  o: LandmarkOptions,
+  ctx: LandmarkContext,
+  center: Vec2,
+  radius: number,
+  seed: number
+): Map<number, Building> {
   const rand = mulberry32(hash4(seed, 71, 7, 3))
   const out = new Map<number, Building>()
   for (const kind of LANDMARKS) {
@@ -103,18 +128,34 @@ export function planLandmarks(lots: PlannedLot[], counts: Record<Landmark, numbe
     for (let i = 0; i < n; i++) {
       let [tx, tz] = center
       if (kind === 'waterTower') {
-        const a = rand() * Math.PI * 2, d = radius * (o.waterTower.reach[0] + rand() * (o.waterTower.reach[1] - o.waterTower.reach[0]))
-        tx += Math.cos(a) * d; tz += Math.sin(a) * d
+        const a = rand() * Math.PI * 2,
+          d = radius * (o.waterTower.reach[0] + rand() * (o.waterTower.reach[1] - o.waterTower.reach[0]))
+        tx += Math.cos(a) * d
+        tz += Math.sin(a) * d
       }
       const candidates = lots
-        .filter((l) => l.front >= 0 && !out.has(l.id) && l.district !== 'park' && (kind === 'waterTower' || l.district !== 'farmland'))
+        .filter(
+          (l) =>
+            l.front >= 0 &&
+            !out.has(l.id) &&
+            l.district !== 'park' &&
+            (kind === 'waterTower' || l.district !== 'farmland')
+        )
         .map((l) => ({ l, d: Math.hypot(l.center[0] - tx, l.center[1] - tz) }))
         .sort((p, q) => p.d - q.d || p.l.id - q.l.id)
         .slice(0, 80)
       for (const { l } of candidates) {
         const lr = mulberry32(hash4(seed, l.id, 73, LANDMARKS.indexOf(kind)))
-        const b = kind === 'church' ? church(l, o.church, ctx, lr) : kind === 'townHall' ? townHall(l, o.townHall, ctx, lr) : waterTower(l, o.waterTower, lr)
-        if (b) { out.set(l.id, b); break }
+        const b =
+          kind === 'church'
+            ? church(l, o.church, ctx, lr)
+            : kind === 'townHall'
+              ? townHall(l, o.townHall, ctx, lr)
+              : waterTower(l, o.waterTower, lr)
+        if (b) {
+          out.set(l.id, b)
+          break
+        }
       }
     }
   }
@@ -124,7 +165,9 @@ export function planLandmarks(lots: PlannedLot[], counts: Record<Landmark, numbe
 const span = (r: [number, number], rand: () => number) => r[0] + rand() * (r[1] - r[0])
 
 function frontLength(lot: Lot): number {
-  const p = lot.polygon, a = p[lot.front], b = p[(lot.front + 1) % p.length]
+  const p = lot.polygon,
+    a = p[lot.front],
+    b = p[(lot.front + 1) % p.length]
   return Math.hypot(b[0] - a[0], b[1] - a[1])
 }
 
@@ -138,13 +181,44 @@ function church(lot: PlannedLot, c: ChurchOptions, ctx: LandmarkContext, rand: (
   // The nave runs back from the street (gable end to the street); the tower stands across its front gable.
   const nave = streetRect(lot, along, w, len, c.setback + tw * 0.6)
   const tower = streetRect(lot, along + (w - tw) / 2, tw, tw, c.setback)
-  if (!nave || !tower || nave.halfLength * 2 < c.length[0] * 0.7 || Math.min(tower.halfLength, tower.halfWidth) * 2 < tw * 0.8) return null
+  if (
+    !nave ||
+    !tower ||
+    nave.halfLength * 2 < c.length[0] * 0.7 ||
+    Math.min(tower.halfLength, tower.halfWidth) * 2 < tw * 0.8
+  )
+    return null
   const flat = pick(ctx.architecture.houseRoofs, rand()) === 'flat'
-  const wall = span(c.wallHeight, rand), top = Math.max(wall + nave.halfWidth * c.pitch + 3, span(c.towerHeight, rand))
-  return assembleBuilding(lot, 'church', 'house', [
-    { tiers: [{ polygon: boxCorners(nave), top: wall }], rect: nave, roof: flat ? 'flat' : 'gable', roofHeight: flat ? 0 : nave.halfWidth * c.pitch, blank: true },
-    { tiers: [{ polygon: boxCorners(tower), top }], rect: tower, roof: flat || c.spire <= 0 ? 'flat' : 'hip', roofHeight: flat ? 0 : tw * c.spire, blank: true },
-  ], { material: pick(ctx.architecture.houseMaterials, rand()), roofMaterial: pick(ctx.architecture.roofMaterials, rand()), floors: 1, floorHeight: wall }, rand())
+  const wall = span(c.wallHeight, rand),
+    top = Math.max(wall + nave.halfWidth * c.pitch + 3, span(c.towerHeight, rand))
+  return assembleBuilding(
+    lot,
+    'church',
+    'house',
+    [
+      {
+        tiers: [{ polygon: boxCorners(nave), top: wall }],
+        rect: nave,
+        roof: flat ? 'flat' : 'gable',
+        roofHeight: flat ? 0 : nave.halfWidth * c.pitch,
+        blank: true
+      },
+      {
+        tiers: [{ polygon: boxCorners(tower), top }],
+        rect: tower,
+        roof: flat || c.spire <= 0 ? 'flat' : 'hip',
+        roofHeight: flat ? 0 : tw * c.spire,
+        blank: true
+      }
+    ],
+    {
+      material: pick(ctx.architecture.houseMaterials, rand()),
+      roofMaterial: pick(ctx.architecture.roofMaterials, rand()),
+      floors: 1,
+      floorHeight: wall
+    },
+    rand()
+  )
 }
 
 function townHall(lot: PlannedLot, t: TownHallOptions, ctx: LandmarkContext, rand: () => number): Building | null {
@@ -158,21 +232,63 @@ function townHall(lot: PlannedLot, t: TownHallOptions, ctx: LandmarkContext, ran
   const top = floors * fh
   const flat = pick(ctx.architecture.houseRoofs, rand()) === 'flat'
   const rise = flat ? 0 : r.halfWidth * t.pitch
-  const parts: BuildingPart[] = [{ tiers: [{ polygon: boxCorners(r), top }], rect: r, roof: flat ? 'flat' : 'hip', roofHeight: rise }]
+  const parts: BuildingPart[] = [
+    { tiers: [{ polygon: boxCorners(r), top }], rect: r, roof: flat ? 'flat' : 'hip', roofHeight: rise }
+  ]
   if (rand() < t.clockTower) {
     const s = r.halfWidth * 0.32
     const tower: OrientedBox = { center: r.center, axis: r.axis, halfLength: s, halfWidth: s }
-    parts.push({ tiers: [{ polygon: boxCorners(tower), top: top + rise + t.towerHeight }], rect: tower, roof: flat ? 'flat' : 'hip', roofHeight: flat ? 0 : s * 1.6, blank: true })
+    parts.push({
+      tiers: [{ polygon: boxCorners(tower), top: top + rise + t.towerHeight }],
+      rect: tower,
+      roof: flat ? 'flat' : 'hip',
+      roofHeight: flat ? 0 : s * 1.6,
+      blank: true
+    })
   }
-  return assembleBuilding(lot, 'townHall', 'block', parts, { material: pick(ctx.architecture.blockMaterials, rand()), roofMaterial: pick(ctx.architecture.roofMaterials, rand()), floors, floorHeight: fh }, rand())
+  return assembleBuilding(
+    lot,
+    'townHall',
+    'block',
+    parts,
+    {
+      material: pick(ctx.architecture.blockMaterials, rand()),
+      roofMaterial: pick(ctx.architecture.roofMaterials, rand()),
+      floors,
+      floorHeight: fh
+    },
+    rand()
+  )
 }
 
 function waterTower(lot: PlannedLot, o: WaterTowerOptions, rand: () => number): Building | null {
-  const h = span(o.height, rand), R = span(o.tankRadius, rand), th = span(o.tankHeight, rand)
+  const h = span(o.height, rand),
+    R = span(o.tankRadius, rand),
+    th = span(o.tankHeight, rand)
   const [cx, cz] = lot.center
-  const ring = (r: number, n: number): Vec2[] => Array.from({ length: n }, (_, i) => [cx + Math.cos((i / n) * Math.PI * 2) * r, cz + Math.sin((i / n) * Math.PI * 2) * r])
+  const ring = (r: number, n: number): Vec2[] =>
+    Array.from({ length: n }, (_, i) => [
+      cx + Math.cos((i / n) * Math.PI * 2) * r,
+      cz + Math.sin((i / n) * Math.PI * 2) * r
+    ])
   if (!ring(R + 1.5, 16).every(([x, z]) => pointInPolygon(x, z, lot.polygon))) return null
-  return assembleBuilding(lot, 'waterTower', 'shed', [
-    { tiers: [{ polygon: ring(o.columnRadius, 16), top: h }, { polygon: ring(R, 24), top: h + th }], rect: null, roof: 'cone', roofHeight: R * 0.3, blank: true },
-  ], { material: 'metal', roofMaterial: 'metal', floors: 1, floorHeight: h }, rand())
+  return assembleBuilding(
+    lot,
+    'waterTower',
+    'shed',
+    [
+      {
+        tiers: [
+          { polygon: ring(o.columnRadius, 16), top: h },
+          { polygon: ring(R, 24), top: h + th }
+        ],
+        rect: null,
+        roof: 'cone',
+        roofHeight: R * 0.3,
+        blank: true
+      }
+    ],
+    { material: 'metal', roofMaterial: 'metal', floors: 1, floorHeight: h },
+    rand()
+  )
 }

@@ -1,4 +1,12 @@
-import { ClampToEdgeWrapping, DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, Vector4, type Node } from 'three/webgpu'
+import {
+  ClampToEdgeWrapping,
+  DataTexture,
+  LinearFilter,
+  RGBAFormat,
+  UnsignedByteType,
+  Vector4,
+  type Node
+} from 'three/webgpu'
 import { positionWorld, step, uniform } from 'three/tsl'
 import { STATE_CHANNELS, type MaterialStates, type StateChannel } from './states.ts'
 import type { ClimatePoint, SurfaceSample, Weather } from './weather.ts'
@@ -83,18 +91,25 @@ export class StateField {
     const before = this.options
     const next = merge(structuredClone(before), input)
     if (JSON.stringify(next) === JSON.stringify(before)) return this
-    const oldMinX = this.minX, oldMinZ = this.minZ, oldTexel = this.texel, oldN = before.resolution, old = this.data
+    const oldMinX = this.minX,
+      oldMinZ = this.minZ,
+      oldTexel = this.texel,
+      oldN = before.resolution,
+      old = this.data
     this.options = next
     this.snapCenter()
     const n = next.resolution
     if (n !== oldN || next.size !== before.size || this.minX !== oldMinX || this.minZ !== oldMinZ) {
       const data = new Float32Array(n * n * 4)
-      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-        const x = this.minX + (i + 0.5) * this.texel, z = this.minZ + (j + 0.5) * this.texel
-        const fi = (x - oldMinX) / oldTexel - 0.5, fj = (z - oldMinZ) / oldTexel - 0.5
-        if (fi < -0.5 || fj < -0.5 || fi > oldN - 0.5 || fj > oldN - 0.5) continue
-        for (let c = 0; c < 4; c++) data[(j * n + i) * 4 + c] = bilinear(old, oldN, fi, fj, c)
-      }
+      for (let j = 0; j < n; j++)
+        for (let i = 0; i < n; i++) {
+          const x = this.minX + (i + 0.5) * this.texel,
+            z = this.minZ + (j + 0.5) * this.texel
+          const fi = (x - oldMinX) / oldTexel - 0.5,
+            fj = (z - oldMinZ) / oldTexel - 0.5
+          if (fi < -0.5 || fj < -0.5 || fi > oldN - 0.5 || fj > oldN - 0.5) continue
+          for (let c = 0; c < 4; c++) data[(j * n + i) * 4 + c] = bilinear(old, oldN, fi, fj, c)
+        }
       this.data = data
       this.climate = null
       this.weatherRow = 0
@@ -144,7 +159,8 @@ export class StateField {
   /** One state at (x, z), bilinear. Zero outside the region. */
   value(channel: StateChannel, x: number, z: number): number {
     const n = this.options.resolution
-    const fi = (x - this.minX) / this.texel - 0.5, fj = (z - this.minZ) / this.texel - 0.5
+    const fi = (x - this.minX) / this.texel - 0.5,
+      fj = (z - this.minZ) / this.texel - 0.5
     if (fi < -0.5 || fj < -0.5 || fi > n - 0.5 || fj > n - 0.5) return 0
     return bilinear(this.data, n, fi, fj, STATE_CHANNELS.indexOf(channel))
   }
@@ -153,26 +169,44 @@ export class StateField {
    * Paints a round brush of `radius` metres at (x, z). `falloff` (0…1) is the soft share of the radius.
    * Values are clamped to 0…1. Returns the number of texels touched.
    */
-  paint(x: number, z: number, radius: number, values: Partial<MaterialStates>, mode: PaintMode = 'max', falloff = 0.5): number {
-    const n = this.options.resolution, t = this.texel
-    const i0 = Math.max(0, Math.floor((x - radius - this.minX) / t)), i1 = Math.min(n - 1, Math.floor((x + radius - this.minX) / t))
-    const j0 = Math.max(0, Math.floor((z - radius - this.minZ) / t)), j1 = Math.min(n - 1, Math.floor((z + radius - this.minZ) / t))
+  paint(
+    x: number,
+    z: number,
+    radius: number,
+    values: Partial<MaterialStates>,
+    mode: PaintMode = 'max',
+    falloff = 0.5
+  ): number {
+    const n = this.options.resolution,
+      t = this.texel
+    const i0 = Math.max(0, Math.floor((x - radius - this.minX) / t)),
+      i1 = Math.min(n - 1, Math.floor((x + radius - this.minX) / t))
+    const j0 = Math.max(0, Math.floor((z - radius - this.minZ) / t)),
+      j1 = Math.min(n - 1, Math.floor((z + radius - this.minZ) / t))
     const inner = radius * (1 - Math.min(1, Math.max(0, falloff)))
     let touched = 0
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const d = Math.hypot(this.minX + (i + 0.5) * t - x, this.minZ + (j + 0.5) * t - z)
-      if (d > radius) continue
-      const w = d <= inner ? 1 : 1 - (d - inner) / Math.max(1e-6, radius - inner)
-      const k = (j * n + i) * 4
-      for (let c = 0; c < 4; c++) {
-        const v = values[STATE_CHANNELS[c]]
-        if (v === undefined) continue
-        const cur = this.data[k + c]
-        const next = mode === 'add' ? cur + v * w : mode === 'set' ? cur + (v - cur) * w : mode === 'min' ? Math.min(cur, cur + (v - cur) * w) : Math.max(cur, v * w)
-        this.data[k + c] = Math.min(1, Math.max(0, next))
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) {
+        const d = Math.hypot(this.minX + (i + 0.5) * t - x, this.minZ + (j + 0.5) * t - z)
+        if (d > radius) continue
+        const w = d <= inner ? 1 : 1 - (d - inner) / Math.max(1e-6, radius - inner)
+        const k = (j * n + i) * 4
+        for (let c = 0; c < 4; c++) {
+          const v = values[STATE_CHANNELS[c]]
+          if (v === undefined) continue
+          const cur = this.data[k + c]
+          const next =
+            mode === 'add'
+              ? cur + v * w
+              : mode === 'set'
+                ? cur + (v - cur) * w
+                : mode === 'min'
+                  ? Math.min(cur, cur + (v - cur) * w)
+                  : Math.max(cur, v * w)
+          this.data[k + c] = Math.min(1, Math.max(0, next))
+        }
+        touched++
       }
-      touched++
-    }
     if (touched) this.changed()
     return touched
   }
@@ -213,8 +247,10 @@ export class StateField {
 
   /** Calls `fn(x, z, i, j)` for every texel centre (frame coordinates). */
   forEachTexel(fn: (x: number, z: number, i: number, j: number) => void): void {
-    const n = this.options.resolution, t = this.texel
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) fn(this.minX + (i + 0.5) * t, this.minZ + (j + 0.5) * t, i, j)
+    const n = this.options.resolution,
+      t = this.texel
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < n; i++) fn(this.minX + (i + 0.5) * t, this.minZ + (j + 0.5) * t, i, j)
   }
 
   /**
@@ -223,7 +259,8 @@ export class StateField {
    * time it started with, so the whole field is consistent. Returns true when a pass completes.
    */
   updateFromWeather(weather: Weather, time: number, budget = 2): boolean {
-    const n = this.options.resolution, t = this.texel
+    const n = this.options.resolution,
+      t = this.texel
     if (!this.climate || this.climateVersion !== weatherKey(weather)) {
       this.climate = new Float32Array(n * n * 4).fill(NaN)
       this.climateVersion = weatherKey(weather)
@@ -236,12 +273,19 @@ export class StateField {
       const j = this.weatherRow++
       for (let i = 0; i < n; i++) {
         const k = (j * n + i) * 4
-        const x = this.minX + (i + 0.5) * t, z = this.minZ + (j + 0.5) * t
+        const x = this.minX + (i + 0.5) * t,
+          z = this.minZ + (j + 0.5) * t
         if (Number.isNaN(this.climate[k])) {
           weather.climateAt(x, z, c)
-          this.climate[k] = c.temperature; this.climate[k + 1] = c.moisture; this.climate[k + 2] = c.elevation; this.climate[k + 3] = c.water ? 1 : 0
+          this.climate[k] = c.temperature
+          this.climate[k + 1] = c.moisture
+          this.climate[k + 2] = c.elevation
+          this.climate[k + 3] = c.water ? 1 : 0
         } else {
-          c.temperature = this.climate[k]; c.moisture = this.climate[k + 1]; c.elevation = this.climate[k + 2]; c.water = this.climate[k + 3] > 0
+          c.temperature = this.climate[k]
+          c.moisture = this.climate[k + 1]
+          c.elevation = this.climate[k + 2]
+          c.water = this.climate[k + 3] > 0
         }
         weather.surfaceAt(x, z, this.weatherTime, this.surface, c)
         this.data[k] = c.water ? 1 : this.surface.wetness
@@ -315,11 +359,17 @@ function weatherKey(w: Weather): number {
 }
 
 function bilinear(data: Float32Array, n: number, fi: number, fj: number, c: number): number {
-  const ci = Math.min(n - 1, Math.max(0, fi)), cj = Math.min(n - 1, Math.max(0, fj))
-  const i0 = Math.floor(ci), j0 = Math.floor(cj)
-  const i1 = Math.min(n - 1, i0 + 1), j1 = Math.min(n - 1, j0 + 1)
-  const tx = ci - i0, tz = cj - j0
-  const a = data[(j0 * n + i0) * 4 + c], b = data[(j0 * n + i1) * 4 + c]
-  const d = data[(j1 * n + i0) * 4 + c], e = data[(j1 * n + i1) * 4 + c]
+  const ci = Math.min(n - 1, Math.max(0, fi)),
+    cj = Math.min(n - 1, Math.max(0, fj))
+  const i0 = Math.floor(ci),
+    j0 = Math.floor(cj)
+  const i1 = Math.min(n - 1, i0 + 1),
+    j1 = Math.min(n - 1, j0 + 1)
+  const tx = ci - i0,
+    tz = cj - j0
+  const a = data[(j0 * n + i0) * 4 + c],
+    b = data[(j0 * n + i1) * 4 + c]
+  const d = data[(j1 * n + i0) * 4 + c],
+    e = data[(j1 * n + i1) * 4 + c]
   return (a + (b - a) * tx) * (1 - tz) + (d + (e - d) * tx) * tz
 }
