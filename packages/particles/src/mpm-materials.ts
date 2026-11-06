@@ -30,12 +30,19 @@ export interface MPMMaterialContext {
 
 /** The CPU twin of {@link MPMMaterialContext}, for the reference solver and tests. */
 export interface MPMMaterialCPUContext {
+  /** Elastic deformation gradient F (column-major Mat3, dimensionless). */
   F: Mat3
+  /** det F (dimensionless; 1 at rest volume). */
   J: number
+  /** Plastic volume ratio Jp (dimensionless, > 0; 1 for materials without plasticity). */
   Jp: number
+  /** APIC affine matrix C ≈ ∇v, the velocity gradient (column-major Mat3, s⁻¹). */
   C: Mat3
+  /** Per-particle temperature, kelvin. */
   temperature: number
+  /** Substep, seconds. */
   dt: number
+  /** The material's parameters as plain numbers, by name. */
   params: Record<string, number>
 }
 
@@ -51,7 +58,10 @@ export interface MPMMaterial<P extends Record<string, number> = Record<string, n
   /** Registry key. */
   name: string
   /** Default parameters (plain JSON numbers). `density` (kg/m³) is required: it sets the particle mass. */
-  defaults: P & { density: number }
+  defaults: P & {
+    /** Mass density, kg/m³ (positive). */
+    density: number
+  }
   /** Kirchhoff stress τ = P(F)·Fᵀ, pascals (a TSL `mat3` node). Runs in P2G. */
   stress: (c: MPMMaterialContext) => any
   /**
@@ -59,11 +69,27 @@ export interface MPMMaterial<P extends Record<string, number> = Record<string, n
    * else a material tracks per particle, such as temperature (e.g. lava cooling). Returns TSL nodes; anything
    * left out stays as it was.
    */
-  plasticity?: (c: MPMMaterialContext) => { F?: any; Jp?: any; temperature?: any }
+  plasticity?: (c: MPMMaterialContext) => {
+    /** New elastic deformation gradient F (mat3, dimensionless); omitted leaves F as it was. */
+    F?: any
+    /** New plastic volume ratio Jp (float, dimensionless, > 0); omitted leaves Jp as it was. */
+    Jp?: any
+    /** New per-particle temperature, kelvin; omitted leaves temperature as it was. */
+    temperature?: any
+  }
   /** CPU versions of the hooks above (same maths, plain numbers). */
   cpu: {
+    /** Kirchhoff stress τ, pascals (column-major Mat3). */
     stress: (c: MPMMaterialCPUContext) => Mat3
-    plasticity?: (c: MPMMaterialCPUContext) => { F?: Mat3; Jp?: number; temperature?: number }
+    /** Optional CPU plasticity return mapping, returning the fields it updates. */
+    plasticity?: (c: MPMMaterialCPUContext) => {
+      /** New elastic deformation gradient F (column-major Mat3, dimensionless); omitted leaves F as it was. */
+      F?: Mat3
+      /** New plastic volume ratio Jp (dimensionless, > 0); omitted leaves Jp as it was. */
+      Jp?: number
+      /** New per-particle temperature, kelvin; omitted leaves temperature as it was. */
+      temperature?: number
+    }
   }
   /** Fastest elastic wave speed for these parameters, m/s (the time step keeps `dt ≤ cfl·Δx / (maxSpeed + c)`). */
   soundSpeed: (p: P) => number
@@ -95,7 +121,12 @@ export function mpmIdentity(): any {
 }
 
 /** Lamé parameters (μ, λ) from Young's modulus and Poisson's ratio (plain numbers or TSL nodes). */
-export function lame(youngs: any, poisson: any): { mu: any; lambda: any } {
+export function lame(youngs: any, poisson: any): {
+  /** Shear modulus μ, pascals (≥ 0 for E ≥ 0 and ν > −1). */
+  mu: any
+  /** Lamé first parameter λ, pascals (negative for auxetic ν < 0; singular at ν = −1 and ν = 0.5). */
+  lambda: any
+} {
   if (typeof youngs === 'number' && typeof poisson === 'number') {
     return { mu: youngs / (2 * (1 + poisson)), lambda: (youngs * poisson) / ((1 + poisson) * (1 - 2 * poisson)) }
   }
@@ -130,7 +161,16 @@ const MIN_J = 0.05
  */
 export const JELLY = registerMPMMaterial({
   name: 'jelly',
-  defaults: { density: 1000, youngs: 100000, poisson: 0.3, viscosity: 1000 },
+  defaults: {
+    /** Mass density, kg/m³. */
+    density: 1000,
+    /** Young's modulus E, pascals. */
+    youngs: 100000,
+    /** Poisson's ratio ν (dimensionless, −1 < ν < 0.5). */
+    poisson: 0.3,
+    /** Dynamic viscosity η, Pa·s. */
+    viscosity: 1000,
+  },
   stress: ({ F, J, C, params: p }) => {
     const { mu, lambda } = lame(p.youngs, p.poisson)
     const lnJ = log(max(J, MIN_J))

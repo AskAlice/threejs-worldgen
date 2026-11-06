@@ -137,8 +137,9 @@ const PUDDLE_WET = 5e-4
 export class PuddleField {
   /** Resolved settings. */
   options: PuddleOptions
-  /** Cells along x and z. */
+  /** Cells along x. */
   readonly nx: number
+  /** Cells along z. */
   readonly nz: number
   /** Standing water per cell, metres (row-major, x fastest). */
   readonly depth: Float32Array
@@ -259,7 +260,12 @@ export class PuddleField {
   }
 
   /** Standing water and wetness at world (x, z), bilinear between cell centres (0 outside the field). */
-  sample(x: number, z: number, out = { depth: 0, wetness: 0 }): { depth: number; wetness: number } {
+  sample(x: number, z: number, out = { depth: 0, wetness: 0 }): {
+    /** Standing water depth at the sample point, metres (0 outside the field). */
+    depth: number
+    /** Surface wetness at the sample point, 0…1 (0 outside the field). */
+    wetness: number
+  } {
     const { cellSize: c, origin } = this.options
     const gx = (x - origin[0]) / c - 0.5, gz = (z - origin[1]) / c - 0.5
     out.depth = out.wetness = 0
@@ -353,13 +359,22 @@ export const SPLASH_TAG = 1
 
 /** Anything particles can be emitted into: an {@link MPMSolver} or an `MPMReference`. */
 export interface SplashTarget {
+  /** Emits one particle block; returns how many particles were emitted. */
   emit(spec: MPMEmit): number
-  options: { cellSize: number; seed: number | string }
+  /** Solver options the emitter reads: particle spacing and seed. */
+  options: {
+    /** Cell size, metres (the emitter spaces droplets at half this). */
+    cellSize: number
+    /** Seed of the particle random numbers. */
+    seed: number | string
+  }
 }
 
 /** One rain-drop impact: where, and whether onto a puddle. */
 export interface SplashImpact {
+  /** World x, metres. */
   x: number
+  /** World z, metres. */
   z: number
   /** Ground (plus puddle) height, world metres. */
   y: number

@@ -115,7 +115,12 @@ export function snowPlasticityGeneric<T>(o: MPMOps<T>, F: T[], Jp: T, p: Record<
 export const ICE_DENSITY = 917
 
 /** Lamé (μ, λ) of snow parameters at a hardening factor. */
-export function snowLame(p: SnowParams, h = 1): { mu: number; lambda: number } {
+export function snowLame(p: SnowParams, h = 1): {
+  /** Shear modulus μ, pascals. */
+  mu: number
+  /** Lamé first parameter λ, pascals. */
+  lambda: number
+} {
   return { mu: (h * p.youngs) / (2 * (1 + p.poisson)), lambda: (h * p.youngs * p.poisson) / ((1 + p.poisson) * (1 - 2 * p.poisson)) }
 }
 
@@ -337,6 +342,12 @@ export class MPMSnowSurface {
   private readonly uniforms = { edgeDepth: uniform(0), edgeStart: uniform(0), edgeWidth: uniform(1), minDepth: uniform(0.03), debris: uniform(0) }
   private readonly passes: ComputeNode[]
 
+  /**
+   * Builds the snow surface for `solver` and renders it with `renderer`.
+   * @param renderer The WebGPU renderer the solver draws with.
+   * @param solver The snow MPM solver to read particles from.
+   * @param input Surface settings (merged over {@link DEFAULT_SNOW_SURFACE}).
+   */
   constructor(renderer: Renderer, solver: MPMSolver, input: Partial<SnowSurfaceOptions> = {}) {
     this.renderer = renderer
     this.solver = solver

@@ -136,7 +136,12 @@ export const DEFAULT_LAVA: LavaOptions = {
  * runnier and gassier, with a thin ductile glassy crust that stretches and folds into ropes; ʻaʻā is cooler, more viscous
  * and crystal-rich, and its thicker brittle crust tears into dark clinker.
  */
-export const LAVA_PRESETS: Record<'pahoehoe' | 'aa', { material: Partial<LavaParams>; lava: LavaInput }> = {
+export const LAVA_PRESETS: Record<'pahoehoe' | 'aa', {
+  /** Material parameters for `materials.lava` (merged over the default lava material). */
+  material: Partial<LavaParams>
+  /** Drawing options for {@link MPMLava} (merged over {@link DEFAULT_LAVA}). */
+  lava: LavaInput
+}> = {
   pahoehoe: {
     material: { density: 2200, viscosity: 150, eruption: 1430, solidus: 1270, yieldStress: 8000, meltYield: 800, crackStrain: 0.03, skin: 0.002 },
     lava: { render: { smoothing: 2.5, crust: '#585653', roughness: 0.35, ropes: 0.8, ropeLength: 0.07, cracks: 1, crackSize: 0.3, crackWidth: 0.005, clasts: 0 } },

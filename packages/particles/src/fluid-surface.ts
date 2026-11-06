@@ -96,15 +96,33 @@ export interface FluidSource {
    * Pool buffers: position xyz (local to `object`), velocity xyz and w > 0 when alive; optionally a state with a tag in z,
    * and the solver's grid (w: node mass) with its `resolution`, which tells spray from bulk water.
    */
-  buffers: { position: any; velocity: any; state?: any; grid?: any }
+  buffers: {
+    /** Particle positions xyz (local to `object`), metres. */
+    position: any
+    /** Particle velocities xyz; w > 0 when alive. */
+    velocity: any
+    /** Optional particle state; the tag is in z. */
+    state?: any
+    /** Optional solver grid; w is node mass. */
+    grid?: any
+  }
   /** Grid nodes along x, y, z (with `buffers.grid`). */
   resolution?: readonly number[]
   /** Pool size. */
   capacity: number
   /** The object the positions are local to. */
-  object: { matrixWorld: { elements: ArrayLike<number> } }
+  object: {
+    /** The object's world matrix, whose elements are column-major. */
+    matrixWorld: {
+      /** The 16 matrix elements, column-major. */
+      elements: ArrayLike<number>
+    }
+  }
   /** `cellSize` sets the particle spacing (Δx/2). */
-  options: { cellSize: number }
+  options: {
+    /** Solver cell size, metres. */
+    cellSize: number
+  }
 }
 
 /** Construction options: settings plus object inputs. */

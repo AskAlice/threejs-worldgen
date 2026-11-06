@@ -163,7 +163,12 @@ export function mpmStableStep(o: MPMOptions): number {
  * Substeps and substep length for a frame of `frameDt` seconds (capped at 0.1 s): at least `substeps`, as many
  * more as {@link mpmStableStep} needs, at most `maxSubsteps` (then `dt` is the stable step and the frame runs slow).
  */
-export function mpmTimeStep(o: MPMOptions, frameDt: number): { substeps: number; dt: number } {
+export function mpmTimeStep(o: MPMOptions, frameDt: number): {
+  /** Substeps this frame runs (integer, at least `substeps`, at most `maxSubsteps`). */
+  substeps: number
+  /** Length of each substep, seconds (≤ the stable step). */
+  dt: number
+} {
   const frame = Math.min(0.1, Math.max(0, frameDt))
   const dtMax = mpmStableStep(o)
   const substeps = Math.min(o.maxSubsteps, Math.max(o.substeps, Math.ceil(frame / dtMax)))

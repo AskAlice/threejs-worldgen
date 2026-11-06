@@ -11,20 +11,31 @@ import type { Mat3 } from './mpm-materials.ts'
  * ({@link NODE_OPS}). `v` pins a value (a TSL `.toVar()`, so the generated shader stays linear; identity on numbers).
  */
 export interface MPMOps<T> {
+  /** a + b. */
   add(a: T, b: T): T
+  /** a − b. */
   sub(a: T, b: T): T
+  /** a × b. */
   mul(a: T, b: T): T
+  /** a ÷ b (b must be non-zero, or a TSL divide-by-zero node results). */
   div(a: T, b: T): T
+  /** √a (a ≥ 0). */
   sqrt(a: T): T
   /** `c < 0 ? a : b`, branch-free on the GPU. */
   neg(c: T, a: T, b: T): T
   /** `|c| < eps ? a : b`. */
   tiny(c: T, eps: number, a: T, b: T): T
+  /** The smaller of a and b. */
   min(a: T, b: T): T
+  /** The larger of a and b. */
   max(a: T, b: T): T
+  /** eᵃ. */
   exp(a: T): T
+  /** ln a (a > 0). */
   log(a: T): T
+  /** The plain number `x` as a T. */
   num(x: number): T
+  /** Pins a value in a TSL variable (`.toVar()`, so the generated shader stays linear); identity on numbers. */
   v(a: T): T
 }
 
@@ -53,7 +64,14 @@ const EPS = 1e-37 // the smallest normal float32 is 1.2e-38: AᵀA entries below
  * (det +1), S is sorted by magnitude, S[0] ≥ S[1] ≥ |S[2]|, and S[2] < 0 when det A < 0. Branch-free and the same
  * operation sequence on every backend. Degenerate input is fine: the zero matrix gives U = V = I, S = 0.
  */
-export function svd3Generic<T>(o: MPMOps<T>, a: T[]): { U: T[]; S: T[]; V: T[] } {
+export function svd3Generic<T>(o: MPMOps<T>, a: T[]): {
+  /** Left singular vectors U (a rotation, det +1), column-major 3×3 as a flat 9-array. */
+  U: T[]
+  /** Singular values, sorted by magnitude: S[0] ≥ S[1] ≥ |S[2]|, S[2] < 0 when det A < 0. */
+  S: T[]
+  /** Right singular vectors V (a rotation, det +1), column-major 3×3 as a flat 9-array. */
+  V: T[]
+} {
   const at = (m: T[], r: number, c: number) => m[c * 3 + r]
   // S = AᵀA, symmetric: s[i][j], kept as a full 3×3 of scalars for simple indexing.
   const s: T[][] = [0, 1, 2].map((i) => [0, 1, 2].map((j) => o.num(0)))
@@ -134,7 +152,14 @@ export function usvGeneric<T>(o: MPMOps<T>, U: T[], s: T[], V: T[]): T[] {
 }
 
 /** SVD of a column-major 3×3 on the CPU: A = U·diag(S)·Vᵀ (see {@link svd3Generic}). */
-export function svd3(a: Mat3): { U: Mat3; S: [number, number, number]; V: Mat3 } {
+export function svd3(a: Mat3): {
+  /** Left singular vectors U (a rotation, det +1), column-major. */
+  U: Mat3
+  /** Singular values [σ0, σ1, σ2], sorted by magnitude descending (σ2 < 0 when det A < 0). */
+  S: [number, number, number]
+  /** Right singular vectors V (a rotation, det +1), column-major. */
+  V: Mat3
+} {
   const r = svd3Generic(NUMBER_OPS, a)
   return { U: r.U, S: r.S as [number, number, number], V: r.V }
 }
@@ -150,7 +175,14 @@ export function scalarsMat3(s: any[]): any {
 }
 
 /** SVD of a TSL `mat3` node (inline shader code): U and V as `mat3`, S as `vec3` (see {@link svd3Generic}). */
-export function svd3Node(F: any): { U: any; S: any; V: any } {
+export function svd3Node(F: any): {
+  /** Left singular vectors U as a TSL `mat3` node. */
+  U: any
+  /** Singular values as a TSL `vec3` node, sorted by magnitude descending. */
+  S: any
+  /** Right singular vectors V as a TSL `mat3` node. */
+  V: any
+} {
   const r = svd3Generic(NODE_OPS, mat3Scalars(F))
   return { U: scalarsMat3(r.U), S: vec3(r.S[0], r.S[1], r.S[2]), V: scalarsMat3(r.V) }
 }

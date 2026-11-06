@@ -95,7 +95,12 @@ export class MPMSolver {
     /** Colliders in use (see {@link MPMSolver.setColliders}). */ colliders: uniform(0, 'int'),
   }
   /** Per material: its parameters as uniforms, and particle mass in normalised units. */
-  readonly params: { values: Record<string, any>; mass: any }[]
+  readonly params: {
+    /** The material's parameters as uniforms, by name. */
+    values: Record<string, any>
+    /** Particle mass in normalised units (density / (DENSITY_UNIT · PPC_AXIS³)). */
+    mass: any
+  }[]
 
   private readonly renderer: Renderer
   private readonly gridAtomic: any
