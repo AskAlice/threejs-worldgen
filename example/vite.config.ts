@@ -14,8 +14,9 @@ export default defineConfig({
     { find: new RegExp(`^${name(dir)}/react$`), replacement: src(`${dir}/src/react.tsx`) },
     { find: new RegExp(`^${name(dir)}$`), replacement: src(`${dir}/src/index.ts`) },
   ])] },
-  // Reachable over the tailnet (tailscale serve) as well as localhost.
-  server: { allowedHosts: ['.ts.net', 'localhost', '127.0.0.1'] },
+  // Reachable over the tailnet (tailscale serve) as well as localhost. The port is fixed so the T3
+  // Code action's preview URL stays valid; strictPort fails loudly instead of drifting to 5174.
+  server: { port: 5173, strictPort: true, allowedHosts: ['.ts.net', 'localhost', '127.0.0.1'] },
   worker: { format: 'es' },
   build: { target: 'esnext', rollupOptions: { input: readdirSync(fileURLToPath(new URL('.', import.meta.url))).filter((f) => f.endsWith('.html')) } },
 })
