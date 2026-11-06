@@ -111,7 +111,7 @@ Everything is plain JSON except `terrain`, `camera`, `scene`, a function `densit
 | Export | |
 |---|---|
 | `Scatter` | The streamer: `create`, `set`, `reset`, `update(budgetMs?)`, `query`, `setTerrain`, `regenerate`, `dispose`, `.object`, `.stats`. |
-| `bakeImpostor(renderer, object, { mode, frames, size, hemisphere, alphaTest }, mask?)` | Renders `object` from `frames × frames` octahedral directions (or one side view, `mode: 'billboard'`) into colour + normal atlases and returns `{ texture, normalTexture, surface, material, geometry, bounds, options, dispose }`. The material is lit, alpha-tested and picks the nearest view in TSL. |
+| `bakeImpostor(renderer, object, { mode, frames, size, hemisphere, alphaTest }, mask?)` | Renders `object` from `frames × frames` octahedral directions (or one side view, `mode: 'billboard'`) into colour and surface atlases and returns `{ texture, normalTexture, surface, material, geometry, bounds, options, dispose }`. The material is lit, alpha-tested and picks the nearest view in TSL. The surface atlas carries the normal, the material's roughness and the bake's `mask`, and `surface` (`color`, `alpha`, `normal`, `roughness`, `mask`) exposes them for re-shading, e.g. weather that matches the mesh levels. |
 | `scatterParamsNode()` | TSL `vec4` per instance: yaw, brightness tint, random 0..1. Every pooled mesh carries it, so materials can vary per instance. |
 | `placeTile`, `poissonDisk`, `clusterFactor`, `groupSeed`, `INSTANCE_STRIDE` | The pure placement functions (usable in a worker). |
 | `selectLod`, `octEncode`, `octDecode`, `frameDirection`, `directionToFrame` | Pure LOD and octahedral math. |
@@ -129,7 +129,8 @@ the same order as the mesh materials, so far instances don't pop at the switch:
 |---|---|
 | `color` | Baked base colour × the instance's brightness tint (`scatterParams.y`). |
 | `alpha` | Baked coverage (alpha-tested against `alphaTest`). |
-| `normal` | World-space normal of the view shown — what the mesh's `normalWorld` was at that pixel, so snow settles by the same up component. |
+| `normal` | World-space normal of the surface pixel shown: the mesh's `normalWorld` at that pixel, turned by the instance's yaw. It does not change with the view, so snow settles by the same up component as at the mesh level. |
+| `roughness` | Baked roughness of that pixel (the material's `roughnessNode`, else its `roughness`), so the far level keeps the material's PBR response instead of one constant. |
 | `mask` | The bake's `mask` value at that pixel (`0..1`, 8 bits; `1` where no mask was given). Baked per source material, so pass a `mask` callback to separate e.g. foliage from bark and to carry a per-card random for leaf loss or damage. |
 
 `surface` nodes are ordinary TSL: set `material.colorNode` / `roughnessNode` / `emissiveNode` from them. The

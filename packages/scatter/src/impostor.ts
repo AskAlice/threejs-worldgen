@@ -3,7 +3,7 @@ import {
   SRGBColorSpace, Vector3, type BufferGeometry, type Material, type Node, type Object3D, type Renderer, type Texture,
 } from 'three/webgpu'
 import {
-  abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, diffuseColor, dot, float, max, normalize, normalWorld, positionGeometry,
+  abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, diffuseColor, float, max, normalize, normalWorld, positionGeometry,
   round, select, sin, step, texture, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl'
 import { frameDirection } from './octahedral.ts'
@@ -31,7 +31,10 @@ export interface ImpostorOptions {
 export interface Impostor {
   /** Colour atlas (alpha = coverage). */
   texture: Texture
-  /** Normal atlas (object-space normals packed to 0..1, alpha = the bake's `mask`), used to light the impostor like the mesh. */
+  /**
+   * Surface atlas: R, G = the object-space normal octahedral-encoded, B = roughness, alpha = the bake's `mask`, used
+   * to light the impostor like the mesh.
+   */
   normalTexture: Texture
   /**
    * TSL nodes of the impostor's surface, for re-shading `material` (e.g. weather, the way the mesh materials apply
@@ -56,8 +59,14 @@ export interface ImpostorSurface {
   color: Node<'vec3'>
   /** Baked coverage (alpha-tested against `options.alphaTest`). */
   alpha: Node<'float'>
-  /** World-space normal of the view shown (what the mesh's `normalWorld` was at that pixel). */
+  /**
+   * World-space normal of the surface pixel shown (the mesh's `normalWorld` at that pixel, turned by the instance's
+   * `scatterParams.x` yaw). It does not change with the view, so weather driven by it (snow on upward faces) is the
+   * same at every view and matches the mesh levels.
+   */
   normal: Node<'vec3'>
+  /** Baked roughness of that pixel (its material's `roughnessNode`, else `roughness`), so the far level keeps the PBR look. */
+  roughness: Node<'float'>
   /** The bake's `mask` value at this pixel (0..1, 8 bits; 1 where no mask was given). */
   mask: Node<'float'>
 }
@@ -69,9 +78,10 @@ export const DEFAULT_IMPOSTOR: ImpostorOptions = { mode: 'octahedral', frames: 8
  * Renders `object` from many directions into a texture atlas and returns a material + quad that draw it as a
  * camera-facing impostor, the far level of detail of a scatter layer.
  *
- * Each view is unlit: one pass captures each material's base colour (after its alpha test), a second its normals,
- * so the impostor is lit live by the scene's lights. Materials keep their vertex displacement (`positionNode`), so
- * wind is frozen at bake time; set wind to 0 while baking if that matters.
+ * Each view is unlit: one pass captures each material's base colour (after its alpha test), a second its surface
+ * (normal, roughness, mask), so the impostor is lit live by the scene's lights and keeps the mesh's PBR response.
+ * Materials keep their vertex displacement (`positionNode`), so wind is frozen at bake time; set wind to 0 while
+ * baking if that matters.
  *
  * The object is baked in its own local space (its position, rotation and scale are ignored).
  *
@@ -197,23 +207,29 @@ export async function bakeImpostor(
 }
 
 /**
- * A copy of `source` that outputs its base colour (or its world normal, with `mask` in alpha) unlit, keeping its alpha
- * test and displacement.
+ * A copy of `source` that outputs its base colour, or its surface (`normal`, `roughness`, `mask`) unlit, keeping its
+ * alpha test and displacement.
  */
 function bakeMaterial(source: Material, pass: 'albedo' | 'normal', mask: Node<'float'> | number): Material {
   if (!(source as NodeMaterial).isNodeMaterial) {
     // Classic materials: approximate with a node material carrying the common colour/alpha properties.
     const s = source as any
     const m = new MeshStandardNodeMaterial()
-    for (const k of ['color', 'map', 'alphaMap', 'alphaTest', 'vertexColors', 'side', 'opacity']) if (s[k] !== undefined) (m as any)[k] = s[k]
+    for (const k of ['color', 'map', 'alphaMap', 'alphaTest', 'vertexColors', 'side', 'opacity', 'roughness']) if (s[k] !== undefined) (m as any)[k] = s[k]
     return bakeMaterial(m, pass, mask)
   }
   const m = (source as NodeMaterial).clone()
   m.transparent = false
   m.depthWrite = true
   if (m.alphaTest <= 0 && (source as NodeMaterial).transparent) m.alphaTest = 0.5
-  m.outputNode = pass === 'albedo' ? vec4(diffuseColor.rgb, 1) : vec4(normalize(normalWorld).mul(0.5).add(0.5), mask)
+  m.outputNode = pass === 'albedo' ? vec4(diffuseColor.rgb, 1) : vec4(octEncodeNode(normalize(normalWorld), false), roughnessOf(m), mask)
   return m
+}
+
+/** TSL: the roughness a material shades with: its `roughnessNode`, else its `roughness` number. */
+function roughnessOf(m: NodeMaterial): any {
+  const o = m as any
+  return o.roughnessNode ?? float(typeof o.roughness === 'number' ? o.roughness : 1)
 }
 
 /** TSL: ±1 per component, with +1 for zero (unlike `sign`). */
@@ -273,23 +289,12 @@ function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOp
   const view = basisNode(toCam)
 
   let cell: any = vec2(0)
-  let frameDir: any = vec3(0, 0, 1)
   if (!billboard) {
     const n = float(N - 1)
     cell = clamp(round(octEncodeNode(unrot(toCam), o.hemisphere).mul(n)), 0, n)
-    frameDir = octDecodeNode(cell.div(n), o.hemisphere)
   }
-  // A baked normal is in object space. Express it in the baked view's camera basis, then rebuild it from the quad's
-  // own (world) basis, so the impostor is lit as it is shown.
-  const frame = basisNode(frameDir)
   const v = (node: any, name: string): any => varying(node, name)
   const vCell = v(cell, 'vImpostorCell')
-  const vRight = v(view.right, 'vImpostorRight')
-  const vUp = v(view.up, 'vImpostorUp')
-  const vDir = v(toCam, 'vImpostorDir')
-  const vFrameRight = v(frame.right, 'vImpostorFrameRight')
-  const vFrameUp = v(frame.up, 'vImpostorFrameUp')
-  const vFrameDir = v(frameDir, 'vImpostorFrameDir')
   const vTint = v(aPar.y, 'vImpostorTint')
 
   const material = new MeshStandardNodeMaterial({ roughness: 0.85, metalness: 0 })
@@ -300,10 +305,13 @@ function createImpostorMaterial(albedo: Texture, normals: Texture, o: ImpostorOp
   const atlasUv = vCell.add(clamp(uv() as any, inset, 1 - inset)).div(N)
   const sample = texture(albedo, atlasUv)
   const normalSample = texture(normals, atlasUv)
-  const n: any = normalSample.xyz.mul(2).sub(1)
-  const shown: any = vRight.mul(dot(n, vFrameRight)).add(vUp.mul(dot(n, vFrameUp))).add(vDir.mul(dot(n, vFrameDir))).normalize()
-  const surface: ImpostorSurface = { color: sample.rgb.mul(vTint), alpha: sample.a, normal: shown, mask: normalSample.a }
+  // The bake stores object-space normals; yaw is the only instance rotation, so turning it by yaw gives the world
+  // normal of the surface pixel the chosen view shows. It is the same normal at every view, so lighting and the
+  // weather states driven by it (snow on upward faces) do not shift as the camera moves.
+  const n: any = rot(octDecodeNode(normalSample.rg, false))
+  const surface: ImpostorSurface = { color: sample.rgb.mul(vTint), alpha: sample.a, normal: n, roughness: normalSample.b, mask: normalSample.a }
   material.colorNode = vec4(surface.color, surface.alpha)
-  material.normalNode = cameraViewMatrix.mul(vec4(shown, 0)).xyz.normalize()
+  material.normalNode = cameraViewMatrix.mul(vec4(n, 0)).xyz.normalize()
+  material.roughnessNode = surface.roughness
   return { material, surface }
 }

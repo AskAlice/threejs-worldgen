@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BoxGeometry, InstancedMesh, MeshBasicNodeMaterial, PerspectiveCamera, type InstancedBufferGeometry, type Mesh } from 'three/webgpu'
+import { BoxGeometry, InstancedMesh, Mesh, MeshBasicNodeMaterial, MeshStandardNodeMaterial, PerspectiveCamera, type InstancedBufferGeometry, type Renderer } from 'three/webgpu'
 import {
-  INSTANCE_STRIDE, Scatter, directionToFrame, frameDirection, octDecode, octEncode, placeTile, poissonDisk, resolveLayer, selectLod,
+  INSTANCE_STRIDE, Scatter, bakeImpostor, directionToFrame, frameDirection, octDecode, octEncode, placeTile, poissonDisk, resolveLayer, selectLod,
 } from '../src/index.ts'
 
 function minDistance(points: Float32Array | number[], stride = 3) {
@@ -246,4 +246,25 @@ test('multi-material levels pool as single-material meshes sharing instance buff
     assert.ok(mesh.count > 0 && mesh.count === meshes[0].count)
   }
   scatter.dispose()
+})
+
+test('bakeImpostor: the surface carries normal, roughness and mask, and the material shades with them', async () => {
+  // A renderer stand-in: the bake only submits draws, so the atlas contents and node wiring can be checked without a GPU.
+  const renderer = {
+    autoClear: true,
+    getRenderTarget: () => null,
+    setRenderTarget() {},
+    getClearColor: (c: unknown) => c,
+    getClearAlpha: () => 1,
+    setClearColor() {},
+    clear() {},
+    compileAsync: async () => {},
+    render() {},
+  } as unknown as Renderer
+  const source = new MeshStandardNodeMaterial({ roughness: 0.4 })
+  const impostor = await bakeImpostor(renderer, new Mesh(new BoxGeometry(), source), { size: 64, frames: 4 })
+  for (const k of ['color', 'alpha', 'normal', 'roughness', 'mask'] as const) assert.ok(impostor.surface[k], `surface.${k}`)
+  // The baked roughness (the source material's) lights the impostor, instead of one constant for every material.
+  assert.equal(impostor.material.roughnessNode, impostor.surface.roughness)
+  impostor.dispose()
 })
