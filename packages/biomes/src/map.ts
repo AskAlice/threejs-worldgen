@@ -36,7 +36,7 @@ const HEIGHT_RAMP: [number, [number, number, number]][] = [
   [0.75, [0.55, 0.5, 0.35]], [0.9, [0.6, 0.58, 0.56]], [1, [1, 1, 1]],
 ]
 const HEAT_RAMP: [number, [number, number, number]][] = [[0, [0.2, 0.3, 0.9]], [0.5, [0.95, 0.95, 0.8]], [1, [0.9, 0.2, 0.1]]]
-// The sea colour threejs-water renders (`DEFAULT_APPEARANCE.deepColor`). Kept as a literal so the map
+// The sea colour threejs-water renders (`DEFAULT_APPEARANCE.scatterColor`). Kept as a literal so the map
 // package does not depend on the water package.
 const SEA_COLOR = '#0b3247'
 

@@ -105,7 +105,7 @@ export const DEFAULT_OCEAN: OceanSettings = {
  * @example
  * ```ts
  * const ocean = await Ocean.create({ camera, scene, renderer, world, sun, waves: { amplitude: 0.8 } })
- * ocean.set({ deepColor: '#06283a', whitecaps: 0.6 })   // live
+ * ocean.set({ scatterColor: '#06283a', absorption: [0.5, 0.2, 0.12], whitecaps: 0.6 }) // live
  * floating.onRebase((origin) => ocean.setOrigin(origin)) // floating origin (threejs-biomes FloatingOrigin)
  * ```
  */

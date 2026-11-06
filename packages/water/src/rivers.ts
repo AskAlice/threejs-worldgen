@@ -76,9 +76,8 @@ export interface RiversStats {
 /** Default rivers: greenish, fairly clear water. */
 export const DEFAULT_RIVERS: RiversSettings = {
   ...DEFAULT_APPEARANCE,
-  shallowColor: '#a9cdb0',
-  deepColor: '#1f3d33',
-  visibility: 2.5,
+  absorption: [0.88, 0.4, 0.24],
+  scatterColor: '#1f3d33',
   refraction: 0.03,
   foamWidth: 0.25,
   detail: 0.45,

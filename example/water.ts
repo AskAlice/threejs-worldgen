@@ -73,12 +73,13 @@ const gui = new GUI({ title: 'threejs-water' })
 const oceanOptions = structuredClone({ ...DEFAULT_OCEAN, sun: null, environment: null }) as Record<string, any>
 for (const k of ['sun', 'environment', 'origin', 'seaLevel', 'radius']) delete oceanOptions[k]
 addOptions(gui.addFolder('Ocean'), oceanOptions, (path, value) => ocean.set(patch(path, value)), {
-  ranges: { amplitude: [0, 4], count: [0, 16, 1], choppiness: [0, 1], spread: [0, 1], speed: [0, 4], whitecaps: [0, 1], segments: [16, 256, 1], range: [1e3, 1e8], visibility: [0.1, 40], refraction: [0, 0.2], roughness: [0.01, 1], foam: [0, 1], detail: [0, 1.5], altitudeFactor: [0.001, 0.2], innerRadius: [0.001, 1] },
+  arrays: true,
+  ranges: { amplitude: [0, 4], count: [0, 16, 1], choppiness: [0, 1], spread: [0, 1], speed: [0, 4], whitecaps: [0, 1], segments: [16, 256, 1], range: [1e3, 1e8], absorption: [0, 2, 0.01], refraction: [0, 0.2], roughness: [0.01, 1], foam: [0, 1], detail: [0, 1.5], altitudeFactor: [0.001, 0.2], innerRadius: [0.001, 1] },
 })
 const riverOptions = structuredClone({ ...DEFAULT_RIVERS, sun: null, environment: null }) as Record<string, any>
 for (const k of ['sun', 'environment', 'origin']) delete riverOptions[k]
 const riverFolder = gui.addFolder('Rivers')
-addOptions(riverFolder, riverOptions, (path, value) => rivers.set(patch(path, value)), { ranges: { resolution: [8, 96, 1], expand: [0, 6, 1], tileSize: [32, 512, 1] } })
+addOptions(riverFolder, riverOptions, (path, value) => rivers.set(patch(path, value)), { arrays: true, ranges: { resolution: [8, 96, 1], expand: [0, 6, 1], tileSize: [32, 512, 1], absorption: [0, 2, 0.01] } })
 riverFolder.close()
 if (!planet) {
   gui.add({ hydrology: runHydrology }, 'hydrology').name('bounded hydrology (carve rivers, lakes)')

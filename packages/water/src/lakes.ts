@@ -53,9 +53,8 @@ export interface LakesOptions extends LakesInput {
 /** Default lakes: calm, slightly green fresh water with light wind ripples. */
 export const DEFAULT_LAKES: LakesSettings = {
   ...DEFAULT_APPEARANCE,
-  shallowColor: '#a3d2c4',
-  deepColor: '#123a3f',
-  visibility: 4,
+  absorption: [0.55, 0.25, 0.15],
+  scatterColor: '#123a3f',
   foamWidth: 0.2,
   detail: 0.3,
   detailScale: 0.8,

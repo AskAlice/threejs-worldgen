@@ -43,7 +43,7 @@ export interface OceanProps extends OceanInput {
  *
  * @example
  * ```tsx
- * <Ocean world={world} sun={sunRef.current} waves={{ amplitude: 0.8 }} deepColor="#06283a" />
+ * <Ocean world={world} sun={sunRef.current} waves={{ amplitude: 0.8 }} scatterColor="#06283a" />
  * ```
  */
 export function Ocean({ ref, world = null, camera, prepass = null, ...options }: OceanProps): React.JSX.Element | null {

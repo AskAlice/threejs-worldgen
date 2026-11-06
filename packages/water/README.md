@@ -17,8 +17,8 @@ npm i threejs-water threejs-biomes three
   sparse at the horizon, scaled with the camera's height) built in the local tangent plane and bent onto the planet in
   the vertex shader, clamped at the horizon. Gerstner waves with float64 phases (stable millions of metres from the
   origin), per-pixel wave normals that fade out before they alias, ripples, Fresnel sky or environment reflections, a
-  GGX sun glint, refraction, depth-based absorption from shallow to deep colour, shoreline foam and whitecaps. Floating
-  origin: everything is placed relative to `origin`.
+  GGX sun glint, refraction of the bed with Beer–Lambert absorption and a scattering tint, shoreline foam and
+  whitecaps. Floating origin: everything is placed relative to `origin`.
 - **`Rivers`**: river surfaces for the world's rivers, streamed in camera-centred tiles under a per-frame time budget.
   Flow follows the slope of the river surface; flow-mapped ripples and rapids foam move downstream.
 - **Hydrology** for bounded maps (pure functions, no three.js): Priority-Flood+ε depression filling (Barnes et al.
@@ -43,7 +43,7 @@ const ocean = await Ocean.create({ camera, scene, renderer, world, sun, waves: {
 const rivers = await Rivers.create({ camera, scene, renderer, world, sun, maxDistance: 2000 })
 // With `scene`, both update themselves whenever the scene renders.
 
-ocean.set({ deepColor: '#06283a', whitecaps: 0.6, waves: { direction: [0, 1] } }) // live
+ocean.set({ scatterColor: '#06283a', absorption: [0.5, 0.2, 0.12], whitecaps: 0.6, waves: { direction: [0, 1] } }) // live
 ocean.setOrigin([x, y, z]) // floating origin, e.g. from threejs-biomes FloatingOrigin.onRebase
 
 const { depth, normal } = ocean.waterAt(boat.position.x, boat.position.y, boat.position.z) // buoyancy
@@ -69,7 +69,7 @@ import { Water, Ocean, Rivers, Lakes } from 'threejs-water/react'
 <Canvas gl={async (props) => { const r = new WebGPURenderer(props as any); await r.init(); return r }}>
   <Water world={world} sun={sun} ocean={{ waves: { amplitude: 0.8 } }} rivers={{ maxDistance: 2000 }} />
   {/* or separately: */}
-  <Ocean world={world} deepColor="#06283a" whitecaps={0.6} />
+  <Ocean world={world} scatterColor="#06283a" whitecaps={0.6} />
   <Rivers world={world} flowSpeed={1.4} />
   <Lakes hydrology={hydrology} frame={world.frame} />
 </Canvas>
@@ -102,8 +102,9 @@ view-space normal material at `resolutionScale` (default `0.5`, clamped to `0.1 
 attachment. It exposes `prepass.viewZ(uv)` (scene depth as view-space z, metres), `prepass.normal(uv)` (unit
 view-space normal, bilinear) and `prepass.colour(uv)` (the renderer's full-resolution colour copy), and is available
 on the material as `material.userData.prepass` and on the water object as `ocean.prepass`. The built-in shading keeps
-the renderer's own full-resolution depth and colour readback, so attaching a pass never changes the look; the pass
-adds the view-space normals (and a downsampled depth) that the absorption, shoreline, reflection and foam work reads.
+the renderer's own full-resolution depth and colour readback, so the shoreline never coarsens and attaching a pass
+never changes the look; the pass adds same-frame view-space normals and a downsampled depth for shading that wants
+them.
 
 `Ocean`, `Rivers` and `Lakes` take `prepass` as a constructor option and also accept it live through
 `setPrepass(prepass)` / `setPrepass(null)`, which rebuild the material.
@@ -119,12 +120,17 @@ Every setting has a default and is live through `set(partial)` / `reset(full)`. 
 
 ### Appearance (`Ocean`, `Rivers`, `Lakes`)
 
+What is behind the surface follows Beer–Lambert: each channel keeps `exp(-absorption[c] · path)` of the
+refracted scene, where `path` is the metres of water along the view ray, and the rest is replaced by
+`scatterColor`. Red is absorbed fastest, so a shallow shelf shows its sand and pebbles through turquoise
+water and deep water converges on `scatterColor`. The refracted sample is rejected wherever it belongs to
+foreground geometry (checked against scene depth), so objects in front never leak through the surface.
+
 | Setting | Default (ocean) | What it does |
 |---|---|---|
-| `shallowColor` | `'#8fd8cf'` | Tint of light through shallow water. |
-| `deepColor` | `'#0b3247'` | Colour where the bottom is out of sight. |
-| `visibility` | `6` | Metres of water after which ~63% of the view through it is `deepColor`. |
-| `refraction` | `0.035` | Screen-space refraction strength. |
+| `absorption` | `[0.37, 0.17, 0.1]` | Per-channel absorption, 1/m (R, G, B); red goes first. `1 / absorption[c]` is the depth where that channel is 63% absorbed. |
+| `scatterColor` | `'#0b3247'` | Colour of light scattered back out of the water body: what deep water looks like. |
+| `refraction` | `0.035` | Screen-space refraction strength: how far the bed is sampled through the surface, scaled by wave slope. |
 | `roughness` | `0.06` | Blurs reflections and widens the glint; rises by itself with distance. |
 | `reflectivity` | `0.02` | Fresnel reflectance looking straight down. |
 | `skyColor`, `horizonColor` | `'#6e9fd6'`, `'#cfe0ee'` | Sky gradient reflected when there is no `environment`. |
@@ -175,7 +181,7 @@ Every setting has a default and is live through `set(partial)` / `reset(full)`. 
 | `reframeDistance` | `20000` | Planets: re-centre the tile frame on the camera after this many metres. |
 | `origin` | `[0, 0, 0]` | Floating origin. |
 
-River appearance defaults: `shallowColor '#a9cdb0'`, `deepColor '#1f3d33'`, `visibility 2.5`, `foamWidth 0.25`,
+River appearance defaults: `absorption [0.88, 0.4, 0.24]`, `scatterColor '#1f3d33'`, `foamWidth 0.25`,
 `detail 0.45`, `detailScale 0.9`.
 
 ### `Lakes`

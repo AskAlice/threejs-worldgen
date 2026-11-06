@@ -10,12 +10,15 @@ import { MAX_WAVES, crestSharpness, type Wave } from './waves.ts'
 
 /** How water looks: colour, clarity, reflections, foam and ripples. Shared by oceans, lakes and rivers. */
 export interface WaterAppearance {
-  /** Tint of light that crossed shallow water (`#rrggbb`). */
-  shallowColor: string
-  /** Colour of deep water: what you see where the bottom is out of sight. */
-  deepColor: string
-  /** Metres of water after which ~63% of the green channel is replaced by `deepColor`. Absorption is per channel (red first), so shallows read turquoise. */
-  visibility: number
+  /**
+   * Per-channel absorption coefficients, 1/m, in R, G, B order: how fast each channel of the light
+   * behind the surface is absorbed per metre of water. Red goes first, so a shallow bed reads turquoise
+   * and deep water keeps only the `scatterColor`. `1 / absorption[c]` is the depth (m) at which that
+   * channel is down to 37%.
+   */
+  absorption: [red: number, green: number, blue: number]
+  /** Colour of the light scattered back out of the water body: what deep water looks like where the bottom is out of sight. */
+  scatterColor: string
   /** Screen-space refraction strength (0 = none). */
   refraction: number
   /** Surface roughness 0 … 1 (blurs reflections and widens the sun glint). Grows by itself with distance. */
@@ -50,9 +53,8 @@ export interface WaterAppearance {
 
 /** Default look: clear tropical-ish sea water. */
 export const DEFAULT_APPEARANCE: WaterAppearance = {
-  shallowColor: '#8fd8cf',
-  deepColor: '#0b3247',
-  visibility: 6,
+  absorption: [0.37, 0.17, 0.1],
+  scatterColor: '#0b3247',
   refraction: 0.035,
   roughness: 0.06,
   reflectivity: 0.02,
@@ -76,12 +78,10 @@ export const DEFAULT_APPEARANCE: WaterAppearance = {
  */
 export function createWaterUniforms() {
   return {
-    /** `shallowColor`. */
-    shallowColor: uniform(new Color()),
-    /** `deepColor`. */
-    deepColor: uniform(new Color()),
-    /** `visibility`, metres. */
-    visibility: uniform(1),
+    /** `absorption`, per-channel 1/m (R, G, B). */
+    absorption: uniform(new Vector3(...DEFAULT_APPEARANCE.absorption)),
+    /** `scatterColor`. */
+    scatterColor: uniform(new Color()),
     /** `refraction`. */
     refraction: uniform(0),
     /** `roughness`. */
@@ -148,11 +148,45 @@ export function createWaterUniforms() {
 /** Shader uniforms of a water material. Each entry is a TSL uniform node. */
 export type WaterUniforms = ReturnType<typeof createWaterUniforms>
 
+/** `absorption` as a plain triple, clamped to ≥ 0. */
+export function absorptionCoefficients(a: Pick<WaterAppearance, 'absorption'>): [number, number, number] {
+  return [Math.max(0, a.absorption[0]), Math.max(0, a.absorption[1]), Math.max(0, a.absorption[2])]
+}
+
+/**
+ * Beer–Lambert transmittance exp(−σ·path) per channel: the fraction of the light behind the surface
+ * that survives `path` metres of water. 1 = clear, 0 = fully absorbed.
+ */
+export function transmittance(absorption: readonly number[], path: number): [number, number, number] {
+  return [Math.exp(-absorption[0] * path), Math.exp(-absorption[1] * path), Math.exp(-absorption[2] * path)]
+}
+
+/** What a water pixel reads behind itself, and how much water lies along that ray. */
+export interface BehindSample {
+  /** `'refracted'` = the offset sample, `'self'` = the pixel's own sample, `'none'` = nothing behind (deep water). */
+  uv: 'refracted' | 'self' | 'none'
+  /** Metres of water along the view ray; `Infinity` when nothing valid is behind. */
+  path: number
+}
+
+/**
+ * Picks the sample behind a water fragment, rejecting foreground geometry: view-space z is negative in
+ * front of the camera, so a sample is behind the surface only when it is more negative. The refracted
+ * offset is used when it lands on the background, otherwise the pixel's own sample, and if that is
+ * foreground too, nothing (deep water) — so an object in front never leaks through the surface.
+ */
+export function behindSample(viewZ: number, refractedZ: number, ownZ: number, dist: number): BehindSample {
+  const path = (z: number) => Math.max(0, dist * (z / viewZ - 1))
+  if (refractedZ < viewZ) return { uv: 'refracted', path: path(refractedZ) }
+  if (ownZ < viewZ) return { uv: 'self', path: path(ownZ) }
+  return { uv: 'none', path: Infinity }
+}
+
 /** Copies the appearance settings into uniforms. */
 export function applyAppearance(u: WaterUniforms, a: WaterAppearance): void {
-  u.shallowColor.value.set(a.shallowColor)
-  u.deepColor.value.set(a.deepColor)
-  u.visibility.value = Math.max(1e-3, a.visibility)
+  const [r, g, b] = absorptionCoefficients(a)
+  u.absorption.value.set(r, g, b)
+  u.scatterColor.value.set(a.scatterColor)
   u.refraction.value = a.refraction
   u.roughness.value = Math.min(1, Math.max(0.01, a.roughness))
   u.reflectivity.value = a.reflectivity
@@ -241,7 +275,8 @@ const tilt = (v: any, p: any, radius: any) => {
  *   (continuous x/z for noise); flow-mapped ripples and foam move downstream.
  *
  * Both share the shading: Fresnel reflection of the environment or sky, GGX sun glint, refraction of
- * the scene behind, depth-based absorption from shallow to deep colour, and shoreline foam.
+ * the bed through the surface, Beer–Lambert absorption of it by path length with a scattering tint,
+ * and shoreline foam.
  */
 export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null, prepass: WaterPrepass | null = null): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ side: FrontSide })
@@ -249,8 +284,8 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
   material.depthWrite = true
   material.name = kind === 'waves' ? 'Water (waves)' : 'Water (flow)'
   // A scene prepass (optional) makes the scene's depth, view-space normals and colour available on
-  // the material for the shading added by later tickets. The shading below keeps the renderer's own
-  // full-resolution depth and colour readback, so attaching a pass never changes the look.
+  // the material for shading that wants it. The shading below keeps the renderer's own full-resolution
+  // depth and colour readback (so the shoreline never coarsens and attaching a pass never changes the look).
   material.userData.prepass = prepass
 
   const vP = varyingProperty('vec2', 'vWaterP')
@@ -382,20 +417,27 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const Fh = u.reflectivity.add(float(1).sub(u.reflectivity).mul(pow(float(1).sub(max(dot(H, V), 0)), 5)))
     const glint = u.sunColor.mul(D.mul(Fh).mul(max(dot(N, L), 0)).div(NdotV.mul(4)).mul(u.specular)).mul(smoothstep(-0.02, 0.05, sunUp))
 
-    // What is behind the surface: refract, but never pick up things in front of the water.
+    // What is behind the surface: refract, but never pick up things in front of the water. View-space
+    // z is negative in front of the camera, so a sample is behind the surface when it is more negative.
     const viewZ = positionView.z
     const bend = cameraViewMatrix.mul(vec4(N.sub(U), 0)).xy
     const offset = vec2(bend.x, bend.y.negate()).mul(u.refraction).mul(min(float(1), float(10).div(dist)))
     const refractedUv = screenUV.add(offset)
-    const uv = select(sceneViewZ(refractedUv).lessThan(viewZ), refractedUv, screenUV)
-    const sceneZ = sceneViewZ(uv)
-    const path = max(dist.mul(sceneZ.div(viewZ).sub(1)), 0) // metres of water the view ray crosses
+    const refractedZ = sceneViewZ(refractedUv)
+    const ownZ = sceneViewZ(screenUV)
+    const useRefracted = refractedZ.lessThan(viewZ)
+    const uv = select(useRefracted, refractedUv, screenUV)
+    const sceneZ = select(useRefracted, refractedZ, ownZ)
+    // A foreground sample (the offset crossed a silhouette) would leak its colour through, so treat it
+    // as 10 km of water: fully absorbed, no hole in the surface.
+    const path = select(sceneZ.lessThan(viewZ), max(dist.mul(sceneZ.div(viewZ).sub(1)), 0), float(1e4))
+    // The shoreline stays on the full-resolution depth, so it does not coarsen.
     const depth = path.mul(max(dot(V, U), 0.02)) // ≈ vertical water depth
     const behind = viewportSharedTexture(uv).rgb
-    // Beer–Lambert absorption per channel: red dies first, so shallows read turquoise and depth reads blue.
-    const absorb = float(1).sub(exp(path.negate().mul(vec3(2.2, 1, 0.6).div(u.visibility))))
-    const tint = mix(vec3(1), u.shallowColor, absorb)
-    const body = mix(behind.mul(tint), u.deepColor.mul(day), absorb)
+    // Beer–Lambert: each channel keeps exp(−σ·path) of the bed (red first), and the rest is light
+    // scattered back out of the water body, so shallows show the bed tinted and deep water is scatter.
+    const transmit = exp(path.negate().mul(u.absorption))
+    const body = behind.mul(transmit).add(u.scatterColor.mul(day).mul(float(1).sub(transmit)))
 
     // Shoreline: soft edge, then foam that laps in bands. The band's wobble fades out at the waterline,
     // where the depth buffer is noise and would otherwise speckle the foam.
