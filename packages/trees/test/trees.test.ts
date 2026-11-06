@@ -171,7 +171,7 @@ function dependsOn(node: unknown, target: unknown): boolean {
 }
 
 test('impostors get the same weather as the mesh LODs: snow by the baked normal, wet, burn, damage leaf loss', () => {
-  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5) }
+  const surface = { color: vec3(0.2, 0.4, 0.1), alpha: float(1), normal: vec3(0, 1, 0), mask: float(0.5), roughness: float(0.6) }
   const m = new MeshStandardNodeMaterial()
   applyImpostorWeather(m, surface)
   const u = treeUniforms
