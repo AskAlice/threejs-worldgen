@@ -157,8 +157,9 @@ export function buildChunk(world: World, key: ChunkKey, settings: ChunkSettings)
   const sphere = key.face >= 0
   const R = world.options.radius
   const size = chunkSize(world, key, settings.rootSize)
-  const spacing = size / (n - 1)
-  const minWavelength = spacing * 2
+  // One fixed filter for every level: LOD changes tessellation, never the sampled terrain. Filtering by
+  // vertex spacing here made coarse chunks flatten peaks (725 m → 47 m) and change biome between levels.
+  const minWavelength = 0
 
   // Base-surface point and "up" direction for grid cell (i, j), i, j in [-1, n].
   const base: Vec3 = [0, 0, 0]

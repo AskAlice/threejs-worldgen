@@ -36,6 +36,9 @@ const HEIGHT_RAMP: [number, [number, number, number]][] = [
   [0.75, [0.55, 0.5, 0.35]], [0.9, [0.6, 0.58, 0.56]], [1, [1, 1, 1]],
 ]
 const HEAT_RAMP: [number, [number, number, number]][] = [[0, [0.2, 0.3, 0.9]], [0.5, [0.95, 0.95, 0.8]], [1, [0.9, 0.2, 0.1]]]
+// The sea colour threejs-water renders (`DEFAULT_APPEARANCE.deepColor`). Kept as a literal so the map
+// package does not depend on the water package.
+const SEA_COLOR = '#0b3247'
 
 /**
  * Renders a top-down map of the world into RGBA bytes (row 0 = −Z edge). Pure (no DOM), so it also
@@ -49,47 +52,55 @@ export function renderWorldMap(world: World, input: Partial<MapOptions> = {}, fr
   const out = new Uint8ClampedArray(n * n * 4)
   const s = createSample()
   const heights = new Float32Array(n * n)
-  const biomeRgb = world.options.biomes.map((b) => hexToRgb(b.color))
   const sea = world.options.seaLevel
   const span = Math.max(1, world.options.mountains.height + 200)
   const weights = new Float32Array(7)
   const color = new Float32Array(3)
+  const seaRgb = hexToRgb(SEA_COLOR)
+  const cell = o.size / n
+  // Ground colours need the slope, which is only known once every height is sampled, so they are
+  // painted in the second pass — with the same palette the 3D material uses.
+  const groundMode = o.mode === 'biomes' || o.mode === 'ground'
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const x = o.center[0] + ((i + 0.5) / n - 0.5) * o.size
-    const z = o.center[1] + ((j + 0.5) / n - 0.5) * o.size
-    frame.sample(x, z, s, o.size / n)
+    const x = o.center[0] + (i + 0.5 - n / 2) * cell
+    const z = o.center[1] + (j + 0.5 - n / 2) * cell
+    frame.sample(x, z, s, cell)
     heights[j * n + i] = s.elevation
-    let rgb: [number, number, number]
+    if (groundMode) continue
+    let rgb: [number, number, number] = [0, 0, 0]
     switch (o.mode) {
-      case 'biomes': {
-        rgb = [0, 0, 0]
-        for (let k = 0; k < s.count; k++) {
-          const c = biomeRgb[s.biomes[k]], w = s.weights[k]
-          rgb[0] += c[0] * w; rgb[1] += c[1] * w; rgb[2] += c[2] * w
-        }
-        if (!Number.isNaN(s.waterLevel) && s.waterLevel > s.elevation) rgb = [rgb[0] * 0.4, rgb[1] * 0.55, rgb[2] * 0.9 + 0.1]
-        break
-      }
       case 'height': rgb = ramp(HEIGHT_RAMP, clamp(0.5 + (s.elevation - sea) / (2 * span), 0, 1)); break
       case 'temperature': rgb = ramp(HEAT_RAMP, clamp((s.temperature + 25) / 60, 0, 1)); break
       case 'moisture': rgb = ramp([[0, [0.75, 0.6, 0.35]], [1, [0.1, 0.35, 0.8]]], s.moisture); break
       case 'continentalness': rgb = ramp(HEAT_RAMP, 0.5 + 0.5 * s.continentalness); break
       case 'erosion': rgb = [s.erosion, s.erosion, s.erosion]; break
       case 'rivers': rgb = [0.15 + 0.6 * s.valley, 0.15 + 0.6 * s.valley, 0.2 + 0.8 * Math.max(s.valley, s.river)]; break
-      case 'ground': world.ground(s, 0, weights, color); rgb = [color[0], color[1], color[2]]; break
     }
     const p = (j * n + i) * 4
     out[p] = rgb[0] * 255; out[p + 1] = rgb[1] * 255; out[p + 2] = rgb[2] * 255; out[p + 3] = 255
   }
-  if (o.shade) {
-    const cell = o.size / n
+  if (groundMode || o.shade) {
+    const h = (a: number, b: number) => heights[clamp(b, 0, n - 1) * n + clamp(a, 0, n - 1)]
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const h = (a: number, b: number) => heights[clamp(b, 0, n - 1) * n + clamp(a, 0, n - 1)]
-      const dx = (h(i + 1, j) - h(i - 1, j)) / (2 * cell), dz = (h(i, j + 1) - h(i, j - 1)) / (2 * cell)
-      const light = clamp(0.75 + (-dx - dz) * 0.6, 0.4, 1.3) * (heights[j * n + i] < sea ? 1 : 1)
       const p = (j * n + i) * 4
-      const k = lerp(1, light, smoothstep(sea - 1, sea + 1, heights[j * n + i]))
-      out[p] *= k; out[p + 1] *= k; out[p + 2] *= k
+      const dx = (h(i + 1, j) - h(i - 1, j)) / (2 * cell), dz = (h(i, j + 1) - h(i, j - 1)) / (2 * cell)
+      if (groundMode) {
+        const x = o.center[0] + (i + 0.5 - n / 2) * cell
+        const z = o.center[1] + (j + 0.5 - n / 2) * cell
+        frame.sample(x, z, s, cell)
+        const wet = !Number.isNaN(s.waterLevel) && s.waterLevel > s.elevation
+        let rgb: [number, number, number]
+        if (wet) rgb = seaRgb
+        else { world.ground(s, Math.hypot(dx, dz), weights, color); rgb = [color[0], color[1], color[2]] }
+        // Water is flat in the map: only land takes the hill shading the 3D ground has.
+        const light = clamp(0.75 + (-dx - dz) * 0.6, 0.4, 1.3)
+        const k = o.shade && !wet ? lerp(1, light, smoothstep(sea - 1, sea + 1, heights[j * n + i])) : 1
+        out[p] = rgb[0] * 255 * k; out[p + 1] = rgb[1] * 255 * k; out[p + 2] = rgb[2] * 255 * k; out[p + 3] = 255
+      } else {
+        const light = clamp(0.75 + (-dx - dz) * 0.6, 0.4, 1.3)
+        const k = lerp(1, light, smoothstep(sea - 1, sea + 1, heights[j * n + i]))
+        out[p] *= k; out[p + 1] *= k; out[p + 2] *= k
+      }
     }
   }
   return out

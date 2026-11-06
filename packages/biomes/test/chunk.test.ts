@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { World } from '../src/world.ts'
-import { buildChunk, cubeToSphere, sphereToFace } from '../src/chunk.ts'
+import { buildChunk, chunkSize, cubeToSphere, sphereToFace } from '../src/chunk.ts'
 
 const settings = { resolution: 9, rootSize: 2048, skirt: 0.02 }
 
@@ -59,4 +59,53 @@ test('invalid options from GUIs or URLs are sanitised instead of producing NaN',
   assert.ok(Number.isFinite(s.elevation) && s.count > 0)
   world.set({ hills: { scale: -5 } })
   assert.ok(Number.isFinite(world.sampleAt(5, 0, 5).elevation))
+})
+
+// The same area at two levels must agree at every world position both levels sample: the level only
+// changes tessellation. Before the fix each chunk filtered noise by its own spacing, so shared vertices
+// sampled different terrain (coarse peaks flattened, biome weights and colours changed).
+test('chunk elevation, biome weights and colour do not depend on the LOD level', () => {
+  const settings = { resolution: 9, rootSize: 2048, skirt: 0.02 }
+  const n = settings.resolution
+  for (const planet of [false, true]) {
+    const world = planet ? new World({ seed: 11, surface: 'sphere', radius: 50_000 }) : new World({ seed: 11 })
+    const R = world.options.radius
+    const coarse = { face: planet ? 0 : -1, level: 4, x: 3, y: 2 }
+    const coarseSize = chunkSize(world, coarse, settings.rootSize)
+    const step = planet ? 2 / 2 ** coarse.level : 0
+    const c = buildChunk(world, coarse, settings)
+    const elevation = (d: typeof c, v: number) => planet
+      ? Math.hypot(d.center[0] + d.positions[v * 3], d.center[1] + d.positions[v * 3 + 1], d.center[2] + d.positions[v * 3 + 2]) - R
+      : d.center[1] + d.positions[v * 3 + 1]
+    let shared = 0, maxElevation = 0, maxColor = 0, maxDirect = 0
+    const p: [number, number, number] = [0, 0, 0]
+    const s = world.sampleAt(0, 0, 0)
+    for (let oy = 0; oy < 2; oy++) for (let ox = 0; ox < 2; ox++) {
+      const f = buildChunk(world, { face: coarse.face, level: coarse.level + 1, x: coarse.x * 2 + ox, y: coarse.y * 2 + oy }, settings)
+      for (let j = 0; j < n; j += 2) for (let i = 0; i < n; i += 2) {
+        // Fine vertices that coincide with the coarse grid (children sit 2×2 inside the parent).
+        const ci = ox * (n - 1) / 2 + i / 2, cj = oy * (n - 1) / 2 + j / 2
+        const cv = cj * n + ci, fv = j * n + i
+        shared++
+        maxElevation = Math.max(maxElevation, Math.abs(elevation(c, cv) - elevation(f, fv)))
+        for (let k = 0; k < 3; k++) {
+          maxColor = Math.max(maxColor, Math.abs(c.colors[cv * 3 + k] - f.colors[fv * 3 + k]),
+            Math.abs(c.biomeColors[cv * 3 + k] - f.biomeColors[fv * 3 + k]))
+        }
+        // ...and both match the world's authoritative (unfiltered) sample at that point.
+        if (planet) {
+          const u = -1 + (coarse.x + ci / (n - 1)) * step, v = -1 + (coarse.y + cj / (n - 1)) * step
+          cubeToSphere(coarse.face, u, v, p)
+          p[0] *= R; p[1] *= R; p[2] *= R
+        } else {
+          p[0] = (coarse.x + ci / (n - 1)) * coarseSize; p[1] = 0; p[2] = (coarse.y + cj / (n - 1)) * coarseSize
+        }
+        maxDirect = Math.max(maxDirect, Math.abs(elevation(c, cv) - world.sampleAt(p[0], p[1], p[2], s).elevation))
+      }
+    }
+    assert.equal(shared, 4 * 5 * 5)
+    assert.ok(maxElevation < (planet ? 0.02 : 0.002), `${planet ? 'planet' : 'plane'} elevation delta ${maxElevation} m`)
+    assert.ok(maxDirect < (planet ? 0.02 : 0.002), `${planet ? 'planet' : 'plane'} filtered-vs-authoritative delta ${maxDirect} m`)
+    assert.ok(maxColor < 1e-4, `${planet ? 'planet' : 'plane'} colour delta ${maxColor}`)
+  }
 })

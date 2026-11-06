@@ -1,5 +1,5 @@
 import type { PerspectiveCamera } from 'three/webgpu'
-import type { Vec3 } from './noise.ts'
+import { smoothstep, type Vec3 } from './noise.ts'
 import { createSample, type World } from './world.ts'
 
 /** Settings for {@link SurfaceControls}. */
@@ -30,6 +30,20 @@ export interface SurfaceControlsOptions {
 export const DEFAULT_SURFACE_CONTROLS: SurfaceControlsOptions = {
   minDistance: 0.01, maxDistance: 0, zoomSpeed: 1, rotateSpeed: 1, moveSpeed: 0.8,
   minElevation: 0.03, maxElevation: Math.PI / 2 - 0.01, clearance: 0.3, autoClip: true, damping: 0.8,
+}
+
+/**
+ * How far the orbit pivot has moved from the surface focus (0) to the planet centre (1) at a given
+ * camera distance: 0 near the ground, 1 once the camera is far enough out that dragging should spin
+ * the globe. 0 on flat worlds (radius 0).
+ */
+export function pivotBlend(distance: number, radius: number): number {
+  return radius > 0 ? smoothstep(radius * 0.2, radius * 1.5, distance) : 0
+}
+
+/** How far to lift a camera along the local up so it clears the ground by `clearance`, metres. */
+export function surfaceLift(height: number, ground: number, clearance: number): number {
+  return Math.max(0, ground + clearance - height)
 }
 
 /**
@@ -144,16 +158,17 @@ export class SurfaceControls {
     const ground = this.groundAt(cam)
     const camHeight = sphere ? Math.hypot(...cam) - R : cam[1]
     const clearance = Math.min(o.clearance, this.distance * 0.3)
-    if (camHeight < ground + clearance) {
-      const lift = ground + clearance - camHeight
-      off = [off[0] + up[0] * lift, off[1] + up[1] * lift, off[2] + up[2] * lift]
-    }
+    const lift = surfaceLift(camHeight, ground, clearance)
+    if (lift > 0) off = [off[0] + up[0] * lift, off[1] + up[1] * lift, off[2] + up[2] * lift]
     this.altitude = Math.max(0, camHeight - ground)
 
+    // Pivot from the surface focus (close up) to the planet centre (far out), so dragging at orbit
+    // spins the globe; the camera itself stays on the focus point as before.
+    const t = sphere ? pivotBlend(this.distance, R) : 0
     const c = this.camera
     c.up.set(up[0], up[1], up[2])
     c.position.set(off[0], off[1], off[2])
-    c.lookAt(0, 0, 0)
+    c.lookAt(-this.focus[0] * t, -this.focus[1] * t, -this.focus[2] * t)
     if (o.autoClip) {
       c.near = Math.max(1e-4, Math.min(this.altitude, this.distance) * 0.05)
       c.far = sphere ? Math.hypot(...cam) + R * 4 : Math.max(200_000, this.distance * 10)

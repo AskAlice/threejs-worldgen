@@ -107,6 +107,17 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
 
   const fade = smoothstep(u.detailDistance, u.detailDistance.mul(0.25), distance(positionWorld, cameraPosition)).mul(u.detail)
 
+  // Mid-scale ground detail (~7 m and ~30 m features) that survives to a few kilometres, so the ground
+  // does not blur into flat biome colour between the metre-scale detail and the far LODs.
+  const midFade = smoothstep(u.detailDistance.mul(14), u.detailDistance.mul(3), distance(positionWorld, cameraPosition)).mul(u.detail)
+  const mid = Fn(() => {
+    const n = float(0).toVar()
+    If(midFade.greaterThan(0.002), () => {
+      n.assign(mx_noise_float(p.mul(0.03)).add(mx_noise_float(p.mul(0.14)).mul(0.5)))
+    })
+    return n
+  })()
+
   // Five noise lookups, only for fragments close enough to show them: broad patches, rock grain, sand
   // ripples (warped by the patches) and snow sparkle. Far fragments skip all of it.
   const noise = Fn(() => {
@@ -136,6 +147,7 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   ground = mix(ground, u.snowColor, snow)
   const variation = float(1).add(patches.mul(0.22)).add(grain.mul(rock).mul(0.18)).add(ripple.mul(sand).mul(0.08))
   let color = ground.mul(mix(float(1), variation, fade))
+  color = color.mul(mid.mul(midFade).mul(0.22).add(1))
   color = color.mul(mix(float(1), float(0.6), wet.mul(0.6)))
   color = color.add(vec3(sparkle.mul(snow).mul(fade).mul(0.6)))
   const lum = color.dot(vec3(0.2126, 0.7152, 0.0722))
@@ -160,7 +172,7 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
 
   // Micro relief bump from the same noise, stronger on rock and sand.
   const height = patches.mul(0.6).add(grain.mul(rock.mul(0.5).add(0.15))).add(ripple.mul(sand).mul(0.4))
-  material.normalNode = perturbNormal(height.mul(fade), u.bump.mul(0.05))
+  material.normalNode = perturbNormal(height.mul(fade).add(mid.mul(midFade).mul(0.5)), u.bump.mul(0.05))
 
   return { material, uniforms: u, setDebug }
 }
