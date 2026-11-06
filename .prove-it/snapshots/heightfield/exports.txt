@@ -1,0 +1,6 @@
+bakeHeightfield
+createHeightSampler
+merge
+raycastHeight
+resolve
+slopeAt

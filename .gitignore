@@ -9,3 +9,6 @@ site
 .claude/flywheel-state.json
 .claude/flywheel-feedback.json
 .claude/flywheel-hook.log
+
+.prove-it/runs/
+.prove-it/audits/
