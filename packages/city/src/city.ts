@@ -3,7 +3,8 @@ import {
   type Camera, type Material, type Object3D,
 } from 'three/webgpu'
 import { batchIndirectIndex, hash } from 'three/tsl'
-import { hash01, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
+import { hash01, seedOf, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
+import { decorateRoads, Props, type RoadSurface } from 'threejs-props'
 import type { Climate } from './architecture.ts'
 import { buildingGeometry, detailGeometry, detailInstances, DETAIL_SHAPES } from './building-mesh.ts'
 import type { Building } from './buildings.ts'
@@ -16,9 +17,8 @@ import type { MeshData } from './mesh-builder.ts'
 import { mergeOptions, resolveCityOptions, type CityInput, type CityOptions, type Weather } from './options.ts'
 import { planCity, type CityPlan } from './plan.ts'
 import { pointInPolygon } from './polygon.ts'
-import { createRoadMaterial } from './road-material.ts'
+import { createRoadMaterial, roadSurfaceLook } from './road-material.ts'
 import { roadGeometry } from './road-mesh.ts'
-import { ROAD_SURFACES } from './graph.ts'
 import { Site } from './site.ts'
 import { modifierPoint, padModifier, roadModifiers } from './terrain.ts'
 
@@ -115,6 +115,8 @@ export class City {
   private details: BatchedMesh | null = null
   private detailIds: number[][] = []
   private roads: Mesh | null = null
+  private road: RoadSurface | null = null
+  private props: Props | null = null
   private fields: Mesh | null = null
   private materials: Material[] = []
   private weather: BuildingWeather | null = null
@@ -242,15 +244,8 @@ export class City {
   private apply(): this {
     const o = (this.options = resolveCityOptions(this.input))
     applyFacadeUniforms(this.uniforms, o.facade, o.buildings.floorHeight, o.weather)
-    const u = this.uniforms
-    ROAD_SURFACES.forEach((s, i) => (u.roadColors.array[i] as Color).set(o.roadLook.colors[s]))
-    u.sidewalk.value.set(o.roadLook.sidewalk)
-    u.kerb.value.set(o.roadLook.kerb)
-    u.marking.value.set(o.roadLook.marking)
-    u.centerLine.value.set(o.roadLook.centerLine)
-    u.concrete.value.set(o.roadLook.concrete)
-    u.markings.value = o.roadLook.markings ? 1 : 0
-    u.wear.value = o.roadLook.wear
+    this.road?.set(roadSurfaceLook(o.roadLook))
+    this.props?.set({ states: o.weather.roads })
 
     // Place the root on the world surface, oriented to the frame.
     const f = this.frame
@@ -341,10 +336,13 @@ export class City {
     if (this.roads) { this.roads.removeFromParent(); this.roads.geometry.dispose() }
     if (this.fields) { this.fields.removeFromParent(); this.fields.geometry.dispose() }
     this.fields = null
+    this.props?.dispose()
+    this.props = null
     for (const m of this.materials) m.dispose()
     this.weather?.dispose()
     this.walls = this.roofs = null
     this.roads = null
+    this.road = null
     this.materials = []
     this.weather = null
   }
@@ -374,11 +372,12 @@ export class City {
     this.weather = new BuildingWeather(plan.buildings.length)
     const facade = createFacadeMaterial(this.uniforms, this.weather)
     const roof = createRoofMaterial(this.uniforms, this.weather)
-    const road = createRoadMaterial(this.uniforms)
+    const road = createRoadMaterial(this.uniforms, o.roadLook)
+    this.road = road
     // Per-detail shade (0.85…1.1) from the batch instance id, folded in before weather: a BatchedMesh
     // instance colour (setColorAt) would be multiplied in after colorNode and tint the snow.
     const detail = createRoofMaterial(this.uniforms, null, hash(batchIndirectIndex).mul(0.25).add(0.85))
-    this.materials = [facade, roof, road, detail]
+    this.materials = [facade, roof, road.material, detail]
     this.walls = batch(meshes.map((m) => [m.walls, m.simpleWalls]), facade)
     this.roofs = batch(meshes.map((m) => [m.roofs, m.simpleRoofs]), roof)
     for (const b of [this.walls, this.roofs]) if (b) { b.mesh.castShadow = b.mesh.receiveShadow = true; this.object.add(b.mesh) }
@@ -411,7 +410,7 @@ export class City {
       kerbHeight: o.roadLook.kerbHeight, offset: o.terrain.roadOffset, deckThickness: 1.2, pierSpacing: 24,
     })
     if (roadData.count) {
-      this.roads = new Mesh(toGeometry(roadData), road)
+      this.roads = new Mesh(toGeometry(roadData), road.material)
       this.roads.receiveShadow = true
       this.roads.name = 'Roads'
       this.object.add(this.roads)
@@ -432,6 +431,14 @@ export class City {
         this.object.add(this.fields)
       }
     }
+    // Street furniture (threejs-props): lights, hydrants, signs, traffic lights, mailboxes, power lines,
+    // fences, hay bales and wells along this settlement's roads.
+    const data = cityData(plan, o.roads)
+    const seed = o.seed
+    const placements = decorateRoads(data.roads, this.world, { seed: typeof seed === 'number' ? seed : seedOf(seed) }, { frame: this.frame, lots: data.lots })
+    this.props = new Props({ placements, states: o.weather.roads, nightNode: this.uniforms.night })
+    this.local.add(this.props.object)
+
     this.lodState = new Uint8Array(plan.buildings.length)
     this.lastCam.set(Infinity, 0, 0)
   }

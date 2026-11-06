@@ -36,22 +36,6 @@ export function createCityUniforms() {
     roofWeather: uniform(new Vector4()),
     /** Road weather: wetness, snow, burn, damage. */
     roadWeather: uniform(new Vector4()),
-    /** Road base colour per surface (asphalt, cobblestone, gravel, dirt). */
-    roadColors: uniformArray([new Color(), new Color(), new Color(), new Color()], 'color'),
-    /** Sidewalk colour. */
-    sidewalk: uniform(new Color('#a8a49c')),
-    /** Kerb colour. */
-    kerb: uniform(new Color('#bdb8ae')),
-    /** Lane marking colour. */
-    marking: uniform(new Color('#e9e9e2')),
-    /** Arterial centre line colour. */
-    centerLine: uniform(new Color('#e2b842')),
-    /** Bridge concrete colour. */
-    concrete: uniform(new Color('#9d9a93')),
-    /** 1 = paint markings, 0 = none. */
-    markings: uniform(1),
-    /** Road wear 0..1. */
-    wear: uniform(0.5),
   }
 }
 

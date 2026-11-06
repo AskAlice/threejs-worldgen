@@ -114,15 +114,18 @@ data below).
 - Balconies, railings, rooftop plant, tanks, antennas, chimneys, AC units and stilts: one more `BatchedMesh` of eight
   shared unit geometries, instanced with per-instance matrices and colour.
 - Roads: one indexed mesh of shared-vertex strips (carriageway, kerbs, sidewalks, skirts, bridge decks, parapets, piers)
-  and junction discs.
+  and junction discs, drawn with threejs-props' `RoadSurface` material.
+- Street furniture: one `threejs-props` `Props` added to `city.local` — street lights, hydrants, bins, benches, bus
+  stops, signs, traffic lights, mailboxes, power lines, fences, hay bales and wells along the settlement's roads.
 - Geometry is built straight into typed arrays (16-bit indices where they fit), bounds are set explicitly, and all
   materials are shared TSL node materials varied per vertex or instance.
 
 Facades are a TSL shader: per-style window grids from wall coordinates (metres along the wall and above the ground
 floor), frames and mullions, shopfronts, window lights hashed per window that glow with `night`, and procedural
 plaster, brick, wood, stone, concrete, glass, adobe and metal. Roofs draw tiles, slates, shingles, standing-seam metal,
-thatch and gravel. Roads draw lane markings, worn tyre tracks, cracks and patches on asphalt, cobblestones, gravel,
-rutted dirt, paving slabs and kerbs. No texture assets.
+thatch and gravel. Roads use threejs-props' `RoadSurface`: lane markings, worn tyre tracks, cracks and patches on
+asphalt, cobblestones, gravel, rutted dirt, paving slabs and kerbs, the same look as props road ribbons. No texture
+assets.
 
 ### Weather hooks
 
@@ -130,14 +133,17 @@ rutted dirt, paving slabs and kerbs. No texture assets.
 `city.setBuildingWeather(id, partial)` overrides single buildings (the larger value wins). Wet surfaces darken and turn
 glossy, with puddles on roads; snow settles on upward faces and stays out of tyre tracks; burn chars surfaces with
 embers near 1; damage adds cracks, holes and potholes. They are uniforms and a small data texture, so a weather system
-can drive them every frame.
+can drive them every frame. Road weather goes through `threejs-props`' `RoadSurface`, so city streets and props road
+ribbons respond the same way; the street furniture takes `weather.roads` too.
 
 ### Data for other packages
 
 `city.data()` returns a JSON-safe `CityData` in frame-local metres: road nodes and edges (class, surface, width,
 sidewalk, lanes, speed, access, graded centreline), lots (district, polygon, street frontage and its road edge) and
 buildings (style, material, roof, height, footprint, entrance, `use`: landmark or farm building). Add props to
-`city.local`, which uses the same coordinates.
+`city.local`, which uses the same coordinates — the settlement's street furniture is already a `threejs-props` `Props`
+there, so `decorateRoads(city.data()!.roads, world, …, { frame: city.frame, lots: city.data()!.lots })` is only needed
+if you want to place another set.
 
 A farm's `data().farm` holds its `yard`, gravel `apron`, driveway `access` point and:
 
@@ -151,7 +157,7 @@ A farm's `data().farm` holds its `yard`, gravel `apron`, driveway `access` point
 ```ts
 import { laneOffset, pointOnEdge, roadAnchors, routeCost } from 'threejs-city'
 const data = city.data()!
-roadAnchors(data, { spacing: 30, surfaces: ['asphalt'] })          // street lights
+roadAnchors(data, { spacing: 30, surfaces: ['asphalt'] })          // your own street lights
 roadAnchors(data, { spacing: 45, sides: 'one', types: ['secondary'] }) // power poles
 data.lots.filter((l) => l.frontage && l.building >= 0)            // mailboxes at l.frontage
 const route = city.graph!.shortestPath(from, to, routeCost('bicycle', city.options.roads))
