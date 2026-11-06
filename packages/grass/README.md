@@ -77,7 +77,7 @@ All of these were captured from the demos. Click any image to open the live demo
   - [Terrain helpers: `createHeightSampler`, `bakeHeightfield`, `raycastHeight`, `slopeAt`, `HeightFn`, `Terrain`](#terrain-helpers)
   - [Geometry: `createBladeGeometry`, `createBillboardGeometry`](#geometry)
   - [Shader access: `GrassUniforms`, `GrassMapSample`, `MAX_INTERACTORS`](#shader-access)
-  - [Corn: `Corn`, `CornField`, `CornSettings`, `FlattenMap`, `plantRows`](#corn)
+  - [Corn: `Corn`, `CornOptions`, `DEFAULT_CORN`, `FlattenMap`, `plantRows`, `pointInPolygon`, `createCornGeometry`, `createCanopyGeometry`, `createCornUniforms`](#corn)
   - [React: `<Grass>`, `GrassProps`, `GrassImpl`, `<Corn>`](#react)
 - [Performance tips](#performance-tips)
 - [Running the demos](#running-the-demos)
@@ -946,6 +946,46 @@ corn.set({ harvested: true })   // stubble
 corn.flattened(x, z)            // 0 standing … 1 flat
 ```
 
+**API**
+
+```ts
+class Corn {
+  readonly object: Group            // root of the canopy and the plant chunks
+  readonly uniforms: CornUniforms   // live TSL uniforms
+  readonly stats: CornStats         // { chunks, plants }, refreshed by update()
+  camera: Camera
+  settings: CornSettings            // resolved: DEFAULT_CORN ← input
+  sampleHeight: HeightFn            // terrain height; NaN off the terrain
+  flattenMap: FlattenMap            // where corn is flattened
+
+  static create(options: CornOptions): Promise<Corn>   // validates the renderer, builds visible chunks
+  constructor(options: CornOptions)                     // prefer create()
+  set(input: CornInput): this
+  reset(input?: CornInput): this
+  setTerrain(terrain?: Terrain | ObjectRef<Object3D>): void
+  flatten(x: number, z: number, radius: number, dirX?: number, dirZ?: number): void
+  flattened(x: number, z: number): number
+  clearFlattened(): void
+  densityAt(distance: number): number
+  update(budgetMs?: number): void
+  dispose(): void
+}
+
+interface CornOptions extends CornInput {
+  camera: Camera
+  scene?: Object3D
+  renderer?: GrassRenderer
+  terrain?: Terrain | ObjectRef<Object3D>
+}
+interface CornLOD { distance: number; density: number }
+interface CornStats { chunks: number; plants: number }
+```
+
+`CornInput` is `Partial<CornSettings>` (with a partial `wind`), exactly like `GrassInput`; `update()` runs
+automatically when a `scene` was given, and refreshes `CornStats` (`chunks` currently built, `plants` currently
+drawn). `DEFAULT_CORN` is the complete default `CornSettings` (a mature 2.4 m field), and the table below lists
+every setting against it.
+
 **Fields** (`CornField`, plain JSON, the shape threejs-city's farm planner hands over):
 
 | Field | Type | Meaning |
@@ -978,9 +1018,41 @@ corn.flattened(x, z)            // 0 standing … 1 flat
 Interactors flatten corn for good: each frame they stamp the strip they drove since the last frame into a
 `FlattenMap` (stalks fall along the direction of travel, splayed outwards), and neighbours just outside are pushed
 aside. `corn.flatten(x, z, radius, dirX?, dirZ?)` knocks corn down from anything else; `corn.clearFlattened()`
-stands it back up. `plantRows(fields, minX, minZ, maxX, maxZ, { plantSpacing, seed })` is the layout on its own
-(sorted by LOD rank), `createCornGeometry(detail)` and `createCanopyGeometry(fields, resolution, heightFn)` the
-meshes. In React, `<Corn>` takes the same settings as props (the class is `CornImpl`).
+stands it back up.
+
+The corn helpers are exported on their own:
+
+```ts
+const DEFAULT_CORN: CornSettings
+
+function plantRows(fields: readonly CornField[], minX: number, minZ: number, maxX: number, maxZ: number,
+                   options: PlantOptions): Float32Array
+interface PlantOptions { plantSpacing: number; seed: number; gaps?: number }  // gaps defaults to 0.04
+const PLANT_STRIDE = 5   // floats per plant: x, z, yaw, seed, rank
+
+function pointInPolygon(polygon: readonly (readonly [number, number])[], x: number, z: number): boolean
+function createCornGeometry(detail: number): BufferGeometry          // 0 near … 2 far
+function createCanopyGeometry(fields: readonly CornField[], resolution: number, heightFn: HeightFn): BufferGeometry
+function createCornUniforms(): CornUniforms
+
+class FlattenMap {
+  constructor(minX: number, minZ: number, maxX: number, maxZ: number, texel: number, maxTexels?: number) // 2048
+  readonly data: Uint8Array        // RGBA: R = amount, GB = fall direction, A = 255
+  readonly minX: number; minZ: number; texel: number; width: number; height: number
+  version: number                  // bumps on every change, for uploads
+  stamp(x: number, z: number, radius: number, dirX?: number, dirZ?: number): boolean
+  sample(x: number, z: number): number   // 0 standing … 1 flat
+  clear(): void
+}
+```
+
+`plantRows` is the layout on its own, sorted by LOD rank so any prefix is an even thinning; `PLANT_STRIDE` and
+`pointInPolygon` are what it uses to pack plants and test field outlines, and `PlantOptions` carries the plant
+spacing, seed and gap fraction. `createCornGeometry` and
+`createCanopyGeometry` build the meshes `Corn` uses, for your own instancing. `corn.uniforms` is the live
+`CornUniforms` set (the grass [Shader access](#shader-access) notes apply unchanged), and
+`createCornUniforms()` builds a matching set for a custom material. In React, `<Corn>` takes the same settings
+as props (the class is `CornImpl`).
 
 ---
 
@@ -1003,6 +1075,19 @@ export { Grass as GrassImpl }  // the imperative class
 - `ref` receives the `GrassImpl` instance.
 - `paint` toggles a `TerrainPainter`; brush changes apply without recreating it.
 - `threejs-grass/react` also re-exports everything from `threejs-grass`.
+
+```ts
+function Corn(props: CornProps): JSX.Element | null
+interface CornProps extends CornInput {
+  ref?: Ref<CornImpl | null>
+  terrain?: Terrain | RefObject<Object3D | null>
+  camera?: Camera
+}
+export { Corn as CornImpl }  // the imperative class
+```
+
+`<Corn>` follows the same rules as `<Grass>`: created on mount, props applied with `corn.reset()`, updated every
+frame, disposed on unmount; `ref` receives the `CornImpl` instance.
 
 **React Three Fiber**
 ```tsx
