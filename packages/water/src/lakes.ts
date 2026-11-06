@@ -13,7 +13,7 @@ export interface LakesSettings extends WaterAppearance, Omit<RiverFlowOptions, '
   origin: [x: number, y: number, z: number]
   /** Wind ripples on the lakes (small Gerstner waves). */
   waves: WaveOptions
-  /** 0 … 1 foam on the sharpest crests. */
+  /** 0 … 1 foam on the steepest crests. Calm water cannot whitecap however high this is. */
   whitecaps: number
   /** Cells each lake surface extends past its shore, so it tucks under the banks. */
   expand: number

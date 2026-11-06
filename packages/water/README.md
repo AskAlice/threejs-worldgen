@@ -17,8 +17,9 @@ npm i threejs-water threejs-biomes three
   sparse at the horizon, scaled with the camera's height) built in the local tangent plane and bent onto the planet in
   the vertex shader, clamped at the horizon. Gerstner waves with float64 phases (stable millions of metres from the
   origin), per-pixel wave normals that fade out before they alias, ripples, Fresnel sky or environment reflections, a
-  GGX sun glint, refraction of the bed with Beer–Lambert absorption and a scattering tint, shoreline foam and
-  whitecaps. Floating origin: everything is placed relative to `origin`.
+  GGX sun glint, refraction of the bed with Beer–Lambert absorption and a scattering tint, and foam (whitecaps where
+  the wave Jacobian breaks, at the shoreline and around obstacles). Floating origin: everything is placed relative to
+  `origin`.
 - **`Rivers`**: river surfaces for the world's rivers, streamed in camera-centred tiles under a per-frame time budget.
   Flow follows the slope of the river surface; flow-mapped ripples and rapids foam move downstream.
 - **Hydrology** for bounded maps (pure functions, no three.js): Priority-Flood+ε depression filling (Barnes et al.
@@ -132,6 +133,18 @@ boundary that MSAA cannot anti-alias — blends into the land instead of stair-s
 5 km. Foam, whitecaps, rapids and ripples are filtered the same way: each mask is faded, or its threshold
 widened, by its screen-space derivative, so it cannot alias at a grazing angle or with distance.
 
+Foam appears where the water actually breaks, never as a wash over still water:
+
+- **Whitecaps** come from the wave Jacobian: the horizontal Gerstner displacement squeezes the surface's
+  area, and where the determinant of that Jacobian drops past a threshold the crest is steep enough to
+  break. The threshold moves into milder crests with `whitecaps`, and calm water cannot whitecap at all
+  however high the setting is. A discarded copy of the same mask one lifetime ago leaves a short trail,
+  so a crest fades out over ~0.35 s instead of blinking off in the frame it relaxes.
+- **Shoreline foam** is full at the waterline and eases to zero by `foamWidth` metres of depth, so a
+  shallow shelf is not covered in it.
+- **Contact foam** gathers in a few pixels of foam where geometry stands in front of the surface — banks,
+  rocks and hulls — which is the only obstacle information a water fragment has.
+
 | Setting | Default (ocean) | What it does |
 |---|---|---|
 | `absorption` | `[0.37, 0.17, 0.1]` | Per-channel absorption, 1/m (R, G, B); red goes first. `1 / absorption[c]` is the depth where that channel is 63% absorbed. |
@@ -145,8 +158,8 @@ widened, by its screen-space derivative, so it cannot alias at a grazing angle o
 | `specular` | `1` | Multiplier on the sun glint. |
 | `sun` | `null` | `DirectionalLight` for glint and daylight; `null` = first one in the scene. |
 | `foamColor` | `'#f3f7f8'` | Foam colour. |
-| `foamWidth` | `0.6` | Depth (m) below which shoreline foam appears. |
-| `foam` | `1` | Overall foam amount (shore, whitecaps, rapids). |
+| `foamWidth` | `0.6` | Depth (m) over which shoreline foam fades out: full at the waterline, zero here. |
+| `foam` | `1` | Overall foam amount (shore, whitecaps, rapids, contact around obstacles). |
 | `detail`, `detailScale`, `detailSpeed` | `0.25`, `1.4`, `0.4` | Ripple normal strength, wavelength (m), drift (m/s). |
 
 ### `Ocean`
@@ -161,7 +174,7 @@ widened, by its screen-space derivative, so it cannot alias at a grazing angle o
 | `waves.choppiness` | `0.75` | 0 … 1 horizontal displacement (sharp crests); capped before crests fold. |
 | `waves.speed` | `1` | Time multiplier. |
 | `waves.seed` | `1` | Seed for wavelengths and directions. |
-| `whitecaps` | `0.3` | Foam on the sharpest crests. |
+| `whitecaps` | `0.3` | Foam on the steepest crests. Calm water cannot whitecap however high this is; a steeper sea breaks at lower settings. |
 | `origin` | `[0, 0, 0]` | World position at render-space (0, 0, 0). |
 | `seaLevel`, `radius` | `0`, `0` | Used only without a `world` (radius 0 = flat). |
 | `segments` | `128` | Vertices per ring: spacing ≈ distance × 2π / segments. |

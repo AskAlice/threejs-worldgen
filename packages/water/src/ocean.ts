@@ -15,7 +15,7 @@ export interface OceanSettings extends WaterAppearance {
   origin: [x: number, y: number, z: number]
   /** The wind sea. */
   waves: WaveOptions
-  /** 0 … 1 foam on the sharpest crests. */
+  /** 0 … 1 foam on the steepest crests. Calm water cannot whitecap however high this is; a steeper sea breaks at lower settings. */
   whitecaps: number
   /** Vertices around each ring. Vertex spacing ≈ distance × 2π / segments, so the grid looks the same at every scale. */
   segments: number

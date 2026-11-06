@@ -65,7 +65,7 @@ export function createWaves(options: WaveOptions): Wave[] {
   return waves
 }
 
-/** Sum of `chop × k` over the waves: the crest sharpness the whitecap foam is normalised by. */
+/** Sum of `chop × k` over the waves: the surface steepness (1 = crests fold), which gates whitecap foam. */
 export function crestSharpness(waves: readonly Wave[]): number {
   let s = 0
   for (const w of waves) s += w.chop * w.k
@@ -125,6 +125,23 @@ export function sampleWaves(waves: readonly Wave[], x: number, z: number, time: 
   out.height = h
   out.nx = nx / len; out.ny = ny / len; out.nz = nz / len
   return out
+}
+
+/**
+ * Determinant of the Gerstner surface's Jacobian at `x`, `z`: the fraction of its rest area the surface
+ * has been squeezed into by the horizontal displacement (1 on flat water, → 0 as crests steepen and
+ * fold over). Crests that squeeze the surface hardest are where real water breaks into whitecaps.
+ */
+export function waveJacobian(waves: readonly Wave[], x: number, z: number, time = 0, phase?: ArrayLike<number>): number {
+  let jxx = 1, jxz = 0, jzz = 1
+  for (let i = 0; i < waves.length; i++) {
+    const w = waves[i]
+    const s = w.chop * w.k * Math.sin(w.k * (w.dirX * x + w.dirZ * z) - w.omega * time + (phase?.[i] ?? 0))
+    jxx -= s * w.dirX * w.dirX
+    jxz -= s * w.dirX * w.dirZ
+    jzz -= s * w.dirZ * w.dirZ
+  }
+  return jxx * jzz - jxz * jxz
 }
 
 /** Seeded PRNG (mulberry32 over an FNV-1a hash of the seed), kept local so this module has no dependencies. */

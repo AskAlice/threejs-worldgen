@@ -36,9 +36,9 @@ export interface WaterAppearance {
   specular: number
   /** Foam colour. */
   foamColor: string
-  /** Water depth (metres) below which shoreline foam appears. */
+  /** Water depth (metres) by which shoreline foam has faded out: full at the waterline, 0 here. */
   foamWidth: number
-  /** 0 … 1 overall foam amount (shoreline, whitecaps and rapids). */
+  /** 0 … 1 overall foam amount (shoreline, whitecaps, rapids and around obstacles). */
   foam: number
   /** Strength of the procedural ripple normals added on top of the waves. */
   detail: number
@@ -125,9 +125,9 @@ export function createWaterUniforms() {
     waveCount: uniform(0, 'int'),
     /** Per wave: direction x, direction z, wavenumber k, amplitude. */
     waveA: uniformArray(Array.from({ length: MAX_WAVES }, () => new Vector4()), 'vec4'),
-    /** Per wave: horizontal amplitude (chop), phase (radians, includes −ωt), unused, unused. */
+    /** Per wave: horizontal amplitude (chop), phase (radians, includes −ωt), angular frequency ω (rad/s), unused. */
     waveB: uniformArray(Array.from({ length: MAX_WAVES }, () => new Vector4()), 'vec4'),
-    /** Σ k·chop of the waves (normalises whitecaps). */
+    /** Σ k·chop of the waves: surface steepness (1 = folding), which gates whitecap foam. */
     crest: uniform(1),
     /** Multiplier from geometry x/z to tangent-plane metres (the ocean's ring scale). */
     gridScale: uniform(1),
@@ -230,6 +230,46 @@ export function shoreCoverage(depth: number, band: number): number {
   return t * t * (3 - 2 * t)
 }
 
+/** Hermite ease of `x` clamped to 0 … 1. */
+function ease(x: number): number {
+  const t = Math.min(1, Math.max(0, x))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * Whitecap coverage from the wave Jacobian: 0 on open water, rising on squeezed (steep) crests.
+ *
+ * `fold` is `1 − det J` (0 on flat water, → 1 as the surface folds over). `steepness` is the summed
+ * `chop × k` of the sea (1 = folding): calm water cannot foam however high `whitecaps` is, and a
+ * steeper sea breaks earlier. `whitecaps` moves the threshold into progressively milder crests.
+ * `width` is the screen-space-widened ramp above the threshold; mirrors `antiAlias` in the shader.
+ */
+export function whitecapFoam(fold: number, whitecaps: number, steepness: number, width = 0.16): number {
+  const amount = Math.min(1, Math.max(0, whitecaps))
+  const cut = 0.08 + (1 - amount) * 0.28
+  return ease((fold - cut) / Math.max(width, 1e-6)) * ease((steepness - 0.12) / 0.28) * ease(amount / 0.02)
+}
+
+/**
+ * Foam that outlives the crest that made it: the stronger of the coverage now and a faded amount of
+ * the coverage one lifetime ago. A breaking crest leaves a trail that decays instead of blinking off
+ * in the frame the Jacobian relaxes.
+ */
+export function foamTrail(now: number, older: number, decay = 0.5): number {
+  return Math.max(now, older * decay)
+}
+
+/**
+ * Shoreline foam over the shallow depth band: full at the waterline, easing to 0 by `foamWidth` (m).
+ * `noise` (0 … 1) breaks up the band without moving its outer edge, so foam stays at the shore
+ * instead of covering a shallow shelf.
+ */
+export function shoreFoam(depth: number, foamWidth: number, noise = 1, wobble = 0): number {
+  if (depth < 0) return 0
+  const levels = depth / Math.max(foamWidth, 1e-4) + wobble
+  return (1 - ease((levels - 0.15) / 0.85)) * (0.55 + 0.45 * Math.min(1, Math.max(0, noise)))
+}
+
 /** Copies the appearance settings into uniforms. */
 export function applyAppearance(u: WaterUniforms, a: WaterAppearance): void {
   const [r, g, b] = absorptionCoefficients(a)
@@ -256,7 +296,7 @@ export function applyWaves(u: WaterUniforms, waves: readonly Wave[], windX: numb
   const b = u.waveB.array as unknown as Vector4[]
   for (let i = 0; i < MAX_WAVES; i++) {
     const w = waves[i]
-    if (w) { a[i].set(w.dirX, w.dirZ, w.k, w.amplitude); b[i].set(w.chop, 0, 0, 0) } else { a[i].set(1, 0, 1, 0); b[i].set(0, 0, 0, 0) }
+    if (w) { a[i].set(w.dirX, w.dirZ, w.k, w.amplitude); b[i].set(w.chop, 0, w.omega, 0) } else { a[i].set(1, 0, 1, 0); b[i].set(0, 0, 0, 0) }
   }
   u.waveCount.value = Math.min(MAX_WAVES, waves.length)
   u.crest.value = Math.max(1e-4, crestSharpness(waves))
@@ -300,6 +340,18 @@ const TAU = Math.PI * 2
 const REFLECTION_REACH = 250
 /** March steps for one reflection ray; the depth crossing is then bisected a few times. */
 const REFLECTION_STEPS = 24
+/** Seconds foam lingers behind a breaking crest, and the fraction of the crest's coverage it keeps. */
+const FOAM_LIFETIME = 0.35
+const FOAM_DECAY = 0.5
+/**
+ * Screen-space taps (offset in pixels, weight) for contact foam: foam gathers where geometry stands
+ * in front of the surface (banks, rocks, hulls), which is the only obstacle information a water
+ * fragment has.
+ */
+const CONTACT_TAPS: readonly [x: number, y: number, weight: number][] = [
+  [2, 0, 1], [-2, 0, 1], [0, 2, 1], [0, -2, 1],
+  [3.5, 3.5, 0.6], [3.5, -3.5, 0.6], [-3.5, 3.5, 0.6], [-3.5, -3.5, 0.6],
+]
 
 /** View-space z of the opaque scene behind a screen position, for plain and logarithmic depth buffers. */
 const sceneViewZ = (uv: any) => Fn((builder) => {
@@ -329,10 +381,13 @@ const tilt = (v: any, p: any, radius: any) => {
  * Both share the shading: Fresnel reflection traced in screen space against the scene depth, falling
  * back to the environment or a sky gradient where the ray leaves the frame (and blurring into it as
  * the surface roughens), a GGX sun glint, refraction of the bed through the surface, Beer–Lambert
- * absorption of it by path length with a scattering tint, and shoreline foam. The surface's coverage
- * fades out over the last few centimetres of depth, so the waterline blends into the bed instead of
- * stair-stepping, and every procedural mask (foam, whitecaps, rapids, ripples) is filtered by its own
- * screen-space change so it cannot alias at a grazing angle or with distance.
+ * absorption of it by path length with a scattering tint, and foam where the water breaks: whitecaps
+ * where the wave Jacobian says the surface is being squeezed to a break (with a short-lived trail
+ * behind them), shoreline foam concentrated in the shallow band, and contact foam where geometry
+ * (banks, rocks, hulls) stands in front of the surface. The surface's coverage fades out over the last
+ * few centimetres of depth, so the waterline blends into the bed instead of stair-stepping, and every
+ * procedural mask (foam, whitecaps, rapids, ripples) is filtered by its own screen-space change so it
+ * cannot alias at a grazing angle or with distance.
  */
 export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null, prepass: WaterPrepass | null = null): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ side: FrontSide })
@@ -403,7 +458,10 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const surfaceFoam = float(0).toVar()
 
     if (kind === 'waves') {
-      const crest = float(0).toVar()
+      // Jacobian of the Gerstner displacement: 1 on flat water, → 0 as a crest folds over. Repeating
+      // it one foam lifetime ago gives the trail that fades behind a breaking crest.
+      const jxx = float(1).toVar(), jxz = float(0).toVar(), jzz = float(1).toVar()
+      const oxx = float(1).toVar(), oxz = float(0).toVar(), ozz = float(1).toVar()
       Loop({ start: int(0), end: u.waveCount, type: 'int', condition: '<' }, ({ i }: any) => {
         const a = u.waveA.element(i) as any
         const b = u.waveB.element(i) as any
@@ -415,8 +473,15 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
         nz.subAssign(a.y.mul(ka).mul(c).mul(fade))
         const kc = a.z.mul(b.x).mul(s).mul(fade)
         ny.subAssign(kc)
-        crest.addAssign(kc)
         lost.addAssign(ka.mul(ka).mul(float(1).sub(fade)))
+        const wk = a.z.mul(b.x).mul(fade)
+        const cur = wk.mul(s), prev = wk.mul(sin(ph.add(b.z.mul(FOAM_LIFETIME))))
+        jxx.subAssign(cur.mul(a.x.mul(a.x)))
+        jxz.subAssign(cur.mul(a.x).mul(a.y))
+        jzz.subAssign(cur.mul(a.y.mul(a.y)))
+        oxx.subAssign(prev.mul(a.x.mul(a.x)))
+        oxz.subAssign(prev.mul(a.x).mul(a.y))
+        ozz.subAssign(prev.mul(a.y.mul(a.y)))
       })
       // Ripples: two drifting, slowly evolving noise layers.
       const drift = u.detailDirection.mul(u.time.mul(u.detailSpeed))
@@ -427,12 +492,23 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
       nx.addAssign(ripple.x)
       nz.addAssign(ripple.y)
       lost.addAssign(u.detail.mul(u.detail).mul(float(2).sub(f1).sub(f2.mul(0.5))).mul(0.1))
-      // Whitecaps where crests are sharpest, broken up by noise filtered by its screen footprint.
-      const breakup = mx_noise_float(vec3(p.div(u.detailScale.mul(2.5)), u.time.mul(0.2))).mul(0.35).mul(keep(u.detailScale.mul(2.5)))
-      const crestN = crest.div(u.crest).add(breakup)
-      const crestCut = float(1).sub(u.whitecaps).add(0.075)
-      const crestAA = aa(0.075, fwidth(crestN) as any)
-      surfaceFoam.assign(smoothstep(crestCut.sub(crestAA), crestCut.add(crestAA), crestN).mul(smoothstep(0, 0.02, u.whitecaps)))
+      // Whitecaps: only where the surface is squeezed past the whitecap threshold. The noise warps the
+      // threshold (not the foam) at a scale well below the crests, so crests break into ragged patches
+      // instead of a per-pixel speckle, and the mask one lifetime ago leaves a fading trail.
+      const fold = float(1).sub(jxx.mul(jzz).sub(jxz.mul(jxz)))
+      const older = float(1).sub(oxx.mul(ozz).sub(oxz.mul(oxz)))
+      const breakup = mx_noise_float(vec3(p.div(u.detailScale.mul(3)), u.time.mul(0.25))).mul(keep(u.detailScale.mul(3))).mul(0.05)
+      const cut = float(0.08).add(float(1).sub(u.whitecaps).mul(0.28))
+      // Widen the threshold upward only: anti-aliasing can make a crest fade in over a pixel or two,
+      // but it can never make foam appear where the surface is not being squeezed.
+      const foldAA = min(aa(0.06, fwidth(fold) as any), 0.25)
+      const whitecap = smoothstep(cut, cut.add(foldAA.mul(2)), fold.add(breakup))
+        .mul(smoothstep(0.12, 0.4, u.crest)) // calm water cannot whitecap
+        .mul(smoothstep(0, 0.02, u.whitecaps))
+      const whitecapOlder = smoothstep(cut, cut.add(foldAA.mul(2)), older.add(breakup))
+        .mul(smoothstep(0.12, 0.4, u.crest))
+        .mul(smoothstep(0, 0.02, u.whitecaps))
+      surfaceFoam.assign(max(whitecap, whitecapOlder.mul(FOAM_DECAY)))
     } else {
       // Flow map: two noise layers advected downstream, half a cycle apart, cross-faded so neither
       // stretches too far before it resets.
@@ -570,15 +646,25 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const depthStep = fwidth(depth) as any
     const band = aa(u.foamWidth.mul(0.15), depthStep)
     const coverage = smoothstep(0, band, depth)
-    // Foam then laps in bands. Its noise, the band's wobble (a sine in depth) and the foam threshold
-    // are all filtered or widened by their screen-space change, so none of them can alias.
-    const foamNoise = mx_noise_float(vec3(p.div(u.detailScale.mul(0.8)), u.time.mul(0.3))).mul(keep(u.detailScale.mul(0.8)).mul(0.5)).add(0.5)
+    // Shore foam: full at the waterline, gone by `foamWidth` of depth, broken up by a noise field and
+    // lapping in and out with time. Its outer edge is widened by its own screen-space change so it
+    // cannot alias; the noise only thins the foam, it never pushes it out into open water.
+    const foamNoise = mx_noise_float(vec3(p.div(u.detailScale.mul(0.8)), u.time.mul(0.3))).mul(keep(u.detailScale.mul(0.8))).mul(0.5).add(0.5)
     const levels = depth.div(u.foamWidth)
-    const wobbleFade = smoothstep(3, 7, float(TAU / 5).mul(u.foamWidth).div(max(depthStep, 1e-9)))
-    const cut = levels.add(sin(u.time.mul(1.3).sub(levels.mul(5))).mul(0.12).mul(smoothstep(0, 0.5, levels)).mul(wobbleFade))
-    const shoreAA = aa(0.15, fwidth(foamNoise.sub(cut)) as any)
-    const shore = smoothstep(cut.sub(shoreAA), cut.add(shoreAA), foamNoise)
-    const foam = max(shore, surfaceFoam).mul(u.foam).clamp(0, 1)
+    const lap = sin(u.time.mul(1.3).sub(levels.mul(5))).mul(0.12).mul(smoothstep(0.1, 0.5, levels))
+    const levelAA = min(aa(0.1, fwidth(levels) as any), 0.35)
+    const shore = float(1).sub(smoothstep(float(0.15).add(lap).sub(levelAA), float(1).add(lap).add(levelAA), levels)).mul(mix(0.55, 1, foamNoise))
+    // Contact foam: where geometry stands in front of the surface — banks, rocks, hulls — a few pixels
+    // of foam gather. Obstacles reach the water only through the depth buffer, so this is what keeps
+    // the waterline marked and puts foam around a hull instead of spreading it over the whole shelf.
+    const pixel = fwidth(screenUV) as any
+    const contact = float(0).toVar()
+    for (const [tx, ty, weight] of CONTACT_TAPS) {
+      const front = sceneViewZ(screenUV.add(pixel.mul(vec2(tx, ty)))).sub(viewZ)
+      contact.assign(max(contact, smoothstep(0.02, 0.25, front).mul(weight)))
+    }
+    const contactFoam = contact.mul(mix(0.45, 1, foamNoise))
+    const foam = max(max(shore, contactFoam), surfaceFoam).mul(u.foam).clamp(0, 1)
 
     const lit = mix(body, reflection, F.mul(coverage)).add(glint.mul(coverage))
     return vec4(mix(lit, u.foamColor.mul(day), foam), coverage)

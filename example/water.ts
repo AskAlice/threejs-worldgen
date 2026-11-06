@@ -87,7 +87,7 @@ const oceanOptions = structuredClone({ ...DEFAULT_OCEAN, sun: null, environment:
 for (const k of ['sun', 'environment', 'origin', 'seaLevel', 'radius']) delete oceanOptions[k]
 addOptions(gui.addFolder('Ocean'), oceanOptions, (path, value) => ocean.set(patch(path, value)), {
   arrays: true,
-  ranges: { amplitude: [0, 4], count: [0, 16, 1], choppiness: [0, 1], spread: [0, 1], speed: [0, 4], whitecaps: [0, 1], segments: [16, 256, 1], range: [1e3, 1e8], absorption: [0, 2, 0.01], refraction: [0, 0.2], roughness: [0.01, 1], foam: [0, 1], detail: [0, 1.5], altitudeFactor: [0.001, 0.2], innerRadius: [0.001, 1] },
+  ranges: { amplitude: [0, 4], count: [0, 16, 1], choppiness: [0, 1], spread: [0, 1], speed: [0, 4], whitecaps: [0, 1], foamWidth: [0, 3, 0.01], segments: [16, 256, 1], range: [1e3, 1e8], absorption: [0, 2, 0.01], refraction: [0, 0.2], roughness: [0.01, 1], foam: [0, 1], detail: [0, 1.5], altitudeFactor: [0.001, 0.2], innerRadius: [0.001, 1] },
 })
 const riverOptions = structuredClone({ ...DEFAULT_RIVERS, sun: null, environment: null }) as Record<string, any>
 for (const k of ['sun', 'environment', 'origin']) delete riverOptions[k]
