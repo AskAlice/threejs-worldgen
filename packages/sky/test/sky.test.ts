@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { DEFAULT_SHOOTING_STARS, meteorsAt } from '../src/shooting-stars.ts'
 import { DEFAULT_LIGHTING, computeLighting } from '../src/day-night.ts'
 import { StarSystem } from '../src/bodies.ts'
-import { observe } from '../src/observer.ts'
+import { observe, type ObserverOptions } from '../src/observer.ts'
 import { DEFAULT_ATMOSPHERE } from '../src/scattering.ts'
 import { galacticMatrix, DEFAULT_MILKY_WAY } from '../src/milky-way.ts'
 import { mulVec } from '../src/util.ts'
@@ -63,7 +63,7 @@ test('galactic frame: pole and centre map to galactic axes', () => {
 
 test('day/night phase follows the sun angle as the planet turns', () => {
   const s = new StarSystem({ moon: null, planets: 0 })
-  const obs = { frame: 'local', latitude: 45, longitude: 0, planetCenter: [0, 0, 0] } as const
+  const obs: ObserverOptions = { frame: 'local', latitude: 45, longitude: 0, planetCenter: [0, 0, 0] }
   const ctx = { starTemperature: s.star.temperature, moonSkyIntensity: 0.02 }
   const [dayEdge, nightEdge] = DEFAULT_LIGHTING.twilight // 2° … −12°
   const light = (t: number) => {
