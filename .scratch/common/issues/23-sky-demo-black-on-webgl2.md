@@ -1,4 +1,4 @@
-# 13: Sky demo renders black on the WebGL2 fallback
+# 23: Sky demo renders black on the WebGL2 fallback
 
 **What to build:** `sky.html` must render on the WebGL2 fallback, or the demo must say clearly that it needs WebGPU. Today the page produces a fully black frame when WebGPU is unavailable, even at midday.
 

@@ -1,4 +1,4 @@
-# 12: Shallow water shows dashed green outlines
+# 22: Shallow water shows dashed green outlines
 
 **What to build:** Remove the dashed, dithered green outlines visible on the water surface where the bed or an obstacle is close to the surface. They read as an artifact rather than water.
 
