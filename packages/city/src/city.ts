@@ -3,7 +3,7 @@ import {
   type Camera, type Material, type Object3D,
 } from 'three/webgpu'
 import { batchIndirectIndex, hash } from 'three/tsl'
-import { hash01, seedOf, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
+import { hash01, type FlattenPath, type LocalFrame, type World } from 'threejs-biomes'
 import { decorateRoads, Props, type RoadSurface } from 'threejs-props'
 import type { Climate } from './architecture.ts'
 import { buildingGeometry, detailGeometry, detailInstances, DETAIL_SHAPES } from './building-mesh.ts'
@@ -106,6 +106,7 @@ export class City {
   private input: CityInput = {}
   private planKey = ''
   private meshKey = ''
+  private propsKey = ''
   private worldKey = ''
   private job: Generator<void, CityPlan> | null = null
   private jobTime = 0
@@ -256,7 +257,7 @@ export class City {
     this.object.quaternion.setFromRotationMatrix(_m)
     this.local.position.set(-cx, 0, -cz)
 
-    const { facade, roadLook, weather: _w, lod: _l, progressive: _p, buildBudget: _b, ...layout } = o
+    const { facade, roadLook, props, weather: _w, lod: _l, progressive: _p, buildBudget: _b, ...layout } = o
     const planKey = JSON.stringify(layout)
     const meshKey = JSON.stringify([facade.walls, facade.roofs, facade.variation, roadLook.kerbHeight])
     if (planKey !== this.planKey) {
@@ -266,6 +267,8 @@ export class City {
     } else if (meshKey !== this.meshKey) {
       this.meshKey = meshKey
       if (this.plan) this.buildMeshes(this.plan)
+    } else if (this.plan && JSON.stringify(props) !== this.propsKey) {
+      this.buildProps(this.plan)
     }
     this.lastCam.set(Infinity, 0, 0)
     return this
@@ -431,16 +434,24 @@ export class City {
         this.object.add(this.fields)
       }
     }
-    // Street furniture (threejs-props): lights, hydrants, signs, traffic lights, mailboxes, power lines,
-    // fences, hay bales and wells along this settlement's roads.
-    const data = cityData(plan, o.roads)
-    const seed = o.seed
-    const placements = decorateRoads(data.roads, this.world, { seed: typeof seed === 'number' ? seed : seedOf(seed) }, { frame: this.frame, lots: data.lots })
-    this.props = new Props({ placements, states: o.weather.roads, nightNode: this.uniforms.night })
-    this.local.add(this.props.object)
+    // Street furniture (threejs-props): lights, hydrants, signs and traffic lights along the roads.
+    this.buildProps(plan)
 
     this.lodState = new Uint8Array(plan.buildings.length)
     this.lastCam.set(Infinity, 0, 0)
+  }
+
+  private buildProps(plan: CityPlan) {
+    this.props?.dispose()
+    this.props = null
+    const o = this.options
+    this.propsKey = JSON.stringify(o.props)
+    if (!o.props.enabled) return
+    const { enabled: _enabled, seed, ...decorate } = o.props
+    const data = cityData(plan, o.roads)
+    const placements = decorateRoads(data.roads, this.world, { ...decorate, seed: seed ?? o.seed }, { frame: this.frame, lots: data.lots })
+    this.props = new Props({ placements, states: o.weather.roads, nightNode: this.uniforms.night })
+    this.local.add(this.props.object)
   }
 
   private updateLod() {

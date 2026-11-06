@@ -116,7 +116,9 @@ data below).
 - Roads: one indexed mesh of shared-vertex strips (carriageway, kerbs, sidewalks, skirts, bridge decks, parapets, piers)
   and junction discs, drawn with threejs-props' `RoadSurface` material.
 - Street furniture: one `threejs-props` `Props` added to `city.local` — street lights, hydrants, bins, benches, bus
-  stops, signs, traffic lights, mailboxes, power lines, fences, hay bales and wells along the settlement's roads.
+  stops, signs and traffic lights along the settlement's roads. The rural runs (power lines, fences, hay bales, wells)
+  and the mailboxes at lot frontages are off by default: each candidate asks threejs-props for a nearest-road search,
+  which is slow on a city network. Add them with `props`, e.g. `city.set({ props: { powerLines: { spacing: 45 } } })`.
 - Geometry is built straight into typed arrays (16-bit indices where they fit), bounds are set explicitly, and all
   materials are shared TSL node materials varied per vertex or instance.
 
@@ -194,6 +196,7 @@ regenerate the settlement, palette changes rebuild its meshes, everything else i
 | `sizes` | | Size classes: `population` range, `radius` range (a settlement's radius follows its population through them), `maxFloors`, `style`, `arms`, `districts` shares, `surfaces`, `oldTown`, `mainStreet` (half-width of a main-street downtown, 0 = a disc), `landmarks` (how many churches, town halls, water towers), and `roads` / `styles` presets over the defaults (your own input still wins). |
 | `facade` | | `night`, `windowLight`, `lightIntensity`, `glass`, `frame`, `windows` per style (`bayWidth`, `windowWidth`, `windowHeight`, `sill`, `frame`, `lit`), `walls` / `roofs` palettes per material, `variation`, `patternScale`. |
 | `roadLook` | | `colors` per surface, `sidewalk`, `kerb`, `kerbHeight`, `marking`, `centerLine`, `concrete`, `markings`, `wear`. |
+| `props` | | Street furniture (threejs-props' `decorateRoads`): `enabled`, `seed` (default: the city's), `streetLights`, `hydrants`, `bins`, `benches`, `busStops`, `signs`, `trafficLights`, `mailboxes`, `powerLines`, `fences`, `hayBales`, `wells`. |
 | `weather` | zeros | `walls`, `roofs`, `roads`: `{ wetness, snow, burn, damage }`. |
 | `lod` | | `simple` (450 m: box buildings), `hide` (9 km), `roads` (7 km). |
 | `progressive` | `false` | Generate over several frames instead of inside `create`. |

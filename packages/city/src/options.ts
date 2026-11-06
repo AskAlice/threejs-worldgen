@@ -1,5 +1,6 @@
 import type { DeepPartial } from 'threejs-biomes'
 import { resolve } from 'threejs-heightfield'
+import { DEFAULT_DECORATE, type DecorateOptions } from 'threejs-props'
 import { ARCHITECTURES, type ArchitectureName, type Architecture, type Climate, type RoofMaterial, type WallMaterial } from './architecture.ts'
 import { DEFAULT_BLOCKS, type BlockOptions } from './blocks.ts'
 import { DEFAULT_BUILDINGS, type BuildingOptions } from './buildings.ts'
@@ -102,6 +103,38 @@ export interface RoadLookOptions {
   wear: number
 }
 
+/** Street furniture along the settlement's roads (threejs-props' `decorateRoads`). */
+export interface CityPropsOptions extends Omit<DecorateOptions, 'seed'> {
+  /** Place street furniture at all. */
+  enabled: boolean
+  /** Seed for the furniture (default: the city's own `seed`). */
+  seed?: number | string
+}
+
+const { seed: _seed, ...DECORATE_DEFAULTS } = DEFAULT_DECORATE
+
+/**
+ * Default street furniture: the urban kinds only (street lights, hydrants, bins, benches, bus stops,
+ * signs, traffic lights). The rural runs (power lines, fences, hay bales, wells) and the mailboxes at
+ * lot frontages are off because each candidate asks threejs-props for a brute-force nearest-road
+ * search, which takes seconds to minutes on a city-sized network; turn them back on with
+ * `props: { powerLines: { spacing: 45 }, … }` once threejs-props indexes its road chains.
+ */
+export const DEFAULT_CITY_PROPS: CityPropsOptions = {
+  ...DECORATE_DEFAULTS,
+  streetLights: { spacing: 40, rural: false, variant: 'auto' },
+  hydrants: { spacing: 100 },
+  bins: { spacing: 90 },
+  benches: { spacing: 150 },
+  busStops: { spacing: 320 },
+  mailboxes: { style: 'us', spacing: 45, chance: 0 },
+  powerLines: { spacing: 0, offset: 3, kind: 'power-pole' },
+  fences: { chance: 0, offset: 4, length: 2.5, style: 'auto' },
+  hayBales: { density: 0 },
+  wells: { density: 0 },
+  enabled: true,
+}
+
 /** Level of detail by distance from the camera (metres). */
 export interface LodOptions {
   /** Beyond this, buildings switch to simple boxes. */
@@ -158,6 +191,8 @@ export interface CityOptions {
   facade: FacadeOptions
   /** Road surfaces. */
   roadLook: RoadLookOptions
+  /** Street furniture along the roads (threejs-props' `decorateRoads`). */
+  props: CityPropsOptions
   /** Weather and wear per material group (hooks for a weather system). */
   weather: WeatherOptions
   /** Level of detail. */
@@ -232,6 +267,7 @@ export const DEFAULT_CITY: CityOptions = {
     colors: { asphalt: '#3a3c3f', cobblestone: '#7c766c', gravel: '#9a8f7c', dirt: '#7a6249' },
     sidewalk: '#a8a49c', kerb: '#bdb8ae', kerbHeight: 0.15, marking: '#e9e9e2', centerLine: '#e2b842', concrete: '#9d9a93', markings: true, wear: 0.5,
   },
+  props: DEFAULT_CITY_PROPS,
   weather: {
     walls: { wetness: 0, snow: 0, burn: 0, damage: 0 },
     roofs: { wetness: 0, snow: 0, burn: 0, damage: 0 },

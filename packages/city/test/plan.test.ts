@@ -63,6 +63,17 @@ test('villages and hamlets: houses on big lots along the road, a church in the v
   assert.ok(area(village) > 2 * area(plan('city')), 'bigger lots than a city')
 })
 
+test('growth keeps town and city blocks street-sized (#89)', () => {
+  // Normalising the junction angles lets roads carry on through junctions, so the growth defaults
+  // are retuned for it: blocks stay at roughly 60–120 m sides in a town and 80–200 m in a city.
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
+  for (const [size, lo, hi] of [['town', 60, 120], ['city', 80, 200]] as const) {
+    const areas = [3, 7, 11].flatMap((seed) => plan(size, seed).blocks.map((b) => b.area))
+    const side = Math.sqrt(median(areas))
+    assert.ok(side >= lo && side <= hi, `${size}: median block side ${side.toFixed(0)} m, wanted ${lo}–${hi}`)
+  }
+})
+
 test('a town plans fast and deterministically', () => {
   const fresh = () => runToEnd(planCity(ground, resolveCityOptions({ size: 'town', seed: 3 }), { temperature: 12, moisture: 0.5, biome: 'grassland' }))
   plan('town', 9) // warm up the JIT
