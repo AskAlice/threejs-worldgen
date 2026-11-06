@@ -60,3 +60,38 @@ test('galactic frame: pole and centre map to galactic axes', () => {
   const pole = mulVec(m, [Math.cos(b) * Math.cos(l), Math.sin(b), -Math.cos(b) * Math.sin(l)])
   assert.ok(Math.abs(pole[1] - 1) < 1e-9)
 })
+
+test('day/night phase follows the sun angle as the planet turns', () => {
+  const s = new StarSystem({ moon: null, planets: 0 })
+  const obs = { frame: 'local', latitude: 45, longitude: 0, planetCenter: [0, 0, 0] } as const
+  const ctx = { starTemperature: s.star.temperature, moonSkyIntensity: 0.02 }
+  const [dayEdge, nightEdge] = DEFAULT_LIGHTING.twilight // 2° … −12°
+  const light = (t: number) => {
+    const st = observe(s, t, obs, [0, 2, 0])
+    return { st, l: computeLighting(st, DEFAULT_ATMOSPHERE, DEFAULT_LIGHTING, ctx) }
+  }
+  const day = s.solarDay(), from = toSimTime('2026-03-20T00:00:00Z')
+  const samples = Array.from({ length: 97 }, (_, i) => light(from + (day * i) / 96))
+  // Above the upper edge it is day, below the lower edge night, between them a partial phase.
+  for (const { st, l } of samples) {
+    if (st.sunElevation >= dayEdge) assert.equal(l.night, 0, `${st.sunElevation}° should be day`)
+    else if (st.sunElevation <= nightEdge) assert.equal(l.night, 1, `${st.sunElevation}° should be night`)
+    else assert.ok(l.night > 0 && l.night < 1, `${st.sunElevation}° should be twilight, night ${l.night}`)
+  }
+  // Sun angle alone decides the phase: night never rises as the sun climbs.
+  const byAngle = [...samples].sort((a, b) => a.st.sunElevation - b.st.sunElevation)
+  for (let i = 1; i < byAngle.length; i++) {
+    assert.ok(byAngle[i].l.night <= byAngle[i - 1].l.night + 1e-12, `night rose at ${byAngle[i].st.sunElevation}°`)
+  }
+  // Rotation drives it: local noon is day and local midnight is night.
+  const near = (hours: number) => samples.reduce((a, b) => Math.abs(b.st.solarTime - hours) < Math.abs(a.st.solarTime - hours) ? b : a)
+  assert.equal(near(12).l.night, 0)
+  assert.equal(near(0).l.night, 1)
+  // Deterministic and parametric: the same instant gives the same phase, and a custom twilight band moves the ramp.
+  const a = light(from + day * 0.37), b = light(from + day * 0.37)
+  assert.deepEqual(a.l, b.l)
+  const dusk = samples.find(({ st }) => st.sunElevation < -4 && st.sunElevation > nightEdge)!
+  assert.ok(dusk.l.night > 0 && dusk.l.night < 1, `mid-twilight night ${dusk.l.night}`)
+  const narrow = computeLighting(dusk.st, DEFAULT_ATMOSPHERE, { ...DEFAULT_LIGHTING, twilight: [0, -4] }, ctx)
+  assert.equal(narrow.night, 1)
+})
