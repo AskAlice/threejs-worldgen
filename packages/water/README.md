@@ -78,10 +78,44 @@ import { Water, Ocean, Rivers, Lakes } from 'threejs-water/react'
 Props are the settings below. Every render calls `reset(props)`, so removing a prop reverts it. Use `ref` for the
 underlying class (`OceanImpl`, `RiversImpl`, `LakesImpl` are re-exported).
 
+## Scene readback (optional)
+
+The water shades from what is behind it: the scene's depth, its view-space normals and its colour. By default that
+comes from the renderer's own framebuffer and depth readback (`viewportDepthTexture` / `viewportSharedTexture`).
+A `WaterPrepass` instead renders the opaque scene once into a dedicated target, giving the water reliable depth and
+view-space normals in the same frame:
+
+```ts
+import { Ocean, WaterPrepass } from 'threejs-water'
+
+const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 }) // 0.5 = half width/height, ¼ the pixels
+const ocean = await Ocean.create({ camera, scene, renderer, prepass })
+
+renderer.setAnimationLoop(() => {
+  prepass.update(renderer, scene) // once per frame, before the scene render
+  renderer.render(scene, camera)
+})
+```
+
+`prepass.update()` draws the opaque scene (transparent objects such as the water are skipped) with an unlit
+view-space normal material at `resolutionScale` (default `0.5`, clamped to `0.1 … 1`), using a 32-bit float depth
+attachment. It exposes `prepass.viewZ(uv)` (scene depth as view-space z, metres), `prepass.normal(uv)` (unit
+view-space normal, bilinear) and `prepass.colour(uv)` (the renderer's full-resolution colour copy), and is available
+on the material as `material.userData.prepass` and on the water object as `ocean.prepass`. The built-in shading keeps
+the renderer's own full-resolution depth and colour readback, so attaching a pass never changes the look; the pass
+adds the view-space normals (and a downsampled depth) that the absorption, shoreline, reflection and foam work reads.
+
+`Ocean`, `Rivers` and `Lakes` take `prepass` as a constructor option and also accept it live through
+`setPrepass(prepass)` / `setPrepass(null)`, which rebuild the material.
+
+Cost: one extra opaque scene draw at a quarter of the pixels (at `0.5`). The water demo's HUD shows the pass's CPU
+submit time and the frame interval; tick "measure prepass cost" to alternate the pass on 60-frame blocks and report the
+frame interval with and without it (adjacent blocks cancel scene drift).
+
 ## Settings
 
 Every setting has a default and is live through `set(partial)` / `reset(full)`. All are plain JSON except `sun`,
-`environment` (and the `world`, `camera`, `scene`, `renderer` constructor options).
+`environment` (and the `world`, `camera`, `scene`, `renderer`, `prepass` constructor options).
 
 ### Appearance (`Ocean`, `Rivers`, `Lakes`)
 

@@ -2,6 +2,7 @@ import { BufferGeometry, Float32BufferAttribute, Matrix4, Mesh, Sphere, Vector3,
 import type { World } from 'threejs-biomes'
 import { Clock, hookScene, mergeInput, prepareRenderer, type WaterRenderer } from './common.ts'
 import { DEFAULT_APPEARANCE, applyAppearance, applyWaves, createWaterMaterial, createWaterUniforms, setWavePhases, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
+import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, createWaves, sampleWaves, type Wave, type WaveOptions, type WaveSample } from './waves.ts'
 
 /** Every setting of an {@link Ocean}. All optional on input; see {@link OceanInput}. */
@@ -44,6 +45,11 @@ export interface OceanOptions extends OceanInput {
   scene?: Object3D
   /** A WebGPURenderer; initialised if needed. */
   renderer?: WaterRenderer
+  /**
+   * Optional scene prepass (see {@link WaterPrepass}) giving the water the scene's depth, view-space
+   * normals and colour in the same frame. `null` (default) = the renderer's own depth/colour readback.
+   */
+  prepass?: WaterPrepass | null
 }
 
 /** Live counters of an {@link Ocean}. */
@@ -118,12 +124,15 @@ export class Ocean {
   settings!: OceanSettings
   /** Seconds of wave time. Advanced by {@link Ocean.update}; set it to sync clients. */
   time = 0
+  /** The scene prepass in use, or `null` for the renderer's own depth/colour readback. Change it with {@link Ocean.setPrepass}. */
+  prepass: WaterPrepass | null
 
   private input: OceanInput = {}
   private waves: Wave[] = []
   private waveKey = ''
   private geometryKey = ''
   private environment: unknown = undefined
+  private materialPrepass: WaterPrepass | null = null
   private clock = new Clock()
   private sunCache = { light: null, searched: false } as Parameters<typeof updateSun>[3]
   private unhook = () => {}
@@ -141,9 +150,10 @@ export class Ocean {
   }
 
   /** Prefer {@link Ocean.create}. */
-  constructor({ camera, world = null, scene, renderer: _renderer, ...input }: OceanOptions) {
+  constructor({ camera, world = null, scene, renderer: _renderer, prepass = null, ...input }: OceanOptions) {
     this.camera = camera
     this.world = world
+    this.prepass = prepass
     this.object = new Mesh(new BufferGeometry(), undefined as unknown as MeshBasicNodeMaterial)
     this.object.name = 'Ocean'
     this.object.frustumCulled = false // vertices move in the shader; the grid always surrounds the camera
@@ -192,12 +202,20 @@ export class Ocean {
       this.object.geometry = createRingGeometry(s.segments, s.range)
       this.stats.vertices = this.object.geometry.attributes.position.count
     }
-    if (s.environment !== this.environment) {
+    if (s.environment !== this.environment || this.prepass !== this.materialPrepass) {
       this.environment = s.environment
+      this.materialPrepass = this.prepass
       this.object.material?.dispose()
-      this.object.material = createWaterMaterial(u, 'waves', s.environment)
+      this.object.material = createWaterMaterial(u, 'waves', s.environment, this.prepass)
     }
     return this
+  }
+
+  /** Uses (or drops, with `null`) a scene prepass, rebuilding the material. Dropping it restores the renderer's own readback. */
+  setPrepass(prepass: WaterPrepass | null): this {
+    if (prepass === this.prepass) return this
+    this.prepass = prepass
+    return this.apply()
   }
 
   /**

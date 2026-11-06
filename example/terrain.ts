@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
 import { World, WorldTerrain, SurfaceControls, renderWorldMap, createSample, type MapMode, type WorldInput } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
-import { Ocean } from 'threejs-water'
+import { Ocean, WaterPrepass } from 'threejs-water'
 import { patch } from './options-gui'
 import { classOf, createPanel } from './panel'
 
@@ -37,9 +37,12 @@ scene.fog = new THREE.FogExp2(skyDay.getHex(), 0)
 
 // The sea, from the water package: it reads sea level and radius from the world every frame and follows
 // the camera, so it works on the flat world and on the 60 km planet alike.
-const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#7fa8d4', horizonColor: '#cfe0ee' })
+// Scene readback for the water (depth, view-space normals, colour). Half resolution: the pass draws
+// the visible terrain once more at a quarter of the pixels.
+const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 })
+const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#7fa8d4', horizonColor: '#cfe0ee', prepass })
 
-Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean })
+Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean, prepass })
 
 // UI.
 const hud = document.getElementById('hud')!
@@ -106,6 +109,7 @@ renderer.setAnimationLoop(() => {
   fog.color.copy(scene.background as THREE.Color)
   fog.density = ui.fog ? (1 - thin) * Math.min(0.002, 2 / Math.max(500, controls.distance * 8)) : 0
 
+  prepass.update(renderer, scene)
   renderer.render(scene, camera)
 
   // HUD.

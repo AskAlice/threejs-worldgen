@@ -5,6 +5,7 @@ import {
   positionGeometry, positionView, positionWorld, pow, reflect, screenSize, screenUV, select, sin, smoothstep, sqrt, uniform, uniformArray,
   varying, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl'
+import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, crestSharpness, type Wave } from './waves.ts'
 
 /** How water looks: colour, clarity, reflections, foam and ripples. Shared by oceans, lakes and rivers. */
@@ -242,11 +243,15 @@ const tilt = (v: any, p: any, radius: any) => {
  * Both share the shading: Fresnel reflection of the environment or sky, GGX sun glint, refraction of
  * the scene behind, depth-based absorption from shallow to deep colour, and shoreline foam.
  */
-export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null): MeshBasicNodeMaterial {
+export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null, prepass: WaterPrepass | null = null): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ side: FrontSide })
   material.transparent = true // draw after opaque geometry, so the depth and colour behind are available
   material.depthWrite = true
   material.name = kind === 'waves' ? 'Water (waves)' : 'Water (flow)'
+  // A scene prepass (optional) makes the scene's depth, view-space normals and colour available on
+  // the material for the shading added by later tickets. The shading below keeps the renderer's own
+  // full-resolution depth and colour readback, so attaching a pass never changes the look.
+  material.userData.prepass = prepass
 
   const vP = varyingProperty('vec2', 'vWaterP')
   if (kind === 'waves') {

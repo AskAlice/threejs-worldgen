@@ -3,6 +3,7 @@ import { createSample, type LocalFrame, type World, type WorldSample } from 'thr
 import { Clock, hookScene, mergeInput, placeInFrame, prepareRenderer, worldToFrame, type WaterRenderer } from './common.ts'
 import { createWaterSample, type WaterSample } from './hydrology.ts'
 import { DEFAULT_APPEARANCE, applyAppearance, createWaterMaterial, createWaterUniforms, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
+import type { WaterPrepass } from './prepass.ts'
 
 /** How river water moves; shared by {@link Rivers} and {@link waterAt}. */
 export interface RiverFlowOptions {
@@ -53,6 +54,11 @@ export interface RiversOptions extends RiversInput {
   scene?: Object3D
   /** A WebGPURenderer; initialised if needed. */
   renderer?: WaterRenderer
+  /**
+   * Optional scene prepass (see {@link WaterPrepass}) giving the water the scene's depth, view-space
+   * normals and colour in the same frame. `null` (default) = the renderer's own depth/colour readback.
+   */
+  prepass?: WaterPrepass | null
 }
 
 /** Live counters of {@link Rivers}. */
@@ -135,10 +141,13 @@ export class Rivers {
   time = 0
   /** The frame tiles are built in (the world itself on flat worlds). */
   frame: LocalFrame
+  /** The scene prepass in use, or `null` for the renderer's own depth/colour readback. Change it with {@link Rivers.setPrepass}. */
+  prepass: WaterPrepass | null
 
   private input: RiversInput = {}
   private material: MeshBasicNodeMaterial | null = null
   private environment: unknown = undefined
+  private materialPrepass: WaterPrepass | null = null
   private layoutKey = ''
   private frameId = 0
   private frameVersion = -1
@@ -161,10 +170,11 @@ export class Rivers {
   }
 
   /** Prefer {@link Rivers.create}. */
-  constructor({ camera, world, scene, renderer: _renderer, ...input }: RiversOptions) {
+  constructor({ camera, world, scene, renderer: _renderer, prepass = null, ...input }: RiversOptions) {
     this.camera = camera
     this.world = world
     this.frame = world.frame
+    this.prepass = prepass
     this.object.name = 'Rivers'
     this.object.matrixAutoUpdate = false
     this.set(input)
@@ -183,13 +193,21 @@ export class Rivers {
     this.uniforms.flowPeriod.value = Math.max(0.1, s.flowPeriod)
     this.uniforms.rapids.value = s.rapids
     this.layoutKey = JSON.stringify([s.tileSize, s.resolution, s.expand, s.surfaceOffset, s.minStrength, s.flowSpeed, s.minFlowSpeed, s.maxFlowSpeed])
-    if (s.environment !== this.environment) {
+    if (s.environment !== this.environment || this.prepass !== this.materialPrepass) {
       this.environment = s.environment
+      this.materialPrepass = this.prepass
       this.material?.dispose()
-      this.material = createWaterMaterial(this.uniforms, 'flow', s.environment)
+      this.material = createWaterMaterial(this.uniforms, 'flow', s.environment, this.prepass)
       for (const t of this.tiles.values()) if (t.mesh) t.mesh.material = this.material
     }
     return this
+  }
+
+  /** Uses (or drops, with `null`) a scene prepass, rebuilding the material. Dropping it restores the renderer's own readback. */
+  setPrepass(prepass: WaterPrepass | null): this {
+    if (prepass === this.prepass) return this
+    this.prepass = prepass
+    return this.set({})
   }
 
   /** Replaces all settings: anything not in `input` goes back to the defaults. */

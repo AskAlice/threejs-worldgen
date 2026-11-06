@@ -14,6 +14,7 @@ import type { WaterRenderer } from './common.ts'
 import type { HydrologyResult } from './hydrology.ts'
 import { Lakes as LakesImpl, type LakesInput } from './lakes.ts'
 import type { WaterAppearance } from './material.ts'
+import type { WaterPrepass } from './prepass.ts'
 import { Ocean as OceanImpl, type OceanInput } from './ocean.ts'
 import { Rivers as RiversImpl, type RiversInput } from './rivers.ts'
 
@@ -33,6 +34,8 @@ export interface OceanProps extends OceanInput {
   world?: World | null
   /** Camera the rings follow. Defaults to the R3F default camera. */
   camera?: Camera
+  /** Optional scene prepass; see {@link WaterPrepass}. Call `update()` from a `useFrame` before the render. */
+  prepass?: WaterPrepass | null
 }
 
 /**
@@ -43,7 +46,7 @@ export interface OceanProps extends OceanInput {
  * <Ocean world={world} sun={sunRef.current} waves={{ amplitude: 0.8 }} deepColor="#06283a" />
  * ```
  */
-export function Ocean({ ref, world = null, camera, ...options }: OceanProps): React.JSX.Element | null {
+export function Ocean({ ref, world = null, camera, prepass = null, ...options }: OceanProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [ocean, setOcean] = useState<OceanImpl | null>(null)
@@ -53,7 +56,7 @@ export function Ocean({ ref, world = null, camera, ...options }: OceanProps): Re
   useEffect(() => {
     let created: OceanImpl | null = null
     let cancelled = false
-    OceanImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, ...latest.current }).then((o) => {
+    OceanImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, prepass, ...latest.current }).then((o) => {
       if (cancelled) return o.dispose()
       created = o
       setOcean(o)
@@ -69,6 +72,7 @@ export function Ocean({ ref, world = null, camera, ...options }: OceanProps): Re
     if (!ocean) return
     ocean.camera = activeCamera
     ocean.world = world
+    ocean.setPrepass(prepass)
     ocean.reset(options)
   })
   useImperativeHandle(ref, () => ocean!, [ocean])
@@ -84,6 +88,8 @@ export interface RiversProps extends RiversInput {
   world: World
   /** Camera the tiles stream around. Defaults to the R3F default camera. */
   camera?: Camera
+  /** Optional scene prepass; see {@link WaterPrepass}. Call `update()` from a `useFrame` before the render. */
+  prepass?: WaterPrepass | null
 }
 
 /**
@@ -94,7 +100,7 @@ export interface RiversProps extends RiversInput {
  * <Rivers world={world} maxDistance={2000} flowSpeed={1.4} />
  * ```
  */
-export function Rivers({ ref, world, camera, ...options }: RiversProps): React.JSX.Element | null {
+export function Rivers({ ref, world, camera, prepass = null, ...options }: RiversProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [rivers, setRivers] = useState<RiversImpl | null>(null)
@@ -104,7 +110,7 @@ export function Rivers({ ref, world, camera, ...options }: RiversProps): React.J
   useEffect(() => {
     let created: RiversImpl | null = null
     let cancelled = false
-    RiversImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, ...latest.current }).then((r) => {
+    RiversImpl.create({ camera: activeCamera, world, renderer: gl as unknown as WaterRenderer, prepass, ...latest.current }).then((r) => {
       if (cancelled) return r.dispose()
       created = r
       setRivers(r)
@@ -119,6 +125,7 @@ export function Rivers({ ref, world, camera, ...options }: RiversProps): React.J
   useEffect(() => {
     if (!rivers) return
     rivers.camera = activeCamera
+    rivers.setPrepass(prepass)
     rivers.reset(options)
   })
   useImperativeHandle(ref, () => rivers!, [rivers])
@@ -138,6 +145,8 @@ export interface WaterProps extends Partial<Pick<WaterAppearance, 'sun' | 'envir
   ocean?: OceanInput | false
   /** River settings, or `false` for no rivers. */
   rivers?: RiversInput | false
+  /** Optional scene prepass shared by both surfaces; see {@link WaterPrepass}. */
+  prepass?: WaterPrepass | null
 }
 
 /**
@@ -148,8 +157,8 @@ export interface WaterProps extends Partial<Pick<WaterAppearance, 'sun' | 'envir
  * <Water world={world} sun={sun} ocean={{ waves: { amplitude: 1 } }} rivers={{ maxDistance: 2500 }} />
  * ```
  */
-export function Water({ world, camera, origin, sun, environment, ocean = {}, rivers = {} }: WaterProps): React.JSX.Element {
-  const shared = { origin, sun, environment }
+export function Water({ world, camera, origin, sun, environment, prepass = null, ocean = {}, rivers = {} }: WaterProps): React.JSX.Element {
+  const shared = { origin, sun, environment, prepass }
   return (
     <>
       {ocean !== false && <Ocean world={world} camera={camera} {...shared} {...ocean} />}
@@ -168,6 +177,8 @@ export interface LakesProps extends LakesInput {
   frame?: LocalFrame | null
   /** Camera (for the detail fade). Defaults to the R3F default camera. */
   camera?: Camera
+  /** Optional scene prepass; see {@link WaterPrepass}. Call `update()` from a `useFrame` before the render. */
+  prepass?: WaterPrepass | null
 }
 
 /**
@@ -179,18 +190,18 @@ export interface LakesProps extends LakesInput {
  * <Lakes hydrology={hydrology} frame={world.frame} />
  * ```
  */
-export function Lakes({ ref, hydrology, frame = null, camera, ...options }: LakesProps): React.JSX.Element | null {
+export function Lakes({ ref, hydrology, frame = null, camera, prepass = null, ...options }: LakesProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
   const [lakes, setLakes] = useState<LakesImpl | null>(null)
-  const latest = useRef({ options, hydrology, frame })
-  latest.current = { options, hydrology, frame }
+  const latest = useRef({ options, hydrology, frame, prepass })
+  latest.current = { options, hydrology, frame, prepass }
 
   useEffect(() => {
     let created: LakesImpl | null = null
     let cancelled = false
     const l = latest.current
-    LakesImpl.create({ hydrology: l.hydrology, frame: l.frame, camera: activeCamera, renderer: gl as unknown as WaterRenderer, ...l.options }).then((x) => {
+    LakesImpl.create({ hydrology: l.hydrology, frame: l.frame, camera: activeCamera, renderer: gl as unknown as WaterRenderer, prepass, ...l.options }).then((x) => {
       if (cancelled) return x.dispose()
       created = x
       setLakes(x)
@@ -206,6 +217,7 @@ export function Lakes({ ref, hydrology, frame = null, camera, ...options }: Lake
     if (!lakes) return
     lakes.camera = activeCamera
     if (lakes.hydrology !== hydrology || lakes.frame !== frame) lakes.setHydrology(hydrology, frame)
+    lakes.setPrepass(prepass)
     lakes.reset(options)
   })
   useImperativeHandle(ref, () => lakes!, [lakes])

@@ -4,6 +4,7 @@ import { Clock, hookScene, mergeInput, placeInFrame, prepareRenderer, type Water
 import type { HydrologyResult } from './hydrology.ts'
 import { DEFAULT_APPEARANCE, applyAppearance, applyWaves, createWaterMaterial, createWaterUniforms, setWavePhases, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
 import type { RiverFlowOptions } from './rivers.ts'
+import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, createWaves, type Wave, type WaveOptions } from './waves.ts'
 
 /** Every setting of {@link Lakes}. All optional on input; see {@link LakesInput}. */
@@ -42,6 +43,11 @@ export interface LakesOptions extends LakesInput {
   scene?: Object3D
   /** A WebGPURenderer; initialised if needed. */
   renderer?: WaterRenderer
+  /**
+   * Optional scene prepass (see {@link WaterPrepass}) giving the water the scene's depth, view-space
+   * normals and colour in the same frame. `null` (default) = the renderer's own depth/colour readback.
+   */
+  prepass?: WaterPrepass | null
 }
 
 /** Default lakes: calm, slightly green fresh water with light wind ripples. */
@@ -95,12 +101,15 @@ export class Lakes {
   settings!: LakesSettings
   /** Seconds of wave and flow time. */
   time = 0
+  /** The scene prepass in use, or `null` for the renderer's own depth/colour readback. Change it with {@link Lakes.setPrepass}. */
+  prepass: WaterPrepass | null
 
   private input: LakesInput = {}
   private waves: Wave[] = []
   private waveKey = ''
   private meshKey = ''
   private environment: unknown = undefined
+  private materialPrepass: WaterPrepass | null = null
   private lakeMesh: Mesh<BufferGeometry, MeshBasicNodeMaterial> | null = null
   private riverMesh: Mesh<BufferGeometry, MeshBasicNodeMaterial> | null = null
   private lakeMaterial: MeshBasicNodeMaterial | null = null
@@ -119,10 +128,11 @@ export class Lakes {
   }
 
   /** Prefer {@link Lakes.create}. */
-  constructor({ hydrology, frame = null, camera = null, scene, renderer: _renderer, ...input }: LakesOptions) {
+  constructor({ hydrology, frame = null, camera = null, scene, renderer: _renderer, prepass = null, ...input }: LakesOptions) {
     this.hydrology = hydrology
     this.frame = frame
     this.camera = camera
+    this.prepass = prepass
     this.object.name = 'Lakes'
     this.object.matrixAutoUpdate = false
     this.set(input)
@@ -151,12 +161,13 @@ export class Lakes {
       applyWaves(this.uniforms, this.waves, s.waves.direction[0], s.waves.direction[1])
       applyWaves(this.riverUniforms, [], s.waves.direction[0], s.waves.direction[1])
     }
-    if (s.environment !== this.environment) {
+    if (s.environment !== this.environment || this.prepass !== this.materialPrepass) {
       this.environment = s.environment
+      this.materialPrepass = this.prepass
       this.lakeMaterial?.dispose()
       this.riverMaterial?.dispose()
-      this.lakeMaterial = createWaterMaterial(this.uniforms, 'waves', s.environment)
-      this.riverMaterial = createWaterMaterial(this.riverUniforms, 'flow', s.environment)
+      this.lakeMaterial = createWaterMaterial(this.uniforms, 'waves', s.environment, this.prepass)
+      this.riverMaterial = createWaterMaterial(this.riverUniforms, 'flow', s.environment, this.prepass)
       if (this.lakeMesh) this.lakeMesh.material = this.lakeMaterial
       if (this.riverMesh) this.riverMesh.material = this.riverMaterial
     }
@@ -172,6 +183,13 @@ export class Lakes {
   reset(input: LakesInput = {}): this {
     this.input = {}
     return this.set(input)
+  }
+
+  /** Uses (or drops, with `null`) a scene prepass, rebuilding the materials. Dropping it restores the default readback. */
+  setPrepass(prepass: WaterPrepass | null): this {
+    if (prepass === this.prepass) return this
+    this.prepass = prepass
+    return this.set({})
   }
 
   /** Moves the floating origin. Same as `set({ origin })`. */

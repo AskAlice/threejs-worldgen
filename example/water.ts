@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { World, createSample, type LocalFrame } from 'threejs-biomes'
-import { DEFAULT_OCEAN, DEFAULT_RIVERS, Lakes, Ocean, Rivers, computeHydrology, riverModifiers, waterAt } from 'threejs-water'
+import { DEFAULT_OCEAN, DEFAULT_RIVERS, Lakes, Ocean, Rivers, WaterPrepass, computeHydrology, riverModifiers, waterAt } from 'threejs-water'
 import { addOptions, patch } from './options-gui'
 
 // Sandbox for threejs-water. `?planet`: a 120 km planet (zoom from the beach to orbit); otherwise a
@@ -59,10 +59,14 @@ controls.maxDistance = planet ? 900_000 : 20_000
 sun.position.copy(local(-300, 400, -500))
 sun.target.position.set(0, 0, 0)
 
-const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin })
-const rivers = await Rivers.create({ camera, scene, renderer, world, sun, origin })
+// Scene readback for the water: depth, view-space normals and colour in one frame. Half resolution
+// (a documented quarter of the pixels) keeps the extra opaque pass cheap; toggle it in the GUI.
+const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 })
+const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin, prepass })
+const rivers = await Rivers.create({ camera, scene, renderer, world, sun, origin, prepass })
 let lakes: Lakes | null = null
-Object.assign(window, { world, ocean, rivers, scene, camera, controls }) // for poking at from the console
+Object.assign(window, { world, ocean, rivers, scene, camera, controls, prepass }) // for poking at from the console
+const ui = { prepass: true, measure: false }
 
 // GUI: every JSON setting of the ocean and the rivers.
 const gui = new GUI({ title: 'threejs-water' })
@@ -79,6 +83,16 @@ riverFolder.close()
 if (!planet) {
   gui.add({ hydrology: runHydrology }, 'hydrology').name('bounded hydrology (carve rivers, lakes)')
 }
+gui.add(ui, 'prepass').name('depth/normal prepass').onChange((on: boolean) => {
+  ocean.setPrepass(on ? prepass : null)
+  rivers.setPrepass(on ? prepass : null)
+  lakes?.setPrepass(on ? prepass : null)
+})
+gui.add(ui, 'measure').name('measure prepass cost').onChange(() => {
+  cost.with = cost.without = cost.nWith = cost.nWithout = 0
+  cost.frame = 0
+  cost.run = true
+})
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -86,9 +100,38 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight)
 })
 
+// Frame cost, measured from the HUD. The pass is too cheap to see against scene drift, so with
+// "measure prepass" on it runs on alternating 60-frame blocks and each block's frame interval is
+// averaged; adjacent blocks cancel the scene load drift. With measurement off the pass runs every
+// frame, as it should for the shading that reads it.
+let lastFrame = 0, frameMs = 0, prepassMs = 0
+const average = (current: number, next: number) => (current ? current * 0.95 + next * 0.05 : next)
+const cost = { block: 60, frame: 0, run: true, with: 0, without: 0, nWith: 0, nWithout: 0 }
+
 renderer.setAnimationLoop(() => {
+  const frameStart = performance.now()
+  let dt = 0
+  if (lastFrame) {
+    dt = frameStart - lastFrame
+    frameMs = average(frameMs, dt)
+  }
+  lastFrame = frameStart
+
+  cost.frame++
+  if (cost.frame % cost.block === 0) cost.run = !cost.run
+
   controls.update()
+  const runPass = !!ui.prepass && (!ui.measure || cost.run)
+  const beforePrepass = performance.now()
+  if (runPass) prepass.update(renderer, scene)
+  prepassMs = average(prepassMs, performance.now() - beforePrepass)
   renderer.render(scene, camera)
+  if (ui.prepass && ui.measure && dt) {
+    if (cost.run) { cost.with += dt; cost.nWith++ } else { cost.without += dt; cost.nWithout++ }
+  }
+  const withMs = cost.nWith ? cost.with / cost.nWith : 0
+  const withoutMs = cost.nWithout ? cost.without / cost.nWithout : 0
+  const share = cost.nWith && cost.nWithout ? ((cost.with / cost.nWith) / (cost.without / cost.nWithout) - 1) * 100 : 0
   const o = ocean.stats, r = rivers.stats
   const target = controls.target
   const sea = ocean.waterAt(target.x, target.y, target.z)
@@ -98,6 +141,9 @@ renderer.setAnimationLoop(() => {
     `rivers: ${r.meshes}/${r.tiles} tiles with water, ${r.triangles} triangles, ${r.pending} pending`,
     `orbit target: ${sea.depth.toFixed(2)} m below the waves · ${w.kind}${w.kind === 'river' ? ` flowing ${Math.hypot(w.flowX, w.flowZ).toFixed(2)} m/s` : ''}`,
     lakes ? `hydrology: ${lakes.hydrology.lakes.length} lakes, ${lakes.hydrology.rivers.length} rivers` : '',
+    ui.prepass
+      ? `prepass ${prepassMs.toFixed(2)} ms CPU · frame ${frameMs.toFixed(1)} ms${ui.measure ? ` · pass ${withMs.toFixed(1)} / ${withoutMs.toFixed(1)} ms without (${share >= 0 ? '+' : ''}${share.toFixed(1)}%)` : ''}`
+      : `prepass off · frame ${frameMs.toFixed(1)} ms`,
   ].join('\n')
 })
 
@@ -160,6 +206,6 @@ function runHydrology() {
     terrain = buildTerrain(1600, 192)
     scene.add(terrain)
     lakes?.dispose()
-    lakes = new Lakes({ hydrology, frame, camera, scene, sun, origin })
+    lakes = new Lakes({ hydrology, frame, camera, scene, sun, origin, prepass: ui.prepass ? prepass : null })
   }, 30)
 }
