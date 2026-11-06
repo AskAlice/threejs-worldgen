@@ -148,7 +148,7 @@ export class TileGeometryStore {
   applyTileSettings(tile: Tile): void {
     const s = this.ctx.settings()
     const { mesh } = tile
-    const ts = s.tileSize
+    const ts = tile.size // stale tiles still carry the grid they were built on
     const material = this.ctx.material()
     if (!material) throw new Error('Grass: tile settings applied before the material was created.')
     mesh.material = material
