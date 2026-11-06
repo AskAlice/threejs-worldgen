@@ -1,8 +1,8 @@
 import { Color, FrontSide, MeshBasicNodeMaterial, Vector2, Vector3, Vector4, type DirectionalLight, type Object3D, type Texture } from 'three/webgpu'
 import {
-  Fn, Loop, abs, attribute, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, cos, cross, dot, exp, float, fract, int, length,
+  Fn, Loop, abs, attribute, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, cos, cross, dot, exp, float, fract, fwidth, int, length,
   logarithmicDepthToViewZ, max, min, mix, modelWorldMatrix, mx_noise_float, mx_noise_vec3, normalize, perspectiveDepthToViewZ, pmremTexture,
-  positionGeometry, positionView, positionWorld, pow, reflect, screenSize, screenUV, select, sin, smoothstep, sqrt, uniform, uniformArray,
+  positionGeometry, positionView, positionWorld, pow, reflect, screenUV, select, sin, smoothstep, sqrt, uniform, uniformArray,
   varying, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl'
 import type { WaterPrepass } from './prepass.ts'
@@ -138,8 +138,6 @@ export function createWaterUniforms() {
     radius: uniform(1e15),
     /** Surface distance beyond which vertices are clamped (the horizon on planets). */
     maxArc: uniform(1e30),
-    /** tan(fov / 2) of the camera, for the per-pixel detail fade. */
-    tanHalfFov: uniform(0.4),
     /** Seconds per flow-map cycle (rivers). */
     flowPeriod: uniform(2),
   }
@@ -180,6 +178,27 @@ export function behindSample(viewZ: number, refractedZ: number, ownZ: number, di
   if (refractedZ < viewZ) return { uv: 'refracted', path: path(refractedZ) }
   if (ownZ < viewZ) return { uv: 'self', path: path(ownZ) }
   return { uv: 'none', path: Infinity }
+}
+
+/**
+ * Half-width (or width) of an anti-aliased transition: the mask never changes over less than `pixels`
+ * pixels of its own screen-space change (`step`, e.g. `fwidth` of the mask). A value that is already
+ * smooth on screen keeps the `base` width, so near-camera detail stays crisp; a threshold that is
+ * sub-pixel at a grazing angle or with distance widens until it spans a few pixels instead of aliasing.
+ * The shader mirrors this as `aa(base, fwidth(signal))`.
+ */
+export function antiAlias(base: number, step: number, pixels = 2): number {
+  return Math.max(base, Math.max(0, step) * pixels)
+}
+
+/**
+ * Water-surface coverage over the shoreline depth band: 0 at the waterline, 1 at `band` metres of
+ * depth. Fading alpha over this band is what makes the depth-test crossing with the bed — which MSAA
+ * does not anti-alias — blend smoothly into the land instead of stair-stepping.
+ */
+export function shoreCoverage(depth: number, band: number): number {
+  const t = Math.min(1, Math.max(0, depth / Math.max(band, 1e-9)))
+  return t * t * (3 - 2 * t)
 }
 
 /** Copies the appearance settings into uniforms. */
@@ -276,7 +295,10 @@ const tilt = (v: any, p: any, radius: any) => {
  *
  * Both share the shading: Fresnel reflection of the environment or sky, GGX sun glint, refraction of
  * the bed through the surface, Beer–Lambert absorption of it by path length with a scattering tint,
- * and shoreline foam.
+ * and shoreline foam. The surface's coverage fades out over the last few centimetres of depth, so
+ * the waterline blends into the bed instead of stair-stepping, and every procedural mask (foam,
+ * whitecaps, rapids, ripples) is filtered by its own screen-space change so it cannot alias at a
+ * grazing angle or with distance.
  */
 export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null, prepass: WaterPrepass | null = null): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ side: FrontSide })
@@ -333,10 +355,15 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const U = normalize(modelWorldMatrix.mul(vec4(upModel, 0)).xyz)
     const V = normalize(cameraPosition.sub(positionWorld))
     const dist = length(positionView)
-    // Metres per pixel along the surface, stretched at grazing angles, where detail aliases first.
-    const footprint = dist.mul(u.tanHalfFov).mul(2).div(screenSize.y).div(max(dot(V, U), 0.12))
+    // Metres per pixel along the surface, from the screen derivative of the surface coordinate:
+    // exact at grazing angles (a distance estimate flattens out there) and with distance. Every
+    // procedural mask below is filtered by this so it cannot alias.
+    const dp = fwidth(p) as any
+    const footprint = max(max(dp.x, dp.y), 1e-4)
     // Keep a feature only while it spans several pixels (shading is nonlinear, so 2 is not enough).
     const keep = (wavelength: any) => smoothstep(3, 7, wavelength.div(footprint))
+    // Anti-aliased half-width of a mask threshold: never changes over less than ~2 px. Mirrors `antiAlias`.
+    const aa = (base: any, change: any) => max(base, change.mul(2))
     const nx = float(0).toVar(), ny = float(1).toVar(), nz = float(0).toVar()
     const lost = float(0).toVar() // slope variance of detail too small to draw → extra roughness
     const surfaceFoam = float(0).toVar()
@@ -366,10 +393,12 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
       nx.addAssign(ripple.x)
       nz.addAssign(ripple.y)
       lost.addAssign(u.detail.mul(u.detail).mul(float(2).sub(f1).sub(f2.mul(0.5))).mul(0.1))
-      // Whitecaps where crests are sharpest, broken up by noise.
-      const breakup = mx_noise_float(vec3(p.div(u.detailScale.mul(2.5)), u.time.mul(0.2))).mul(0.35)
+      // Whitecaps where crests are sharpest, broken up by noise filtered by its screen footprint.
+      const breakup = mx_noise_float(vec3(p.div(u.detailScale.mul(2.5)), u.time.mul(0.2))).mul(0.35).mul(keep(u.detailScale.mul(2.5)))
       const crestN = crest.div(u.crest).add(breakup)
-      surfaceFoam.assign(smoothstep(float(1).sub(u.whitecaps), float(1.15).sub(u.whitecaps), crestN).mul(smoothstep(0, 0.02, u.whitecaps)))
+      const crestCut = float(1).sub(u.whitecaps).add(0.075)
+      const crestAA = aa(0.075, fwidth(crestN) as any)
+      surfaceFoam.assign(smoothstep(crestCut.sub(crestAA), crestCut.add(crestAA), crestN).mul(smoothstep(0, 0.02, u.whitecaps)))
     } else {
       // Flow map: two noise layers advected downstream, half a cycle apart, cross-faded so neither
       // stretches too far before it resets.
@@ -387,9 +416,11 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
       nx.addAssign(ripple.x)
       nz.addAssign(ripple.y)
       lost.addAssign(strength.mul(strength).mul(float(2).sub(f1).sub(f2.mul(0.5))).mul(0.1))
-      // Rapids: foam streaks where the water runs fast.
+      // Rapids: foam streaks where the water runs fast. The streak is filtered out once it is
+      // sub-pixel (keep), and its threshold is widened by its screen derivative before that.
       const streak = mix(mx_noise_float(vec3(p.sub(flow.mul(t1.mul(u.flowPeriod))).div(u.detailScale.mul(1.7)), 1.3)), mx_noise_float(vec3(p.sub(flow.mul(t0.mul(u.flowPeriod))).div(u.detailScale.mul(1.7)), 1.3)), w0)
-      surfaceFoam.assign(smoothstep(u.rapids, u.rapids.mul(1.8), length(flow)).mul(smoothstep(-0.1, 0.4, streak)))
+      const streakAA = aa(0.25, fwidth(streak) as any)
+      surfaceFoam.assign(smoothstep(u.rapids, u.rapids.mul(1.8), length(flow)).mul(smoothstep(float(0.15).sub(streakAA), float(0.15).add(streakAA), streak)).mul(keep(u.detailScale.mul(1.7))))
     }
 
     // Tangent-plane normal → model space (bent onto the sphere for oceans) → world.
@@ -439,17 +470,25 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const transmit = exp(path.negate().mul(u.absorption))
     const body = behind.mul(transmit).add(u.scatterColor.mul(day).mul(float(1).sub(transmit)))
 
-    // Shoreline: soft edge, then foam that laps in bands. The band's wobble fades out at the waterline,
-    // where the depth buffer is noise and would otherwise speckle the foam.
-    const edge = smoothstep(0, u.foamWidth.mul(0.2), depth)
+    // Shoreline: the surface's coverage fades out over a depth band that is never thinner than a
+    // couple of pixels of the depth buffer's own change across a pixel. The water/bed crossing is a
+    // depth-test boundary, which MSAA does not anti-alias; fading alpha there is what makes the
+    // waterline soft instead of stair-stepped, at any distance or grazing angle.
+    const depthStep = fwidth(depth) as any
+    const band = aa(u.foamWidth.mul(0.15), depthStep)
+    const coverage = smoothstep(0, band, depth)
+    // Foam then laps in bands. Its noise, the band's wobble (a sine in depth) and the foam threshold
+    // are all filtered or widened by their screen-space change, so none of them can alias.
     const foamNoise = mx_noise_float(vec3(p.div(u.detailScale.mul(0.8)), u.time.mul(0.3))).mul(keep(u.detailScale.mul(0.8)).mul(0.5)).add(0.5)
-    const band = depth.div(u.foamWidth)
-    const cut = band.add(sin(u.time.mul(1.3).sub(band.mul(5))).mul(0.12).mul(smoothstep(0, 0.5, band)))
-    const shore = smoothstep(cut.sub(0.15), cut.add(0.15), foamNoise)
+    const levels = depth.div(u.foamWidth)
+    const wobbleFade = smoothstep(3, 7, float(TAU / 5).mul(u.foamWidth).div(max(depthStep, 1e-9)))
+    const cut = levels.add(sin(u.time.mul(1.3).sub(levels.mul(5))).mul(0.12).mul(smoothstep(0, 0.5, levels)).mul(wobbleFade))
+    const shoreAA = aa(0.15, fwidth(foamNoise.sub(cut)) as any)
+    const shore = smoothstep(cut.sub(shoreAA), cut.add(shoreAA), foamNoise)
     const foam = max(shore, surfaceFoam).mul(u.foam).clamp(0, 1)
 
-    const lit = mix(body, sky, F.mul(edge)).add(glint.mul(edge))
-    return vec4(mix(lit, u.foamColor.mul(day), foam), 1)
+    const lit = mix(body, sky, F.mul(coverage)).add(glint.mul(coverage))
+    return vec4(mix(lit, u.foamColor.mul(day), foam), coverage)
   })()
 
   return material

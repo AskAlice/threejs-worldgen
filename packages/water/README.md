@@ -126,6 +126,12 @@ refracted scene, where `path` is the metres of water along the view ray, and the
 water and deep water converges on `scatterColor`. The refracted sample is rejected wherever it belongs to
 foreground geometry (checked against scene depth), so objects in front never leak through the surface.
 
+The waterline is a fade, not a cut. Coverage drops to zero over a depth band that is never thinner than a
+couple of pixels of the depth buffer's own change across a pixel, so the water/bed crossing — a depth-test
+boundary that MSAA cannot anti-alias — blends into the land instead of stair-stepping, at 0.5 m or at
+5 km. Foam, whitecaps, rapids and ripples are filtered the same way: each mask is faded, or its threshold
+widened, by its screen-space derivative, so it cannot alias at a grazing angle or with distance.
+
 | Setting | Default (ocean) | What it does |
 |---|---|---|
 | `absorption` | `[0.37, 0.17, 0.1]` | Per-channel absorption, 1/m (R, G, B); red goes first. `1 / absorption[c]` is the depth where that channel is 63% absorbed. |

@@ -1,4 +1,4 @@
-import { BufferGeometry, Float32BufferAttribute, Matrix4, Mesh, Sphere, Vector3, type Camera, type MeshBasicNodeMaterial, type Object3D, type PerspectiveCamera } from 'three/webgpu'
+import { BufferGeometry, Float32BufferAttribute, Matrix4, Mesh, Sphere, Vector3, type Camera, type MeshBasicNodeMaterial, type Object3D } from 'three/webgpu'
 import type { World } from 'threejs-biomes'
 import { Clock, hookScene, mergeInput, prepareRenderer, type WaterRenderer } from './common.ts'
 import { DEFAULT_APPEARANCE, applyAppearance, applyWaves, createWaterMaterial, createWaterUniforms, setWavePhases, updateSun, type WaterAppearance, type WaterUniforms } from './material.ts'
@@ -288,8 +288,6 @@ export class Ocean {
       extent = Math.min(extent, horizon * 1.25 + inner * 8, rs * Math.PI * 0.5)
     }
     u.maxArc.value = extent
-    const persp = this.camera as PerspectiveCamera
-    u.tanHalfFov.value = persp.isPerspectiveCamera ? Math.tan((persp.fov * Math.PI) / 360) / (persp.zoom || 1) : 0.5
 
     // Phases in float64: k·(grid origin) + accumulated re-anchor offsets − ωt, reduced to ±π.
     const ph = this.phases

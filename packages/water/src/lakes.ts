@@ -1,4 +1,4 @@
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Camera, type MeshBasicNodeMaterial, type Object3D, type PerspectiveCamera } from 'three/webgpu'
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Camera, type MeshBasicNodeMaterial, type Object3D } from 'three/webgpu'
 import type { LocalFrame } from 'threejs-biomes'
 import { Clock, hookScene, mergeInput, placeInFrame, prepareRenderer, type WaterRenderer } from './common.ts'
 import type { HydrologyResult } from './hydrology.ts'
@@ -211,8 +211,6 @@ export class Lakes {
     const { x0, z0 } = this.hydrology.grid
     for (const u of [this.uniforms, this.riverUniforms]) {
       u.time.value = this.time
-      const cam = this.camera as PerspectiveCamera | null
-      u.tanHalfFov.value = cam?.isPerspectiveCamera ? Math.tan((cam.fov * Math.PI) / 360) / (cam.zoom || 1) : 0.4
       updateSun(u, s.sun, this.object, this.sunCache)
     }
     // Lake geometry is relative to the grid origin; phases carry the rest in float64.
