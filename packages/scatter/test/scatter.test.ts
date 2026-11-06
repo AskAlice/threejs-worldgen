@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BoxGeometry, InstancedMesh, MeshBasicNodeMaterial, PerspectiveCamera } from 'three/webgpu'
+import { BoxGeometry, InstancedMesh, MeshBasicNodeMaterial, PerspectiveCamera, type InstancedBufferGeometry, type Mesh } from 'three/webgpu'
 import {
   INSTANCE_STRIDE, Scatter, directionToFrame, frameDirection, octDecode, octEncode, placeTile, poissonDisk, resolveLayer, selectLod,
 } from '../src/index.ts'
@@ -187,6 +187,42 @@ test('Scatter streams tiles around the camera, pools by LOD and answers queries'
   assert.ok(scatter.stats.visible > 0)
   scatter.dispose()
   assert.equal(scatter.object.parent, null)
+})
+
+test('impostor far level: one pooled mesh with the baked geometry, per-instance yaw/tint/scale', () => {
+  const camera = new PerspectiveCamera()
+  camera.position.set(0, 2, 0)
+  camera.updateMatrixWorld()
+  const far = new MeshBasicNodeMaterial()
+  const scatter = Scatter.create({
+    camera, tileSize: 20,
+    layers: [{
+      name: 'box', spacing: 4, colorVariation: 0.2,
+      lods: [{ distance: 20, geometry: new BoxGeometry(), material: new MeshBasicNodeMaterial() }],
+      // What `bakeImpostor` returns: its quad, its baked material and its draw distance.
+      impostor: { distance: 60, geometry: new BoxGeometry(), material: far, castShadow: false },
+    }],
+  })
+  const meshes = scatter.object.children as Mesh[]
+  assert.equal(meshes.length, 2, 'one pooled mesh per level, impostor included: no draw call per instance')
+  const impostor = meshes.find((m) => m.name === 'box:impostor')!
+  assert.ok(impostor, 'the far level is drawn')
+  assert.ok(!(impostor as unknown as InstancedMesh).isInstancedMesh, 'one mesh over an InstancedBufferGeometry, not one per instance')
+  assert.equal(impostor.material, far, 'draws with the material weather is re-shaded onto')
+  assert.equal(impostor.castShadow, false)
+
+  // Instances past the last mesh level land here, and carry what a weather shader reads per instance.
+  const geometry = impostor.geometry as InstancedBufferGeometry
+  const count = geometry.instanceCount
+  assert.ok(count > 0, 'distant instances land on the impostor')
+  const pos = geometry.getAttribute('scatterPosition').array
+  const par = geometry.getAttribute('scatterParams').array
+  const range = (a: ArrayLike<number>, c: number, k: number) => Array.from({ length: c }, (_, n) => a[n * 4 + k])
+  assert.ok(range(pos, count, 3).every((s) => s > 0), 'scale in scatterPosition.w (baked bounds are unit)')
+  const tints = range(par, count, 1)
+  assert.ok(tints.every((t) => t >= 0.8 && t <= 1.2) && new Set(tints).size > 1, 'per-instance tint in scatterParams.y')
+  assert.ok(range(par, count, 2).every((r) => r > 0 && r < 1), 'per-instance random in scatterParams.z (weather variation)')
+  scatter.dispose()
 })
 
 test('multi-material levels pool as single-material meshes sharing instance buffers (no shared shadow render object)', () => {

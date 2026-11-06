@@ -111,12 +111,30 @@ Everything is plain JSON except `terrain`, `camera`, `scene`, a function `densit
 | Export | |
 |---|---|
 | `Scatter` | The streamer: `create`, `set`, `reset`, `update(budgetMs?)`, `query`, `setTerrain`, `regenerate`, `dispose`, `.object`, `.stats`. |
-| `bakeImpostor(renderer, object, { mode, frames, size, hemisphere, alphaTest })` | Renders `object` from `frames × frames` octahedral directions (or one side view, `mode: 'billboard'`) into colour + normal atlases and returns `{ texture, normalTexture, material, geometry, bounds, dispose }`. The material is lit, alpha-tested and picks the nearest view in TSL. |
+| `bakeImpostor(renderer, object, { mode, frames, size, hemisphere, alphaTest }, mask?)` | Renders `object` from `frames × frames` octahedral directions (or one side view, `mode: 'billboard'`) into colour + normal atlases and returns `{ texture, normalTexture, surface, material, geometry, bounds, options, dispose }`. The material is lit, alpha-tested and picks the nearest view in TSL. |
 | `scatterParamsNode()` | TSL `vec4` per instance: yaw, brightness tint, random 0..1. Every pooled mesh carries it, so materials can vary per instance. |
 | `placeTile`, `poissonDisk`, `clusterFactor`, `groupSeed`, `INSTANCE_STRIDE` | The pure placement functions (usable in a worker). |
 | `selectLod`, `octEncode`, `octDecode`, `frameDirection`, `directionToFrame` | Pure LOD and octahedral math. |
 | `disposeLayers(layers)` | Frees every geometry, material and texture of a set of layers. |
 | `hash`, `hashString`, `mulberry32`, `valueNoise2`, `fbm2` | Deterministic random helpers. |
+
+## Impostor material states
+
+`bakeImpostor` captures each source material's base colour and normals **unlit**, so any state a material
+derives from a uniform (snow, wetness, burn, season…) is frozen into the atlas if it is non-zero at bake time.
+Bake from a neutral copy, then re-shade `impostor.material` from `impostor.surface` with the same uniforms and in
+the same order as the mesh materials, so far instances don't pop at the switch:
+
+| `surface` | |
+|---|---|
+| `color` | Baked base colour × the instance's brightness tint (`scatterParams.y`). |
+| `alpha` | Baked coverage (alpha-tested against `alphaTest`). |
+| `normal` | World-space normal of the view shown — what the mesh's `normalWorld` was at that pixel, so snow settles by the same up component. |
+| `mask` | The bake's `mask` value at that pixel (`0..1`, 8 bits; `1` where no mask was given). Baked per source material, so pass a `mask` callback to separate e.g. foliage from bark and to carry a per-card random for leaf loss or damage. |
+
+`surface` nodes are ordinary TSL: set `material.colorNode` / `roughnessNode` / `emissiveNode` from them. The
+per-instance tint is already folded into `surface.color`, and `scatterParamsNode().z` gives a stable random for
+per-instance effects. There is still one draw call per level: the impostor is a single pooled mesh.
 
 Pools start at 1100 instances and double as needed. That keeps three.js on its vertex-attribute instancing path (a
 smaller pool would put its matrices in a uniform buffer that is reallocated when the pool grows). Replaced pools are
