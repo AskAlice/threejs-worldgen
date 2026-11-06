@@ -1,9 +1,9 @@
 import * as THREE from 'three/webgpu'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import GUI from 'three/addons/libs/lil-gui.module.min.js'
 import { World, createSample, type LocalFrame } from 'threejs-biomes'
-import { DEFAULT_OCEAN, DEFAULT_RIVERS, Lakes, Ocean, Rivers, WaterPrepass, computeHydrology, riverModifiers, waterAt } from 'threejs-water'
-import { addOptions, patch } from './options-gui'
+import { DEFAULT_LAKES, DEFAULT_OCEAN, DEFAULT_RIVERS, Lakes, Ocean, Rivers, WaterPrepass, computeHydrology, riverModifiers, waterAt } from 'threejs-water'
+import { classOf, createPanel, specOptions } from './panel'
+import { panels } from './water.panel'
 
 // Sandbox for threejs-water. `?planet`: a 120 km planet (zoom from the beach to orbit); otherwise a
 // flat world at a river mouth. The terrain here is a simple self-contained mesh.
@@ -12,15 +12,20 @@ const planet = params.has('planet')
 const hud = document.getElementById('hud')!
 
 const renderer = new THREE.WebGPURenderer({ antialias: true, logarithmicDepthBuffer: planet, forceWebGL: params.has('webgl') })
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
-renderer.setSize(innerWidth, innerHeight)
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 0.8
 document.body.appendChild(renderer.domElement)
 await renderer.init()
+// Size after init, so the first presented frame is already at the final resolution instead of a
+// blurry buffer that snaps to full detail (the device pixel ratio's worth of extra pixels).
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
+renderer.setSize(innerWidth, innerHeight)
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color('#9cc4e4')
+// Aerial haze: the sea, the apron and the sky meet in one horizon, and the far edge of the coarse
+// ground never shows. Thins with altitude so the view from orbit stays clear.
+scene.fog = new THREE.FogExp2('#9cc4e4', 1 / 4000)
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, planet ? 0.05 : 0.1, planet ? 3e6 : 60_000)
 const sun = new THREE.DirectionalLight('#fff1dc', 3)
 scene.add(sun, sun.target, new THREE.HemisphereLight('#cfe3ff', '#5a5040', 1.1))
@@ -37,6 +42,10 @@ let terrain = buildTerrain(1600, planet ? 128 : 192)
 scene.add(terrain)
 const planetMesh = planet ? buildPlanet() : null
 if (planetMesh) scene.add(planetMesh)
+// Flat world: a coarse apron carries the same world out past the detailed patch, so the sea never
+// shows over empty space (and river tiles built outside the patch still sit on ground).
+let apron: THREE.Mesh | null = planet ? null : buildApron()
+if (apron) scene.add(apron)
 
 // Look from the land towards the sea.
 let seaAngle = 0, lowest = Infinity
@@ -70,43 +79,45 @@ let lakes: Lakes | null = null
 // (look at `window.boat` from the console, or move the camera close to it).
 const boat = new THREE.Group()
 boat.name = 'Boat'
-const hull = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.7, 1.3), new THREE.MeshStandardNodeMaterial({ color: '#b8452e', roughness: 0.6 }))
+const hull = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.9, 1.3), new THREE.MeshStandardNodeMaterial({ color: '#b8452e', roughness: 0.6 }))
 const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), new THREE.MeshStandardNodeMaterial({ color: '#efe9da', roughness: 0.8 }))
-mast.position.y = 1.9
+mast.position.y = 2.0
 boat.add(hull, mast)
 const mooring = local(Math.cos(seaAngle) * 46 + Math.cos(seaAngle + Math.PI / 2) * 10, 0, Math.sin(seaAngle) * 46 + Math.sin(seaAngle + Math.PI / 2) * 10)
-boat.position.set(mooring.x, ocean.waterAt(mooring.x, mooring.y, mooring.z).surface[1] + 0.1, mooring.z)
+boat.position.set(mooring.x, ocean.waterAt(mooring.x, mooring.y, mooring.z).surface[1] + 0.35, mooring.z)
 boat.rotation.y = -seaAngle
 scene.add(boat)
 Object.assign(window, { world, ocean, rivers, scene, camera, renderer, controls, prepass, boat }) // for poking at from the console
 const ui = { prepass: true, measure: false }
 
-// GUI: every JSON setting of the ocean and the rivers.
-const gui = new GUI({ title: 'threejs-water' })
-const oceanOptions = structuredClone({ ...DEFAULT_OCEAN, sun: null, environment: null }) as Record<string, any>
-for (const k of ['sun', 'environment', 'origin', 'seaLevel', 'radius']) delete oceanOptions[k]
-addOptions(gui.addFolder('Ocean'), oceanOptions, (path, value) => ocean.set(patch(path, value)), {
-  arrays: true,
-  ranges: { amplitude: [0, 4], count: [0, 16, 1], choppiness: [0, 1], spread: [0, 1], speed: [0, 4], whitecaps: [0, 1], foamWidth: [0, 3, 0.01], segments: [16, 256, 1], range: [1e3, 1e8], absorption: [0, 2, 0.01], refraction: [0, 0.2], roughness: [0.01, 1], foam: [0, 1], detail: [0, 1.5], altitudeFactor: [0.001, 0.2], innerRadius: [0.001, 1] },
-})
-const riverOptions = structuredClone({ ...DEFAULT_RIVERS, sun: null, environment: null }) as Record<string, any>
-for (const k of ['sun', 'environment', 'origin']) delete riverOptions[k]
-const riverFolder = gui.addFolder('Rivers')
-addOptions(riverFolder, riverOptions, (path, value) => rivers.set(patch(path, value)), { arrays: true, ranges: { resolution: [8, 96, 1], expand: [0, 6, 1], tileSize: [32, 512, 1], absorption: [0, 2, 0.01] } })
-riverFolder.close()
-if (!planet) {
-  gui.add({ hydrology: runHydrology }, 'hydrology').name('bounded hydrology (carve rivers, lakes)')
-}
-gui.add(ui, 'prepass').name('depth/normal prepass').onChange((on: boolean) => {
+// Panel: every JSON setting of the ocean, the rivers and the lakes on the shared panel (search, per-class
+// reset, share-by-URL).
+const spec = panels['threejs-water']
+const lakeOptions = structuredClone(DEFAULT_LAKES)
+const gui = createPanel([
+  {
+    name: 'threejs-water',
+    classes: [
+      classOf('Ocean', ocean, structuredClone(DEFAULT_OCEAN), specOptions(spec.Ocean)),
+      classOf('Rivers', rivers, structuredClone(DEFAULT_RIVERS), specOptions(spec.Rivers)),
+      // The lakes have no instance until hydrology runs, so their target is the input the next `Lakes`
+      // is built with; once it exists, each edit re-applies the whole target (keeping the demo's origin).
+      { name: 'Lakes', target: lakeOptions, onChange: () => lakes?.set({ ...lakeOptions, origin, sun }), ...specOptions(spec.Lakes) },
+    ],
+  },
+])
+const sandbox = gui.addFolder('sandbox')
+sandbox.add(ui, 'prepass').name('depth/normal prepass').onChange((on: boolean) => {
   ocean.setPrepass(on ? prepass : null)
   rivers.setPrepass(on ? prepass : null)
   lakes?.setPrepass(on ? prepass : null)
 })
-gui.add(ui, 'measure').name('measure prepass cost').onChange(() => {
+sandbox.add(ui, 'measure').name('measure prepass cost').onChange(() => {
   cost.with = cost.without = cost.nWith = cost.nWithout = 0
   cost.frame = 0
   cost.run = true
 })
+if (!planet) sandbox.add({ hydrology: runHydrology }, 'hydrology').name('bounded hydrology (carve rivers, lakes)')
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -135,6 +146,10 @@ renderer.setAnimationLoop(() => {
   if (cost.frame % cost.block === 0) cost.run = !cost.run
 
   controls.update()
+  // Keep the moored boat riding the waves, so it (and its reflection at the waterline) stays afloat.
+  boat.position.y = ocean.waterAt(boat.position.x, boat.position.y, boat.position.z).surface[1] + 0.35
+  // Haze thins with altitude (the sea and the sky meet at the horizon; the apron edge stays hidden).
+  ;(scene.fog as THREE.FogExp2).density = 1 / (3000 + Math.max(0, ocean.stats.altitude) * 15)
   const runPass = !!ui.prepass && (!ui.measure || cost.run)
   const beforePrepass = performance.now()
   if (runPass) prepass.update(renderer, scene)
@@ -207,6 +222,63 @@ function buildPlanet() {
   return new THREE.Mesh(geo, ground)
 }
 
+/**
+ * Coarse ground from just inside the detailed patch edge out to the far plane: a ring mesh sampled
+ * from the same frame, dense near the patch and growing with distance. Sampling at a few cells keeps
+ * it cheap; its far edge sinks below the sea, where the ocean and the haze cover it.
+ */
+function buildApron() {
+  const segments = 192
+  // Reach past the 60 km far plane, so the camera's far clip — not the apron's edge — is the horizon.
+  const near = 780, far = 150_000
+  const rings = Math.max(1, Math.round((segments * Math.log(far / near)) / (Math.PI * 2)))
+  const positions = new Float32Array((rings + 1) * segments * 3)
+  const colors = new Float32Array((rings + 1) * segments * 3)
+  const index: number[] = []
+  const s = createSample(8)
+  const c = new THREE.Color()
+  const p: [number, number, number] = [0, 0, 0]
+  const sea = world.options.seaLevel
+  for (let i = 0; i <= rings; i++) {
+    const r = near * Math.pow(far / near, i / rings)
+    const step = (r * 2 * Math.PI) / segments
+    for (let j = 0; j < segments; j++) {
+      const a = (j / segments) * Math.PI * 2
+      const x = center[0] + Math.cos(a) * r, z = center[1] + Math.sin(a) * r
+      const h = frame.sample(x, z, s, Math.max(8, step * 2)).elevation
+      // Under the detailed patch at the seam (its coarse samples can differ by metres) so it cannot
+      // poke through the patch; exact everywhere the patch does not cover; sunk below the sea at the
+      // far edge. Confining the seam sink to the patch's square keeps rivers out here on the ground.
+      const underPatch = Math.abs(x - center[0]) <= 800 && Math.abs(z - center[1]) <= 800
+      const seam = underPatch ? 1 - THREE.MathUtils.smoothstep(r, near, 1135) : 0
+      const y = THREE.MathUtils.lerp(h - 2 * seam, sea - 40, THREE.MathUtils.smoothstep(r, far * 0.94, far))
+      frame.toWorld(x, y, z, p)
+      const k = (i * segments + j) * 3
+      positions[k] = p[0] - origin[0]
+      positions[k + 1] = p[1] - origin[1]
+      positions[k + 2] = p[2] - origin[2]
+      if (s.river > 0.2) c.set('#6b5a44')
+      else if (h < sea + 1.2) c.set('#d8c79a')
+      else if (h < 60) c.set('#5f8a3c')
+      else if (h < 250) c.set('#4f6d34')
+      else c.set('#7d756b')
+      c.toArray(colors, k)
+    }
+  }
+  for (let i = 0; i < rings; i++) {
+    for (let j = 0; j < segments; j++) {
+      const a = i * segments + j, b = i * segments + ((j + 1) % segments)
+      index.push(a, b, a + segments, b, b + segments, a + segments)
+    }
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geo.setIndex(index)
+  geo.computeVertexNormals()
+  return new THREE.Mesh(geo, ground)
+}
+
 /** Turns the noise rivers off, runs drainage on the patch, carves the rivers and shows the lakes. */
 function runHydrology() {
   hud.textContent = 'running hydrology…'
@@ -219,7 +291,9 @@ function runHydrology() {
     terrain.geometry.dispose()
     terrain = buildTerrain(1600, 192)
     scene.add(terrain)
+    // The hydrology turned the world's noise rivers off: resample the apron so its valleys agree.
+    if (apron) { scene.remove(apron); apron.geometry.dispose(); apron = buildApron(); scene.add(apron) }
     lakes?.dispose()
-    lakes = new Lakes({ hydrology, frame, camera, scene, sun, origin, prepass: ui.prepass ? prepass : null })
+    lakes = new Lakes({ ...structuredClone(lakeOptions), hydrology, frame, camera, scene, sun, origin, prepass: ui.prepass ? prepass : null })
   }, 30)
 }
