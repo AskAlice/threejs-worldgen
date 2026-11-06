@@ -72,6 +72,16 @@ test('shoreFoam: concentrated at the waterline, gone by foamWidth, never spread 
   assert.ok(shoreFoam(width * 0.85, width, 1) < 0.2 * shoreFoam(0, width, 1))
 })
 
+test('shoreFoam: a near-flat shelf does not foam; a real bank does', () => {
+  const width = 0.6
+  // Same shallow depth over two beds: the flat floodplain stays dry, the 5% bank foams.
+  assert.equal(shoreFoam(0.2, width, 1, 0, 0.001), 0, 'no bank, no foam')
+  assert.ok(shoreFoam(0.2, width, 1, 0, 0.05) > 0.2, 'a bank foams')
+  assert.equal(shoreFoam(0.2, width, 1, 0, Infinity), shoreFoam(0.2, width, 1), 'an omitted slope keeps the ungated result')
+  assert.ok(shoreFoam(0.3, width, 1, 0, 0.02) > shoreFoam(0.3, width, 1, 0, 0.008), 'foam rises with the bank')
+  assert.ok(shoreFoam(0.3, width, 1, 0, 0.5) <= shoreFoam(0.3, width, 1) + 1e-12, 'a steep bank is not over-foamed')
+})
+
 test('foamTrail: a crest leaves a fading trail, then no foam at all', () => {
   assert.equal(foamTrail(0.8, 0), 0.8, 'the current crest is not reduced')
   assert.equal(foamTrail(0, 1), 0.5, 'a crest one lifetime ago has faded')

@@ -262,12 +262,15 @@ export function foamTrail(now: number, older: number, decay = 0.5): number {
 /**
  * Shoreline foam over the shallow depth band: full at the waterline, easing to 0 by `foamWidth` (m).
  * `noise` (0 … 1) breaks up the band without moving its outer edge, so foam stays at the shore
- * instead of covering a shallow shelf.
+ * instead of covering a shallow shelf. `slope` (m of depth per m across the surface, default ∞) gates
+ * the foam to a real bank: over near-flat ground the whole shelf is shallow, and foam there would
+ * read as a white sheet instead of a shoreline.
  */
-export function shoreFoam(depth: number, foamWidth: number, noise = 1, wobble = 0): number {
+export function shoreFoam(depth: number, foamWidth: number, noise = 1, wobble = 0, slope = Infinity): number {
   if (depth < 0) return 0
   const levels = depth / Math.max(foamWidth, 1e-4) + wobble
-  return (1 - ease((levels - 0.15) / 0.85)) * (0.55 + 0.45 * Math.min(1, Math.max(0, noise)))
+  const bank = Math.min(1, Math.max(0, (slope - 0.005) / 0.025))
+  return (1 - ease((levels - 0.15) / 0.85)) * (0.55 + 0.45 * Math.min(1, Math.max(0, noise))) * (bank * bank * (3 - 2 * bank))
 }
 
 /** Copies the appearance settings into uniforms. */
@@ -570,13 +573,14 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
       const hitUv = vec2(0).toVar()
       const from = float(0).toVar(), to = float(1).toVar()
       Loop({ start: int(1), end: int(REFLECTION_STEPS + 1), type: 'int', condition: '<' }, ({ i }: any) => {
-        const s = float(i).div(REFLECTION_STEPS).toVar()
+        // Denser steps near the surface: near objects are what a reflection shows first.
+        const s = pow(float(i).div(REFLECTION_STEPS), 2).toVar()
         const uv = mix(screenUV, rayEndUv, s).toVar()
         If(uv.x.lessThan(0).or(uv.x.greaterThan(1)).or(uv.y.lessThan(0)).or(uv.y.greaterThan(1)), () => Break())
         const rayZ = float(1).div(invStartZ.add(s.mul(invEndZ.sub(invStartZ)))).toVar()
         // Depth is negative in front of the camera: the ray is behind the scene once it is more negative.
         If(rayZ.lessThanEqual(prepass.viewZ(uv)), () => {
-          from.assign(max(s.sub(1 / REFLECTION_STEPS), 0))
+          from.assign(pow(float(i).sub(1).div(REFLECTION_STEPS), 2))
           to.assign(s)
           hit.assign(true)
           hitUv.assign(uv)
@@ -597,14 +601,15 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
       })
       // Water reflects the air hemisphere only: a hit below the surface is the bed seen through the
       // water, not a reflection (the depth buffer has no water in it, so a ray passing above the
-      // bed still "crosses" it). Reconstruct the hit and require it to be above the surface plane.
+      // bed still "crosses" it). Reconstruct the hit and fade it out towards the surface plane, so
+      // marginal hits do not speckle.
       const hitPos = getViewPosition(hitUv, prepass.depth(hitUv), cameraProjectionMatrixInverse)
       const above = dot(hitPos.sub(positionView), cameraViewMatrix.mul(vec4(U, 0)).xyz)
-      const real = hit.and(above.greaterThan(-0.02))
-      // Weight by distance to the frame's edge and by roughness, so a hit can never pop against the
-      // environment and rough water blurs into it.
+      // Weight by height above the water, distance to the frame's edge and roughness: a hit can
+      // never pop against the environment, and rough water blurs into it.
       const edge = max(min(min(hitUv.x, float(1).sub(hitUv.x)), min(hitUv.y, float(1).sub(hitUv.y))), 0)
-      const traced = select(real, smoothstep(0, 0.08, edge), float(0)).mul(smoothstep(0.08, 0.45, rough).oneMinus())
+      const weight = max(smoothstep(0, 0.08, above), 0).mul(smoothstep(0, 0.08, edge)).mul(smoothstep(0.08, 0.45, rough).oneMinus())
+      const traced = select(hit, weight, float(0))
       reflection = mix(sky, prepass.colour(hitUv), traced)
     }
 
@@ -653,7 +658,10 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const levels = depth.div(u.foamWidth)
     const lap = sin(u.time.mul(1.3).sub(levels.mul(5))).mul(0.12).mul(smoothstep(0.1, 0.5, levels))
     const levelAA = min(aa(0.1, fwidth(levels) as any), 0.35)
-    const shore = float(1).sub(smoothstep(float(0.15).add(lap).sub(levelAA), float(1).add(lap).add(levelAA), levels)).mul(mix(0.55, 1, foamNoise))
+    // Foam belongs to a bank, not a thin sheet over near-flat ground: require the bed to rise about
+    // 0.5 … 3% across the surface, so a shallow flat shelf stays clear instead of foaming all over.
+    const bank = smoothstep(0.005, 0.03, depthStep.div(max(footprint, 1e-4)))
+    const shore = float(1).sub(smoothstep(float(0.15).add(lap).sub(levelAA), float(1).add(lap).add(levelAA), levels)).mul(mix(0.55, 1, foamNoise)).mul(bank)
     // Contact foam: where geometry stands in front of the surface — banks, rocks, hulls — a few pixels
     // of foam gather. Obstacles reach the water only through the depth buffer, so this is what keeps
     // the waterline marked and puts foam around a hull instead of spreading it over the whole shelf.

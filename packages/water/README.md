@@ -141,7 +141,8 @@ Foam appears where the water actually breaks, never as a wash over still water:
   however high the setting is. A discarded copy of the same mask one lifetime ago leaves a short trail,
   so a crest fades out over ~0.35 s instead of blinking off in the frame it relaxes.
 - **Shoreline foam** is full at the waterline and eases to zero by `foamWidth` metres of depth, so a
-  shallow shelf is not covered in it.
+  shallow shelf is not covered in it. It also needs a bank: the bed must rise about 0.5–3% across the
+  surface, so a thin sheet over near-flat ground stays clear instead of foaming all over.
 - **Contact foam** gathers in a few pixels of foam where geometry stands in front of the surface — banks,
   rocks and hulls — which is the only obstacle information a water fragment has.
 
