@@ -4,9 +4,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { MPMReference, mpmStableStep, resolveMPMOptions } from '../src/mpm-reference.ts'
 import { det3, identity3, mpmMaterial, mul3, transpose3 } from '../src/mpm-materials.ts'
 import {
-  DEFAULT_LAVA, LAVA, LAVA_DEFAULTS, LAVA_PRESETS, lavaCoolingRate, lavaCrust, lavaGlow, lavaHeatSources, lavaSkin, lavaThermalStep, lavaViscosity, lavaYield, resolveLavaOptions,
-  type LavaParams,
+  DEFAULT_LAVA, LAVA, LAVA_DEFAULTS, LAVA_PRESETS, MPMLava, lavaCoolingRate, lavaCrust, lavaGlow, lavaHeatSources, lavaSkin, lavaThermalStep, lavaViscosity, lavaYield,
+  resolveLavaOptions, type LavaParams,
 } from '../src/mpm-lava.ts'
+import { MPMSolver } from '../src/mpm.ts'
+import type { Renderer } from 'three/webgpu'
 
 const P: LavaParams = { ...LAVA_DEFAULTS }
 const zero = new Array(9).fill(0)
@@ -226,6 +228,28 @@ test('heat sources for haze and sparks: the hot lava particles, glow-weighted, w
   assert.equal(aged.length, 8)
   assert.ok(aged[3] < 0.05 && aged[7] < 0.8, `skin glow ${aged[3]}, T ${aged[7] * 1400}`)
   assert.ok(Math.abs(lavaSkin(10) - 0.77) < 0.02 && Math.abs(lavaSkin(60) - 0.64) < 0.02 && Math.abs(lavaSkin(300) - 0.5) < 0.02)
+})
+
+test('set and reset on the lava surface: every drawing option is live, reset rebuilds the constructed state, material is fixed', () => {
+  const solver = new MPMSolver({} as Renderer, { resolution: [8, 8, 8], cellSize: 0.5, materials: { lava: {}, hot: {} } })
+  const lava = new MPMLava(solver)
+  lava.set({ render: { radius: 3, ropes: 1, crust: '#112233' } })
+  assert.equal(lava.options.render.radius, 3)
+  assert.equal(lava.options.render.ropes, 1)
+  assert.equal((lava as unknown as { uniforms: { radius: { value: number } } }).uniforms.radius.value, (3 * solver.options.cellSize) / 2)
+  // Back to the original values: the same state a fresh instance has.
+  lava.set({ render: { radius: DEFAULT_LAVA.render.radius, ropes: DEFAULT_LAVA.render.ropes, crust: DEFAULT_LAVA.render.crust } })
+  assert.deepEqual(lava.options, new MPMLava(solver).options)
+  // Several sets, then reset: back to the constructed defaults, or to the defaults plus the reset input.
+  lava.set({ render: { radius: 2 } }).set({ render: { clasts: 1 } }).reset()
+  assert.deepEqual(lava.options, new MPMLava(solver).options)
+  lava.set({ render: { roughness: 0.9 } }).reset({ render: { radius: 2.5 } })
+  assert.deepEqual(lava.options, new MPMLava(solver, { render: { radius: 2.5 } }).options)
+  // `material` cannot change (the passes test for its compiled index): it throws instead of silently ignoring it.
+  assert.equal(lava.set({ material: 'lava' }).options.material, 'lava')
+  assert.throws(() => lava.set({ material: 'hot' }), /'material' is fixed at construction/)
+  assert.throws(() => lava.reset({ material: 'hot' }), /'material' is fixed at construction/)
+  assert.equal(lava.options.material, 'lava')
 })
 
 // GPU check: example/mpm-lava.html?check runs a tiny lava block (inside the crust band, cooling fast) on the GPU, 1 and 24

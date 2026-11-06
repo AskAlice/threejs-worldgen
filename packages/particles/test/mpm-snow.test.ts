@@ -4,7 +4,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { det3, identity3, mul3, transpose3, type Mat3 } from '../src/mpm-materials.ts'
 import { MPMReference, mpmEmitPositions, mpmStableStep, resolveMPMOptions, type MPMCollider } from '../src/mpm-reference.ts'
 import { svd3 } from '../src/mpm-svd.ts'
-import { ICE_DENSITY, SNOW, SNOW_JP_RANGE, SNOW_PRESETS, snowLame, type SnowParams } from '../src/mpm-snow.ts'
+import { DEFAULT_SNOW_SURFACE, ICE_DENSITY, MPMSnowSurface, SNOW, SNOW_JP_RANGE, SNOW_PRESETS, snowLame, type SnowParams } from '../src/mpm-snow.ts'
+import { MPMSolver } from '../src/mpm.ts'
+import type { Renderer } from 'three/webgpu'
 
 // Seeded uniform numbers in [-1, 1).
 function rng(seed: number) {
@@ -271,6 +273,26 @@ test('CPU reference matches a recorded GPU snow step', { skip: !existsSync(fixtu
     check('deformation', r.data.deformation, run.deformation, one ? 1e-5 : 2e-4)
     check('Jp', r.data.Jp, run.Jp, one ? 1e-5 : 2e-4)
   }
+})
+
+test('set and reset on the snow surface: settings are live, reset rebuilds the constructed state, detail is fixed', () => {
+  const solver = new MPMSolver({} as Renderer, { resolution: [8, 8, 8], cellSize: 0.5 })
+  const renderer = {} as Renderer
+  const snow = new MPMSnowSurface(renderer, solver)
+  snow.set({ edgeDepth: 0.5, glints: 0.2, color: '#ff0000' })
+  assert.equal(snow.options.edgeDepth, 0.5)
+  assert.equal(snow.shading.glints.value, 0.2)
+  assert.equal((snow as unknown as { uniforms: { edgeDepth: { value: number } } }).uniforms.edgeDepth.value, 0.5)
+  assert.throws(() => snow.set({ detail: 4 }), /'detail' is fixed at construction/)
+  assert.equal(snow.options.detail, 2)
+  // Back to the original values: the same state a fresh instance has.
+  snow.set({ edgeDepth: DEFAULT_SNOW_SURFACE.edgeDepth, glints: DEFAULT_SNOW_SURFACE.glints, color: DEFAULT_SNOW_SURFACE.color })
+  assert.deepEqual(snow.options, new MPMSnowSurface(renderer, solver).options)
+  // Several sets, then reset: back to the constructed defaults, or to the defaults plus the reset input.
+  snow.set({ edgeDepth: 0.8 }).set({ debris: 0 }).reset()
+  assert.deepEqual(snow.options, new MPMSnowSurface(renderer, solver).options)
+  snow.set({ relief: 0.01 }).reset({ minDepth: 0.05 })
+  assert.deepEqual(snow.options, new MPMSnowSurface(renderer, solver, { minDepth: 0.05 }).options)
 })
 
 test('friction map: a weak patch releases the snow on it while the rest of the slope holds', () => {

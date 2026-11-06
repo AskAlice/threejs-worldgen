@@ -533,11 +533,18 @@ export class MPMLava {
     this.applyOptions()
   }
 
-  /** Merges `input` into the drawing options (`material` is fixed at construction). */
+  /** Merges `input` into the drawing options (`material` is fixed at construction; another name throws). */
   set(input: LavaInput): this {
-    const material = this.options.material
+    this.checkMaterial(input)
     this.options = resolveLavaOptions(merge(structuredClone(this.options), input))
-    this.options.material = material
+    return this.applyOptions()
+  }
+
+  /** Replaces all drawing options (anything not given goes back to the defaults); `material` stays as constructed. */
+  reset(input: LavaInput = {}): this {
+    const material = this.options.material
+    this.checkMaterial(input)
+    this.options = resolveLavaOptions({ ...input, material })
     return this.applyOptions()
   }
 
@@ -647,6 +654,13 @@ export class MPMLava {
     for (const rt of [this.depthRT, this.tempRT, this.smoothRT]) rt.dispose()
     this.field.dispose()
     for (const n of [this.scatterNode, this.nodeNode, this.gatherNode, this.gateNode]) n.dispose()
+  }
+
+  // `material` names a material compiled into the solver, and the passes test for its index: it cannot change here.
+  private checkMaterial(input: LavaInput): void {
+    if (input.material !== undefined && input.material !== this.options.material) {
+      throw new Error(`threejs-particles: MPMLava 'material' is fixed at construction (the solver compiled '${this.options.material}', not '${input.material}')`)
+    }
   }
 
   private applyOptions(): this {

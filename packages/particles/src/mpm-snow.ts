@@ -473,9 +473,21 @@ export class MPMSnowSurface {
     this.set({})
   }
 
-  /** Merges `input` into the settings (`detail` is fixed at construction). */
+  /** Merges `input` into the settings (`detail` is fixed at construction; another value throws). */
   set(input: Partial<SnowSurfaceOptions>): this {
-    const o = (this.options = { ...this.options, ...input, detail: this.options.detail })
+    if (input.detail !== undefined && Math.max(1, Math.round(input.detail)) !== this.options.detail) {
+      throw new Error(`threejs-particles: MPMSnowSurface 'detail' is fixed at construction (${this.options.detail} columns per cell), got ${input.detail}`)
+    }
+    return this.applyOptions({ ...this.options, ...input, detail: this.options.detail })
+  }
+
+  /** Replaces all settings (anything not given goes back to the defaults); `detail` stays as constructed. */
+  reset(input: Partial<SnowSurfaceOptions> = {}): this {
+    return this.applyOptions({ ...DEFAULT_SNOW_SURFACE, ...input, detail: this.options.detail })
+  }
+
+  private applyOptions(o: SnowSurfaceOptions): this {
+    this.options = o
     this.uniforms.edgeDepth.value = o.edgeDepth
     this.uniforms.edgeStart.value = (2 + 1.5 / o.detail) * this.solver.options.cellSize
     this.uniforms.edgeWidth.value = Math.max(1e-3, o.edgeCells * this.solver.options.cellSize)
