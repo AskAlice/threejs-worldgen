@@ -1,6 +1,6 @@
 /**
- * threejs-worldgen (work in progress).
+ * threejs-worldgen.
  *
  * @module threejs-worldgen
  */
-export {}
+export * from './assets.ts'

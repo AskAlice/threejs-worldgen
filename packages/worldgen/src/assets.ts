@@ -40,6 +40,8 @@ export interface AssetDef {
   category: string
   /** Search tags. */
   tags: string[]
+  /** Other names it goes by (`sequoia`, `big tree`), searched like tags. */
+  aliases?: string[]
   /** Editable parameters with defaults. */
   params: Record<string, AssetParam>
   /** Where it plausibly goes. */
@@ -56,6 +58,18 @@ export interface AssetMatch {
   asset: AssetDef
   /** Relevance (higher is better). */
   score: number
+}
+
+/** Narrows a list or a search to some assets; every field is optional. */
+export interface AssetFilter {
+  /** Category, e.g. `tree` or `vehicle`. */
+  category?: string
+  /** Placement kind: what it stands on or in. */
+  surface?: PlacementRule['surface']
+  /** Providing package, e.g. `threejs-props`. */
+  package?: string
+  /** A biome it belongs to (assets with no biome affinity always pass). */
+  biome?: string
 }
 
 /**
@@ -76,26 +90,25 @@ export class AssetRegistry {
     return this.assets.get(id)
   }
 
-  /** All assets, optionally filtered by category, package or biome. */
-  list(filter: { category?: string; package?: string; biome?: string } = {}): AssetDef[] {
-    return [...this.assets.values()].filter((a) =>
-      (!filter.category || a.category === filter.category) &&
-      (!filter.package || a.package === filter.package) &&
-      (!filter.biome || !a.placement.biomes?.length || a.placement.biomes.includes(filter.biome)))
+  /** All assets matching `filter`. */
+  list(filter: AssetFilter = {}): AssetDef[] {
+    return [...this.assets.values()].filter((a) => matches(a, filter))
   }
 
   /**
-   * Fuzzy search over names, tags, categories, packages and biomes: typo-tolerant, every query word
-   * must match something, best matches first.
+   * Fuzzy search over names, ids, aliases, tags, categories, packages and biomes: typo-tolerant, every
+   * query word must match something, best matches first. `filter` narrows the candidates first.
    */
-  search(query: string, limit = 50): AssetMatch[] {
+  search(query: string, limit = 50, filter: AssetFilter = {}): AssetMatch[] {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-    if (!words.length) return this.list().sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit).map((asset) => ({ asset, score: 0 }))
+    const candidates = this.list(filter)
+    if (!words.length) return candidates.sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit).map((asset) => ({ asset, score: 0 }))
     const hits: AssetMatch[] = []
-    for (const asset of this.assets.values()) {
+    for (const asset of candidates) {
       const fields: [string, number][] = [
         [asset.name, 3], [asset.id, 2], [asset.category, 2], [asset.package, 1],
-        ...asset.tags.map((t): [string, number] => [t, 2]), ...(asset.placement.biomes ?? []).map((b): [string, number] => [b, 1]),
+        ...asset.tags.map((t): [string, number] => [t, 2]), ...(asset.aliases ?? []).map((a): [string, number] => [a, 2]),
+        ...(asset.placement.biomes ?? []).map((b): [string, number] => [b, 1]),
       ]
       let total = 0
       let all = true
@@ -118,6 +131,13 @@ export class AssetRegistry {
   }
 }
 
+function matches(a: AssetDef, filter: AssetFilter): boolean {
+  return (!filter.category || a.category === filter.category) &&
+    (!filter.surface || a.placement.surface === filter.surface) &&
+    (!filter.package || a.package === filter.package) &&
+    (!filter.biome || !a.placement.biomes?.length || a.placement.biomes.includes(filter.biome))
+}
+
 /** The default value of every parameter of an asset. */
 export function defaults(asset: AssetDef): Record<string, unknown> {
   return Object.fromEntries(Object.entries(asset.params).map(([k, p]) => [k, p.default]))
@@ -131,6 +151,7 @@ export function defaults(asset: AssetDef): Record<string, unknown> {
 export function fuzzyScore(word: string, text: string): number {
   const t = text.toLowerCase()
   if (!word) return 0
+  word = word.toLowerCase()
   if (t === word) return 1
   const words = t.split(/[^a-z0-9]+/).filter(Boolean)
   if (words.includes(word)) return 0.95
@@ -248,12 +269,48 @@ export function planSpawns(registry: AssetRegistry, world: World, frame: LocalFr
     const fits = candidates.filter((c) => isPlausible(world, frame, x, z, c.placement, 1, sample))
     if (!fits.length) continue
     const pick = fits[Math.floor(rand() * fits.length)]
-    const ground = sample.elevation
-    const y = pick.placement.surface === 'water' ? sample.waterLevel
-      : pick.placement.surface === 'air' ? ground + (pick.placement.height ? pick.placement.height[0] + rand() * (pick.placement.height[1] - pick.placement.height[0]) : 50)
-      : pick.placement.surface === 'underwater' ? ground + (sample.waterLevel - ground) * (0.2 + 0.6 * rand())
-      : ground
+    const y = surfaceY(pick.placement, sample, rand)
     out.push({ id: pick.id, x, y, z, yaw: rand() * Math.PI * 2, seed: Math.floor(hash01(Math.floor(x * 10), Math.floor(z * 10), out.length, s) * 2 ** 31) })
   }
   return out
+}
+
+/** Where an asset with `rule` sits at a sampled spot: the ground, the water surface, a depth or an altitude. */
+function surfaceY(rule: PlacementRule, sample: WorldSample, rand: () => number): number {
+  const ground = sample.elevation
+  switch (rule.surface) {
+    case 'water': return sample.waterLevel
+    case 'air': return ground + (rule.height ? rule.height[0] + rand() * (rule.height[1] - rule.height[0]) : 50)
+    case 'underwater': return ground + (sample.waterLevel - ground) * (0.2 + 0.6 * rand())
+    default: return ground
+  }
+}
+
+/** One hand-placed asset: its serialisable plan and the built object. */
+export interface PlacedAsset {
+  /** Position, yaw and per-instance seed; store with `world.options.seed` to rebuild the placement. */
+  plan: SpawnPlan
+  /** The built instance, already positioned and rotated. */
+  object: Object3D
+}
+
+/**
+ * Places one asset at frame-local (x, z) for the gallery: `undefined` when the spot does not suit its
+ * placement rule, otherwise the built, ground/water-snapped and seeded instance. The same asset, spot,
+ * seed and world always give the same instance.
+ */
+export async function placeAsset(registry: AssetRegistry, id: string, world: World, frame: LocalFrame, x: number, z: number, seed: number | string = 1, overrides: Record<string, unknown> = {}): Promise<PlacedAsset | undefined> {
+  const asset = registry.get(id)
+  const sample = createSample()
+  frame.sample(x, z, sample)
+  if (!asset || !isPlausible(world, frame, x, z, asset.placement, 1, sample)) return undefined
+  const s = seedOf(seed) ^ seedOf(world.options.seed)
+  const rand = mulberry32(s)
+  const y = surfaceY(asset.placement, sample, rand)
+  const yaw = rand() * Math.PI * 2
+  const instance = Math.floor(hash01(Math.floor(x * 10), Math.floor(z * 10), 0, s) * 2 ** 31)
+  const object = await registry.create(id, overrides, instance)
+  object.position.set(x, y, z)
+  object.rotation.y = yaw
+  return { plan: { id, x, y, z, yaw, seed: instance }, object }
 }

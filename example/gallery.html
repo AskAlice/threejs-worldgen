@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>threejs-worldgen · asset gallery</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #9cc4e4; font: 12px/1.4 ui-monospace, monospace; color: #fff }
+      canvas { display: block }
+      #panel { position: fixed; left: 10px; top: 10px; bottom: 10px; width: 300px; display: flex; flex-direction: column; gap: 6px; background: #0d1117e6; border: 1px solid #30363d; border-radius: 8px; padding: 8px; z-index: 10 }
+      #panel input, #panel select { width: 100%; box-sizing: border-box; padding: 5px 6px; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; font: inherit }
+      #row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
+      #results { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 2px }
+      #results button { text-align: left; padding: 5px 6px; background: #161b22; color: #e6edf3; border: 1px solid transparent; border-radius: 4px; font: inherit; cursor: pointer }
+      #results button small { display: block; color: #8b949e }
+      #results button:hover { border-color: #58a6ff }
+      #results button.on { border-color: #58a6ff; background: #1f6feb33 }
+      #params { max-height: 34%; overflow: auto }
+      #params .lil-gui { --width: 100% }
+      #actions { display: flex; gap: 6px }
+      #actions button { flex: 1; padding: 6px; background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; font: inherit; cursor: pointer }
+      #actions button:hover { border-color: #58a6ff }
+      #hud { position: fixed; right: 10px; bottom: 10px; max-width: 420px; background: #0009; padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; pointer-events: none }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <input id="search" type="search" placeholder="search assets (fuzzy)…" autocomplete="off" />
+      <div id="row">
+        <select id="category"><option value="">all categories</option></select>
+        <select id="kind"><option value="">all kinds</option></select>
+      </div>
+      <select id="package"><option value="">all packages</option></select>
+      <div id="params"></div>
+      <div id="results"></div>
+      <div id="actions">
+        <button id="scatter" title="spawn the matching assets around the view">spawn</button>
+        <button id="save" title="download the placements as JSON">save</button>
+        <button id="clear" title="remove every placed asset">clear</button>
+      </div>
+    </div>
+    <div id="hud">loading…</div>
+    <script type="module" src="./gallery.ts"></script>
+  </body>
+</html>
