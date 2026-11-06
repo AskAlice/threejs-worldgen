@@ -1,9 +1,10 @@
 import { Color, FrontSide, MeshBasicNodeMaterial, Vector2, Vector3, Vector4, type DirectionalLight, type Object3D, type Texture } from 'three/webgpu'
 import {
-  Fn, Loop, abs, attribute, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, cos, cross, dot, exp, float, fract, fwidth, int, length,
-  logarithmicDepthToViewZ, max, min, mix, modelWorldMatrix, mx_noise_float, mx_noise_vec3, normalize, perspectiveDepthToViewZ, pmremTexture,
-  positionGeometry, positionView, positionWorld, pow, reflect, screenUV, select, sin, smoothstep, sqrt, uniform, uniformArray,
-  varying, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  Break, Fn, If, Loop, abs, attribute, bool, cameraFar, cameraNear, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse,
+  cameraViewMatrix, cos, cross, dot, exp, float, fract, fwidth, getScreenPosition, getViewPosition, int, length, logarithmicDepthToViewZ, max,
+  min, mix, modelWorldMatrix, mx_noise_float, mx_noise_vec3, normalize, perspectiveDepthToViewZ, pmremTexture, positionGeometry, positionView,
+  positionWorld, pow, reflect, screenUV, select, sin, smoothstep, sqrt, uniform, uniformArray, varying, varyingProperty, vec2, vec3, vec4,
+  viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl'
 import type { WaterPrepass } from './prepass.ts'
 import { MAX_WAVES, crestSharpness, type Wave } from './waves.ts'
@@ -181,6 +182,34 @@ export function behindSample(viewZ: number, refractedZ: number, ownZ: number, di
 }
 
 /**
+ * Schlick Fresnel reflectance of water: `reflectivity` (F0, 0.02 for water) looking straight down,
+ * rising to 1 at grazing incidence. The shader's reflection mix mirrors this exactly.
+ */
+export function fresnel(nDotV: number, reflectivity: number): number {
+  const c = 1 - Math.min(1, Math.max(0, nDotV))
+  return reflectivity + (1 - reflectivity) * c ** 5
+}
+
+/**
+ * How much of a reflection is traced in screen space rather than read from the environment/sky:
+ * 1 for calm water (a sharp mirror), 0 for rough water, which blurs into the environment.
+ */
+export function screenReflectionWeight(roughness: number): number {
+  const t = Math.min(1, Math.max(0, (roughness - 0.08) / 0.37))
+  return 1 - t * t * (3 - 2 * t)
+}
+
+/**
+ * Reflection weight of a screen-space hit by its distance from the frame's border (UV): 1 inside,
+ * fading to 0 over `width` so a traced hit blends into the environment without a visible seam.
+ */
+export function screenEdgeFade(u: number, v: number, width = 0.08): number {
+  const edge = Math.max(0, Math.min(u, 1 - u, v, 1 - v))
+  const t = Math.min(1, edge / Math.max(width, 1e-6))
+  return t * t * (3 - 2 * t)
+}
+
+/**
  * Half-width (or width) of an anti-aliased transition: the mask never changes over less than `pixels`
  * pixels of its own screen-space change (`step`, e.g. `fwidth` of the mask). A value that is already
  * smooth on screen keeps the `base` width, so near-camera detail stays crisp; a threshold that is
@@ -267,6 +296,10 @@ export function updateSun(u: WaterUniforms, light: DirectionalLight | null, obje
 }
 
 const TAU = Math.PI * 2
+/** Metres a screen-space reflection ray travels before it falls back to the environment. */
+const REFLECTION_REACH = 250
+/** March steps for one reflection ray; the depth crossing is then bisected a few times. */
+const REFLECTION_STEPS = 24
 
 /** View-space z of the opaque scene behind a screen position, for plain and logarithmic depth buffers. */
 const sceneViewZ = (uv: any) => Fn((builder) => {
@@ -293,12 +326,13 @@ const tilt = (v: any, p: any, radius: any) => {
  * - `'flow'` (rivers): flat geometry with per-vertex `aFlow` (velocity, m/s, x/z) and `aLocal`
  *   (continuous x/z for noise); flow-mapped ripples and foam move downstream.
  *
- * Both share the shading: Fresnel reflection of the environment or sky, GGX sun glint, refraction of
- * the bed through the surface, Beer–Lambert absorption of it by path length with a scattering tint,
- * and shoreline foam. The surface's coverage fades out over the last few centimetres of depth, so
- * the waterline blends into the bed instead of stair-stepping, and every procedural mask (foam,
- * whitecaps, rapids, ripples) is filtered by its own screen-space change so it cannot alias at a
- * grazing angle or with distance.
+ * Both share the shading: Fresnel reflection traced in screen space against the scene depth, falling
+ * back to the environment or a sky gradient where the ray leaves the frame (and blurring into it as
+ * the surface roughens), a GGX sun glint, refraction of the bed through the surface, Beer–Lambert
+ * absorption of it by path length with a scattering tint, and shoreline foam. The surface's coverage
+ * fades out over the last few centimetres of depth, so the waterline blends into the bed instead of
+ * stair-stepping, and every procedural mask (foam, whitecaps, rapids, ripples) is filtered by its own
+ * screen-space change so it cannot alias at a grazing angle or with distance.
  */
 export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', environment: Texture | null = null, prepass: WaterPrepass | null = null): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ side: FrontSide })
@@ -439,6 +473,65 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const sky = environment ? pmremTexture(environment, R, rough).rgb.mul(u.environmentIntensity) : skyGradient
     const F = u.reflectivity.add(float(1).sub(u.reflectivity).mul(pow(float(1).sub(NdotV), 5)))
 
+    // Screen-space reflection: march the mirrored view ray against the prepass depth and read the
+    // scene colour where it crosses. It needs the prepass (same frame, water excluded, and the depth
+    // of what the ray crosses); without one the reflection is the environment/sky only. A ray that
+    // leaves the frame, finds nothing, or crosses something below the surface (the bed) falls back to
+    // the environment/sky, and rough water blends into it.
+    let reflection = sky as any
+    if (prepass) {
+      const mirrored = normalize(cameraViewMatrix.mul(vec4(R, 0)).xyz).toVar()
+      const rayEnd = positionView.add(mirrored.mul(float(REFLECTION_REACH))).toVar()
+      If(rayEnd.z.greaterThan(cameraNear.negate()), () => {
+        // A ray coming back towards the camera stops at the near plane.
+        rayEnd.assign(positionView.add(mirrored.mul(cameraNear.negate().sub(positionView.z).div(max(mirrored.z, 1e-6)))))
+      })
+      const rayEndUv = getScreenPosition(rayEnd, cameraProjectionMatrix).toVar()
+      // View-space z at ray parameter s ∈ [0, 1]; in perspective it is linear in 1/z.
+      const invStartZ = float(1).div(positionView.z)
+      const invEndZ = float(1).div(rayEnd.z)
+      const hit = bool(false).toVar()
+      const hitUv = vec2(0).toVar()
+      const from = float(0).toVar(), to = float(1).toVar()
+      Loop({ start: int(1), end: int(REFLECTION_STEPS + 1), type: 'int', condition: '<' }, ({ i }: any) => {
+        const s = float(i).div(REFLECTION_STEPS).toVar()
+        const uv = mix(screenUV, rayEndUv, s).toVar()
+        If(uv.x.lessThan(0).or(uv.x.greaterThan(1)).or(uv.y.lessThan(0)).or(uv.y.greaterThan(1)), () => Break())
+        const rayZ = float(1).div(invStartZ.add(s.mul(invEndZ.sub(invStartZ)))).toVar()
+        // Depth is negative in front of the camera: the ray is behind the scene once it is more negative.
+        If(rayZ.lessThanEqual(prepass.viewZ(uv)), () => {
+          from.assign(max(s.sub(1 / REFLECTION_STEPS), 0))
+          to.assign(s)
+          hit.assign(true)
+          hitUv.assign(uv)
+          Break()
+        })
+      })
+      // Bisect the bracket so the reflection lands on the object's edge, not the nearest whole step.
+      If(hit, () => {
+        Loop({ start: int(0), end: int(4), type: 'int', condition: '<' }, () => {
+          const s = from.add(to).mul(0.5).toVar()
+          const midUv = mix(screenUV, rayEndUv, s).toVar()
+          const rayZ = float(1).div(invStartZ.add(s.mul(invEndZ.sub(invStartZ)))).toVar()
+          const crossed = rayZ.lessThanEqual(prepass.viewZ(midUv))
+          to.assign(select(crossed, s, to))
+          hitUv.assign(select(crossed, midUv, hitUv))
+          from.assign(select(crossed, from, s))
+        })
+      })
+      // Water reflects the air hemisphere only: a hit below the surface is the bed seen through the
+      // water, not a reflection (the depth buffer has no water in it, so a ray passing above the
+      // bed still "crosses" it). Reconstruct the hit and require it to be above the surface plane.
+      const hitPos = getViewPosition(hitUv, prepass.depth(hitUv), cameraProjectionMatrixInverse)
+      const above = dot(hitPos.sub(positionView), cameraViewMatrix.mul(vec4(U, 0)).xyz)
+      const real = hit.and(above.greaterThan(-0.02))
+      // Weight by distance to the frame's edge and by roughness, so a hit can never pop against the
+      // environment and rough water blurs into it.
+      const edge = max(min(min(hitUv.x, float(1).sub(hitUv.x)), min(hitUv.y, float(1).sub(hitUv.y))), 0)
+      const traced = select(real, smoothstep(0, 0.08, edge), float(0)).mul(smoothstep(0.08, 0.45, rough).oneMinus())
+      reflection = mix(sky, prepass.colour(hitUv), traced)
+    }
+
     // Sun glint: GGX distribution with Schlick Fresnel.
     const H = normalize(L.add(V))
     const NdotH = max(dot(N, H), 0)
@@ -487,7 +580,7 @@ export function createWaterMaterial(u: WaterUniforms, kind: 'waves' | 'flow', en
     const shore = smoothstep(cut.sub(shoreAA), cut.add(shoreAA), foamNoise)
     const foam = max(shore, surfaceFoam).mul(u.foam).clamp(0, 1)
 
-    const lit = mix(body, sky, F.mul(coverage)).add(glint.mul(coverage))
+    const lit = mix(body, reflection, F.mul(coverage)).add(glint.mul(coverage))
     return vec4(mix(lit, u.foamColor.mul(day), foam), coverage)
   })()
 

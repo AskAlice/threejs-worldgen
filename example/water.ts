@@ -65,7 +65,20 @@ const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 })
 const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin, prepass })
 const rivers = await Rivers.create({ camera, scene, renderer, world, sun, origin, prepass })
 let lakes: Lakes | null = null
-Object.assign(window, { world, ocean, rivers, scene, camera, controls, prepass }) // for poking at from the console
+
+// A boat moored at the waterline: a hard edge for the water's screen-space reflection to mirror
+// (look at `window.boat` from the console, or move the camera close to it).
+const boat = new THREE.Group()
+boat.name = 'Boat'
+const hull = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.7, 1.3), new THREE.MeshStandardNodeMaterial({ color: '#b8452e', roughness: 0.6 }))
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), new THREE.MeshStandardNodeMaterial({ color: '#efe9da', roughness: 0.8 }))
+mast.position.y = 1.9
+boat.add(hull, mast)
+const mooring = local(Math.cos(seaAngle) * 46 + Math.cos(seaAngle + Math.PI / 2) * 10, 0, Math.sin(seaAngle) * 46 + Math.sin(seaAngle + Math.PI / 2) * 10)
+boat.position.set(mooring.x, ocean.waterAt(mooring.x, mooring.y, mooring.z).surface[1] + 0.1, mooring.z)
+boat.rotation.y = -seaAngle
+scene.add(boat)
+Object.assign(window, { world, ocean, rivers, scene, camera, renderer, controls, prepass, boat }) // for poking at from the console
 const ui = { prepass: true, measure: false }
 
 // GUI: every JSON setting of the ocean and the rivers.

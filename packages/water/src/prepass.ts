@@ -4,7 +4,7 @@ import {
 } from 'three/webgpu'
 import {
   Fn, cameraFar, cameraNear, logarithmicDepthToViewZ, normalize, normalView, perspectiveDepthToViewZ, screenUV, texture, vec4,
-  viewportSharedTexture,
+  viewZToPerspectiveDepth, viewZToReversedPerspectiveDepth, viewportSharedTexture,
 } from 'three/tsl'
 
 /** Options for {@link WaterPrepass}. */
@@ -97,6 +97,22 @@ export class WaterPrepass {
    */
   normal(uv: any = screenUV) {
     return normalize(texture(this.target.texture, uv).xyz)
+  }
+
+  /**
+   * Scene depth at `uv` in `[0, 1]`, in the form the inverse projection matrix expects: perspective
+   * depth, or reversed perspective depth when `reversedDepthBuffer` is on. Log depth is converted
+   * (it cannot be inverted by the projection matrix). Pair with `getViewPosition`.
+   */
+  depth(uv: any = screenUV) {
+    return Fn((builder: any) => {
+      const d = texture(this.target.depthTexture!, uv).x
+      if (!builder.renderer.logarithmicDepthBuffer) return d
+      const z = logarithmicDepthToViewZ(d, cameraNear, cameraFar)
+      return builder.renderer.reversedDepthBuffer
+        ? viewZToReversedPerspectiveDepth(z, cameraNear, cameraFar)
+        : viewZToPerspectiveDepth(z, cameraNear, cameraFar)
+    })()
   }
 
   /**
