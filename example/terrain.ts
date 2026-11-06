@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu'
-import { World, WorldTerrain, SurfaceControls, renderWorldMap, createSample, type MapMode, type WorldInput } from 'threejs-biomes'
+import { World, WorldTerrain, SurfaceControls, renderWorldMap, createSample, type LocalFrame, type MapMode, type WorldInput } from 'threejs-biomes'
 import TerrainWorker from 'threejs-biomes/worker?worker'
-import { Ocean, WaterPrepass } from 'threejs-water'
+import { Lakes, Ocean, Rivers, WaterPrepass, computeHydrology } from 'threejs-water'
 import { patch } from './options-gui'
 import { classOf, createPanel } from './panel'
 
@@ -43,7 +43,19 @@ scene.fog = new THREE.FogExp2(skyDay.getHex(), 0)
 const prepass = new WaterPrepass({ camera, resolutionScale: 0.5 })
 const ocean = await Ocean.create({ camera, scene, renderer, world, sun, origin: controls.origin, skyColor: '#9ec3e6', horizonColor: '#dfeaf2', scatterColor: '#0b3247', prepass })
 
-Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean, prepass })
+// The world's own rivers (the network the biome map's `rivers` mode draws), streamed around the camera
+// in tiles. Same world, same floating origin as the terrain and the sea, so a river meets the coast the
+// terrain draws, at the level the world sampled.
+const rivers = await Rivers.create({ camera, scene, renderer, world, sun, origin: controls.origin, maxDistance: 3000, prepass })
+
+// Lakes come from drainage-basin hydrology on a patch around the focus. Hydrology is a bounded-map
+// solver, so the patch is a fixed window (2 km, 8 m cells) that follows the focus, not the whole world.
+const LAKE_REGION = 2048
+const LAKE_CELL = 8
+let lakes: Lakes | null = null
+const lakePatch = { focus: null as number[] | null, version: -1, pending: false }
+
+Object.assign(window, { world, terrain, controls, renderer, camera, scene, ocean, rivers, prepass })
 
 // UI.
 const hud = document.getElementById('hud')!
@@ -87,6 +99,38 @@ sandbox.add(ui, 'fog')
 addEventListener('keydown', (e) => {
   if (e.key === 'm') { ui.map = modes[(modes.indexOf(ui.map) + 1) % modes.length]; mapDirty = true; gui.controllersRecursive().forEach((c) => c.updateDisplay()) }
 })
+/**
+ * Solves the drainage of a patch around `focus` and draws its lakes at their spill level. Deferred so
+ * the pan that triggers it does not stutter on the solve. The world's own noise rivers are already
+ * carved and levelled by `world`, so `Rivers` draws those; drawing the hydrology rivers too would put a
+ * second, uncarved channel next to them.
+ */
+function requestLakes(focus: readonly number[]) {
+  lakePatch.pending = true
+  lakePatch.focus = [focus[0], focus[1], focus[2]]
+  setTimeout(() => {
+    lakePatch.pending = false
+    lakePatch.version = world.version
+    // A flat world's region is in world x/z; on a planet, a tangent frame centred on the focus, so the
+    // sampled heights (and the lake levels) are that frame's local y.
+    const frame = planet ? frameAtFocus(focus) : world.frame
+    const half = LAKE_REGION / 2
+    const x = planet ? -half : focus[0] - half
+    const z = planet ? -half : focus[2] - half
+    const hydrology = computeHydrology(frame.height, { x, z, width: LAKE_REGION, depth: LAKE_REGION, cellSize: LAKE_CELL }, { seaLevel: world.options.seaLevel })
+    if (lakes) lakes.setHydrology(hydrology, frame)
+    else lakes = new Lakes({ hydrology, frame, camera, scene, sun, origin: controls.origin, prepass, rivers: false })
+    Object.assign(window, { lakes })
+  }, 50)
+}
+
+/** The local frame centred on a planet focus point (lat/lon of the focus's base point). */
+function frameAtFocus(focus: readonly number[]): LocalFrame {
+  const len = Math.hypot(focus[0], focus[1], focus[2]) || 1
+  const deg = 180 / Math.PI
+  return world.frameAt(Math.asin(focus[1] / len) * deg, Math.atan2(focus[0], focus[2]) * deg)
+}
+
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
   camera.updateProjectionMatrix()
@@ -101,6 +145,14 @@ renderer.setAnimationLoop(() => {
   controls.update()
   terrain.setOrigin(controls.origin)
   ocean.setOrigin(controls.origin)
+  rivers.setOrigin(controls.origin)
+  lakes?.setOrigin(controls.origin)
+  // Keep the lake patch around the focus: re-run the drainage when the focus leaves its inner half,
+  // or when the world changes. Only while close enough to see a lake (it is a ~0.5 s solve).
+  if (controls.distance < LAKE_REGION * 1.5 && !lakePatch.pending) {
+    const [fx, fy, fz] = controls.focus
+    if (lakePatch.version !== world.version || !lakePatch.focus || Math.hypot(fx - lakePatch.focus[0], fy - lakePatch.focus[1], fz - lakePatch.focus[2]) > LAKE_REGION * 0.25) requestLakes(controls.focus)
+  }
 
   // Sky fades to space with altitude; fog thins out with it.
   const alt = controls.altitude
@@ -126,7 +178,8 @@ renderer.setAnimationLoop(() => {
   hud.textContent = `${fps.toFixed(0)} fps · camera ${fmt(controls.distance)} from focus, ${fmt(alt)} above ground
 ${biome} · ${sample.temperature.toFixed(1)} °C · moisture ${sample.moisture.toFixed(2)} · elevation ${sample.elevation.toFixed(1)} m
 chunks ${s.visible} drawn / ${s.cached} cached · ${s.building} building · ${s.queued} queued · depth ${s.deepest} · ${(s.triangles / 1e6).toFixed(2)} M tris
-sea ${sea.depth >= 0 ? `${fmt(sea.depth)} deep` : `${fmt(-sea.depth)} above the waterline`} at the focus · camera ${fmt(ocean.stats.altitude)} above sea level`
+sea ${sea.depth >= 0 ? `${fmt(sea.depth)} deep` : `${fmt(-sea.depth)} above the waterline`} at the focus · camera ${fmt(ocean.stats.altitude)} above sea level
+rivers ${rivers.stats.meshes}/${rivers.stats.tiles} tiles · ${lakes ? `${lakes.hydrology.lakes.length} lakes` : 'lakes…'}`
 
   // Map overlay around the focus (redrawn when the focus moves far or settings change).
   const moved = Math.hypot(f[0] - lastMapFocus[0], f[1] - lastMapFocus[1], f[2] - lastMapFocus[2]) > ui.mapSize * 0.05
