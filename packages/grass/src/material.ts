@@ -127,7 +127,8 @@ const LOD_COLORS =[new Color('#ff4d4d'), new Color('#ffd23f'), new Color('#4dd96
  *  aParams = heightScale, widthScale, rank (0..1, LOD thinning order), seed (0..1)
  *  aPatch  = field-scale brightness, dryness and flow-field noise (static, so baked on the CPU instead of per vertex)
  */
-export function createGrassMaterial(u: GrassUniforms, billboard: boolean) {
+export function createGrassMaterial(u: GrassUniforms, type: 'blades' | 'billboards') {
+  const billboard = type === 'billboards'
   const aOffset = attribute('aOffset', 'vec4')
   const aParams = attribute('aParams', 'vec4')
   const aPatch = attribute('aPatch', 'vec3')

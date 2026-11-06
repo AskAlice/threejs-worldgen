@@ -1,6 +1,6 @@
 import {
   BufferGeometry, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3,
-  type Camera, type DirectionalLight, type MeshPhysicalNodeMaterial, type Node, type Object3D,
+  type Camera, type DirectionalLight, type MeshPhysicalNodeMaterial, type Node, type Object3D, type Vector4,
 } from 'three/webgpu'
 import { createGrassMaterial, createGrassUniforms, MAX_INTERACTORS, neutralGrassMap, sampleGrassMap, type GrassMapSample, type GrassUniforms } from './material.ts'
 import { presets, type GrassStyle, type PresetName } from './presets.ts'
@@ -209,6 +209,8 @@ export class Grass {
   private layoutKey = ''
   private layoutTileSize = 0
   private layoutType = ''
+  /** `settings.type` resolved once per apply; decides geometry, density, clumping and material. */
+  private billboard = false
   private materialKey = ''
   private frame = 0
   private unhook = () => {}
@@ -271,6 +273,7 @@ export class Grass {
     const s: GrassSettings = { ...DEFAULTS, ...preset, ...(this.input as any), wind: { ...DEFAULT_WIND, ...this.input.wind } }
     if (s.lods.length !== 4) throw new Error('Grass: `lods` must contain exactly 4 levels.')
     this.settings = s
+    this.billboard = s.type === 'billboards'
 
     const u = this.uniforms
     u.baseColor.value.set(s.baseColor)
@@ -328,7 +331,7 @@ export class Grass {
         const material = this.material
         this.retire(() => material.dispose())
       }
-      this.material = createGrassMaterial(this.uniforms, s.type === 'billboards')
+      this.material = createGrassMaterial(this.uniforms, s.type)
     }
     for (const tile of this.tiles.values()) this.applyTileSettings(tile)
     for (const tile of this.staleTiles) tile.mesh.material = this.material!
@@ -439,7 +442,7 @@ export class Grass {
   private get cellFull() {
     const s = this.settings
     const cs = s.tileSize / this.cellsPerSide
-    return Math.ceil(s.density * cs * cs * (s.type === 'billboards' ? BILLBOARD_DENSITY_RATIO : 1))
+    return Math.ceil(s.density * cs * cs * (this.billboard ? BILLBOARD_DENSITY_RATIO : 1))
   }
 
   private needScratch = new Int32Array(0)
@@ -483,7 +486,6 @@ export class Grass {
 
   private buildTile(tile: Tile, needs: Int32Array, segments: number) {
     const s = this.settings
-    const billboard = s.type === 'billboards'
     const cs = s.tileSize / this.cellsPerSide
     const full = this.cellFull
     // Build with headroom so a camera creeping closer doesn't trigger a rebuild every frame.
@@ -504,7 +506,7 @@ export class Grass {
     // Reuse the tile's GPU buffers when the new data fits; only grow (with slack) when it doesn't.
     // Allocating fresh buffers on every LOD change is what makes camera moves stutter.
     let geometry = tile.mesh.geometry
-    const base = this.baseGeometry(segments, billboard)
+    const base = this.baseGeometry(segments, this.billboard)
     const current = geometry.getAttribute('aOffset') as InstancedBufferAttribute | undefined
     if (!current || current.count < written || geometry.attributes.position !== base.attributes.position) {
       const capacity = Math.ceil(written * 1.5) + 16
@@ -594,7 +596,7 @@ export class Grass {
     const cz = Math.floor(c / n) * cs
     const ox = tile.ix * s.tileSize
     const oz = tile.iz * s.tileSize
-    const clumping = s.type === 'billboards' ? 0 : s.clumping // a billboard already is a tuft
+    const clumping = this.billboard ? 0 : s.clumping // a billboard already is a tuft
     const checkSlope = Number.isFinite(s.maxSlope)
     const { rand, clumpX, clumpZ, clumpH } = cell
     const clumps = clumpX.length
@@ -824,7 +826,7 @@ export function interactorObject(it: Interactor | undefined): Object3D | null {
 
 /** Copies interactor positions and radii into the shader slots (shared by grass and corn). */
 export function writeInteractors(u: Pick<GrassUniforms, 'interactors' | 'interactorCount'>, list: Interactor[]) {
-  const slots = u.interactors.array as unknown as { set: (x: number, y: number, z: number, w: number) => void }[]
+  const slots = u.interactors.array as Vector4[]
   u.interactorCount.value = Math.min(list.length, MAX_INTERACTORS)
   for (let i = 0; i < MAX_INTERACTORS; i++) {
     const it = list[i]
