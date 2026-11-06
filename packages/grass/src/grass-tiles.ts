@@ -1,8 +1,8 @@
-import { InstancedBufferGeometry, Mesh, type Group, type MeshPhysicalNodeMaterial, type Vector3 } from 'three/webgpu'
+import { type Group, type Vector3 } from 'three/webgpu'
 import { slopeAt, type HeightFn } from 'threejs-heightfield'
 import { hash2, mulberry32, valueNoise } from './random.ts'
 import { BILLBOARD_DENSITY_RATIO, type GrassSettings } from './grass-settings.ts'
-import { disposeInstanced, type TileGeometryStore } from './grass-geometry.ts'
+import type { TileGeometry, TileGeometryStore } from './grass-geometry.ts'
 import type { Retirement } from './retirement.ts'
 
 export interface CellCache {
@@ -22,16 +22,13 @@ export interface CellCache {
 export interface Tile {
   ix: number
   iz: number
-  /** Edge length of the grid this tile was built on (kept when a tileSize change retires it). */
-  size: number
   /** Blade candidates currently built per cell. */
   built: Int32Array
   segments: number
   /** Generated blades per cell, kept so LOD changes are a copy instead of a regeneration. */
   cells: (CellCache | undefined)[]
-  mesh: Mesh<InstancedBufferGeometry, MeshPhysicalNodeMaterial>
-  minY: number
-  maxY: number
+  /** The tile's mesh, buffers and bounds; the geometry store owns everything it holds. */
+  geometry: TileGeometry
   seen: number
   dist: number
   /** Frames spent stale (0 while live); releases a stale tile whose area is legitimately empty. */
@@ -44,8 +41,6 @@ export interface TileStreamContext {
   billboard: () => boolean
   height: () => HeightFn
   densityAt: (dist: number) => number
-  /** `null` until the field has created its material; no tiles exist before then. */
-  material: () => MeshPhysicalNodeMaterial | null
   geometry: TileGeometryStore
   retirement: Retirement
 }
@@ -53,7 +48,9 @@ export interface TileStreamContext {
 /** Cells are built with this many times the blades they currently need. */
 const HEADROOM = 1.3
 
-/** How long a stale tile may wait for a replacement that legitimately has no blades. */
+/** How long a stale tile may wait for a replacement that legitimately has no blades.
+ *  Without this bound, resizing over ground that has no grass (off the terrain, above `maxSlope`,
+ *  or painted empty) would pin the old grid alive forever. `lifecycle.test.ts` covers it. */
 const STALE_MAX_FRAMES = 60
 
 /** Rebuild when a cell needs more than it holds, holds far more than it needs, or detail changed.
@@ -89,7 +86,7 @@ export class TileStream {
    * Re-centres the grid on `cam`, retires tiles that left the view and rebuilds what needs it,
    * nearest first, until `budget` ms are spent.
    */
-  update(cam: Vector3, budget: number, castShadow: boolean, shadowDistance: number): { tiles: number; instances: number } {
+  update(cam: Vector3, budget: number): { tiles: number; instances: number } {
     const s = this.ctx.settings()
     const frame = ++this.frame
     const ts = s.tileSize
@@ -136,8 +133,8 @@ export class TileStream {
 
     let instances = 0
     for (const tile of this.tiles.values()) {
-      instances += tile.mesh.geometry.instanceCount
-      tile.mesh.castShadow = castShadow && tile.dist < shadowDistance
+      instances += this.ctx.geometry.count(tile.geometry)
+      this.ctx.geometry.applyShadow(tile.geometry, tile.dist)
     }
     return { tiles: this.tiles.size, instances }
   }
@@ -158,8 +155,8 @@ export class TileStream {
 
   /** Pushes the current material and per-tile settings to every live (and stale) tile. */
   applySettings(): void {
-    for (const tile of this.tiles.values()) this.ctx.geometry.applyTileSettings(tile)
-    for (const tile of this.staleTiles) this.ctx.geometry.applyTileSettings(tile)
+    for (const tile of this.tiles.values()) this.ctx.geometry.applyTileSettings(tile.geometry, tile.dist)
+    for (const tile of this.staleTiles) this.ctx.geometry.applyTileSettings(tile.geometry, tile.dist)
   }
 
   /** Removes and frees every tile, live or stale. */
@@ -210,17 +207,8 @@ export class TileStream {
   }
 
   private createTile(ix: number, iz: number): Tile {
-    const material = this.ctx.material()
-    if (!material) throw new Error('Grass: tiles were updated before the material was created.')
-    const geometry = new InstancedBufferGeometry()
-    geometry.instanceCount = 0
-    const mesh = new Mesh(geometry, material)
-    mesh.position.set(ix * this.ctx.settings().tileSize, 0, iz * this.ctx.settings().tileSize)
-    mesh.updateMatrix()
-    mesh.matrixAutoUpdate = false
-    mesh.visible = false
-    this.ctx.object.add(mesh)
-    return { ix, iz, size: this.ctx.settings().tileSize, built: new Int32Array(0), segments: 0, cells: [], mesh, minY: 0, maxY: 0, seen: 0, dist: 0, staleFor: 0 }
+    const geometry = this.ctx.geometry.create(ix, iz, this.ctx.settings().tileSize)
+    return { ix, iz, built: new Int32Array(0), segments: 0, cells: [], geometry, seen: 0, dist: 0, staleFor: 0 }
   }
 
   private buildTile(tile: Tile, needs: Int32Array, segments: number) {
@@ -241,10 +229,10 @@ export class TileStream {
       return k
     })
 
-    this.ctx.geometry.write(tile, take, segments, this.ctx.billboard())
+    this.ctx.geometry.write(tile.geometry, tile.cells, take, segments, this.ctx.billboard())
     tile.built = counts
     tile.segments = segments
-    this.ctx.geometry.applyTileSettings(tile)
+    this.ctx.geometry.applyTileSettings(tile.geometry, tile.dist)
   }
 
   createCell(tile: Pick<Tile, 'ix' | 'iz'>, c: number, cs: number): CellCache {
@@ -354,10 +342,10 @@ export class TileStream {
     const ts = this.ctx.settings().tileSize
     const keep: Tile[] = []
     for (const stale of this.staleTiles) {
-      const x0 = stale.ix * stale.size
-      const x1 = x0 + stale.size
-      const z0 = stale.iz * stale.size
-      const z1 = z0 + stale.size
+      const x0 = stale.ix * stale.geometry.size
+      const x1 = x0 + stale.geometry.size
+      const z0 = stale.iz * stale.geometry.size
+      const z1 = z0 + stale.geometry.size
       let overlaps = false
       let ready = true
       let shown = false
@@ -373,7 +361,7 @@ export class TileStream {
             ready = false
             break
           }
-          if (tile.mesh.geometry.instanceCount > 0) shown = true
+          if (this.ctx.geometry.count(tile.geometry) > 0) shown = true
         }
       }
       stale.staleFor++
@@ -388,8 +376,6 @@ export class TileStream {
   }
 
   private removeTile(tile: Tile) {
-    tile.mesh.removeFromParent()
-    const geometry = tile.mesh.geometry
-    this.ctx.retirement.retire(() => disposeInstanced(geometry))
+    this.ctx.geometry.remove(tile.geometry)
   }
 }

@@ -85,6 +85,7 @@ export class Grass {
   private material: MeshPhysicalNodeMaterial | null = null
   private readonly retirement = new Retirement()
   private readonly geometry = new TileGeometryStore({
+    object: this.object,
     settings: () => this.settings,
     material: () => this.material,
   }, this.retirement)
@@ -94,7 +95,6 @@ export class Grass {
     billboard: () => this.billboard,
     height: () => this.sampleHeight,
     densityAt: (dist) => this.densityAt(dist),
-    material: () => this.material,
     geometry: this.geometry,
     retirement: this.retirement,
   })
@@ -227,7 +227,7 @@ export class Grass {
     if (terrain !== this.resolvedTerrain) this.adoptTerrain(terrain)
     this.retirement.beginFrame()
     const cam = this.camera.getWorldPosition(_cam)
-    const { tiles, instances } = this.stream.update(cam, budget, s.castShadow, s.shadowDistance)
+    const { tiles, instances } = this.stream.update(cam, budget)
 
     this.uniforms.viewPosition.value.copy(cam)
     let sun = s.sun

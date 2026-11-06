@@ -61,8 +61,7 @@ function streamFor(grass: Grass) {
     billboard: () => grass.settings.type === 'billboards',
     height: () => grass.sampleHeight,
     densityAt: (dist) => grass.densityAt(dist),
-    material,
-    geometry: new TileGeometryStore({ settings: () => grass.settings, material }, retirement),
+    geometry: new TileGeometryStore({ object: grass.object, settings: () => grass.settings, material }, retirement),
     retirement,
   })
 }

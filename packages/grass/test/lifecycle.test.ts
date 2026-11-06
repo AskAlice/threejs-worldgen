@@ -113,6 +113,15 @@ function visible(grass: GrassType) {
   return grass.object.children.filter((o) => o.visible).length
 }
 
+/** Blades currently drawn: only visible meshes contribute instances. */
+function visibleBlades(grass: GrassType) {
+  let blades = 0
+  for (const mesh of grass.object.children) {
+    if (mesh.visible) blades += (mesh as Mesh<InstancedBufferGeometry>).geometry.instanceCount
+  }
+  return blades
+}
+
 function settle(grass: GrassType) {
   // Stale tiles are extra meshes beyond the live grid; keep updating until none are left.
   for (let i = 0; i < 20; i++) grass.update(Infinity)
@@ -167,12 +176,59 @@ test('repeated tileSize changes do not pile up tile meshes', () => {
   assertNoOverlap(grass)
 })
 
+test('shrinking the tile size 25 -> 5 keeps the old blades until replacements render', () => {
+  const grass = new Grass({ camera: camera(), tileSize: 25, maxDistance: 30 })
+  grass.update(Infinity)
+  const before = visibleBlades(grass)
+  assert.ok(before > 0, 'the 25 m grid starts drawn')
+  const old = new Set(grass.object.children)
+
+  grass.set({ tileSize: 5 })
+  assert.equal(visibleBlades(grass), before, 'nothing is dropped before the new grid exists')
+
+  grass.update(0) // build at most one 5 m tile; the other 168 are queued
+  assert.ok(grass.stats.tiles > old.size, 'the 5 m grid is live')
+  assert.ok(
+    [...old].some((mesh) => mesh.visible && mesh.parent === grass.object),
+    'the 25 m blades are still on screen',
+  )
+  assert.ok(
+    grass.object.children.some((mesh) => !old.has(mesh) && mesh.visible),
+    'while the first replacement blades render',
+  )
+
+  // Stream the rest in one tile per frame; the field may never blink out on the way.
+  let steps = 0
+  while (grass.object.children.length > grass.stats.tiles && steps++ < 1000) {
+    grass.update(0)
+    assert.ok(visibleBlades(grass) > 0, `field went dark ${steps} frames into the resize`)
+  }
+  assert.ok(steps < 1000, 'the resize finishes')
+
+  settle(grass)
+  assert.ok([...old].every((mesh) => mesh.parent === null), 'every 25 m tile was retired')
+  assert.equal(grass.object.children.length, grass.stats.tiles)
+  assertNoOverlap(grass)
+  for (const mesh of grass.object.children) {
+    assert.ok(Math.abs(mesh.position.x % 5) < 1e-9, `x ${mesh.position.x} is on the 5 m grid`)
+    assert.ok(Math.abs(mesh.position.z % 5) < 1e-9, `z ${mesh.position.z} is on the 5 m grid`)
+  }
+  assert.ok(visibleBlades(grass) > 0, 'the shrunken grid still draws blades')
+})
+
 test('stale tiles are released when the new grid legitimately has no blades', () => {
-  // Off-terrain: every candidate is rejected, so replacements never get instances.
+  // Off-terrain: every candidate is rejected, so replacements never get instances. The frame bound is
+  // the only thing that stops the old grid being pinned forever: assert it waits, then releases.
   const grass = new Grass({ camera: camera(), tileSize: 25, maxDistance: 20, terrain: () => NaN })
   grass.update(Infinity)
+  const stale = grass.object.children.length
+  assert.ok(stale > 0, 'an off-terrain field still owns its tile meshes')
+
   grass.set({ tileSize: 10 })
-  for (let i = 0; i < 61; i++) grass.update(Infinity)
+  for (let i = 0; i < 60; i++) grass.update(Infinity)
+  assert.equal(grass.object.children.length, grass.stats.tiles + stale, 'the old grid is held for the bounded wait')
+
+  grass.update(Infinity) // one frame past the bound
   assert.equal(grass.object.children.length, grass.stats.tiles, 'empty replacements do not pin the old grid forever')
 })
 

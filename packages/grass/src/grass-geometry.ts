@@ -1,9 +1,9 @@
 import {
-  BufferGeometry, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, Sphere, Vector3,
-  type MeshPhysicalNodeMaterial,
+  BufferGeometry, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3,
+  type MeshPhysicalNodeMaterial, type Object3D,
 } from 'three/webgpu'
 import type { GrassSettings } from './grass-settings.ts'
-import type { Tile } from './grass-tiles.ts'
+import type { CellCache } from './grass-tiles.ts'
 import type { Retirement } from './retirement.ts'
 
 /**
@@ -71,12 +71,28 @@ export function disposeInstanced(geometry: InstancedBufferGeometry) {
 }
 
 interface GeometryContext {
+  /** Root the tile meshes are added to and removed from. */
+  object: Object3D
   settings: () => GrassSettings
   /** `null` until the field has created its material; tiles cannot be written or drawn before then. */
   material: () => MeshPhysicalNodeMaterial | null
 }
 
-/** Owns the shared blade/billboard shapes and the per-tile instance buffers that reference them. */
+/**
+ * A tile's mesh and the height bounds of the blades uploaded to it. Owned by {@link TileGeometryStore}:
+ * the stream keeps one per tile but only reads through it.
+ */
+export interface TileGeometry {
+  readonly mesh: Mesh<InstancedBufferGeometry, MeshPhysicalNodeMaterial>
+  /** Edge length of the grid this tile was built on (a stale tile keeps the size it was retired at). */
+  readonly size: number
+  /** Lowest blade height uploaded to the tile (written by {@link TileGeometryStore.write}). */
+  minY: number
+  /** Highest blade height uploaded to the tile (written by {@link TileGeometryStore.write}). */
+  maxY: number
+}
+
+/** Owns the shared blade/billboard shapes, the per-tile meshes and their instance buffers. */
 export class TileGeometryStore {
   private baseGeometries = new Map<string, BufferGeometry>()
   private readonly ctx: GeometryContext
@@ -87,14 +103,29 @@ export class TileGeometryStore {
     this.retirement = retirement
   }
 
+  /** Creates a tile's mesh on the grid, attaches it and hides it until it has blades. */
+  create(ix: number, iz: number, size: number): TileGeometry {
+    const material = this.ctx.material()
+    if (!material) throw new Error('Grass: tiles were updated before the material was created.')
+    const geometry = new InstancedBufferGeometry()
+    geometry.instanceCount = 0
+    const mesh = new Mesh(geometry, material)
+    mesh.position.set(ix * size, 0, iz * size)
+    mesh.updateMatrix()
+    mesh.matrixAutoUpdate = false
+    mesh.visible = false
+    this.ctx.object.add(mesh)
+    return { mesh, size, minY: 0, maxY: 0 }
+  }
+
   /**
    * Fills a tile's instance buffers with its cells' blades, growing the buffers only when needed:
    * reusing them across LOD changes is what keeps camera moves from stuttering.
    */
-  write(tile: Tile, take: Int32Array, segments: number, billboard: boolean): void {
+  write(target: TileGeometry, cells: (CellCache | undefined)[], take: Int32Array, segments: number, billboard: boolean): void {
     const written = take.reduce((a, b) => a + b, 0)
 
-    let geometry = tile.mesh.geometry
+    let geometry = target.mesh.geometry
     const base = this.baseGeometry(segments, billboard)
     const current = geometry.getAttribute('aOffset') as InstancedBufferAttribute | undefined
     if (!current || current.count < written || geometry.attributes.position !== base.attributes.position) {
@@ -107,7 +138,7 @@ export class TileGeometryStore {
       geometry.setAttribute('aOffset', new InstancedBufferAttribute(new Float32Array(capacity * 4), 4))
       geometry.setAttribute('aParams', new InstancedBufferAttribute(new Float32Array(capacity * 4), 4))
       geometry.setAttribute('aPatch', new InstancedBufferAttribute(new Float32Array(capacity * 3), 3))
-      tile.mesh.geometry = geometry
+      target.mesh.geometry = geometry
       this.retirement.retire(() => disposeInstanced(old))
     }
     const aOffset = geometry.getAttribute('aOffset') as InstancedBufferAttribute
@@ -121,7 +152,7 @@ export class TileGeometryStore {
     let maxY = -Infinity
     take.forEach((k, c) => {
       if (!k) return
-      const cell = tile.cells[c]!
+      const cell = cells[c]!
       offsets.set(cell.offsets.subarray(0, k * 4), w * 4)
       params.set(cell.params.subarray(0, k * 4), w * 4)
       patches.set(cell.patches.subarray(0, k * 3), w * 3)
@@ -140,28 +171,46 @@ export class TileGeometryStore {
     }
     geometry.instanceCount = written
 
-    tile.minY = minY
-    tile.maxY = maxY
+    target.minY = minY
+    target.maxY = maxY
   }
 
-  /** Applies material, shadow flags and the manual bounding sphere (instanced geometry can't compute one). */
-  applyTileSettings(tile: Tile): void {
+  /** Applies material, shadow flags and the manual bounding sphere (instanced geometry can't compute one).
+   *  The sphere uses the grid the mesh was built on, which a stale tile keeps. */
+  applyTileSettings(target: TileGeometry, dist: number): void {
     const s = this.ctx.settings()
-    const { mesh } = tile
-    const ts = tile.size // stale tiles still carry the grid they were built on
+    const { mesh, size } = target
     const material = this.ctx.material()
     if (!material) throw new Error('Grass: tile settings applied before the material was created.')
     mesh.material = material
     mesh.receiveShadow = s.receiveShadow
-    mesh.castShadow = s.castShadow && tile.dist < s.shadowDistance
+    this.applyShadow(target, dist)
     mesh.visible = mesh.geometry.instanceCount > 0
     if (!mesh.visible) return
     // Instanced geometry can't compute its own bounds; frustum culling needs a manual sphere.
     const reach = s.bladeHeight * (1 + s.heightVariation) * 2 + s.clumpSize // map can double height; tufts spill over edges
     mesh.geometry.boundingSphere = new Sphere(
-      new Vector3(ts / 2, (tile.minY + tile.maxY) / 2, ts / 2),
-      Math.hypot(ts / Math.SQRT2, (tile.maxY - tile.minY) / 2) + reach,
+      new Vector3(size / 2, (target.minY + target.maxY) / 2, size / 2),
+      Math.hypot(size / Math.SQRT2, (target.maxY - target.minY) / 2) + reach,
     )
+  }
+
+  /** Refreshes just the distance-dependent shadow flag, once per frame. */
+  applyShadow(target: TileGeometry, dist: number): void {
+    const s = this.ctx.settings()
+    target.mesh.castShadow = s.castShadow && dist < s.shadowDistance
+  }
+
+  /** Blades currently uploaded to the tile. */
+  count(target: TileGeometry): number {
+    return target.mesh.geometry.instanceCount
+  }
+
+  /** Detaches a tile's mesh and retires its instance buffers. */
+  remove(target: TileGeometry): void {
+    target.mesh.removeFromParent()
+    const geometry = target.mesh.geometry
+    this.retirement.retire(() => disposeInstanced(geometry))
   }
 
   /** Retires the shared base shapes; per-tile buffers are retired with their tiles. */
