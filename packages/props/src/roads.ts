@@ -19,6 +19,9 @@ export const ROAD_PART = { carriageway: 0, sidewalk: 1, curb: 2, concrete: 3, ju
 /** Centre line styles. */
 export type CentreLine = 'none' | 'dashed' | 'solid' | 'double'
 
+/** Every centre line style, in the shader's code order (0…3). */
+export const CENTRE_LINES: readonly CentreLine[] = ['none', 'dashed', 'solid', 'double']
+
 /** Colours of a {@link RoadSurface} (`#rrggbb`). */
 export interface RoadColors {
   /** Asphalt. */ asphalt: string
@@ -44,6 +47,8 @@ export interface RoadSurfaceOptions {
   lanes: number
   /** Centre line. */
   centreLine: CentreLine
+  /** Paint lane markings at all; the styles above and per-edge inputs only refine what it turns on. */
+  markings: boolean
   /** Dashed lines between lanes (when `lanes` > 1). */
   laneLines: boolean
   /** Solid lines along both edges. */
@@ -68,7 +73,7 @@ export interface RoadSurfaceOptions {
 
 /** Default road look: worn two-lane asphalt with a dashed centre line. */
 export const DEFAULT_ROAD_SURFACE: RoadSurfaceOptions = {
-  surface: 'asphalt', width: 7, lanes: 1, centreLine: 'dashed', laneLines: true, edgeLines: true,
+  surface: 'asphalt', width: 7, lanes: 1, centreLine: 'dashed', markings: true, laneLines: true, edgeLines: true,
   wear: 0.4, cracks: 0.35, patches: 0.3, ruts: 0.5, potholes: 0.3, slabSize: 1,
   colors: {
     asphalt: '#3b3d40', patch: '#26282a', cobblestone: '#6d6a66', gravel: '#8a8378', dirt: '#7a6248', grass: '#55703a',
@@ -90,6 +95,14 @@ export interface RoadSurfaceContext {
   halfWidth?: Node
   /** Surface index node ({@link ROAD_SURFACE_KINDS}). Default: `options.surface`. threejs-city: `attribute('road', 'vec4').z`. */
   surfaceIndex?: Node
+  /** Lanes per direction node (per edge). Default: `options.lanes`. */
+  lanes?: Node
+  /** Centre line style code node ({@link CENTRE_LINES} index). Default: `options.centreLine`. */
+  centreLine?: Node
+  /** Lane line mask node (0 or 1). Default: `options.laneLines`. */
+  laneLines?: Node
+  /** Edge line mask node (0 or 1). Default: `options.edgeLines`. */
+  edgeLines?: Node
   /** (metres across from the centreline, metres along). Default: `uv()`. */
   coords?: Node
   /** Weathering look. */
@@ -134,7 +147,8 @@ function merge<T>(target: T, input: unknown): T {
  *
  * Geometry convention (the same as threejs-city's road mesh): `uv` = (metres across from the
  * centreline, metres along), a `roadPart` float attribute with {@link ROAD_PART} codes. Other geometry
- * can map its own attributes through {@link RoadSurfaceContext}.
+ * can map its own attributes through {@link RoadSurfaceContext}, including per-edge lane counts and
+ * centre line styles, so one material can draw roads of different classes.
  */
 export class RoadSurface {
   /** The material. */
@@ -143,7 +157,7 @@ export class RoadSurface {
   options: RoadSurfaceOptions
   /** Uniforms behind the look. */
   readonly uniforms = {
-    surface: uniform(0), width: uniform(7), lanes: uniform(1), centre: uniform(1), laneLines: uniform(1), edgeLines: uniform(1),
+    surface: uniform(0), width: uniform(7), lanes: uniform(1), centre: uniform(1), markings: uniform(1), laneLines: uniform(1), edgeLines: uniform(1),
     wear: uniform(0.4), cracks: uniform(0.35), patches: uniform(0.3), ruts: uniform(0.5), potholes: uniform(0.3), slabSize: uniform(1),
     wetness: uniform(0), snow: uniform(0), burn: uniform(0), damage: uniform(0),
     asphalt: uniform(new Color()), patch: uniform(new Color()), cobblestone: uniform(new Color()), gravel: uniform(new Color()), dirt: uniform(new Color()),
@@ -165,7 +179,8 @@ export class RoadSurface {
     u.surface.value = Math.max(0, ROAD_SURFACE_KINDS.indexOf(o.surface))
     u.width.value = o.width
     u.lanes.value = Math.max(1, Math.round(o.lanes))
-    u.centre.value = ['none', 'dashed', 'solid', 'double'].indexOf(o.centreLine)
+    u.centre.value = CENTRE_LINES.indexOf(o.centreLine)
+    u.markings.value = o.markings ? 1 : 0
     u.laneLines.value = o.laneLines ? 1 : 0
     u.edgeLines.value = o.edgeLines ? 1 : 0
     for (const k of ['wear', 'cracks', 'patches', 'ruts', 'potholes', 'slabSize'] as const) u[k].value = o[k]
@@ -193,6 +208,11 @@ export class RoadSurface {
     const hw = (ctx.halfWidth as N) ?? u.width.mul(0.5)
     const part = (ctx.part as N) ?? attribute('roadPart', 'float')
     const surf = (ctx.surfaceIndex as N) ?? u.surface
+    // Per-edge marking inputs (e.g. vertex attributes through the context) override the look.
+    const lanes = (ctx.lanes as N) ?? u.lanes
+    const centreStyle = (ctx.centreLine as N) ?? u.centre
+    const laneLinesOn = (ctx.laneLines as N) ?? u.laneLines
+    const edgeLinesOn = (ctx.edgeLines as N) ?? u.edgeLines
     const wear = u.wear
     const ext = ctx.states ?? {}
     const st = (k: 'wetness' | 'snow' | 'burn' | 'damage') => (ext[k] === undefined ? u[k] : max(u[k], ext[k] as N))
@@ -202,7 +222,7 @@ export class RoadSurface {
     const onRoad = eq(part, 0).add(eq(part, 4))
 
     // Tyre tracks, two per lane.
-    const laneW = hw.div(u.lanes)
+    const laneW = hw.div(lanes)
     const inLane = fract(alat.div(laneW)).sub(0.5).mul(laneW)
     const track = exp(abs(abs(inLane).sub(0.85)).div(0.32).pow(2).negate()).mul(step(alat, hw)).mul(wear)
 
@@ -217,14 +237,14 @@ export class RoadSurface {
     asphalt = asphalt.mul(float(1).sub(crack.mul(0.65)))
     // Markings.
     const dashes = (period: number, duty: number) => step(fract(along.div(period)), duty)
-    const centre = band(lat, float(0.06)).mul(eq(u.centre, 1).mul(dashes(9, 0.5)).add(eq(u.centre, 2)))
-      .add(band(alat.sub(0.16), float(0.06)).mul(eq(u.centre, 3)))
+    const centre = band(lat, float(0.06)).mul(eq(centreStyle, 1).mul(dashes(9, 0.5)).add(eq(centreStyle, 2)))
+      .add(band(alat.sub(0.16), float(0.06)).mul(eq(centreStyle, 3)))
     const laneDist = abs(fract(alat.div(laneW)).sub(0.5)).mul(laneW)
     const laneLine = band(laneW.mul(0.5).sub(laneDist), float(0.06)).mul(step(laneW.mul(0.5), alat)).mul(step(alat, hw.sub(laneW.mul(0.5))))
-      .mul(dashes(12, 0.35)).mul(step(1.5, u.lanes)).mul(u.laneLines)
-    const edge = band(alat.sub(hw.sub(0.3)), float(0.07)).mul(u.edgeLines)
+      .mul(dashes(12, 0.35)).mul(step(1.5, lanes)).mul(laneLinesOn)
+    const edge = band(alat.sub(hw.sub(0.3)), float(0.07)).mul(edgeLinesOn)
     const worn = float(1).sub(wear.mul(0.55).mul((mx_noise_float(p.mul(1.3)) as N).mul(0.5).add(0.5))).mul(float(1).sub(crack.mul(0.8)))
-    const paint = eq(part, 0).mul(eq(surf, 0)).mul(worn)
+    const paint = eq(part, 0).mul(eq(surf, 0)).mul(worn).mul(u.markings)
     const white = max(laneLine, edge).mul(paint), yellow = centre.mul(paint)
     asphalt = mix(mix(asphalt, u.marking, white), u.centreLine, yellow)
     const asphaltRough = mix(mix(float(0.92), float(0.72), track), float(0.6), max(white, yellow))

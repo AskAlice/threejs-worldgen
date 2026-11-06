@@ -114,7 +114,9 @@ data below).
 - Balconies, railings, rooftop plant, tanks, antennas, chimneys, AC units and stilts: one more `BatchedMesh` of eight
   shared unit geometries, instanced with per-instance matrices and colour.
 - Roads: one indexed mesh of shared-vertex strips (carriageway, kerbs, sidewalks, skirts, bridge decks, parapets, piers)
-  and junction discs, drawn with threejs-props' `RoadSurface` material.
+  and junction discs, drawn with threejs-props' `RoadSurface` material. Markings follow the road class through a vertex
+  attribute: arterials get a double centre line and lane dividers, collectors a single dashed centre line, and local
+  streets suppress their edge lines.
 - Street furniture: one `threejs-props` `Props` added to `city.local` — street lights, hydrants, bins, benches, bus
   stops, signs and traffic lights along the settlement's roads. The rural runs (power lines, fences, hay bales, wells)
   and the mailboxes at lot frontages are off by default: each candidate asks threejs-props for a nearest-road search,
@@ -125,9 +127,9 @@ data below).
 Facades are a TSL shader: per-style window grids from wall coordinates (metres along the wall and above the ground
 floor), frames and mullions, shopfronts, window lights hashed per window that glow with `night`, and procedural
 plaster, brick, wood, stone, concrete, glass, adobe and metal. Roofs draw tiles, slates, shingles, standing-seam metal,
-thatch and gravel. Roads use threejs-props' `RoadSurface`: lane markings, worn tyre tracks, cracks and patches on
-asphalt, cobblestones, gravel, rutted dirt, paving slabs and kerbs, the same look as props road ribbons. No texture
-assets.
+thatch and gravel. Roads use threejs-props' `RoadSurface`: lane markings by road class (arterials double, collectors
+dashed, local streets bare), worn tyre tracks, cracks and patches on asphalt, cobblestones, gravel, rutted dirt, paving
+slabs and kerbs, the same look as props road ribbons. No texture assets.
 
 ### Weather hooks
 

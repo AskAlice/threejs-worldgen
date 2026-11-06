@@ -145,10 +145,12 @@ potholes fill with water first. Snow clears from the tyre tracks. Damage opens a
 
 Live inputs: `nightNode` (for example threejs-sky's `sky.uniforms.night`), `time` and `look`.
 
-`RoadSurface`: `surface`, `width`, `lanes`, `centreLine` (`none` / `dashed` / `solid` / `double`), `laneLines`,
-`edgeLines`, `wear`, `cracks`, `patches`, `ruts`, `potholes`, `slabSize`, `colors`, `states`. Other geometry can feed
-its own part, width and surface attributes through the context. For example, threejs-city's road mesh:
-`{ part: attribute('road', 'vec4').w, halfWidth: …x, surfaceIndex: …z }`.
+`RoadSurface`: `surface`, `width`, `lanes`, `centreLine` (`none` / `dashed` / `solid` / `double`), `markings`, `laneLines`,
+`edgeLines`, `wear`, `cracks`, `patches`, `ruts`, `potholes`, `slabSize`, `colors`, `states`. `markings` paints any
+markings at all; the rest style them. Other geometry can feed its own part, width and surface attributes through the
+context, and per-edge lane counts and centre line / lane / edge line styles too, so one material can draw roads of
+different classes. For example, threejs-city's road mesh: `{ part: attribute('road', 'vec4').w, halfWidth: …x,
+surfaceIndex: …z, lanes: …, centreLine: …, laneLines: …, edgeLines: … }`.
 
 ## License
 

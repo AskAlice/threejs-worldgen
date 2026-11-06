@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu'
+import { float } from 'three/tsl'
 import { World, createSample } from 'threejs-biomes'
 import {
-  buildProp, catenaryParameter, catenaryPoints, decorateRoads, planPowerLine, propAssets, PROP_KIND_IDS, PROP_KINDS, Props, roadRibbon, ROAD_PART,
-  SHAPES, shapeData, type PropPlacement, type RoadNetworkLike,
+  buildProp, catenaryParameter, catenaryPoints, CENTRE_LINES, decorateRoads, planPowerLine, propAssets, PROP_KIND_IDS, PROP_KINDS, Props, roadRibbon,
+  ROAD_PART, RoadSurface, SHAPES, shapeData, type PropPlacement, type RoadNetworkLike,
 } from '../src/index.ts'
 
 const world = new World({ seed: 7 })
@@ -226,4 +227,29 @@ test('propAssets: unique ids, valid rules, every kind and fence style covered', 
   }
   assert.ok(defs.find((d) => d.id === 'props/fence-adobe')!.placement.biomes!.includes('desert'))
   assert.ok(defs.find((d) => d.id === 'props/hay-bale')!.placement.biomes!.includes('grassland'))
+})
+
+test('RoadSurface: marking options reach the uniforms, per-edge inputs override them', () => {
+  const r = new RoadSurface()
+  assert.equal(r.uniforms.markings.value, 1)
+  assert.equal(r.uniforms.centre.value, CENTRE_LINES.indexOf('dashed'))
+  r.set({ markings: false, centreLine: 'double', lanes: 2.4, laneLines: false, edgeLines: false })
+  assert.equal(r.uniforms.markings.value, 0, 'markings not painted off')
+  assert.equal(r.uniforms.centre.value, 3, 'double centre line not selected')
+  assert.equal(r.uniforms.lanes.value, 2, 'lanes not rounded')
+  assert.equal(r.uniforms.laneLines.value, 0)
+  assert.equal(r.uniforms.edgeLines.value, 0)
+  r.reset()
+  assert.equal(r.uniforms.markings.value, 1)
+  r.dispose()
+
+  // Per-edge inputs (here the same values a road mesh attribute would give) replace the uniforms in the shader.
+  assert.equal(CENTRE_LINES.length, 4)
+  const edge = new RoadSurface({ lanes: 1, centreLine: 'none' }, {
+    lanes: float(2), centreLine: float(CENTRE_LINES.indexOf('double')), laneLines: float(1), edgeLines: float(0),
+  })
+  assert.equal(edge.material.name, 'props/road-surface')
+  assert.equal(edge.uniforms.lanes.value, 1, 'the look is still the fallback')
+  assert.equal(edge.uniforms.centre.value, 0)
+  edge.dispose()
 })
