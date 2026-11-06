@@ -10,6 +10,7 @@ import { useEffect, useImperativeHandle, useMemo, type Ref } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Renderer } from 'three/webgpu'
 import { Fleet as FleetImpl, Vehicle as VehicleImpl, type VehicleSettings } from './fleet.ts'
+import { Traffic as TrafficImpl, type TrafficSettings } from './traffic.ts'
 import { VehicleExhaust, type ExhaustInput } from './exhaust.ts'
 import type { RoadNetwork } from './paths.ts'
 import type { FleetEnvironment, FleetInput } from './sim.ts'
@@ -18,6 +19,8 @@ import type { StateLook } from 'threejs-weathering'
 export * from './index.ts'
 /** The imperative {@link FleetImpl | Fleet} class, renamed because `Fleet` is the component here. */
 export { Fleet as FleetImpl, Vehicle as VehicleImpl } from './fleet.ts'
+/** The imperative {@link TrafficImpl | Traffic} class, renamed because `Traffic` is the component here. */
+export { Traffic as TrafficImpl } from './traffic.ts'
 
 /** Props of `<Fleet>`: every {@link FleetInput} setting plus the ones below. */
 export interface FleetProps extends FleetInput {
@@ -49,6 +52,40 @@ export function Fleet({ ref, roads = null, height, env, look, ...settings }: Fle
   useImperativeHandle(ref, () => fleet, [fleet])
   useFrame((_, delta) => fleet.update(delta, env))
   return <primitive object={fleet.object} />
+}
+
+/** Props of `<Traffic>`: every {@link TrafficSettings} setting plus the ones below. */
+export interface TrafficProps extends Partial<TrafficSettings> {
+  /** Receives the underlying Traffic. */
+  ref?: Ref<TrafficImpl | null>
+  /** Road network to stream traffic on (threejs-city's `city.graph`). */
+  roads?: RoadNetwork | null
+  /** Ground height for road nodes without `y`. */
+  height?: (x: number, z: number) => number
+  /** Weather, fire and ground states the vehicles react to. */
+  env?: FleetEnvironment
+  /** Shared weathering look. */
+  look?: StateLook
+}
+
+/**
+ * Ambient traffic around the camera: a bounded pool of vehicles spawned on nearby roads out of view,
+ * retired when they fall behind, driving the network with car-following and junction stops.
+ *
+ * @example
+ * ```tsx
+ * <Traffic roads={city.graph} max={150} population={0.7} trains={2} rail={railLoop} />
+ * ```
+ */
+export function Traffic({ ref, roads = null, height, env, look, ...settings }: TrafficProps): React.JSX.Element {
+  const camera = useThree((state) => state.camera)
+  const traffic = useMemo(() => new TrafficImpl(settings, { roads, height, look }), [look])
+  useEffect(() => () => traffic.dispose(), [traffic])
+  useEffect(() => { traffic.setRoads(roads) }, [traffic, roads])
+  useEffect(() => { traffic.reset(settings) })
+  useImperativeHandle(ref, () => traffic, [traffic])
+  useFrame((_, delta) => traffic.update(delta, camera))
+  return <primitive object={traffic.object} />
 }
 
 /** Props of `<Vehicle>`: every {@link VehicleSettings} setting plus a ref and an environment. */

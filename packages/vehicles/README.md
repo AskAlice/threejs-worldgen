@@ -79,13 +79,14 @@ new AssetRegistry().register(...vehicleAssets())
 ## React Three Fiber
 
 ```tsx
-import { Fleet, Vehicle } from 'threejs-vehicles/react'
+import { Fleet, Traffic, Vehicle } from 'threejs-vehicles/react'
 
 <Fleet roads={city.graph} groups={[{ type: 'car', count: 300, route: { kind: 'roads' } }]} lights={night} exposure={{ rain: 1 }} env={{ fire }} />
+<Traffic roads={city.graph} max={150} population={0.7} trains={2} rail={railLoop} />
 <group position={[0, 0, 5]}><Vehicle type="car" params={{ style: 'suv' }} speed={6} states={{ snow: 0.7 }} /></group>
 ```
 
-`react` and `@react-three/fiber` are optional peer dependencies; the core never imports them. Props are the JSON settings: every render calls `reset(props)`, which rebuilds only when `groups` or `seed` change. `update()` runs in `useFrame`.
+`react` and `@react-three/fiber` are optional peer dependencies; the core never imports them. Props are the JSON settings: every render calls `reset(props)`, which rebuilds only when `groups` or `seed` change. `update()` runs in `useFrame`, and `<Traffic>` streams around the scene's camera.
 
 ## What's in the box
 
@@ -99,6 +100,7 @@ import { Fleet, Vehicle } from 'threejs-vehicles/react'
 | `RoadNavigator`, `RoadNetwork` | Lane-keeping random walk over a road graph, seeded junction choices and rounded corners. `RoadGraph` from threejs-city fits as it is |
 | `rocketAt` | Analytic gravity-turn ascent (scrubbable) |
 | `planRoute`, `fitsRule`, `VEHICLE_PLACEMENT` | Plausible routes per type (water depth, ground slope, air clearance, flat pads near water). Rules match threejs-worldgen's `PlacementRule` |
+| `Traffic`, `edgePool`, `laneAt` | Ambient traffic around the camera: a bounded pool spawned out of view on nearby roads, retired far behind, with car-following and junction stops |
 | `vehicleAssets` | Every type as an `AssetDef` for threejs-worldgen's `AssetRegistry` |
 | `MeshBuilder` | The typed-array builder behind the models: flat-shaded primitives (box, cylinder, tube, ellipsoid, loft, fin, beam) and smooth-shaded surfaces, lathes and rounded boxes for bodywork |
 | `createVehicleMaterial`, `createFxMaterial`, `createWakeMaterial` | The TSL materials |
@@ -202,6 +204,33 @@ In React: `<Exhaust fleet={fleet} temperature={-4} />` from `threejs-vehicles/re
 ```ts
 new Fleet({ groups: trafficGroups('rural', 60, { kind: 'roads' }) }, { roads: city.graph })
 ```
+
+### Ambient traffic
+
+`Traffic` streams a bounded pool of vehicles around the camera the way games have always done it: each spawn lands on a road edge inside the spawn ring (between `innerRadius` and `outerRadius`) but outside the view frustum, so nothing ever pops in on screen; a vehicle that drifts past `outerRadius` and out of view is retired, freeing its slot for the next spawn. Slots are reused, so spawning allocates nothing after the pool is built.
+
+```ts
+const traffic = new Traffic({ seed: 7, max: 150, population: 0.7, trains: 2, rail: railLoop }, { roads: city.graph })
+scene.add(traffic.object)
+renderer.setAnimationLoop(() => { traffic.update(undefined, camera); renderer.render(scene, camera) })
+traffic.fleet.set({ lights: sky.night })   // the fleet underneath: states, exposure, lights
+```
+
+What appears depends on the road (`edgePool`: 12 m or wider is highway, 8 m or wider is urban, narrow streets in a town are residential, country lanes are rural and tracks are dirt), each pool drawn with `TRAFFIC_POOLS` weights. Traffic keeps its lane, cruises at the tier's speed (`speeds`), keeps a `headway` behind whatever is in front in its lane, waits at a busy junction behind cross traffic (lowest edge index goes first), and a fraction `parked` of residential spawns is stationary. Trains spawn on `rail` the same way and pull their wagons behind them.
+
+Everything is hashed from the seed, the road edge and a time slot (`hash4`, no `Math.random`), so the same seed, camera path and timings give the same traffic. `edgePool` and `laneAt` are the two pure pieces: the pool a road draws from, and the lane pose a spawn is checked at before it is committed.
+
+| Option | Default | What it does |
+|---|---|---|
+| `seed` | `1` | Same seed, camera path and timings, same traffic |
+| `max` | `200` | Vehicles alive at most (the pool size; wagons and trailers ride along) |
+| `innerRadius`, `outerRadius` | `120`, `420` | Spawn ring: nothing appears closer than the inner radius, nothing spawns or stays beyond the outer one once out of view |
+| `spawnRate` | `30` | Spawn attempts per second |
+| `population` | `0.5` | 0 rural … 1 a town: decides which pool a street draws from and where cars park |
+| `parked` | `0.3` | Fraction of residential spawns that are parked |
+| `headway` | `1.6` | Seconds of gap kept behind the vehicle in front |
+| `trains`, `rail` | `0`, `null` | Trains to keep on a closed rail path |
+| `speeds` | `urban .45`, `highway 1`, `rural .55`, `dirtRoad .35` | Cruise speed multiplier per road tier |
 
 ## Fleet options
 

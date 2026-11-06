@@ -750,8 +750,8 @@ export interface VehicleKind {
 
 const size = { type: 'number', default: 1, min: 0.6, max: 1.6, step: 0.01 } as const
 
-/** Every vehicle type with its parameters (all JSON) and generator. */
-export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
+/** The definitions, literal-typed so {@link VehicleParamsOf} can derive each kind's parameter values. */
+const KINDS = {
   car: {
     name: 'Car', domain: 'land', tags: ['car', 'sedan', 'hatchback', 'suv', 'truck', 'pickup', 'van', 'bus', 'compact', 'wagon', 'vintage', 'electric', 'roadster', 'convertible', 'muscle', 'traffic', 'road'],
     params: { style: { type: 'choice', default: 'mixed', options: ['mixed', 'sedan', 'hatchback', 'suv', 'truck', 'van', 'bus', ...LOOKALIKE_STYLES] }, size },
@@ -873,12 +873,34 @@ export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = {
     },
     build: rocket,
   },
-}
+} satisfies Record<VehicleType, VehicleKind>
+
+/** Every vehicle type with its parameters (all JSON) and generator. */
+export const VEHICLE_KINDS: Record<VehicleType, VehicleKind> = KINDS
+
+/** The value type a parameter definition describes (choices and colours are strings). */
+type ParamValue<D> = D extends { type: 'number' } ? number
+  : D extends { type: 'boolean' } ? boolean
+  : D extends { type: 'choice'; options: readonly (infer O)[] } ? O
+  : D extends { type: 'color' } ? string : never
+
+/**
+ * Parameter values of vehicle kind `K`, derived from its definitions in {@link VEHICLE_KINDS}: a key that
+ * kind does not declare and a value of the wrong type are compile errors, and every key is optional
+ * because missing ones resolve to their declared defaults. Choice values are plain strings.
+ *
+ * Loose when the kind is not a single one (`VehicleType`), so code that carries parameters alongside a
+ * runtime type still type-checks.
+ */
+export type VehicleParamsOf<K extends VehicleType = VehicleType> = VehicleType extends K ? VehicleParams : Partial<{
+  [P in keyof (typeof KINDS)[K]['params']]: ParamValue<(typeof KINDS)[K]['params'][P]>
+}>
 
 /** Every vehicle type, in gallery order. */
 export const VEHICLE_TYPES = Object.keys(VEHICLE_KINDS) as VehicleType[]
 
 /** The default parameter values of a type. */
+export function defaultParams<K extends VehicleType>(type: K): VehicleParamsOf<K>
 export function defaultParams(type: VehicleType): VehicleParams {
   return Object.fromEntries(Object.entries(VEHICLE_KINDS[type].params).map(([k, d]) => [k, d.default]))
 }
@@ -892,8 +914,10 @@ export function defaultParams(type: VehicleType): VehicleParams {
  * buildVehicle('car', { style: 'suv' }, 7).size     // [1.95, 1.8, 4.8]-ish metres
  * ```
  */
-export function buildVehicle(type: VehicleType, params: VehicleParams = {}, seed: number | string = 1): VehicleModel {
-  const kind = VEHICLE_KINDS[type]
+export function buildVehicle<K extends VehicleType>(type: K, params: VehicleParamsOf<K> = {}, seed: number | string = 1): VehicleModel {
+  const kind: VehicleKind = VEHICLE_KINDS[type]
   if (!kind) throw new Error(`Unknown vehicle type "${type}"`)
-  return kind.build({ ...defaultParams(type), ...params }, mulberry32(seedOf(seed) ^ 0x5bd1e995))
+  const merged: VehicleParams = {}
+  Object.assign(merged, defaultParams(type), params)
+  return kind.build(merged, mulberry32(seedOf(seed) ^ 0x5bd1e995))
 }

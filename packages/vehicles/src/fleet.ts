@@ -5,7 +5,7 @@ import {
 import { InstanceStates, type MaterialStates, type StateLook } from 'threejs-weathering'
 import { rgb, type MeshData } from './mesh.ts'
 import { createFxMaterial, createVehicleMaterial, createVehicleUniforms, createWakeMaterial, type VehicleUniforms } from './material.ts'
-import type { VehicleParams, VehicleType } from './models.ts'
+import type { VehicleParams, VehicleParamsOf, VehicleType } from './models.ts'
 import type { RoadNetwork } from './paths.ts'
 import { DEFAULT_FLEET, FleetSim, type FleetEnvironment, type FleetInput, type FleetSettings } from './sim.ts'
 
@@ -527,6 +527,9 @@ export interface VehicleSettings {
   /** Wetness, snow, burn, damage and `heat` (on fire). */
   states: MaterialStates & { heat: number }
 }
+
+/** A {@link VehicleSettings} of one known kind: its parameters are typed from that kind's definitions. */
+export type VehicleSettingsOf<K extends VehicleType> = Omit<VehicleSettings, 'type' | 'params'> & { type: K; params: VehicleParamsOf<K> }
 
 /** Default {@link VehicleSettings}. */
 export const DEFAULT_VEHICLE: VehicleSettings = {

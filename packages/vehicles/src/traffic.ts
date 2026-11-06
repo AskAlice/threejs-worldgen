@@ -2,12 +2,12 @@
 // seeded set of vehicles alive on the roads (and rail) around the camera, spawning them out of view and
 // retiring them once they are far away and out of view. Each pool is a weighted list of vehicle types and
 // parameters; `trafficGroups` splits a vehicle count over one into fleet groups.
-import { Frustum, Matrix4, Sphere, Vector3, type Camera, type Group } from 'three/webgpu'
+import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera } from 'three/webgpu'
 import { hash01, hash4, seedOf } from 'threejs-biomes'
 import { Fleet } from './fleet.ts'
-import { Path, type RoadNetwork, type RoadPose } from './paths.ts'
+import { Path, createPathSample, type RoadNetwork, type RoadPose } from './paths.ts'
 import { DEFAULT_SPEEDS, type FleetEnvironment, type FleetGroup, type RouteSpec } from './sim.ts'
-import type { VehicleParams, VehicleType } from './models.ts'
+import type { VehicleParams, VehicleParamsOf, VehicleType } from './models.ts'
 import type { StateLook } from 'threejs-weathering'
 
 /** Kinds of road a pool is for. */
@@ -22,6 +22,9 @@ export interface TrafficEntry {
   /** Relative share. */
   weight: number
 }
+
+/** A {@link TrafficEntry} of one known kind: its parameters are typed from that kind's definitions. */
+export type TrafficEntryOf<K extends VehicleType> = Omit<TrafficEntry, 'type' | 'params'> & { type: K; params: VehicleParamsOf<K> }
 
 /**
  * Weighted traffic by road kind: town streets (mixed cars, buses, a few pickups, box trucks and
@@ -185,6 +188,7 @@ export interface TrafficOptions {
 
 const _m4 = new Matrix4(), _v = new Vector3(), _sphere = new Sphere()
 const tmpPose: RoadPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }
+const tmpTail = createPathSample()
 const VISIBLE = 6 // radius a vehicle counts as visible with, metres
 
 /**
@@ -204,8 +208,8 @@ const VISIBLE = 6 // radius a vehicle counts as visible with, metres
  * ```
  */
 export class Traffic {
-  /** The instanced vehicles (add this to your scene). */
-  readonly object: Group
+  /** The instanced vehicles (add this to your scene; it stays the same object when the pool is rebuilt). */
+  readonly object = new Group()
   /** The fleet behind it: `set` lights, states and exposure here. */
   fleet!: Fleet
   /** Resolved settings. */
@@ -226,6 +230,7 @@ export class Traffic {
   private group = new Int32Array(0)
   private kind = new Uint8Array(0) // 0 = road, 1 = rail
   private half = new Float32Array(0)
+  private rig = new Float32Array(0) // length of a unit's whole rig, metres
   private cruise = new Float32Array(0)
   private parked = new Uint8Array(0)
   private target = new Float32Array(0)
@@ -234,6 +239,7 @@ export class Traffic {
   private edgeOf = new Int32Array(0)
   private live = new Int32Array(0)
   private lists: { key: string; units: number[] }[] = []
+  private pools: Record<string, Int32Array> = {}
   private fill = new Int32Array(0)
   private railUnits: number[] = []
   private railPath: Path | null = null
@@ -245,7 +251,6 @@ export class Traffic {
     this.height = options.height ?? null
     this.look = options.look
     this.build()
-    this.object = this.fleet.object
   }
 
   /** Merges `input` into the settings (a new seed, `max`, `trains` or `rail` rebuilds the pool). */
@@ -326,6 +331,8 @@ export class Traffic {
     }
     const old = this.fleet
     this.fleet = new Fleet({ seed: s.seed, groups }, { roads: this.roads, height: this.height, look: this.look })
+    this.object.clear()
+    this.object.add(this.fleet.object)
     old?.dispose()
     this.railPath = rail ? new Path(rail, true) : null
     const sim = this.fleet.sim, units = sim.unitLeader.length
@@ -335,6 +342,7 @@ export class Traffic {
     this.group = new Int32Array(units)
     this.kind = new Uint8Array(units)
     this.half = new Float32Array(units)
+    this.rig = new Float32Array(units)
     this.cruise = new Float32Array(units)
     this.parked = new Uint8Array(units)
     this.target = new Float32Array(units)
@@ -344,6 +352,9 @@ export class Traffic {
     this.live = new Int32Array(units)
     this.railUnits = []
     this.lists = groups.slice(0, ground).map((g) => ({ key: entryKey(g.type, g.params ?? {}), units: [] as number[] }))
+    const byKey = new Map(this.lists.map((l, i) => [l.key, i]))
+    this.pools = {}
+    for (const [name, list] of Object.entries(TRAFFIC_POOLS)) this.pools[name] = Int32Array.from(list.map((e) => byKey.get(entryKey(e.type, e.params)) ?? -1))
     this.fill = new Int32Array(ground)
     for (let u = 0; u < units; u++) {
       const v = this.lead[u]
@@ -351,9 +362,14 @@ export class Traffic {
       const g = (this.group[u] = sim.group[v])
       this.kind[u] = g < ground ? 0 : 1
       this.half[u] = sim.models[sim.model[v]].size[2] / 2
+      let rig = 0
+      for (let w = v; w < this.end[u]; w++) rig += sim.models[sim.model[w]].size[2]
+      this.rig[u] = rig + 0.8 * (this.end[u] - v - 1)
       if (this.kind[u] === 0) this.lists[g].units.push(u)
       else this.railUnits.push(u)
     }
+    // Nothing is out until the manager spawns it (in the ring, out of view).
+    sim.active.fill(0)
   }
 
   private isActive(u: number): boolean {
@@ -385,9 +401,11 @@ export class Traffic {
     return false
   }
 
-  /** Would a vehicle at this spot be off screen and beyond the ring? */
+  // shortcut: visibility is the frustum only, not occlusion; upgrade if buildings start hiding spawns.
+  /** Would a vehicle at this spot be inside the ring and off screen? */
   private inTheClear(x: number, y: number, z: number, cx: number, cy: number, cz: number): boolean {
-    if (!(Math.hypot(x - cx, y - cy, z - cz) >= this.settings.innerRadius)) return false
+    const d = Math.hypot(x - cx, y - cy, z - cz)
+    if (!(d >= this.settings.innerRadius && d <= this.settings.outerRadius)) return false
     _sphere.center.set(x, y + 1, z)
     _sphere.radius = VISIBLE
     return !this.frustum.intersectsSphere(_sphere)
@@ -410,7 +428,7 @@ export class Traffic {
     const slot = Math.floor(this.clock * 2)
     for (let a = 0; a < attempts; a++) {
       const n = this.spawnCount++
-      if (this.railPath && this.railUnits.some((u) => !this.isActive(u)) && this.activeRail() < s.trains && this.spawnTrain(slot, n, cx, cy, cz)) continue
+      if (this.railPath && this.activeRail() < s.trains && this.spawnTrain(slot, n, cx, cy, cz)) continue
       this.spawnGround(slot, n, cx, cy, cz)
     }
   }
@@ -439,21 +457,26 @@ export class Traffic {
     if (!this.inTheClear(pose.x, pose.y, pose.z, cx, cy, cz)) return false
     const pool = edgePool(ed.width, this.settings.population)
     const list = TRAFFIC_POOLS[pool]
-    const total = list.reduce((sum, entry) => sum + Math.max(0, entry.weight), 0)
-    let w = hash01(this.seed, slot, n, 0x9e37) * total, entry = list[list.length - 1]
-    for (const cand of list) {
-      w -= Math.max(0, cand.weight)
-      if (w <= 0) { entry = cand; break }
+    const total = list.reduce((sum, cand) => sum + Math.max(0, cand.weight), 0)
+    let w = hash01(this.seed, slot, n, 0x9e37) * total, pickAt = list.length - 1
+    for (let k = 0; k < list.length; k++) {
+      w -= Math.max(0, list[k].weight)
+      if (w <= 0) { pickAt = k; break }
     }
-    const g = this.lists.findIndex((l) => l.key === entryKey(entry.type, entry.params))
+    const entry = list[pickAt], g = this.pools[pool][pickAt]
     if (g < 0) return false
     const units = this.lists[g].units
     for (let k = 0; k < units.length; k++) {
       const unit = units[(this.fill[g] + k) % units.length]
       if (this.isActive(unit)) continue
-      const slotIndex = this.fleet.sim.navSlot[this.lead[unit]]
+      const slotIndex = this.fleet.sim.navSlot[unit]
       const nav = this.fleet.sim.navigator(this.group[unit])
       if (!nav || slotIndex < 0) return false
+      // The whole rig has to fit on this edge and be in the clear, not just its tractor.
+      const rear = u - this.rig[unit]
+      if (rear < 2) continue
+      const back = laneAt(roads, e, from, rear, this.fleet.settings.leftHand, this.height, tmpPose)
+      if (!this.inTheClear(back.x, back.y, back.z, cx, cy, cz)) continue
       nav.placeAt(slotIndex, e, from, u)
       this.fill[g] = (this.fill[g] + k + 1) % units.length
       const [lo, hi] = DEFAULT_SPEEDS[entry.type]
@@ -474,6 +497,8 @@ export class Traffic {
     const d = hash01(this.seed, slot, n, 0x7b1) * path.length
     const ps = path.sample(d)
     if (!this.inTheClear(ps.x, ps.y, ps.z, cx, cy, cz)) return false
+    const tail = path.sample(d - this.rig[unit], tmpTail)
+    if (!this.inTheClear(tail.x, tail.y, tail.z, cx, cy, cz)) return false
     this.fleet.sim.unitS[unit] = d
     const [lo, hi] = DEFAULT_SPEEDS.train
     this.cruise[unit] = lo + (hi - lo) * hash01(this.seed, unit, 0, 0x5eed)
@@ -492,9 +517,10 @@ export class Traffic {
       t[u] = this.parked[u] ? 0 : this.cruise[u]
       this.live[live++] = u
       if (this.kind[u] === 1) continue
-      const nav = sim.navigator(this.group[u]), slot = sim.navSlot[this.lead[u]]
+      const nav = sim.navigator(this.group[u]), slot = sim.navSlot[u]
       if (!nav || slot < 0) continue
       const e = nav.edge[slot], from = nav.from[slot]
+      if (e < 0) continue
       const ed = this.roads?.edges[e]
       this.edgeOf[u] = e
       this.nextNode[u] = ed ? (ed.a === from ? ed.b : ed.a) : -1
@@ -511,13 +537,13 @@ export class Traffic {
         const dx = p[bo] - ax, dz = p[bo + 2] - az
         const along = dx * fx + dz * fz
         // Headway: keep a gap to whatever is directly ahead in this lane.
-        if (along > 0 && along < 60 + this.half[this.lead[u]] && Math.abs(dx * fz - dz * fx) < 3) {
+        if (along > 0 && along < 60 + this.half[u] && Math.abs(dx * fz - dz * fx) < 3) {
           const room = along - this.half[u] - this.half[ub] - 3
           const speed = Math.max(0, room) / Math.max(0.5, this.settings.headway)
           if (speed < t[u]) t[u] = speed
         }
         // Junctions: a crossing vehicle in the one ahead of me makes me wait — lowest edge index first.
-        if (node && this.kind[ub] === 0 && this.edgeOf[ub] !== this.edgeOf[u] && this.edgeOf[u] > this.edgeOf[ub]) {
+        if (node && this.edgeOf[ub] >= 0 && this.edgeOf[ub] !== this.edgeOf[u] && this.edgeOf[u] > this.edgeOf[ub]) {
           if (Math.hypot(p[bo] - node.x, p[bo + 2] - node.z) < 12) t[u] = 0
         }
       }

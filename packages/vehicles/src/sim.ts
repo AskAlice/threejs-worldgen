@@ -3,7 +3,7 @@ import { hash01, hash4, seedOf } from 'threejs-biomes'
 import { InstanceStates, type MaterialStates } from 'threejs-weathering'
 import { createWaves, sampleWaves, type Wave, type WaveOptions, type WaveSample } from 'threejs-water'
 import { rgb } from './mesh.ts'
-import { buildVehicle, VEHICLE_KINDS, type VehicleModel, type VehicleParams, type VehicleType } from './models.ts'
+import { buildVehicle, VEHICLE_KINDS, type VehicleModel, type VehicleParams, type VehicleParamsOf, type VehicleType } from './models.ts'
 import { Path, RoadNavigator, circlePoints, createPathSample, type RoadNetwork, type RoadPose } from './paths.ts'
 
 /** Where a group of vehicles goes. Plain JSON. */
@@ -40,6 +40,13 @@ export interface FleetGroup {
   /** Paint every unit this colour (`#rrggbb`) instead of picking from the model's palette. */
   tint?: string
 }
+
+/**
+ * A {@link FleetGroup} of one known kind: its parameters are typed from that kind's definitions, so an
+ * unknown key or a wrong value type is a compile error. `FleetGroup` stays loose when the type is only known
+ * at runtime.
+ */
+export type FleetGroupOf<K extends VehicleType> = Omit<FleetGroup, 'type' | 'params'> & { type: K; params?: VehicleParamsOf<K> }
 
 /** How vehicles weather: rain and snow exposure, drying, snow shed at speed, catching fire. */
 export interface ExposureSettings {

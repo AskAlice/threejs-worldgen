@@ -1,19 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { Frustum, Matrix4, PerspectiveCamera, Sphere } from 'three/webgpu'
 import { World } from 'threejs-biomes'
 import { isPlausible } from '../../worldgen/src/assets.ts'
 import { MeshBuilder, paint, rgb, type MeshData } from '../src/mesh.ts'
-import { buildVehicle, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type VehicleType } from '../src/models.ts'
+import { buildVehicle, defaultParams, VEHICLE_TYPES, VEHICLE_KINDS, type VehicleModel, type VehicleParams, type VehicleParamsOf, type VehicleType } from '../src/models.ts'
 import { CAR_REFERENCES, LOOKALIKE_STYLES, type CarDimensions } from '../src/cars.ts'
 import { FULL_SIZE_DIMENSIONS, pickupReference } from '../src/pickups.ts'
-import { TRAFFIC_POOLS, trafficGroups } from '../src/traffic.ts'
+import { TRAFFIC_POOLS, Traffic, edgePool, laneAt, trafficGroups } from '../src/traffic.ts'
 import { TRAILER_KINDS, TRUCK_LIMITS } from '../src/trucks.ts'
 import { TRACTOR_FAMILIES, TRACTOR_IMPLEMENTS, WheelInteractors, fieldRoute, wheelFootprints } from '../src/tractor.ts'
 import { DEFAULT_EXHAUST, VehicleExhaust, condensation, createExhaustBuffers, createExhaustState, exhaustSources, type ExhaustSettings } from '../src/exhaust.ts'
-import { Fleet } from '../src/fleet.ts'
+import { DEFAULT_VEHICLE, Fleet, type VehicleSettingsOf } from '../src/fleet.ts'
 import { MOTION_STRIDE, SOURCE_STRIDE, spawnRate } from 'threejs-particles'
 import { Path, RoadNavigator, circlePoints, type RoadNetwork } from '../src/paths.ts'
-import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetSettings } from '../src/sim.ts'
+import { DEFAULT_FLEET, FleetSim, groupVehicleCount, rocketAt, type FleetGroup, type FleetGroupOf, type FleetSettings } from '../src/sim.ts'
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from '../src/placement.ts'
 
 const settings = (groups: FleetGroup[], extra: Partial<FleetSettings> = {}): FleetSettings => ({ ...structuredClone(DEFAULT_FLEET), groups, ...extra })
@@ -460,7 +461,7 @@ test('trucks: every cab and trailer within road-legal sizes, rigs couple up, det
     assert.deepEqual(m.parts[0].mesh.position, buildVehicle('truck', params, 9).parts[0].mesh.position)
   }
   // Flatbed loads differ; container trailers carry ISO boxes.
-  const verts = (load: string) => buildVehicle('truck', { piece: 'trailer', trailer: 'flatbed', trailers: 1, load }, 1).parts[0].mesh.position.length
+  const verts = (load: string) => buildVehicle('truck', { piece: 'trailer', trailer: 'flatbed', trailers: 1, load } as VehicleParams, 1).parts[0].mesh.position.length
   assert.ok(verts('lumber') > verts('empty') && verts('pipes') > verts('empty') && verts('machinery') > verts('empty'))
   // A whole rig: one unit of tractor + trailers, within the longest road-train length.
   const g: FleetGroup = { type: 'truck', count: 1, params: { trailers: 3, trailer: 'mixed' }, route: { kind: 'static', position: [0, 0, 0] } }
@@ -717,4 +718,141 @@ test('wheel interactors: follow the wheels without per-frame garbage', () => {
   assert.equal(capped.interactors.length, 0)
   assert.ok(objects.every((o) => o.parent === fleet.object), 'the other set is untouched')
   fleet.dispose()
+})
+
+/** A square grid of roads (rows of nodes `spacing` apart), every edge `width(r, c)` metres wide. */
+function gridRoads(cols: number, spacing: number, width: (r: number, c: number) => number): RoadNetwork {
+  const nodes = Array.from({ length: cols * cols }, (_, i) => ({ x: (i % cols) * spacing, y: 0, z: Math.floor(i / cols) * spacing, edges: [] as number[] }))
+  const edges: { a: number; b: number; width: number }[] = []
+  const link = (a: number, b: number, w: number) => {
+    edges.push({ a, b, width: w })
+    nodes[a].edges.push(edges.length - 1)
+    nodes[b].edges.push(edges.length - 1)
+  }
+  for (let r = 0; r < cols; r++) for (let c = 0; c < cols; c++) {
+    const i = r * cols + c
+    if (c + 1 < cols) link(i, i + 1, width(r, c))
+    if (r + 1 < cols) link(i, i + cols, width(r, c))
+  }
+  return { nodes, edges }
+}
+
+test('ambient traffic: spawns off screen in the ring, retires out of view, never over max', () => {
+  const roads = gridRoads(7, 80, () => 10)
+  const traffic = new Traffic({ seed: 9, max: 12, innerRadius: 100, outerRadius: 260, spawnRate: 40, population: 0.8 }, { roads })
+  const camera = new PerspectiveCamera(60, 16 / 9, 0.1, 1500)
+  const frustum = new Frustum(), m = new Matrix4(), sphere = new Sphere()
+  const view = (f: number) => {
+    const a = f * 0.02
+    camera.position.set(240 + Math.cos(a) * 120, 8, 240 + Math.sin(a) * 120)
+    camera.lookAt(240 + Math.cos(a + 1) * 120, 8, 240 + Math.sin(a + 1) * 120)
+    camera.updateMatrixWorld()
+    frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+  }
+  const sim = traffic.fleet.sim
+  const before = new Uint8Array(sim.count)
+  let spawns = 0, busiest = 0
+  for (let f = 0; f < 180; f++) {
+    view(f)
+    before.set(sim.active)
+    traffic.update(1 / 30, camera)
+    for (let v = 0; v < sim.count; v++) {
+      if (!sim.active[v] || before[v]) continue
+      spawns++
+      const x = sim.pose[v * 8], y = sim.pose[v * 8 + 1], z = sim.pose[v * 8 + 2]
+      const d = Math.hypot(x - camera.position.x, y - camera.position.y, z - camera.position.z)
+      assert.ok(d >= 100 - 1e-6 && d <= 260 + 1e-6, `spawn ${spawns}: ${d.toFixed(1)} m from the camera`)
+      sphere.center.set(x, y + 1, z); sphere.radius = 6
+      assert.ok(!frustum.intersectsSphere(sphere), `spawn ${spawns} landed on screen`)
+    }
+    busiest = Math.max(busiest, traffic.count)
+  }
+  assert.ok(spawns > 5, `only ${spawns} spawns`)
+  assert.ok(busiest <= 12, `${busiest} vehicles alive, max is 12`)
+  assert.ok(traffic.count <= 12, 'the pool never grows past max')
+  // As the camera leaves the network, everything it had out is retired: no traffic where there is no road.
+  camera.position.set(4000, 8, 4000)
+  camera.lookAt(5000, 8, 5000)
+  for (let f = 0; f < 90; f++) traffic.update(1 / 30, camera)
+  assert.equal(traffic.count, 0, 'traffic follows the roads, and none are near this camera')
+  traffic.dispose()
+})
+
+test('ambient traffic: the same seed and camera path give the same traffic, another seed differs', () => {
+  const run = (seed: number) => {
+    const traffic = new Traffic({ seed, max: 10, innerRadius: 90, outerRadius: 300, spawnRate: 50, population: 0.5 }, { roads: gridRoads(6, 80, () => 9) })
+    const camera = new PerspectiveCamera(60, 16 / 9, 0.1, 1200)
+    for (let f = 0; f < 90; f++) {
+      const a = f * 0.03
+      camera.position.set(200 + Math.cos(a) * 60, 6, 200 + Math.sin(a) * 60)
+      camera.lookAt(200 + Math.cos(a + 1.5) * 60, 6, 200 + Math.sin(a + 1.5) * 60)
+      traffic.update(1 / 30, camera)
+    }
+    const out = { active: [...traffic.fleet.sim.active], pose: [...traffic.fleet.sim.pose] }
+    traffic.dispose()
+    return out
+  }
+  const a = run(3), b = run(3), c = run(4)
+  assert.deepEqual(a.active, b.active)
+  assert.deepEqual(a.pose, b.pose)
+  assert.ok(a.active.filter(Boolean).length > 0, 'it spawned something')
+  assert.notDeepEqual(a.pose, c.pose)
+})
+
+test('ambient traffic: roads choose their pool by width and population; spawn poses are the lane pose', () => {
+  assert.equal(edgePool(14, 0), 'highway')
+  assert.equal(edgePool(9, 0), 'urban')
+  assert.equal(edgePool(7, 0.9), 'urban', 'a narrow street in a town is residential')
+  assert.equal(edgePool(7, 0), 'rural')
+  assert.equal(edgePool(5, 0), 'dirtRoad')
+  // The pose a spawn is checked at is exactly where the navigator then puts it (straight part of the edge).
+  const roads = gridRoads(3, 90, () => 10)
+  const nav = new RoadNavigator(roads, 1, 5)
+  const e = 0, from = roads.edges[e].a, u = Math.min(12, nav.length(e) / 2)
+  assert.ok(nav.placeAt(0, e, from, u) === undefined)
+  const pose = nav.pose(0)
+  const lane = laneAt(roads, e, from, u, false)
+  for (const k of ['x', 'y', 'z', 'yaw', 'pitch'] as const) assert.ok(Math.abs(pose[k] - lane[k]) < 1e-9, `${k}: ${pose[k]} vs ${lane[k]}`)
+  // A rebuild (a new pool size) swaps the vehicles but not the object you added to the scene.
+  const traffic = new Traffic({ max: 4 }, { roads })
+  const object = traffic.object
+  traffic.set({ max: 6 })
+  assert.equal(traffic.object, object)
+  assert.equal(object.children.length, 1)
+  assert.equal(object.children[0], traffic.fleet.object)
+  traffic.dispose()
+})
+
+// The negative cases below are compile-time: `tsc` fails if `@ts-expect-error` lands on a line that is accepted.
+test('parameters are typed per kind: unknown keys and wrong value types are compile errors', () => {
+  assert.equal(buildVehicle('truck', { axles: 3, trailer: 'flatbed', sleeper: false }).type, 'truck')
+  // @ts-expect-error a string where the definition declares a number
+  buildVehicle('truck', { axles: 'three' })
+  // @ts-expect-error a key the truck kind does not declare
+  buildVehicle('truck', { ladders: 2 })
+  // @ts-expect-error a number where the definition declares a boolean
+  buildVehicle('pickup', { hitch: 1 })
+  const train: VehicleParamsOf<'train'> = { wagons: 4, cargo: 'mixed' }
+  assert.equal(buildVehicle('train', train).type, 'train')
+  const group: FleetGroupOf<'pickup'> = { type: 'pickup', count: 1, params: { lift: 0.1 }, route: { kind: 'static', position: [0, 0, 0] } }
+  // @ts-expect-error a key the pickup kind does not declare
+  const rejectedGroup: FleetGroupOf<'pickup'> = { type: 'pickup', count: 1, params: { decks: 4 }, route: { kind: 'static', position: [0, 0, 0] } }
+  const settings: VehicleSettingsOf<'car'> = { ...DEFAULT_VEHICLE, type: 'car', params: { style: 'suv' } }
+  // @ts-expect-error a boolean where the definition declares a number
+  const rejectedSettings: VehicleSettingsOf<'car'> = { ...DEFAULT_VEHICLE, type: 'car', params: { size: true } }
+  assert.equal(groupVehicleCount(group), 1)
+  assert.equal(group.params?.lift, 0.1)
+  assert.equal(settings.params.style, 'suv')
+  assert.ok(rejectedGroup && rejectedSettings)
+})
+
+test('every kind resolves missing parameters to its declared defaults', () => {
+  for (const type of VEHICLE_TYPES) {
+    const declared = Object.fromEntries(Object.entries(VEHICLE_KINDS[type].params).map(([k, d]) => [k, d.default]))
+    assert.deepEqual(Object.keys(defaultParams(type)).sort(), Object.keys(declared).sort(), `${type}: every defined parameter has a default`)
+    // No parameters and every declared default spelled out build the same model.
+    const missing = JSON.stringify(buildVehicle(type, {}))
+    assert.equal(missing, JSON.stringify(buildVehicle(type, declared)), `${type}: missing parameters resolve to their defaults`)
+    assert.equal(missing, JSON.stringify(buildVehicle(type, defaultParams(type))), `${type}: defaultParams matches`)
+  }
 })

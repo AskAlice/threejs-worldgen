@@ -166,7 +166,7 @@ export function exhaustSources(sim: FleetSim, eye: { x: number; y: number; z: nu
   const { pick, dist } = state
   let candidates = 0
   for (let v = 0; v < n; v++) {
-    if (!sim.models[sim.model[v]].vents.length) continue
+    if (!sim.active[v] || !sim.models[sim.model[v]].vents.length) continue
     const d = Math.hypot(p[v * 8] - eye.x, p[v * 8 + 1] - eye.y, p[v * 8 + 2] - eye.z)
     if (d >= reach) continue
     dist[v] = d
