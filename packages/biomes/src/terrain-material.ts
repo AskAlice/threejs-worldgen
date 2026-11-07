@@ -23,6 +23,7 @@ import {
   vec3,
   vec4
 } from 'three/tsl'
+import { SEA_BANDS } from './seabed.ts'
 
 /** How the terrain is coloured. */
 export type TerrainDebug = 'none' | 'biomes' | 'lod' | 'splat'
@@ -90,7 +91,13 @@ export function createTerrainUniforms(o: TerrainMaterialOptions = DEFAULT_TERRAI
     /** Sand colour (linear). */
     sandColor: uniform(new Color('#d8c393')),
     /** Mud colour (linear). */
-    mudColor: uniform(new Color('#3f3a2c'))
+    mudColor: uniform(new Color('#3f3a2c')),
+    /** Turquoise of shallow shelves below the waterline (linear). */
+    shelfColor: uniform(new Color('#2f9e93')),
+    /** Blue-green of the mid depths (linear). */
+    slopeColor: uniform(new Color('#1a6b74')),
+    /** Dark blue of the deep ocean (linear). */
+    abyssColor: uniform(new Color('#0b3247'))
   }
 }
 
@@ -208,6 +215,18 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   ground = mix(ground, u.sandColor, sand)
   ground = mix(ground, u.rockColor, rock)
   ground = mix(ground, u.snowColor, snow)
+  // Below the waterline the ground reads turquoise → blue-green → dark with depth. `aboveSea` is the
+  // built-in height relative to the sea level (chunks rebuild with it), and the patch noise jitters the
+  // depth so the shore and the band edges are not hard rings. Mirrors `seabedWeights`.
+  const depth = aboveSea.negate().add(patches.mul(u.sandBand))
+  const submerge = smoothstep(0, 1.5, depth)
+  const shelf = smoothstep(0, SEA_BANDS.shelf, depth)
+  const abyss = smoothstep(SEA_BANDS.slope, SEA_BANDS.abyss, depth)
+  const wShallow = submerge.mul(shelf.oneMinus())
+  const wSlope = submerge.mul(shelf).mul(abyss.oneMinus())
+  const wDeep = submerge.mul(shelf).mul(abyss)
+  const seabed = u.shelfColor.mul(wShallow).add(u.slopeColor.mul(wSlope)).add(u.abyssColor.mul(wDeep))
+  ground = ground.mul(submerge.oneMinus()).add(seabed)
   const variation = float(1).add(patches.mul(0.22)).add(grain.mul(rock).mul(0.18)).add(ripple.mul(sand).mul(0.08))
   let color = ground.mul(mix(float(1), variation, fade))
   color = color.mul(mid.mul(midFade).mul(0.22).add(1))
