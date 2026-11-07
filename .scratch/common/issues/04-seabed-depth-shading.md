@@ -19,4 +19,6 @@
 
 **2026-11-07** — Browser check at 2.54 km: shallow/mid/deep colours read correctly, but the band edges ran as **stepped dashed contours along triangle chords**. Cause: depth was `-climate.x` (a per-vertex attribute) plus patch noise, and the patch noise is exactly zero beyond the 220 m detail fade, so at aerial range the bands were pure iso-height curves of the interpolated attribute.
 
-`9961d72`: depth and the sand edge also take the world-anchored far-detail jitter (per fragment, band-limited, its opacity the complement of the near patch layer), so edges wander with the terrain at every range. `seabedWeightsAtHeight` documents the fragment-height contract. Biomes 31 tests pass. Remote recheck pending.
+`9961d72`: depth and the sand edge also take the world-anchored far-detail jitter (per fragment, band-limited, its opacity the complement of the near patch layer), so edges wander with the terrain at every range. `seabedWeightsAtHeight` documents the fragment-height contract. Biomes 31 tests pass.
+
+**Second browser check still FAILS**, but the aerial image changes the diagnosis: the waterline still has a hard pale ring, and over the open sea there is a regular diagonal lattice of white dashes. A lattice that is periodic in screen space is not a terrain attribute or a band edge; it is a periodic shader stage (whitecaps, ripples or the reflection prepass). A controlled toggle experiment is naming it. The seabed jitter may still be right for its own bands, but it is not what these images show.
