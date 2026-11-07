@@ -1,19 +1,12 @@
 import type { Object3D } from 'three/webgpu'
+import type { AssetDef, AssetParam, PlacementRule } from 'threejs-biomes'
 import { PROP_KIND_IDS, PROP_KINDS, type PropKind, type PropPlacement } from './catalog.ts'
 import { FARM_BIOMES, FENCE_STYLES, WELL_BIOMES, type FenceStyle } from './placement.ts'
 import { Props } from './props.ts'
 import { ROAD_SURFACE_KINDS, RoadPath, type RoadSurfaceKind } from './roads.ts'
 
-// These mirror threejs-worldgen's `AssetParam`, `PlacementRule` and `AssetDef` structurally (worldgen
-// depends on this package, so importing them would be circular). `PropAssetDef` is assignable to
-// `AssetDef`; worldgen's `isPlausible` checks the base rule and ignores `context`.
-
-/** One editable parameter of an asset (as threejs-worldgen's `AssetParam`). */
-export type PropAssetParam =
-  | { type: 'number'; default: number; min: number; max: number; step?: number }
-  | { type: 'boolean'; default: boolean }
-  | { type: 'choice'; default: string; options: string[] }
-  | { type: 'color'; default: string }
+/** One editable parameter of an asset (threejs-biomes' `AssetParam`). */
+export type PropAssetParam = AssetParam
 
 /** What a prop stands next to. Decorators (`decorateRoads`) honour it; generic spawners may ignore it. */
 export type PropContext =
@@ -25,33 +18,15 @@ export type PropContext =
   | 'settlement-link'
   | 'road'
 
-/** threejs-worldgen's `PlacementRule` plus the man-made context a prop needs. */
-export interface PropPlacementRule {
-  /** What it stands on. */ surface: 'ground' | 'water' | 'underwater' | 'air' | 'shore'
-  /** Biome ids it belongs to (empty = any). */ biomes?: string[]
-  /** Minimum share of the matching biomes at the spot. */ minBiomeWeight?: number
-  /** Ground slope range (rise/run). */ slope?: [min: number, max: number]
-  /** Height above sea level range, metres. */ height?: [min: number, max: number]
-  /** Water depth range, metres. */ depth?: [min: number, max: number]
-  /** Temperature range, °C. */ temperature?: [min: number, max: number]
-  /** Within this many metres of water. */ nearWater?: number
+/** threejs-biomes' `PlacementRule` plus the man-made context a prop needs. */
+export interface PropPlacementRule extends PlacementRule {
   /** Must be within `maxDistance` metres of this (roads, lots, junctions, fields, settlement links). */
   context?: { near: PropContext; maxDistance: number }
 }
 
-/** An asset definition, assignable to threejs-worldgen's `AssetDef`. */
-export interface PropAssetDef {
-  /** `props/<name>`. */ id: string
-  /** Display name. */ name: string
-  /** `threejs-props`. */ package: string
-  /** `prop` or `road`. */ category: string
-  /** Search tags. */ tags: string[]
-  /** Editable parameters. */ params: Record<string, PropAssetParam>
+/** An asset definition, assignable to threejs-biomes' `AssetDef`. */
+export interface PropAssetDef extends AssetDef {
   /** Where it plausibly goes. */ placement: PropPlacementRule
-  /** Builds one instance at the origin. */ create: (
-    params: Record<string, unknown>,
-    seed: number
-  ) => Object3D | Promise<Object3D>
 }
 
 const SETTLED = [

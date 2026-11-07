@@ -68,7 +68,8 @@ Plausible placement, and registering every vehicle in the threejs-worldgen asset
 
 ```ts
 import { planRoute, vehicleAssets, VEHICLE_PLACEMENT } from 'threejs-vehicles'
-import { AssetRegistry, isPlausible } from 'threejs-worldgen'
+import { isPlausible } from 'threejs-biomes'
+import { AssetRegistry } from 'threejs-worldgen'
 
 const plausible = (x, z, rule) => isPlausible(world, frame, x, z, rule)
 const harbour = planRoute('fishing-boat', world, frame, { center: [x, z], radius: 300, plausible }) // a loop on water ≥ 3 m deep
@@ -99,7 +100,7 @@ import { Fleet, Traffic, Vehicle } from 'threejs-vehicles/react'
 | `Path`, `catmullRom`, `circlePoints` | Arc-length spline paths: closed loops, and open ones driven back and forth |
 | `RoadNavigator`, `RoadNetwork` | Lane-keeping random walk over a road graph, seeded junction choices and rounded corners. `RoadGraph` from threejs-city fits as it is |
 | `rocketAt` | Analytic gravity-turn ascent (scrubbable) |
-| `planRoute`, `fitsRule`, `VEHICLE_PLACEMENT` | Plausible routes per type (water depth, ground slope, air clearance, flat pads near water). Rules match threejs-worldgen's `PlacementRule` |
+| `planRoute`, `VEHICLE_PLACEMENT` | Plausible routes per type (water depth, ground slope, air clearance, flat pads near water). Rules are threejs-biomes' `PlacementRule`; the check is its `isPlausible` |
 | `Traffic`, `edgePool`, `laneAt` | Ambient traffic around the camera: a bounded pool spawned out of view on nearby roads, retired far behind, with car-following and junction stops |
 | `vehicleAssets` | Every type as an `AssetDef` for threejs-worldgen's `AssetRegistry` |
 | `MeshBuilder` | The typed-array builder behind the models: flat-shaded primitives (box, cylinder, tube, ellipsoid, loft, fin, beam) and smooth-shaded surfaces, lathes and rounded boxes for bodywork |

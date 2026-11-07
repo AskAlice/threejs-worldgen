@@ -8,6 +8,7 @@
 export * from './noise.ts'
 export * from './biomes.ts'
 export * from './world.ts'
+export * from './assets.ts'
 export * from './chunk.ts'
 export * from './lod.ts'
 export * from './terrain-material.ts'

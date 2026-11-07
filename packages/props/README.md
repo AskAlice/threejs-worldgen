@@ -110,7 +110,7 @@ Props never stand in water, on the carriageway or on top of each other. Everythi
 roads and the world (no `Math.random`).
 
 `propAssets()` gives every prop a `PlacementRule` (`surface`, `biomes`, `slope`, `temperature`) plus a `context`
-(`urban-sidewalk`, `rural-road`, `rural-lot`, `junction`, `field`, `settlement-link`). threejs-worldgen's
+(`urban-sidewalk`, `rural-road`, `rural-lot`, `junction`, `field`, `settlement-link`). threejs-biomes'
 `isPlausible` checks the rule; decorators honour the context.
 
 ## Weathering

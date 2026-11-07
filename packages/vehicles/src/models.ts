@@ -1,4 +1,4 @@
-import { mulberry32, seedOf } from 'threejs-biomes'
+import { mulberry32, seedOf, type AssetParam } from 'threejs-biomes'
 import { MeshBuilder, paint, type MeshData, type Paint, type Vec3 } from './mesh.ts'
 import { LOOKALIKE_STYLES, lookalikeCar, type LookalikeStyle } from './cars.ts'
 import { PICKUP_STYLES, pickup } from './pickups.ts'
@@ -48,11 +48,7 @@ export type VehicleType =
 export type VehicleDomain = 'land' | 'rail' | 'sea' | 'air' | 'space'
 
 /** One editable parameter of a vehicle, as JSON (same shape as `AssetParam` in threejs-worldgen). */
-export type ParamDef =
-  | { type: 'number'; default: number; min: number; max: number; step?: number }
-  | { type: 'boolean'; default: boolean }
-  | { type: 'choice'; default: string; options: string[] }
-  | { type: 'color'; default: string }
+export type ParamDef = AssetParam
 
 /** Parameter values of one vehicle (missing ones use the defaults in {@link VEHICLE_KINDS}). */
 export type VehicleParams = Record<string, number | string | boolean>

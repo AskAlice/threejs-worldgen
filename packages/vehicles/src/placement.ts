@@ -1,31 +1,20 @@
 import type { Object3D } from 'three/webgpu'
-import { createSample, mulberry32, seedOf, type LocalFrame, type World, type WorldSample } from 'threejs-biomes'
+import {
+  createSample,
+  isPlausible,
+  mulberry32,
+  seedOf,
+  type AssetDef,
+  type LocalFrame,
+  type PlacementRule,
+  type World
+} from 'threejs-biomes'
 import { Vehicle } from './fleet.ts'
-import { VEHICLE_KINDS, VEHICLE_TYPES, type ParamDef, type VehicleType } from './models.ts'
+import { VEHICLE_KINDS, VEHICLE_TYPES, type VehicleType } from './models.ts'
 import type { RouteSpec } from './sim.ts'
 
-/**
- * Where an asset can plausibly go — the same shape as `PlacementRule` in threejs-worldgen, so these
- * rules work with its `isPlausible` and `planSpawns` as they are.
- */
-export interface PlacementRule {
-  /** What it stands on or in. */
-  surface: 'ground' | 'water' | 'underwater' | 'air' | 'shore'
-  /** Biome ids it belongs to (empty = any). */
-  biomes?: string[]
-  /** Minimum share of the matching biomes (0…1). */
-  minBiomeWeight?: number
-  /** Ground slope range (rise/run). */
-  slope?: [min: number, max: number]
-  /** Height above sea level (ground/shore) or flight height above ground (air), metres. */
-  height?: [min: number, max: number]
-  /** Water depth range, metres. */
-  depth?: [min: number, max: number]
-  /** Temperature range, °C. */
-  temperature?: [min: number, max: number]
-  /** Must be within this many metres of water. */
-  nearWater?: number
-}
+/** Where an asset can plausibly go; threejs-biomes' `PlacementRule`, re-exported. */
+export type { PlacementRule } from 'threejs-biomes'
 
 /** A vehicle's placement rule plus the network it moves on. */
 export interface VehiclePlacementRule extends PlacementRule {
@@ -51,47 +40,10 @@ export const VEHICLE_PLACEMENT: Record<VehicleType, VehiclePlacementRule> = {
   rocket: { network: 'pad', surface: 'ground', slope: [0, 0.05], height: [1, 400], nearWater: 1500 }
 }
 
-/** `(x, z, rule) => fits`: pass threejs-worldgen's `isPlausible` bound to a world and frame to use it. */
+/** `(x, z, rule) => fits`: pass threejs-biomes' `isPlausible` bound to a world and frame to use it. */
 export type Plausible = (x: number, z: number, rule: PlacementRule) => boolean
 
-const scratch: WorldSample = createSample()
-
-/**
- * A light check of `rule` at (x, z): surface, depth, height above sea level and slope (biome,
- * temperature and near-water checks need threejs-worldgen's `isPlausible`; pass it as `plausible` to the
- * planners for the full rule).
- */
-export function fitsRule(
-  world: World,
-  frame: LocalFrame,
-  x: number,
-  z: number,
-  rule: PlacementRule,
-  step = 2
-): boolean {
-  const s = frame.sample(x, z, scratch)
-  const wet = s.waterLevel === s.waterLevel && s.waterLevel > s.elevation
-  const depth = wet ? s.waterLevel - s.elevation : 0
-  const sea = world.options.seaLevel
-  if ((rule.surface === 'ground' && wet) || ((rule.surface === 'water' || rule.surface === 'underwater') && !wet))
-    return false
-  if (rule.surface === 'shore' && (wet || s.elevation - sea > 3)) return false
-  if (rule.depth && (depth < rule.depth[0] || depth > rule.depth[1])) return false
-  if (
-    rule.height &&
-    rule.surface !== 'air' &&
-    (s.elevation - sea < rule.height[0] || s.elevation - sea > rule.height[1])
-  )
-    return false
-  if (rule.temperature && (s.temperature < rule.temperature[0] || s.temperature > rule.temperature[1])) return false
-  if (rule.slope) {
-    const hx = frame.height(x + step, z) - frame.height(x - step, z),
-      hz = frame.height(x, z + step) - frame.height(x, z - step)
-    const slope = Math.hypot(hx, hz) / (2 * step)
-    if (slope < rule.slope[0] || slope > rule.slope[1]) return false
-  }
-  return true
-}
+const scratch = createSample()
 
 /** Options of {@link planRoute}. */
 export interface PlanRouteOptions {
@@ -105,7 +57,7 @@ export interface PlanRouteOptions {
   points?: number
   /** Candidate loops tried before giving up. Default 24. */
   attempts?: number
-  /** Placement check (default {@link fitsRule}). */
+  /** Placement check (default threejs-biomes' `isPlausible`). */
   plausible?: Plausible
 }
 
@@ -123,7 +75,7 @@ export function planRoute(
 ): RouteSpec | null {
   const rule = VEHICLE_PLACEMENT[type]
   const { center, radius, points = 10, attempts = 24 } = options
-  const ok = options.plausible ?? ((x: number, z: number, r: PlacementRule) => fitsRule(world, frame, x, z, r))
+  const ok = options.plausible ?? ((x: number, z: number, r: PlacementRule) => isPlausible(world, frame, x, z, r, 2))
   const rand = mulberry32(seedOf(options.seed ?? 1) ^ seedOf(type))
   const sea = world.options.seaLevel
   if (rule.network === 'pad') {
@@ -188,23 +140,11 @@ export function planRoute(
   return null
 }
 
-/** One editable parameter, as JSON (threejs-worldgen's `AssetParam`). */
-export type AssetParam = ParamDef
+/** One editable parameter, as JSON; threejs-biomes' `AssetParam`, re-exported. */
+export type { AssetParam } from 'threejs-biomes'
 
-/** A registered asset (threejs-worldgen's `AssetDef`, which these match structurally). */
-export interface VehicleAssetDef {
-  /** `vehicles/<type>`. */
-  id: string
-  /** Display name. */
-  name: string
-  /** `threejs-vehicles`. */
-  package: string
-  /** `vehicle`. */
-  category: string
-  /** Search tags. */
-  tags: string[]
-  /** Parameters with defaults. */
-  params: Record<string, AssetParam>
+/** A registered asset: an `AssetDef` with a vehicle's placement rule. */
+export interface VehicleAssetDef extends AssetDef {
   /** Where it plausibly goes. */
   placement: VehiclePlacementRule
   /** Builds one animated instance (it updates itself while rendered). */
