@@ -1,6 +1,6 @@
 {
   "name": "threejs-grass",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Infinite, terrain-aware WebGPU grass for three.js and react-three-fiber",
   "type": "module",
   "license": "Apache-2.0",
