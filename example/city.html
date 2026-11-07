@@ -7,10 +7,12 @@
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #9cc4e4; font: 12px/1.4 ui-monospace, monospace; }
       #hud { position: fixed; left: 12px; top: 12px; z-index: 10; color: #fff; background: #0009; padding: 8px 10px; border-radius: 6px; white-space: pre; }
+      #map { position: fixed; left: 12px; bottom: 12px; z-index: 10; width: 256px; height: 256px; border: 1px solid #fff4; background: #123; image-rendering: pixelated; }
     </style>
   </head>
   <body>
     <div id="hud">generating…</div>
+    <canvas id="map" width="256" height="256"></canvas>
     <script type="module" src="./city.ts"></script>
   </body>
 </html>

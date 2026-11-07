@@ -3,8 +3,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { World } from 'threejs-biomes'
 import { City, mergeOptions, SETTLEMENT_SIZES, type CityInput } from 'threejs-city'
 import { Props } from 'threejs-props'
-import { classOf, createPanel, specOptions } from './panel'
-import { demoSites, panels, siteInput } from './city.panel'
+import { classOf, createPanel, specOptions, type PanelClass } from './panel'
+import {
+  DEFAULT_PLANNER_MAP,
+  drawPlannerMap,
+  demoSites,
+  panels,
+  PLANNER_MODES,
+  plannerPopulation,
+  siteInput,
+  type PlannerMapOptions
+} from './city.panel'
 import { worldGround } from './world-ground'
 
 // threejs-city demo: a settlement placed by the settlement planner (generatePopulation, then planCities) on a
@@ -40,7 +49,22 @@ scene.add(sun, sun.target, sky)
 
 const world = new World({ seed: 11 })
 const best = demoSites(world)
+const planner = plannerPopulation(world)
 let site = best('town')
+
+// The settlement planner's hex map, in the page: same world, same population that picked `site` (marked on it).
+const mapCanvas = document.getElementById('map') as HTMLCanvasElement
+const mapOptions: PlannerMapOptions = { ...DEFAULT_PLANNER_MAP }
+const mapPanel: PanelClass = {
+  name: 'Map',
+  target: mapOptions,
+  ranges: { hexResolution: [-1, 10, 1] },
+  choices: { mode: PLANNER_MODES },
+  onChange: () => drawMap()
+}
+function drawMap() {
+  drawPlannerMap(mapCanvas, world, planner, mapOptions, [site.x, site.z])
+}
 
 // Terrain: a grid around the city, coloured by the world's ground mix; water from waterLevel.
 const terrainMaterial = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.95 })
@@ -80,6 +104,7 @@ async function place() {
   camera.position.set(site.x + r * 0.9, y + r * 0.7, site.z + r * 1.1)
   sun.position.set(site.x + 1500, y + 2500, site.z + 800)
   sun.target.position.set(site.x, y, site.z)
+  drawMap()
   Object.assign(globalThis, { city, camera, controls, world }) // for poking at it from the console
 }
 await place()
@@ -127,7 +152,7 @@ const cityInput = {
   }
 }
 const cityClass = classOf('City', cityInput, city.options, specOptions(panels['threejs-city'].City))
-const gui = createPanel([{ name: 'threejs-city', classes: [cityClass] }], { title: 'threejs-city' })
+const gui = createPanel([{ name: 'threejs-city', classes: [cityClass, mapPanel] }], { title: 'threejs-city' })
 // Sets an option through its panel control, so keys update the panel and the shared URL too.
 function setOption(path: string[], value: unknown) {
   const parent = path.slice(0, -1).reduce((o, k) => o[k], cityClass.target)

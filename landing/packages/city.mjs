@@ -18,9 +18,7 @@ export default {
   thumbAlt: 'Downtown towers rising from a street grid of houses beside a river',
   demos: [
     { label: 'three.js demo', href: 'city.html' },
-    { label: 'React Three Fiber demo', href: 'city-r3f.html' },
-    { label: 'Settlement planner demo', href: 'population.html' },
-    { label: 'Settlement planner R3F demo', href: 'population-r3f.html' }
+    { label: 'React Three Fiber demo', href: 'city-r3f.html' }
   ],
   stats: [
     ['~3,600', 'buildings in a 1.5 km city'],
@@ -153,7 +151,7 @@ function Town({ night, rain }) {
       label: 'Settlement planner',
       heading: 'Where people <em>live.</em>',
       intro:
-        "A population model on H3's hexagonal grid, read from the world: habitability, settlements, density, land use and networks, all from a seed, as plain data plus a <code>PopulationOverlay</code> hex map. Everything below except the last row is live in the settlement planner demos.",
+        "A population model on H3's hexagonal grid, read from the world: habitability, settlements, density, land use and networks, all from a seed, as plain data plus a <code>PopulationOverlay</code> hex map. Everything below except the last row is live in the city demo, on its map.",
       rows: [
         {
           title: 'Habitability from the world',

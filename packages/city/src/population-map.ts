@@ -135,6 +135,22 @@ export function renderPopulationMap(
   return out
 }
 
+/**
+ * Composites {@link renderPopulationMap}'s overlay over a world map of the same area, in place: a 2D minimap shows
+ * the planner's hexes on the terrain. Pure.
+ */
+export function compositePopulationMap(
+  base: Uint8ClampedArray<ArrayBuffer>,
+  top: Uint8ClampedArray<ArrayBuffer>,
+  alpha = 0.75
+): Uint8ClampedArray<ArrayBuffer> {
+  for (let i = 0; i < base.length; i += 4) {
+    const a = top[i + 3] ? alpha : 0
+    for (let k = 0; k < 3; k++) base[i + k] = base[i + k] * (1 - a) + top[i + k] * a
+  }
+  return base
+}
+
 /** Colour (0…1 sRGB) of a cell in a view mode. */
 export function cellColor(
   cell: Pick<AggregateCell, 'density' | 'light' | 'habitability' | 'landUse'>,

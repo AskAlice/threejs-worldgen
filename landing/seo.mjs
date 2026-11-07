@@ -72,8 +72,8 @@ export const DEMOS = {
   ],
   'population.html': [
     'city',
-    'threejs-city settlement planner demo · Population density on an H3 hex grid',
-    'Live sandbox for the settlement planner of threejs-city: population density, land use, settlement hierarchy and road networks on a hexagonal H3 grid over procedural terrain.'
+    'threejs-city · settlement planner (now part of the city demo)',
+    'The settlement planner moved into the threejs-city city demo, which shows its H3 population map beside the city. This page redirects there.'
   ],
   'props.html': [
     'props',
@@ -182,8 +182,8 @@ export const DEMOS = {
   ],
   'population-r3f.html': [
     'city',
-    'threejs-city settlement planner in React Three Fiber · H3 population maps',
-    'usePopulation and the <PopulationOverlay> hex map of the threejs-city settlement planner in React Three Fiber: density, land use and night lights, with every option live.'
+    'threejs-city · settlement planner R3F (now part of the city demo)',
+    'The settlement planner moved into the threejs-city React Three Fiber city demo, which shows its H3 population map beside the city. This page redirects there.'
   ],
   'fauna-r3f.html': [
     'fauna',

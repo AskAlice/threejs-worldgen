@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal, useFrame } from '@react-three/fiber'
+import { useControls } from 'leva'
 import { World } from 'threejs-biomes'
 import {
   City,
@@ -10,7 +11,16 @@ import {
   type SettlementSize
 } from 'threejs-city/react'
 import { Props } from 'threejs-props/react'
-import { demoSites, panels, siteInput } from './city.panel'
+import {
+  DEFAULT_PLANNER_MAP,
+  demoSites,
+  drawPlannerMap,
+  panels,
+  PLANNER_MODES,
+  plannerPopulation,
+  siteInput,
+  type PlannerMapOptions
+} from './city.panel'
 import { changed } from './leva-options'
 import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 
@@ -21,6 +31,7 @@ import { Daylight, Ground, View, mount, useHud, useSpec } from './r3f-shared'
 // and every control is a <City> prop: looks and weather update instantly, layout changes regenerate in place.
 const world = new World({ seed: 11 })
 const best = demoSites(world)
+const population = plannerPopulation(world)
 
 /** A farm's hay bales and pasture fences, in the city's frame-local group (its tractor spot waits for threejs-vehicles). */
 function FarmProps({ city }: { city: CityImpl }) {
@@ -34,6 +45,22 @@ function Scene() {
   // Only the edited controls: the rest stays unset, so each size class's own road and district rules apply (as in city.ts).
   const options = changed(useSpec('City', panels['threejs-city'].City), DEFAULT_CITY) as CityInput
   const site = useMemo(() => best((options.size ?? DEFAULT_CITY.size) as SettlementSize), [options.size])
+  // The settlement planner's hex map (bottom-left): same world, same population that picked `site` (marked on it).
+  const map = useControls('Map', {
+    visible: { value: DEFAULT_PLANNER_MAP.visible },
+    mode: { value: DEFAULT_PLANNER_MAP.mode, options: PLANNER_MODES },
+    hexResolution: { value: DEFAULT_PLANNER_MAP.hexResolution, min: -1, max: 10, step: 1 },
+    settlements: { value: DEFAULT_PLANNER_MAP.settlements },
+    networks: { value: DEFAULT_PLANNER_MAP.networks }
+  })
+  useEffect(() => {
+    const canvas = document.getElementById('map') as HTMLCanvasElement | null
+    if (canvas)
+      drawPlannerMap(canvas, world, population, { ...map, mode: map.mode as PlannerMapOptions['mode'] }, [
+        site.x,
+        site.z
+      ])
+  }, [map.visible, map.mode, map.hexResolution, map.settlements, map.networks, site])
   const [impl, setImpl] = useState<CityImpl | null>(null)
   useEffect(() => void Object.assign(window, { city: impl, world }), [impl]) // for the console
   const r = site.radius
