@@ -140,25 +140,25 @@ export function createWaterUniforms() {
     /** `absorption`, per-channel 1/m (R, G, B). */
     absorption: uniform(new Vector3(...DEFAULT_APPEARANCE.absorption)),
     /** `scatterColor`. */
-    scatterColor: uniform(new Color()),
+    scatterColor: uniform(new Color(DEFAULT_APPEARANCE.scatterColor)),
     /** `refraction`. */
-    refraction: uniform(0),
+    refraction: uniform(DEFAULT_APPEARANCE.refraction),
     /** `roughness`. */
-    roughness: uniform(0.05),
+    roughness: uniform(DEFAULT_APPEARANCE.roughness),
     /** `reflectivity` (F0). */
-    reflectivity: uniform(0.02),
+    reflectivity: uniform(DEFAULT_APPEARANCE.reflectivity),
     /** `skyColor`. */
-    skyColor: uniform(new Color()),
+    skyColor: uniform(new Color(DEFAULT_APPEARANCE.skyColor)),
     /** `horizonColor`. */
-    horizonColor: uniform(new Color()),
+    horizonColor: uniform(new Color(DEFAULT_APPEARANCE.horizonColor)),
     /** `environmentIntensity`. */
     environmentIntensity: uniform(1),
     /** `specular`. */
     specular: uniform(1),
     /** `foamColor`. */
-    foamColor: uniform(new Color()),
+    foamColor: uniform(new Color(DEFAULT_APPEARANCE.foamColor)),
     /** `foamWidth`, metres. */
-    foamWidth: uniform(0.5),
+    foamWidth: uniform(DEFAULT_APPEARANCE.foamWidth),
     /** `foam`, 0 … 1. */
     foam: uniform(1),
     /** Whitecap amount 0 … 1 (oceans and lakes). */
@@ -166,11 +166,11 @@ export function createWaterUniforms() {
     /** Flow speed (m/s) where river rapids start foaming. */
     rapids: uniform(2.5),
     /** `detail`. */
-    detail: uniform(0),
+    detail: uniform(DEFAULT_APPEARANCE.detail),
     /** `detailScale`, metres. */
-    detailScale: uniform(1),
+    detailScale: uniform(DEFAULT_APPEARANCE.detailScale),
     /** `detailSpeed`, m/s. */
-    detailSpeed: uniform(0.4),
+    detailSpeed: uniform(DEFAULT_APPEARANCE.detailSpeed),
     /** Unit drift direction of the ripples (x, z). */
     detailDirection: uniform(new Vector2(1, 0)),
     /** Direction *towards* the sun, world space. */
@@ -306,6 +306,53 @@ function ease(x: number): number {
 }
 
 /**
+ * Pixels a wave must span to be drawn at full strength, and the span at which it is fully filtered
+ * out: kept above 7 px, gone below 3 px. Both the shader's `keep` and {@link detailFilter} use these
+ * numbers, so the CPU tests pin what the GPU does.
+ */
+export const FILTER_KEEP_PIXELS = [3, 7] as const
+
+/**
+ * LEAN-style detail weight for a wave (or noise layer) of `wavelength` metres seen at `footprint`
+ * metres per pixel: 1 while it spans ≥ 7 px, easing to 0 by 3 px, where it would alias into
+ * speckle. Only the ratio matters, so distance alone never blurs near detail — a wave that covers
+ * many pixels keeps its full amplitude at any range. The energy the filter removes is not lost: the
+ * shader adds the same wave's slope variance to roughness ({@link roughnessFromVariance}), which is
+ * what turns the far sea into a wide, smooth sky reflection instead of a flat mirror with per-pixel
+ * glints.
+ */
+export function detailFilter(wavelength: number, footprint: number): number {
+  const span = wavelength / Math.max(footprint, 1e-6)
+  return ease((span - FILTER_KEEP_PIXELS[0]) / (FILTER_KEEP_PIXELS[1] - FILTER_KEEP_PIXELS[0]))
+}
+
+/** How much of a filtered-out slope variance (σ²) joins roughness²: α² = roughness² + scale·σ². */
+export const SLOPE_VARIANCE_SCALE = 0.5
+
+/**
+ * Roughness for the specular lobe once the slopes too small to draw are folded in: the base roughness
+ * and the lost slope variance add in quadrature (`α² = roughness² + 0.5·σ²`), the Beckmann/GGX NDF
+ * convolution LEAN and Toksvig use. This widens the sun glint instead of letting sub-pixel normals
+ * flicker it on and off, without touching any slope the pixel can resolve.
+ */
+export function roughnessFromVariance(roughness: number, slopeVariance: number): number {
+  const r = Math.max(0, roughness)
+  return Math.min(1, Math.sqrt(r * r + Math.max(0, slopeVariance) * SLOPE_VARIANCE_SCALE))
+}
+
+/** Fold at which the mildest whitecap threshold starts, and how far `whitecaps` 0 moves it. */
+export const WHITECAP_THRESHOLD = { base: 0.08, range: 0.28 } as const
+
+/**
+ * Fold (`1 − det J`) at which whitecaps start for a `whitecaps` setting 0 … 1: higher settings break
+ * at progressively milder crests. The shader's threshold uses this exact ramp.
+ */
+export function whitecapThreshold(whitecaps: number): number {
+  const amount = Math.min(1, Math.max(0, whitecaps))
+  return WHITECAP_THRESHOLD.base + (1 - amount) * WHITECAP_THRESHOLD.range
+}
+
+/**
  * Whitecap coverage from the wave Jacobian: 0 on open water, rising on squeezed (steep) crests.
  *
  * `fold` is `1 − det J` (0 on flat water, → 1 as the surface folds over). `steepness` is the summed
@@ -315,7 +362,7 @@ function ease(x: number): number {
  */
 export function whitecapFoam(fold: number, whitecaps: number, steepness: number, width = 0.16): number {
   const amount = Math.min(1, Math.max(0, whitecaps))
-  const cut = 0.08 + (1 - amount) * 0.28
+  const cut = whitecapThreshold(amount)
   return ease((fold - cut) / Math.max(width, 1e-6)) * ease((steepness - 0.12) / 0.28) * ease(amount / 0.02)
 }
 
@@ -563,7 +610,8 @@ export function createWaterMaterial(
     const dp = fwidth(p) as any
     const footprint = max(max(dp.x, dp.y), 1e-4)
     // Keep a feature only while it spans several pixels (shading is nonlinear, so 2 is not enough).
-    const keep = (wavelength: any) => smoothstep(3, 7, wavelength.div(footprint))
+    const keep = (wavelength: any) =>
+      smoothstep(FILTER_KEEP_PIXELS[0], FILTER_KEEP_PIXELS[1], wavelength.div(footprint))
     // Anti-aliased half-width of a mask threshold: never changes over less than ~2 px. Mirrors `antiAlias`.
     const aa = (base: any, change: any) => max(base, change.mul(2))
     const nx = float(0).toVar(),
@@ -630,7 +678,7 @@ export function createWaterMaterial(
       const breakup = mx_noise_float(vec3(p.div(u.detailScale.mul(3)), u.time.mul(0.25)))
         .mul(keep(u.detailScale.mul(3)))
         .mul(0.05)
-      const cut = float(0.08).add(float(1).sub(u.whitecaps).mul(0.28))
+      const cut = float(WHITECAP_THRESHOLD.base).add(float(1).sub(u.whitecaps).mul(WHITECAP_THRESHOLD.range))
       // Widen the threshold upward only: anti-aliasing can make a crest fade in over a pixel or two,
       // but it can never make foam appear where the surface is not being squeezed.
       const foldAA = min(aa(0.06, fwidth(fold) as any), 0.25)
@@ -692,7 +740,7 @@ export function createWaterMaterial(
     const L = u.sunDirection
     const sunUp = dot(L, U)
     const day = smoothstep(-0.12, 0.35, sunUp).mul(0.85).add(0.15)
-    const rough = min(sqrt(u.roughness.mul(u.roughness).add(lost.mul(0.5))), 1)
+    const rough = min(sqrt(u.roughness.mul(u.roughness).add(lost.mul(SLOPE_VARIANCE_SCALE))), 1)
 
     // Reflection: environment map, or a sky gradient around the local up.
     const R = reflect(V.negate(), N)

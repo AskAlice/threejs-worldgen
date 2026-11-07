@@ -53,6 +53,36 @@ test('planet ocean: waves under the camera stay continuous while re-anchoring ov
   assert.ok(jump < 1e-4, `wave under the camera jumped ${jump} m`)
 })
 
+test('ocean: the first frame is the steady state — no time-sliced wave or normal build', async () => {
+  const world = new World({ surface: 'sphere', radius: 6.4e6 })
+  const frame = world.frameAt(30, 40)
+  const camera = new PerspectiveCamera()
+  const up = new Vector3(...frame.up)
+  camera.position.copy(up).multiplyScalar(3)
+  camera.updateMatrixWorld()
+  const ocean = await Ocean.create({ camera, world, origin: frame.toWorld(0, 0, 0) })
+  const u = ocean.uniforms
+  // Nothing is left for a later frame: the wave set, the grid scale and the horizon are already set.
+  assert.equal(u.waveCount.value, 12)
+  assert.ok(u.gridScale.value > 0 && u.gridMinSpacing.value > 0, 'the ring grid is sized for frame one')
+  assert.ok(u.radius.value > 1e6 && u.maxArc.value > 0, 'the planet and its horizon are set')
+  assert.equal(u.time.value, 0)
+  const a = u.waveA.array as any[]
+  for (let i = 0; i < 12; i++) assert.ok(a[i].z > 0 && a[i].w > 0, `wave ${i} is uploaded`)
+  const snapshot = () =>
+    JSON.stringify({
+      count: u.waveCount.value,
+      crest: u.crest.value,
+      grid: [u.gridScale.value, u.gridAngle.value, u.gridMinSpacing.value],
+      sphere: [u.radius.value, u.maxArc.value],
+      phases: (u.waveB.array as any[]).slice(0, 12).map((b) => b.y)
+    })
+  const first = snapshot()
+  ocean.update(0)
+  assert.equal(snapshot(), first, 'a later frame at the same time is identical: there is no build-up')
+  ocean.dispose()
+})
+
 test('ring grid: rings map onto rings under ×2 scaling', () => {
   const g = createRingGeometry(128, 1e4)
   const pos = g.attributes.position
