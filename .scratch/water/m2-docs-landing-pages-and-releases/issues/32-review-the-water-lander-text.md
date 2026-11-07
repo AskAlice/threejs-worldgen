@@ -4,9 +4,22 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] Behaviour described in the imported issue body is implemented
+- [x] Behaviour described in the imported issue body is implemented
+
+## Comments
+
+**2026-11-07** — Reviewed against the code and the current demos. Every factual claim checks out (`maxDistance`, `flowSpeed`, `whitecaps`, `ocean.waterAt`'s `depth`/`normal`, Gerstner rather than FFT, no SSR claim). Decisions, all keep-as-is:
+
+- Platform label stays WebGPU, despite the WebGL2 fallback.
+- Existing imagery stays; it shows the older look.
+- The one-draw-call lead and the seven-row order stay.
+- Tone stays.
+
+One correction, because the planet demo cannot show it: the lander said "Every feature below is live in the demo", but `example/water.ts` only offers the hydrology control and therefore `Lakes` on the flat world (`if (!planet) ...`). The lede now says the features are live in the three.js demo and that the planet view shows the sea and rivers without the bounded drainage.
+
+If the drainage should be live on the planet too, that is a code change in `example/water.ts` (the terrain demo already samples hydrology in a local frame), not a copy edit.
 
 **Type:** task · imported from GitHub
 

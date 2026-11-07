@@ -4,9 +4,15 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** needs-info
+**Status:** resolved
 
-- [ ] Behaviour described in the imported issue body is implemented
+- [x] Behaviour described in the imported issue body is implemented
+
+## Comments
+
+**2026-11-07** — Closed: publishing is now the release workflow's job, not a ticket. Hidden by this ticket was that `.github/workflows/release.yml` uses OIDC trusted publishing and `<package>@<version>` tags; the old `v0.2.0` tag could never trigger it, and grass 0.2.0 was already on npm.
+
+Shipped: grass bumped to 0.3.0 for the Corn and terrain-ref API, lockfile synced, `main` merged to origin, and `threejs-grass@0.3.0` tagged. The run (`42349162148`) passed `npm ci`, typecheck, tests and build, then failed `npm publish` with a 404 because npm has no trusted publisher for the package. That is an npm account setting, not repo work: add the trusted publisher (AskAlice / threejs-worldgen / release.yml) or run `npm login && scripts/publish-all.sh`, then `gh run rerun 42349162148 --failed`.
 
 **Type:** task · imported from GitHub
 

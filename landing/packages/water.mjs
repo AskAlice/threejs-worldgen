@@ -68,7 +68,7 @@ function Coast({ world, sun }) {
   features: {
     heading: 'Every kind of <em>water.</em>',
     intro:
-      'A sea that covers everything below sea level, rivers along the valleys, and lakes where the ground holds water. Every feature below is live in the demo.',
+      'A sea that covers everything below sea level, rivers along the valleys, and lakes where the ground holds water. Every feature below is live in the flat demo; the planet view shows the same sea and rivers from orbit, without the bounded hydrology (that needs a flat world).',
     rows: [
       {
         title: 'One ocean, every altitude',
