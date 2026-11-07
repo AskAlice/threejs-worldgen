@@ -23,6 +23,7 @@ import {
   vec3,
   vec4
 } from 'three/tsl'
+import { FAR_DETAIL_OCTAVES, MID_DETAIL_BAND, OCTAVE_FULL, OCTAVE_ZERO } from './detail.ts'
 import { SEA_BANDS } from './seabed.ts'
 
 /** How the terrain is coloured. */
@@ -163,11 +164,15 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
 
   // Mid-scale ground detail (~7 m and ~30 m features) that survives to a few kilometres, so the ground
   // does not blur into flat biome colour between the metre-scale detail and the far LODs.
-  const midFade = smoothstep(
-    u.detailDistance.mul(14),
-    u.detailDistance.mul(3),
+  // Distance bands: near detail inside `detailDistance`, mid detail out to 14×, far detail beyond.
+  // Mid and far are complements, so their opacities sum to one where they hand over (660 m → 3.1 km).
+  const midBand = smoothstep(
+    u.detailDistance.mul(MID_DETAIL_BAND.fadeEnd),
+    u.detailDistance.mul(MID_DETAIL_BAND.fadeStart),
     distance(positionWorld, cameraPosition)
-  ).mul(u.detail)
+  )
+  const farBand = midBand.oneMinus()
+  const midFade = midBand.mul(u.detail)
   const mid = Fn(() => {
     const n = float(0).toVar()
     If(midFade.greaterThan(0.002), () => {
@@ -196,16 +201,40 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
     ripple = noise.z,
     sparkle = noise.w
 
+  // Far detail: world-anchored octaves at 2.4 km / 760 m / 240 m, so aerial views keep mid-scale
+  // texture (striations, sediment fans, snow fields) instead of flat per-vertex biome colour. The
+  // coordinates are the chunk centre reduced modulo a 256 km period, so the field is continuous
+  // across chunks, independent of the floating origin (no swim), and in float32 range. Each octave is
+  // band-limited by the pixel footprint, so the near-LOD-fine octaves disappear rather than shimmer.
+  const farOffset = uniform(new Vector3()).onObjectUpdate(({ object }) => object?.userData.farOffset)
+  const farDetail = Fn(() => {
+    const n = float(0).toVar()
+    If(farBand.mul(u.detail).greaterThan(0.002), () => {
+      const f = positionLocal.add(farOffset)
+      // Metres per pixel along the two screen axes; the larger one is the conservative anti-aliasing bound.
+      const footprint = dFdx(f).length().max(dFdy(f).length())
+      for (const o of FAR_DETAIL_OCTAVES) {
+        const w = smoothstep(o.wavelength * OCTAVE_FULL, o.wavelength * OCTAVE_ZERO, footprint).oneMinus()
+        n.assign(n.add(mx_noise_float(f.mul(1 / o.wavelength)).mul(w.mul(o.amplitude))))
+      }
+    })
+    return n
+  })()
+    .mul(farBand)
+    .mul(u.detail)
+
   // Ground overrides per pixel (smooth, noise-broken edges at any LOD): steep → rock, cold → snow,
   // near the waterline → sand, along rivers → mud.
   const aboveSea = climate.x,
     temperature = climate.y,
     river = climate.z,
     slope = climate.w
-  const rock = smoothstep(u.rockSlope.mul(0.7), u.rockSlope, slope.add(patches.mul(0.25)))
-  const snow = smoothstep(u.snowTemperature.add(1.5), u.snowTemperature.sub(1.5), temperature.add(patches.mul(3))).mul(
-    smoothstep(1.8, 1.2, slope)
-  )
+  const rock = smoothstep(u.rockSlope.mul(0.7), u.rockSlope, slope.add(patches.mul(0.25)).add(farDetail.mul(0.08)))
+  const snow = smoothstep(
+    u.snowTemperature.add(1.5),
+    u.snowTemperature.sub(1.5),
+    temperature.add(patches.mul(3)).add(farDetail.mul(3))
+  ).mul(smoothstep(1.8, 1.2, slope))
   const sand = smoothstep(u.sandBand, u.sandBand.mul(0.3), aboveSea.abs().add(patches.mul(u.sandBand).mul(0.6))).mul(
     rock.oneMinus()
   )
@@ -230,6 +259,8 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
   const variation = float(1).add(patches.mul(0.22)).add(grain.mul(rock).mul(0.18)).add(ripple.mul(sand).mul(0.08))
   let color = ground.mul(mix(float(1), variation, fade))
   color = color.mul(mid.mul(midFade).mul(0.22).add(1))
+  // Kilometre-scale brightness variation; farDetail already carries the far-band opacity and detail strength.
+  color = color.mul(farDetail.mul(0.18).add(1))
   color = color.mul(mix(float(1), float(0.6), wet.mul(0.6)))
   color = color.add(vec3(sparkle.mul(snow).mul(fade).mul(0.6)))
   const lum = color.dot(vec3(0.2126, 0.7152, 0.0722))

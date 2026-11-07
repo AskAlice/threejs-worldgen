@@ -19,6 +19,7 @@ import {
   type TerrainUniforms
 } from './terrain-material.ts'
 import type { Vec3 } from './noise.ts'
+import { FAR_DETAIL_PERIOD } from './detail.ts'
 import type { World, WorldRegion } from './world.ts'
 
 /** Every terrain setting (plain data). Change at runtime with {@link WorldTerrain.set}. */
@@ -429,6 +430,12 @@ export class WorldTerrain {
       mod(data.center[0], DETAIL_PERIOD),
       mod(data.center[1], DETAIL_PERIOD),
       mod(data.center[2], DETAIL_PERIOD)
+    )
+    // Far detail uses the same trick over a much longer period so kilometre-scale noise has no seam.
+    mesh.userData.farOffset = new Vector3(
+      mod(data.center[0], FAR_DETAIL_PERIOD),
+      mod(data.center[1], FAR_DETAIL_PERIOD),
+      mod(data.center[2], FAR_DETAIL_PERIOD)
     )
     mesh.userData.morphRange = new Vector2(
       ...morphBand(this.options.lodFactor, this.options.lodMargin ?? 0.1, data.size)
