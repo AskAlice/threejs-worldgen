@@ -7,10 +7,15 @@ import { classOf, createPanel } from './panel'
 
 // threejs-sky sandbox: day/night, moon phases, stars, meteors, clouds and labelled altitude shells over
 // hills, zoomable from ant scale out past the moon's apogee; plus the same star system from afar.
+// Reverse depth is only requested when we actually get a WebGPU adapter: three promotes a pass's depth
+// texture to float under reverse depth, but its WebGL2 backend resolves depth into a 24-bit multisampled
+// buffer, so every frame's depth blit is rejected and the context is lost (black canvas).
+const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu
+const webgpu = !location.search.includes('webgl') && gpu !== undefined && (await gpu.requestAdapter()) !== null
 const renderer = new THREE.WebGPURenderer({
   antialias: true,
-  reversedDepthBuffer: true,
-  forceWebGL: location.search.includes('webgl')
+  reversedDepthBuffer: webgpu,
+  forceWebGL: !webgpu
 })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
 renderer.setSize(innerWidth, innerHeight)
