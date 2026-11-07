@@ -244,9 +244,13 @@ export interface BehindSample {
  * with the depth read, instead of jumping per pixel where the surface meets the bed.
  */
 export function behindSample(viewZ: number, refractedZ: number, ownZ: number, dist: number): BehindSample {
-  const path = (z: number) => Math.max(0, dist * (z / viewZ - 1))
-  if (refractedZ < viewZ) return { uv: 'refracted', path: path(refractedZ) }
-  if (ownZ < viewZ) return { uv: 'self', path: path(ownZ) }
+  // The thickness always comes from the pixel's own depth. The refracted sample is a different world
+  // point, so its depth steps by whatever the bed does across the refraction bend, and whether it is
+  // behind the surface flips from pixel to pixel along the waterline: taking the thickness from it
+  // made the water alternate between 0 and its full depth, a dashed outline round every shallow patch.
+  const path = Math.max(0, dist * (Math.min(ownZ, viewZ) / viewZ - 1))
+  if (refractedZ < viewZ) return { uv: 'refracted', path }
+  if (ownZ < viewZ) return { uv: 'self', path }
   return { uv: 'none', path: 0 }
 }
 
@@ -288,6 +292,16 @@ export function screenEdgeFade(u: number, v: number, width = 0.08): number {
 export function antiAlias(base: number, step: number, pixels = 2): number {
   return Math.max(base, Math.max(0, step) * pixels)
 }
+
+/**
+ * Pixels a smoothstep-faded mask must span. A smoothstep's peak slope is 1.5 / width, so a 2-pixel
+ * band still steps by 0.75 of its range between adjacent pixels — a visible edge — while 4 caps it at
+ * 0.375. The shoreline coverage uses this; {@link antiAlias}'s 2-pixel default suits the other masks.
+ */
+export const COVERAGE_AA_PIXELS = 4
+
+/** Width of the shore-foam ramp in units of `depth / foamWidth`: full at level 0.15, gone by 1. */
+const FOAM_SPAN = 0.85
 
 /**
  * Water-surface coverage over the shoreline depth band: 0 at the waterline, 1 at `band` metres of
@@ -380,15 +394,28 @@ export function foamTrail(now: number, older: number, decay = 0.5): number {
  * `noise` (0 … 1) breaks up the band without moving its outer edge, so foam stays at the shore
  * instead of covering a shallow shelf. `slope` (m of depth per m across the surface, default ∞) gates
  * the foam to a real bank: over near-flat ground the whole shelf is shallow, and foam there would
- * read as a white sheet instead of a shoreline.
+ * read as a white sheet instead of a shoreline. `levelsPerPixel` (`fwidth` of the level) widens the
+ * outer edge by its own screen-space change and, where the whole band is thinner than a pixel, dims it
+ * rather than letting the edge alias into a hard ring.
  */
-export function shoreFoam(depth: number, foamWidth: number, noise = 1, wobble = 0, slope = Infinity): number {
+export function shoreFoam(
+  depth: number,
+  foamWidth: number,
+  noise = 1,
+  wobble = 0,
+  slope = Infinity,
+  levelsPerPixel = 0
+): number {
   if (depth < 0) return 0
   const levels = depth / Math.max(foamWidth, 1e-4) + wobble
   const bank = Math.min(1, Math.max(0, (slope - 0.005) / 0.025))
+  const levelAA = Math.min(antiAlias(0.1, levelsPerPixel), 0.5)
+  const levelSpan = FOAM_SPAN + 2 * levelAA
+  const bandPixels = levelSpan / Math.max(levelsPerPixel, 1e-6)
   return (
-    (1 - ease((levels - 0.15) / 0.85)) *
+    (1 - ease((levels - (0.15 - levelAA)) / levelSpan)) *
     (0.55 + 0.45 * Math.min(1, Math.max(0, noise))) *
+    ease(bandPixels) *
     (bank * bank * (3 - 2 * bank))
   )
 }
@@ -613,7 +640,7 @@ export function createWaterMaterial(
     const keep = (wavelength: any) =>
       smoothstep(FILTER_KEEP_PIXELS[0], FILTER_KEEP_PIXELS[1], wavelength.div(footprint))
     // Anti-aliased half-width of a mask threshold: never changes over less than ~2 px. Mirrors `antiAlias`.
-    const aa = (base: any, change: any) => max(base, change.mul(2))
+    const aa = (base: any, change: any, pixels = 2) => max(base, max(change, 0).mul(pixels))
     const nx = float(0).toVar(),
       ny = float(1).toVar(),
       nz = float(0).toVar()
@@ -854,13 +881,14 @@ export function createWaterMaterial(
     const ownZ = sceneViewZ(screenUV)
     const useRefracted = refractedZ.lessThan(viewZ)
     const uv = select(useRefracted, refractedUv, screenUV)
-    const sceneZ = select(useRefracted, refractedZ, ownZ)
+    // The thickness comes from the pixel's own depth, never the refracted sample's: the refracted
+    // sample is a different world point, so its depth steps by whatever the bed does across the bend,
+    // and `useRefracted` flips from pixel to pixel along the waterline. The thickness then alternated
+    // between 0 and the full water depth, which rings every shallow patch with a dashed contour.
     // A depth read in front of the surface is the bed at the waterline, read a fraction of a pixel off
     // (the depth buffer is coarser than the surface's own interpolated z), not an occluder: the water
-    // there has no thickness. Clamping the read to the surface lets the thickness cross zero
-    // continuously. Treating it as 10 km of water instead made that crossing a hard per-pixel switch —
-    // wherever the bed is within the depth buffer's resolution of the surface, a dashed ring.
-    const path = max(dist.mul(min(sceneZ, viewZ).div(viewZ).sub(1)), 0)
+    // there has no thickness, and clamping the read to the surface lets it cross zero continuously.
+    const path = max(dist.mul(min(ownZ, viewZ).div(viewZ).sub(1)), 0)
     // The shoreline stays on the full-resolution depth, so it does not coarsen.
     const depth = path.mul(max(dot(V, U), 0.02)) // ≈ vertical water depth
     const behind = viewportSharedTexture(uv).rgb
@@ -869,12 +897,14 @@ export function createWaterMaterial(
     const transmit = exp(path.negate().mul(u.absorption))
     const body = behind.mul(transmit).add(u.scatterColor.mul(day).mul(float(1).sub(transmit)))
 
-    // Shoreline: the surface's coverage fades out over a depth band that is never thinner than a
-    // couple of pixels of the depth buffer's own change across a pixel. The water/bed crossing is a
+    // Shoreline: the surface's coverage fades out over a depth band that is never thinner than a few
+    // pixels of the depth buffer's own change across a pixel. The water/bed crossing is a
     // depth-test boundary, which MSAA does not anti-alias; fading alpha there is what makes the
-    // waterline soft instead of stair-stepped, at any distance or grazing angle.
+    // waterline soft instead of stair-stepped, at any distance or grazing angle. The band spans
+    // `COVERAGE_AA_PIXELS` and not 2 because a smoothstep's peak slope is 1.5 / width: at 2 pixels the
+    // alpha would still step by 0.75 of its range between adjacent pixels, which reads as a hard edge.
     const depthStep = fwidth(depth) as any
-    const band = aa(u.foamWidth.mul(0.15), depthStep)
+    const band = aa(u.foamWidth.mul(0.15), depthStep, COVERAGE_AA_PIXELS)
     const coverage = smoothstep(0, band, depth)
     // Shore foam: full at the waterline, gone by `foamWidth` of depth, broken up by a noise field and
     // lapping in and out with time. Its outer edge is widened by its own screen-space change so it
@@ -887,13 +917,20 @@ export function createWaterMaterial(
     const lap = sin(u.time.mul(1.3).sub(levels.mul(5)))
       .mul(0.12)
       .mul(smoothstep(0.1, 0.5, levels))
-    const levelAA = min(aa(0.1, fwidth(levels) as any), 0.35)
+    const levelsPerPixel = fwidth(levels) as any
+    const levelAA = min(aa(0.1, levelsPerPixel), 0.5)
+    // The band's own width in pixels. Past this range the whole band is thinner than a pixel, no ramp
+    // can keep it smooth, so it is dimmed by the fraction of a pixel it covers: otherwise the outer
+    // edge of the foam aliases into a hard ring at aerial range.
+    const levelSpan = float(FOAM_SPAN).add(levelAA.mul(2))
+    const bandPixels = levelSpan.div(max(levelsPerPixel, 1e-6))
     // Foam belongs to a bank, not a thin sheet over near-flat ground: require the bed to rise about
     // 0.5 … 3% across the surface, so a shallow flat shelf stays clear instead of foaming all over.
     const bank = smoothstep(0.005, 0.03, depthStep.div(max(footprint, 1e-4)))
     const shore = float(1)
       .sub(smoothstep(float(0.15).add(lap).sub(levelAA), float(1).add(lap).add(levelAA), levels))
       .mul(mix(0.55, 1, foamNoise))
+      .mul(smoothstep(0, 1, bandPixels))
       .mul(bank)
     // Contact foam: where geometry stands in front of the surface — banks, rocks, hulls — a few pixels
     // of foam gather. Obstacles reach the water only through the depth buffer, so this is what keeps

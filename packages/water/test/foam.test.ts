@@ -69,7 +69,7 @@ test('whitecapFoam: a default sea breaks on a few percent of its area, not acros
 test('shoreFoam: concentrated at the waterline, gone by foamWidth, never spread out to sea', () => {
   const width = 0.6
   assert.ok(shoreFoam(0, width, 0) >= 0.54, 'foam at the waterline')
-  assert.equal(shoreFoam(width, width, 1), 0, 'nothing at the band edge')
+  assert.ok(shoreFoam(width, width, 1) < 0.05, 'almost nothing at the band edge')
   assert.equal(shoreFoam(3 * width, width, 1), 0, 'and nothing in open water')
   assert.equal(shoreFoam(-1, width, 1), 0, 'dry ground has no foam')
   let last = 1
@@ -96,6 +96,37 @@ test('shoreFoam: a near-flat shelf does not foam; a real bank does', () => {
   )
   assert.ok(shoreFoam(0.3, width, 1, 0, 0.02) > shoreFoam(0.3, width, 1, 0, 0.008), 'foam rises with the bank')
   assert.ok(shoreFoam(0.3, width, 1, 0, 0.5) <= shoreFoam(0.3, width, 1) + 1e-12, 'a steep bank is not over-foamed')
+})
+
+test('shoreFoam: a band thinner than a pixel at range is dimmed, not a hard ring', () => {
+  const width = 0.6
+  // 12 m of shoreline depth per pixel at aerial range: the whole 0.6 m band is a tenth of a pixel
+  // wide. Capping the ramp's widening (the old 0.35) still left a full-strength sub-pixel edge — the
+  // hard white ring on the aerial terrain view. Dimming by pixel coverage removes it.
+  const step = 12
+  const lpp = step / width
+  let peak = 0
+  let worst = 0
+  for (let d = 0; d <= 2 * width; d += step / 8) {
+    const f = shoreFoam(d, width, 1, 0, Infinity, lpp)
+    peak = Math.max(peak, f)
+    worst = Math.max(worst, Math.abs(shoreFoam(d + step, width, 1, 0, Infinity, lpp) - f))
+  }
+  assert.ok(peak < 0.1, `a sub-pixel band is dimmed (peak ${peak.toFixed(3)})`)
+  assert.ok(worst <= 0.5, `and never steps the full range (${worst.toFixed(3)})`)
+})
+
+test('shoreFoam: a band a few pixels wide keeps its strength and its edge', () => {
+  const width = 0.6
+  assert.equal(shoreFoam(0, width, 1, 0, Infinity, 1e-4), shoreFoam(0, width, 1), 'a crisp band is unchanged')
+  const step = 3 // metres of depth per pixel at 2.5 km
+  const f = (d: number) => shoreFoam(d, width, 1, 0, Infinity, step / width)
+  assert.ok(f(0) > 0.2, 'a resolvable band keeps its strength')
+  let worst = 0
+  for (let d = 0; d <= 2 * width; d += step / 8) {
+    worst = Math.max(worst, Math.abs(f(d + step) - f(d)))
+  }
+  assert.ok(worst <= 0.5, `no adjacent-pixel jump above half the range (${worst.toFixed(3)})`)
 })
 
 test('foamTrail: a crest leaves a fading trail, then no foam at all', () => {

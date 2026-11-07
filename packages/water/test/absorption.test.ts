@@ -51,13 +51,16 @@ test('absorption: ocean, lake and river defaults are per-channel and red-first',
   )
 })
 
-test('depth rejection: foreground samples fall back, and never leak', () => {
+test('depth rejection: the colour sample falls back, and never leaks', () => {
   const viewZ = -10 // surface 10 m from the camera; farther geometry is more negative
   const dist = 10.1
 
   const refracted = behindSample(viewZ, -14, -30, dist)
   assert.equal(refracted.uv, 'refracted')
-  assert.ok(close(refracted.path, dist * (14 / 10 - 1)), 'path to the refracted sample')
+  assert.ok(
+    close(refracted.path, dist * (30 / 10 - 1)),
+    "the thickness is the pixel's own depth, not the refracted sample's"
+  )
 
   // The offset crossed a silhouette: the refracted sample is nearer than the water, so use the pixel's own.
   const blocked = behindSample(viewZ, -9, -14, dist)
@@ -99,6 +102,19 @@ test('depth rejection: the water thickness is continuous across the waterline', 
     0,
     'in front of the surface the water is gone, not deep'
   )
+})
+
+test('depth rejection: a refracted sample flipping across the waterline cannot dash the outline', () => {
+  // At the waterline the refracted lookup lands on either side of the surface from pixel to pixel.
+  // The thickness must not follow it: doing so alternates between 0 and the full depth, which is the
+  // dotted/dashed contour that ringed every shallow patch.
+  const viewZ = -5
+  const dist = 5.2
+  const ownZ = -5.4 // 0.4 m of water under this pixel
+  const wet = behindSample(viewZ, viewZ - 0.3, ownZ, dist).path
+  const dry = behindSample(viewZ, viewZ + 0.3, ownZ, dist).path
+  assert.ok(close(wet, dry), `the flip changed the thickness: ${wet} vs ${dry}`)
+  assert.ok(wet > 0.01, 'and the water keeps its real thickness')
 })
 
 test('appearance: absorption and scatter drive the uniforms', () => {
