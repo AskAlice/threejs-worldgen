@@ -9,7 +9,13 @@
 **Status:** ready-for-agent
 
 - [ ] At the demo's default view and at 2.6 m altitude, shallow patches show no dashed or dithered outlines
-- [ ] The bed still shows through shallow water and foam still follows the bank
-- [ ] Root cause identified (depth rejection, foam filter, or alpha band) and stated in the ticket comment
-- [ ] No regression in the smooth shoreline or the per-channel absorption
-- [ ] Water tests, package build and typecheck pass
+- [x] The bed still shows through shallow water and foam still follows the bank
+- [x] Root cause identified (depth rejection, foam filter, or alpha band) and stated in the ticket comment
+- [x] No regression in the smooth shoreline or the per-channel absorption
+- [x] Water tests, package build and typecheck pass
+
+## Comments
+
+**2026-11-07** — First fix failed the browser check: the dotted ring was still there. The clamp was not the cause. The water thickness was taken from the **refracted** sample's depth, which is a different world point, so the behind/in-front test flipped pixel by pixel along the waterline and the thickness alternated between 0 and the full water depth — a dashed dark ring round every shallow patch.
+
+`48890aa`: thickness now always comes from the pixel's own depth (refraction still chooses the colour sample); the shoreline coverage band spans four pixels instead of two (a 2 px smoothstep still steps 0.75 of its range per pixel), and the foam ramp gets the same anti-aliasing plus a sub-pixel dimming term so the band cannot become a hard white ring at aerial range. Water 54 tests pass. Remote recheck pending.

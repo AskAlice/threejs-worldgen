@@ -10,6 +10,10 @@
 
 - [ ] Sky colour comes from a scattering model and changes with sun elevation, with a visible sun disc
 - [ ] Clouds are volumetric, sun-lit with shadowed undersides, and do not read as moving blobs
+
+## Comments
+
+**2026-11-07** — Browser pass: sky colour, sun disc and the Kármán limb read well, but the clouds **FAIL**: flat soft white blobs and stretched haze with radiating streaks, no lit tops or shadowed undersides. The two-deck march is there but its shaping and shadowing are too crude at the demo's settings. Fix in progress.
 - [ ] Distant terrain fades into aerial perspective instead of ending at a hard silhouette
 - [ ] From 10 km to 100 km the sky grades toward space with a lit limb
 - [ ] Frame cost stays within the demo budget at the aerial default view (measure and record)

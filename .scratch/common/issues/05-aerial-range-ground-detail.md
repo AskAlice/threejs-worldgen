@@ -9,6 +9,10 @@
 **Status:** ready-for-agent
 
 - [ ] Ground at 5, 20 and 50 km altitude shows visible mid-scale variation rather than flat colour
+
+## Comments
+
+**2026-11-07** — The browser pass at 2.54 km found land variation present and stable (no crawl), but the **waterline** had a hard white band. That part was the water shader and the seabed jitter, not this detail layer: fixed in `48890aa` (foam AA and sub-pixel dimming) and `9961d72` (far-detail jitter in the seabed depth). This ticket's own 5/20/50 km check is still unverified.
 - [ ] The detail does not shimmer or crawl in a static frame, nor swim when the camera moves slowly
 - [ ] Detail is continuous across chunk boundaries with no visible tiling seam
 - [ ] Near-ground detail from the existing layer is not lost or doubled
