@@ -235,19 +235,27 @@ export function createTerrainMaterial(input: Partial<TerrainMaterialOptions> = {
     u.snowTemperature.sub(1.5),
     temperature.add(patches.mul(3)).add(farDetail.mul(3))
   ).mul(smoothstep(1.8, 1.2, slope))
-  const sand = smoothstep(u.sandBand, u.sandBand.mul(0.3), aboveSea.abs().add(patches.mul(u.sandBand).mul(0.6))).mul(
-    rock.oneMinus()
-  )
+  // Noise that breaks the sand and seabed band edges at every range, in metres. `patches` fades out
+  // past `detailDistance` (its lookup is gated on `fade`), which left the aerial bands as bare
+  // iso-height contours stepping along the mesh chords; `farDetail` is its world-anchored,
+  // pixel-band-limited complement, so the break survives out to any range without shimmer or crawl.
+  const sandJitter = patches
+    .mul(u.sandBand)
+    .mul(0.6)
+    .add(farDetail.mul(u.sandBand.mul(0.8)))
+  const sand = smoothstep(u.sandBand, u.sandBand.mul(0.3), aboveSea.abs().add(sandJitter)).mul(rock.oneMinus())
   const wet = river.mul(0.85)
 
   let ground = mix(base, u.mudColor, wet)
   ground = mix(ground, u.sandColor, sand)
   ground = mix(ground, u.rockColor, rock)
   ground = mix(ground, u.snowColor, snow)
-  // Below the waterline the ground reads turquoise → blue-green → dark with depth. `aboveSea` is the
-  // built-in height relative to the sea level (chunks rebuild with it), and the patch noise jitters the
-  // depth so the shore and the band edges are not hard rings. Mirrors `seabedWeights`.
-  const depth = aboveSea.negate().add(patches.mul(u.sandBand))
+  // Below the waterline the ground reads turquoise → blue-green → dark with depth. Depth is evaluated
+  // per fragment from that fragment's height above the sea (negative = below) plus the same
+  // range-independent noise, so the smoothsteps are never a pure function of the interpolated vertex
+  // height (which would draw the bands along the triangle interpolation at coarse aerial LODs).
+  // Mirrors `seabedWeights`.
+  const depth = aboveSea.negate().add(patches.mul(u.sandBand).add(farDetail.mul(2.5)))
   const submerge = smoothstep(0, 1.5, depth)
   const shelf = smoothstep(0, SEA_BANDS.shelf, depth)
   const abyss = smoothstep(SEA_BANDS.slope, SEA_BANDS.abyss, depth)

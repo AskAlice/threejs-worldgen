@@ -18,3 +18,12 @@ export function seabedWeights(depth: number, jitter = 0): [number, number, numbe
   const abyss = smooth(SEA_BANDS.slope, SEA_BANDS.abyss, d)
   return [(1 - shelf) * submerge, shelf * (1 - abyss) * submerge, abyss * submerge]
 }
+
+/**
+ * Blend weights of a fragment `height` metres above the water surface (negative below it). The
+ * material evaluates this from the fragment's own height, never from weights interpolated across
+ * the triangle, so the bands cannot follow the mesh (a coarse aerial LOD would facet them).
+ */
+export function seabedWeightsAtHeight(height: number, jitter = 0): [number, number, number] {
+  return seabedWeights(-height, jitter)
+}
