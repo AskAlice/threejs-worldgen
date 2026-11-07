@@ -78,9 +78,9 @@ export interface CloudOptions {
   wind: [number, number]
   /** Depth of the cloud layer above its base, metres. */
   depth: number
-  /** Ray-march samples through the cloud layer (cost vs. quality). */
+  /** Ray-march samples through the cloud layer (cost vs. quality). Default 24. */
   steps: number
-  /** Samples towards the sun per cloud sample (self-shadowing). */
+  /** Samples towards the sun per cloud sample (self-shadowing). Default 4; 3 flattens bases. */
   lightSteps: number
   /** Cloud albedo colour (`#rrggbb`). */
   color: string
@@ -104,8 +104,8 @@ export const DEFAULT_CLOUDS: CloudOptions = {
   cirrus: { amount: 0.6, altitude: [7000, 10_000], size: [3000, 8000] },
   wind: [6, 1.5],
   depth: 2800,
-  steps: 18,
-  lightSteps: 3,
+  steps: 24,
+  lightSteps: 4,
   color: '#ffffff',
   silverLining: 1,
   ambient: 1,
@@ -168,6 +168,53 @@ export function cloudCover(
   return smooth(t - 0.03, t + 0.03, v)
 }
 
+/**
+ * Height signature of a cloud deck at fractional height `h` (0 = base, 1 = top): a hard flat base and a
+ * rounded cap. Mirrors the shader's `shape`; keep the two in step.
+ */
+export function cloudShape(h: number, capFrom = 0.42): number {
+  const cap = Math.max(1 - Math.max((h - capFrom) / (1 - capFrom), 0) ** 2, 0)
+  return smooth(0, 0.05, h) * Math.sqrt(cap)
+}
+
+/** Weather-field threshold for a coverage fraction 0..1, for `genus` 0 (cumulus/stratus) or 1 (cirrus). */
+export function coverageThreshold(coverage: number, genus = 0): number {
+  const c = Math.min(1, Math.max(0, coverage))
+  return genus ? 0.78 - 0.16 * c : 0.62 - 0.32 * c
+}
+
+/**
+ * Low-deck density 0..1 at fractional height `h`, weather value `n` (0..1), coverage threshold `t` and
+ * edge-erosion `bump` 0..1 (the cauliflower detail). Mirrors the shader's `lowDeck`; keep in step.
+ */
+export function cloudDensity(n: number, t: number, h: number, bump = 0.5): number {
+  const cover = smooth(t, t + 0.2, n)
+  const erode = Math.max(h, 0) ** 1.45 + (bump - 0.5) * 0.2
+  return Math.min(Math.max(cover - erode, 0) * 3, 1) * cloudShape(h)
+}
+
+/** Henyey–Greenstein phase at cosine `mu`; forward-peaked for g > 0. */
+export function cloudPhase(mu: number, g = 0.6): number {
+  return (1 - g * g) / (4 * Math.PI * Math.max(1 + g * g - 2 * g * mu, 1e-4) ** 1.5)
+}
+
+/**
+ * Sun transmittance through the low deck from fractional height `h`, mirroring the shader's light
+ * march: `taps` samples spread over the slab left above the point, Beer–Lambert on each.
+ */
+export function sunTransmittance(
+  h: number,
+  density: (h: number) => number,
+  { depth = 2800, extinction = 0.0035, sunUp = 1, taps = 4 } = {}
+): number {
+  const slant = Math.max(sunUp, 0.12)
+  const remain = Math.max(1 - h, 0)
+  const step = (depth * remain) / (taps * slant) // metres along the sun ray per tap
+  let tau = 0
+  for (let j = 0; j < taps; j++) tau += density(h + ((j + 0.5) * remain) / taps) * extinction * step
+  return Math.exp(-tau)
+}
+
 /** Creates the uniforms shared by the cloud dome and the sky. */
 export function createCloudUniforms() {
   return {
@@ -199,6 +246,10 @@ export function createCloudUniforms() {
     cirrusThreshold: uniform(0.8),
     /** Detail size of the cirrus noise, metres. */
     cirrusFeature: uniform(32_000),
+    /** Horizontal direction of the cirrus streaks in noise space (cos, sin of the wind's bearing). */
+    cirrusOrientation: uniform(new Vector3(1, 0, 0)),
+    /** Wind drift of the cirrus field in noise units. */
+    cirrusWind: uniform(new Vector3()),
     /** Density multiplier. */
     density: uniform(1),
     /** Extinction per metre of density. */
@@ -229,6 +280,9 @@ export type CloudUniforms = ReturnType<typeof createCloudUniforms>
 
 /** Seeded 3D fBm in 0..1, the shape of the cloud field. */
 const dense = Fn(([p]: [any]) => mx_fractal_noise_float(p, 3, 2.03, 0.5).mul(0.5).add(0.5))
+
+/** One octave of 0..1 noise: the lobes that erode a cumulus top into cauliflower. */
+const lobe = Fn(([p]: [any]) => mx_noise_float(p).mul(0.5).add(0.5))
 
 /** Builds the cloud dome: one camera-pinned sphere, raymarched per pixel. */
 function cloudMaterial(u: CloudUniforms, steps: number, lightSteps: number): NodeMaterial {
@@ -266,52 +320,83 @@ function cloudMaterial(u: CloudUniforms, steps: number, lightSteps: number): Nod
     const col = vec3(0).toVar()
     const sunDir = u.sunDirection
     const mu = dot(d, sunDir)
-    const g = 0.72
-    const phase = float((1 - g * g) / (4 * Math.PI)).div(max(float(1 + g * g).sub(mu.mul(2 * g)), 1e-4).pow(1.5))
+    const g = 0.6
+    // Henyey–Greenstein, scaled to cloud range: ~2.7 towards the sun, ~0.5 away from it, so rims are
+    // bright but the deck no longer fans out into radiating streaks.
+    const phase = float((1 - g * g) / (4 * Math.PI))
+      .div(max(float(1 + g * g).sub(mu.mul(2 * g)), 1e-4).pow(1.5))
+      .mul(2.8)
+      .mul(u.silverLining)
+      .add(0.5)
     const sunUp = dot(normalize(o), sunDir)
     const daylight = smoothstep(-0.1, 0.06, sunUp)
     const warm = mix(vec3(1, 0.5, 0.28), vec3(1), smoothstep(0.02, 0.35, sunUp))
 
-    // Height profile of a deck: flat base (rise over `baseFrac`), rounded cap from `capFrom` to the top.
-    const shape = (h: any, base: any, top: any, baseFrac: number, capFrom: number) => {
-      const hb = h.sub(base).div(max(top.sub(base), float(1)))
-      const cap = sqrt(
-        max(
-          float(1).sub(
-            max(hb.sub(capFrom), 0)
-              .div(1 - capFrom)
-              .pow(2)
-          ),
-          0
+    // Signature of a column: hard flat base, dense body, rounded cap.
+    const shape = (hb: any) =>
+      smoothstep(float(0), float(0.05), hb).mul(
+        sqrt(
+          max(
+            float(1).sub(
+              max(hb.sub(0.42), 0)
+                .mul(1 / 0.58)
+                .pow(2)
+            ),
+            0
+          )
         )
       )
-      return smoothstep(float(0), float(baseFrac), hb).mul(cap)
+    // Low deck: coverage from the weather field, cut off higher up the column so each column ends at its
+    // own rounded height instead of a flat slab. `bump` (0..1) erodes the top into cauliflower lobes.
+    const lowDeck = (hb: any, n: any, bump: any) => {
+      const cover = smoothstep(u.threshold, u.threshold.add(0.2), n)
+      const erode = hb.pow(1.45).add(bump.sub(0.5).mul(0.2))
+      return min(max(cover.sub(erode), 0).mul(3), float(1)).mul(shape(hb))
     }
-    const ONE = vec3(1, 1, 1)
-    // Seeded weather field at a point; cirrus is stretched horizontally into streaks.
-    const field = (pos: any, feature: any, stretch: any, offset: any) =>
-      dense(u.rotation.mul(vec3(pos)).mul(stretch).div(feature).add(u.offset).add(u.wind).add(offset))
-    // Density at a point: a low deck (cumulus and stratus share the troposphere band) plus an optional
-    // thin cirrus sheet high above it. Both are drawn by the same march.
-    const densityAt = Fn(([pos]: [any]) => {
+    // Cirrus: wind-aligned streaks. Coordinates are compressed along the flow and expanded across it, so
+    // the streaks lie along the wind instead of the render axes (which read as radiating bands).
+    const cirrusField = (pos: any) => {
+      const q = u.rotation.mul(vec3(pos)).div(u.cirrusFeature)
+      const c = u.cirrusOrientation.x,
+        s = u.cirrusOrientation.y
+      return dense(
+        vec3(q.x.mul(c).add(q.z.mul(s)).mul(0.3), q.y.mul(1.8), q.z.mul(c).sub(q.x.mul(s)).mul(2.4))
+          .add(u.offset)
+          .add(u.cirrusWind)
+          .add(vec3(11.7))
+      )
+    }
+    // Thin high sheet: a soft band across the middle of the cirrus deck.
+    const cirrusSheet = (hb: any, n: any) =>
+      smoothstep(u.cirrusThreshold, u.cirrusThreshold.add(0.14), n)
+        .mul(smoothstep(0, 0.4, hb))
+        .mul(float(1).sub(smoothstep(0.6, 1, hb)))
+        .mul(u.cirrusDensity)
+    // Low deck only, for the sun march (cirrus overhead must not shade the cumulus).
+    const lowDensityAt = Fn(([pos]: [any]) => {
+      const den = float(0).toVar()
       const h = length(pos).sub(R)
-      const den = max(field(pos, u.feature, ONE, vec3(0)).sub(u.threshold), 0)
-        .mul(shape(h, u.base, u.top, 0.05, 0.55))
-        .toVar()
+      const hb = h.sub(u.base).div(max(u.top.sub(u.base), float(1)))
+      If(hb.greaterThan(0).and(hb.lessThan(1)), () => {
+        const q = u.rotation.mul(vec3(pos)).div(u.feature).add(u.offset).add(u.wind)
+        den.assign(lowDeck(hb, dense(q), lobe(q.mul(6.3).add(37.1))))
+      })
+      return den
+    })
+    // Both decks, for the view march.
+    const densityAt = Fn(([pos]: [any]) => {
+      const den = lowDensityAt(pos).toVar()
       If(u.cirrusDensity.greaterThan(0), () => {
-        den.addAssign(
-          max(field(pos, u.cirrusFeature, vec3(0.45, 1.6, 0.45), vec3(11.7)).sub(u.cirrusThreshold), 0)
-            .mul(shape(h, u.cirrusBottom, u.cirrusTop, 0.5, 0.5))
-            .mul(u.cirrusDensity)
-        )
+        const h = length(pos).sub(R)
+        If(h.greaterThan(u.cirrusBottom).and(h.lessThan(u.cirrusTop)), () => {
+          const hb = h.sub(u.cirrusBottom).div(max(u.cirrusTop.sub(u.cirrusBottom), float(1)))
+          den.addAssign(cirrusSheet(hb, cirrusField(pos)))
+        })
       })
       return den.mul(u.density)
     })
 
     If(len.greaterThan(0).and(hTop2.greaterThan(0)).and(u.opacity.greaterThan(0)), () => {
-      // Shadow tap: march the full deck thickness towards the sun, through the same height profile, so
-      // tops are bright and undersides fall away instead of every puff sharing one flat brightness.
-      const lightStep = max(u.top.sub(u.base), float(1)).div(lightSteps)
       Loop(steps, ({ i }) => {
         const u0 = float(i).div(steps),
           u1 = float(i).add(1).div(steps)
@@ -321,24 +406,28 @@ function cloudMaterial(u: CloudUniforms, steps: number, lightSteps: number): Nod
         const pos = p.add(d.mul(t.add(b)))
         const den = densityAt(pos)
         If(den.greaterThan(0.001), () => {
-          const shadow = float(0).toVar()
-          Loop(lightSteps, ({ i: j }) => {
-            const lp = pos.add(sunDir.mul(lightStep.mul(float(j).add(0.5))))
-            shadow.addAssign(densityAt(lp).mul(lightStep))
-          })
-          const sunT = exp(shadow.mul(u.extinction).negate())
-          const powder = float(1).sub(exp(den.mul(-6))) // thin edges glow, thick cores shade
-          const sunLight = u.sunColor
-            .mul(warm)
-            .mul(daylight)
-            .mul(sunT)
-            .mul(phase.mul(u.silverLining).add(0.35))
-            .mul(powder.mul(0.6).add(0.4))
-          // Sky light is occluded lower down: a cloud's underside is darker than its top.
           const h = length(pos).sub(R)
           const hb = min(max(h.sub(u.base).div(max(u.top.sub(u.base), float(1))), float(0)), float(1))
-          const ambient = u.ambientColor.mul(mix(float(0.3), float(1), hb))
-          const moon = u.moonColor.mul(0.5).mul(mix(float(0.4), float(1), hb))
+          // Sky shadow ray: the samples span the whole slab left above this point, so the darkness
+          // reaches the top of the cloud even when the sun is low (the step grows, the span does not).
+          const slant = max(dot(normalize(pos), sunDir), float(0.12))
+          const remain = max(float(1).sub(hb), float(0))
+          const lightStep = max(u.top.sub(u.base), float(1)).mul(remain).div(float(lightSteps).mul(slant))
+          const tau = float(0).toVar()
+          Loop(lightSteps, ({ i: j }) => {
+            tau.addAssign(lowDensityAt(pos.add(sunDir.mul(lightStep.mul(float(j).add(0.5))))).mul(lightStep))
+            If(tau.mul(u.extinction).greaterThan(6), () => {
+              Break()
+            })
+          })
+          // Beer–Lambert along the sun ray; the second, much weaker term stands in for multiple
+          // scattering, so a shadowed base keeps a dim warm fill instead of going black.
+          const sunT = exp(tau.mul(u.extinction).negate())
+          const fill = exp(tau.mul(u.extinction).mul(-0.25)).mul(0.22)
+          const sunLight = u.sunColor.mul(warm).mul(daylight).mul(phase).mul(sunT.add(fill))
+          // Sky light is occluded lower down: a cloud's underside is blue-grey, its top near-white.
+          const ambient = u.ambientColor.mul(mix(float(0.4), float(1), hb))
+          const moon = u.moonColor.mul(mix(float(0.5), float(1), hb)).mul(0.4)
           const hazeMix = select(u.haze.greaterThan(0), float(1).sub(exp(t.negate().div(u.haze))), float(0)).mul(0.85)
           const lit = mix(u.color.mul(sunLight.add(ambient).add(moon)), u.hazeColor, hazeMix)
           const a = float(1).sub(exp(den.mul(u.extinction).mul(dt).negate()))
@@ -419,9 +508,9 @@ export class Clouds {
     u.color.value.set(...hexToLinear(o.color))
     u.silverLining.value = o.silverLining
     // Higher coverage lowers the noise threshold (more cloud), the same statistic as `cloudCover`.
-    u.threshold.value = 0.62 - 0.32 * Math.min(1, Math.max(0, o.coverage))
-    u.cirrusThreshold.value = 0.82 - 0.2 * Math.min(1, Math.max(0, o.coverage))
-    u.cirrusDensity.value = o.cirrus.amount > 0 ? Math.min(1.5, o.cirrus.amount) * 0.6 : 0
+    u.threshold.value = coverageThreshold(o.coverage)
+    u.cirrusThreshold.value = coverageThreshold(o.coverage, 1)
+    u.cirrusDensity.value = o.cirrus.amount > 0 ? Math.min(1.5, o.cirrus.amount) * 0.35 : 0
     this.object.visible = o.enabled
     const marchKey = `${Math.round(o.steps)}|${Math.round(o.lightSteps)}`
     if (marchKey !== this.marchKey) {
@@ -532,7 +621,12 @@ export class Clouds {
     u.haze.value = light.hazeFade > 1e-3 ? (o.haze * s) / light.hazeFade : 0
     this.wind = [o.wind[0] * state.time, -o.wind[1] * state.time]
     const f = Math.max(200, o.featureSize * s)
+    const fc = Math.max(200, o.featureSize * 1.6 * s)
     u.wind.value.set((this.wind[0] * s) / f, 0, (this.wind[1] * s) / f)
+    u.cirrusWind.value.set((this.wind[0] * s) / fc, 0, (this.wind[1] * s) / fc)
+    // Cirrus streaks run along the wind, not along the render axes.
+    const drift = Math.hypot(this.wind[0], this.wind[1])
+    u.cirrusOrientation.value.set(drift > 1e-6 ? this.wind[0] / drift : 1, drift > 1e-6 ? this.wind[1] / drift : 0, 0)
   }
 
   /** Frees GPU resources. */
