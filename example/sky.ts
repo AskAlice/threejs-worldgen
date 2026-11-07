@@ -58,7 +58,7 @@ const sky = await Sky.create({
   clock: { date: '2026-08-12T17:30:00Z', dayLength: 240 },
   observer: { latitude: 47, longitude: 8 },
   shootingStars: { rate: 40, shower: 120 },
-  lighting: { fogDensity: 0.0006, autoExposure: true },
+  lighting: { fogDensity: 0.00022, autoExposure: true },
   shells: { enabled: true }
 })
 sky.follow(controls.target)
@@ -85,7 +85,7 @@ const makePipeline = (s: THREE.Scene, c: THREE.Camera) => {
 const pipelines = { ground: makePipeline(scene, camera), system: makePipeline(systemScene, systemCamera) }
 
 // ---- Panel: every Sky and SolarSystem option, grouped by package then class ----
-const ui = { view: 'ground' as 'ground' | 'orbit' | 'moon' | 'system', timeOfDay: 18 }
+const ui = { view: 'ground' as 'ground' | 'tenk' | 'karman' | 'orbit' | 'moon' | 'system', timeOfDay: 18 }
 const gui = createPanel([
   {
     name: 'threejs-sky',
@@ -126,12 +126,8 @@ const gui = createPanel([
           coverage: [0, 1, 0.01],
           amount: [0, 2, 0.01],
           featureSize: [1000, 100_000, 500],
-          range: [5000, 200_000, 1000],
-          cellSize: [500, 10_000, 100],
-          maxSplats: [0, 64_000, 1000],
-          globalSplats: [0, 64_000, 1000],
           haze: [1000, 300_000, 1000],
-          sortInterval: [1, 30, 1],
+          depth: [500, 8000, 100],
           opacity: [0, 1, 0.01],
           labelSize: [0.005, 0.1, 0.001]
         }
@@ -152,7 +148,7 @@ const gui = createPanel([
   }
 ])
 const sandbox = gui.addFolder('sandbox')
-sandbox.add(ui, 'view', ['ground', 'orbit', 'moon', 'system']).onChange(setView)
+sandbox.add(ui, 'view', ['ground', 'tenk', 'karman', 'orbit', 'moon', 'system']).onChange(setView)
 sandbox
   .add(ui, 'timeOfDay', 0, 24, 0.05)
   .name('time of day')
@@ -163,11 +159,19 @@ function setView(view: typeof ui.view) {
   systemControls.enabled = view === 'system'
   terrain.visible = monolith.visible = view === 'ground'
   // From orbit the sky's average is mostly black space: use a fixed exposure there.
-  sky.set({ lighting: { autoExposure: view === 'ground' } })
-  if (view !== 'ground') renderer.toneMappingExposure = 0.6
-  // Ground: the hills. Orbit: 400 km up, the planet, its limb and the shells. Moon: looking down from past
-  // the apogee shell (in the local frame the planet is always right under the camera).
-  const at = { ground: [0, 12, 40, 18], orbit: [0, 400_000, 900_000, 0], moon: [0, 1.4e9, 1e7, 0], system: null }[view]
+  sky.set({ lighting: { autoExposure: view === 'ground' || view === 'tenk' } })
+  if (view !== 'ground' && view !== 'tenk') renderer.toneMappingExposure = 0.6
+  // Ground: the hills. 10 km / 100 km: level flight, to grade the sky from blue to space. Orbit: 400 km
+  // up, the planet, its limb and the shells. Moon: looking down from past the apogee shell (in the local
+  // frame the planet is always right under the camera).
+  const at = {
+    ground: [0, 12, 40, 18],
+    tenk: [0, 10_000, 40, 10_000],
+    karman: [0, 100_000, 40, 100_000],
+    orbit: [0, 400_000, 900_000, 0],
+    moon: [0, 1.4e9, 1e7, 0],
+    system: null
+  }[view]
   if (at) {
     camera.position.set(at[0], at[1], at[2])
     controls.target.set(0, at[3], 0)

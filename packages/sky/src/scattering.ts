@@ -4,7 +4,7 @@
  * computed here match what is drawn. Pure, no three.js.
  */
 import { DEFAULT_LAYERS, type AtmosphereLayers } from './layers.ts'
-import { clamp, type Vec3 } from './util.ts'
+import { clamp, smoothstep, type Vec3 } from './util.ts'
 
 /** Physical atmosphere parameters. Plain JSON. Coefficients are per metre at sea level. */
 export interface AtmosphereOptions {
@@ -104,11 +104,29 @@ export function phaseMie(mu: number, g: number): number {
   return ((3 / (8 * Math.PI)) * ((1 - g2) * (1 + mu * mu))) / ((2 + g2) * Math.max(1e-6, 1 + g2 - 2 * g * mu) ** 1.5)
 }
 
-/** Rayleigh, Mie and ozone densities (relative to sea level) at a height. */
-function densities(a: AtmosphereOptions, h: number, out: Vec3): Vec3 {
-  out[0] = Math.exp(-h / a.rayleighScaleHeight) * a.density
-  out[1] = Math.exp(-h / a.mieScaleHeight) * a.density
-  out[2] = Math.max(0, 1 - Math.abs(h - a.ozoneCenter) / a.ozoneWidth) * a.density
+/**
+ * The sun disc as the sky shader draws it: `coverage` 0..1 at `angle` radians from the sun's centre
+ * (anti-aliased over ±`softness` radians, so the limb stays clean sub-pixel) and the limb-darkening
+ * factor (1 at the centre, 0.4 at the edge). Pure; `skyColorNode` uses the same formula in TSL.
+ */
+export function sunDisc(angle: number, angularRadius: number, softness = 0): { coverage: number; limb: number } {
+  const soft = Math.max(softness, 1e-9)
+  const x = Math.min(1, Math.abs(angle) / Math.max(angularRadius, 1e-9))
+  return {
+    coverage: 1 - smoothstep(angularRadius - soft, angularRadius + soft, Math.abs(angle)),
+    limb: 1 - 0.6 * (1 - Math.sqrt(Math.max(0, 1 - x * x)))
+  }
+}
+
+/**
+ * Rayleigh, Mie and ozone densities (relative to the ground) at `height` metres, in that order:
+ * `[rayleigh, mie, ozone]`. Exponential profiles for air and aerosol, a tent for the ozone layer.
+ * This is the profile the shader in `atmosphere.ts` marches, so a CPU answer matches the sky.
+ */
+export function densityAt(a: AtmosphereOptions, height: number, out: Vec3 = [0, 0, 0]): Vec3 {
+  out[0] = Math.exp(-height / a.rayleighScaleHeight) * a.density
+  out[1] = Math.exp(-height / a.mieScaleHeight) * a.density
+  out[2] = Math.max(0, 1 - Math.abs(height - a.ozoneCenter) / a.ozoneWidth) * a.density
   return out
 }
 
@@ -137,7 +155,7 @@ export function opticalDepth(
     const x = p[0] + d[0] * t,
       y = p[1] + d[1] * t,
       z = p[2] + d[2] * t
-    densities(a, Math.hypot(x, y, z) - planetRadius, _d)
+    densityAt(a, Math.hypot(x, y, z) - planetRadius, _d)
     od[0] += _d[0] * ds
     od[1] += _d[1] * ds
     od[2] += _d[2] * ds
@@ -193,7 +211,7 @@ export function skyRadiance(
     p[0] = o[0] + d[0] * t
     p[1] = o[1] + d[1] * t
     p[2] = o[2] + d[2] * t
-    densities(a, Math.hypot(p[0], p[1], p[2]) - planetRadius, _d)
+    densityAt(a, Math.hypot(p[0], p[1], p[2]) - planetRadius, _d)
     const dr = _d[0] * ds,
       dm = _d[1] * ds,
       dz = _d[2] * ds

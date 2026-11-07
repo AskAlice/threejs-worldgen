@@ -284,11 +284,10 @@ Object options (not JSON): `renderer`, `scene`, `camera`, `world`.
 | `featureSize` | `18000` | Size of weather systems, m. |
 | `cumulus` / `stratus` / `cirrus` | `{ amount, altitude: [min, max], size: [min, max] }` | Per genus: amount 0..2, base altitudes and cluster sizes in Earth metres (scaled with the atmosphere). |
 | `wind` | `[6, 1.5]` | [east, north] m/s of simulation time. |
-| `range` / `cellSize` | `40000` / `2500` | Detailed layer radius and placement cell, m. |
-| `maxSplats` / `globalSplats` | `16000` / `20000` | Splat budgets of the detailed and planet-wide layers. |
+| `depth` | `2800` | March depth of the cloud slab, m. |
+| `steps` / `lightSteps` | `18` / `3` | March steps, and shadow taps per step (tops lit, undersides shadowed). |
 | `color` / `silverLining` / `ambient` | `'#ffffff'` / `1` / `1` | |
 | `haze` | `70000` | Aerial-perspective distance, m. |
-| `sortInterval` | `4` | Updates between depth sorts. |
 
 ### `nightLights`
 
