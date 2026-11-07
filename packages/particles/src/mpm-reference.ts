@@ -4,6 +4,7 @@
 import { particleRandom } from './emitter.ts'
 import { det3, identity3, mpmMaterial, mul3, type Mat3 } from './mpm-materials.ts'
 import { merge, seedOf, type DeepPartial } from './options.ts'
+import { applySchema, type Schema } from './sanitize.ts'
 
 /** A `(x, z) => y` terrain height, world metres (e.g. threejs-heightfield's `HeightFn` or `world.height`). */
 export type MPMHeightFn = (x: number, z: number) => number
@@ -104,45 +105,44 @@ export function toFixed(v: number): number {
   return Math.max(-2147483648, Math.min(2147483647, Math.floor(v * MPM_FIXED + 0.5)))
 }
 
+/** Rules of {@link sanitizeMPMOptions} (see {@link applySchema}). `substeps` comes before `maxSubsteps`, which bounds from it. */
+const MPM_SCHEMA: Schema = {
+  seed: { type: 'seed' },
+  capacity: { type: 'integer', min: 1, max: 1 << 22 },
+  resolution: { type: 'number[]', min: 8, max: 160, round: true },
+  cellSize: { type: 'number', min: 1e-3 },
+  origin: { type: 'number[]' },
+  substeps: { type: 'integer', min: 1, max: 64 },
+  maxSubsteps: { type: 'integer', minOf: 'substeps', max: 64 },
+  cfl: { type: 'number', min: 0.01, max: 1 },
+  maxSpeed: { type: 'number', min: 0.01 },
+  gravity: { type: 'number[]' },
+  walls: { type: 'boolean' },
+  friction: { type: 'number', min: 0 },
+  render: {
+    size: { type: 'number', min: 0 },
+    colors: { type: 'colors', max: 8 },
+    strainScale: { type: 'number', min: 0 },
+    opacity: { type: 'number', min: 0, max: 1 }
+  }
+}
+
 /** Fixes anything out of range in place (counts become integers, enums and booleans fall back) and returns it. */
 export function sanitizeMPMOptions(o: MPMOptions): MPMOptions {
   const d = DEFAULT_MPM
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
-  const vec = (v: unknown, def: number[], lo = -Infinity, hi = Infinity) =>
-    def.map((x, i) => num(Array.isArray(v) ? v[i] : undefined, x, lo, hi))
-  if (typeof o.seed !== 'number' && typeof o.seed !== 'string') o.seed = d.seed
-  o.capacity = Math.round(num(o.capacity, d.capacity, 1, 1 << 22))
-  o.resolution = vec(o.resolution, d.resolution, 8, 160).map(Math.round) as [number, number, number]
-  o.cellSize = num(o.cellSize, d.cellSize, 1e-3)
-  o.origin = vec(o.origin, d.origin) as [number, number, number]
-  o.substeps = Math.round(num(o.substeps, d.substeps, 1, 64))
-  o.maxSubsteps = Math.round(num(o.maxSubsteps, d.maxSubsteps, o.substeps, 64))
-  o.cfl = num(o.cfl, d.cfl, 0.01, 1)
-  o.maxSpeed = num(o.maxSpeed, d.maxSpeed, 0.01)
-  o.gravity = vec(o.gravity, d.gravity) as [number, number, number]
-  o.walls = typeof o.walls === 'boolean' ? o.walls : d.walls
-  o.friction = num(o.friction, d.friction, 0)
+  applySchema(o, MPM_SCHEMA, d)
   const mats: Record<string, Record<string, number>> = {}
   for (const [name, params] of Object.entries(o.materials && typeof o.materials === 'object' ? o.materials : {})) {
     const m = mpmMaterial(name)
     if (!m) continue
     mats[name] = Object.fromEntries(
-      Object.entries(m.defaults).map(([k, def]) => [
-        k,
-        num((params as Record<string, unknown>)?.[k], def, k === 'density' ? 1e-3 : -Infinity)
-      ])
+      Object.entries(m.defaults).map(([k, def]) => {
+        const v = (params as Record<string, unknown>)?.[k]
+        return [k, typeof v === 'number' && Number.isFinite(v) ? Math.max(k === 'density' ? 1e-3 : -Infinity, v) : def]
+      })
     )
   }
   o.materials = Object.keys(mats).length ? mats : structuredClone(d.materials)
-  const r = (o.render ??= structuredClone(d.render))
-  r.size = num(r.size, d.render.size, 0)
-  const colors = Array.isArray(r.colors)
-    ? r.colors.filter((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8)
-    : []
-  r.colors = colors.length ? colors : [...d.render.colors]
-  r.strainScale = num(r.strainScale, d.render.strainScale, 0)
-  r.opacity = num(r.opacity, d.render.opacity, 0, 1)
   return o
 }
 

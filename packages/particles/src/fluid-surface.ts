@@ -72,6 +72,7 @@ import {
 } from 'three/tsl'
 import { ParticleLighting } from './system.ts'
 import { merge, type DeepPartial } from './options.ts'
+import { applySchema, type Schema } from './sanitize.ts'
 
 /** Settings of a {@link FluidSurface}. Plain JSON; all live through `set`. */
 export interface FluidSurfaceOptions {
@@ -778,34 +779,33 @@ export class FluidSurface {
   }
 }
 
+/** Rules of {@link resolveFluidSurfaceOptions} (see {@link applySchema}). */
+const FLUID_SURFACE_SCHEMA: Schema = {
+  radius: { type: 'number', min: 0.1, max: 4 },
+  tagRadius: { type: 'number', min: 0.05, max: 4 },
+  resolution: { type: 'number', min: 0.25, max: 1 },
+  smoothing: { type: 'number', min: 0, max: 16 },
+  iterations: { type: 'integer', min: 0, max: 4 },
+  absorption: { type: 'number[]', min: 0 },
+  turbidity: { type: 'number', min: 0 },
+  scatterColor: { type: 'color' },
+  foamColor: { type: 'color' },
+  foamSpeed: { type: 'number[]', min: 0 },
+  foam: { type: 'number', min: 0, max: 1 },
+  foamDensity: { type: 'number', min: 0 },
+  streaks: { type: 'number', min: 0, max: 1 },
+  spray: { type: 'number[]', min: 0 },
+  mist: { type: 'number', min: 0, max: 1 },
+  mistSize: { type: 'number', min: 0.1, max: 16 },
+  shutter: { type: 'number', min: 0, max: 1 },
+  ior: { type: 'number', min: 1, max: 3 },
+  refraction: { type: 'number', min: 0 },
+  roughness: { type: 'number', min: 0.01, max: 1 },
+  edge: { type: 'number', min: 1e-5 },
+  sky: { type: 'color[]' }
+}
+
 /** `structuredClone(DEFAULT_FLUID_SURFACE)` merged with `input`, sanitized. */
 export function resolveFluidSurfaceOptions(input: unknown): FluidSurfaceOptions {
-  const o = merge(structuredClone(DEFAULT_FLUID_SURFACE), input)
-  const d = DEFAULT_FLUID_SURFACE
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
-  const hex = (v: unknown, def: string) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : def)
-  o.radius = num(o.radius, d.radius, 0.1, 4)
-  o.tagRadius = num(o.tagRadius, d.tagRadius, 0.05, 4)
-  o.resolution = num(o.resolution, d.resolution, 0.25, 1)
-  o.smoothing = num(o.smoothing, d.smoothing, 0, 16)
-  o.iterations = Math.round(num(o.iterations, d.iterations, 0, 4))
-  o.absorption = [0, 1, 2].map((a) => num(o.absorption?.[a], d.absorption[a], 0)) as [number, number, number]
-  o.turbidity = num(o.turbidity, d.turbidity, 0)
-  o.scatterColor = hex(o.scatterColor, d.scatterColor)
-  o.foamColor = hex(o.foamColor, d.foamColor)
-  o.foamSpeed = [0, 1].map((a) => num(o.foamSpeed?.[a], d.foamSpeed[a], 0)) as [number, number]
-  o.foam = num(o.foam, d.foam, 0, 1)
-  o.foamDensity = num(o.foamDensity, d.foamDensity, 0)
-  o.streaks = num(o.streaks, d.streaks, 0, 1)
-  o.spray = [0, 1].map((a) => num(o.spray?.[a], d.spray[a], 0)) as [number, number]
-  o.mist = num(o.mist, d.mist, 0, 1)
-  o.mistSize = num(o.mistSize, d.mistSize, 0.1, 16)
-  o.shutter = num(o.shutter, d.shutter, 0, 1)
-  o.ior = num(o.ior, d.ior, 1, 3)
-  o.refraction = num(o.refraction, d.refraction, 0)
-  o.roughness = num(o.roughness, d.roughness, 0.01, 1)
-  o.edge = num(o.edge, d.edge, 1e-5)
-  o.sky = [0, 1, 2].map((a) => hex(o.sky?.[a], d.sky[a])) as [string, string, string]
-  return o
+  return applySchema(merge(structuredClone(DEFAULT_FLUID_SURFACE), input), FLUID_SURFACE_SCHEMA, DEFAULT_FLUID_SURFACE)
 }

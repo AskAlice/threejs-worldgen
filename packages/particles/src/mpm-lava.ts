@@ -96,6 +96,7 @@ import {
   type MPMReference
 } from './mpm-reference.ts'
 import { merge, type DeepPartial } from './options.ts'
+import { applySchema, type Schema } from './sanitize.ts'
 import { ParticleLighting } from './system.ts'
 import type { MPMSolver } from './mpm.ts'
 
@@ -1485,28 +1486,29 @@ export class MPMLava {
   }
 }
 
+/** Rules of {@link resolveLavaOptions} (see {@link applySchema}). */
+const LAVA_SCHEMA: Schema = {
+  material: { type: 'string', nonEmpty: true },
+  render: {
+    radius: { type: 'number', min: 0.5, max: 4 },
+    smoothing: { type: 'number', min: 0, max: 8 },
+    iterations: { type: 'integer', min: 0, max: 4 },
+    resolution: { type: 'number', min: 0.25, max: 1 },
+    intensity: { type: 'number', min: 0, max: 1000 },
+    crust: { type: 'color' },
+    roughness: { type: 'number', min: 0.02, max: 1 },
+    ropes: { type: 'number', min: 0, max: 1 },
+    ropeLength: { type: 'number', min: 0.01, max: 1 },
+    cracks: { type: 'number', min: 0, max: 1 },
+    crackSize: { type: 'number', min: 0.01, max: 5 },
+    crackWidth: { type: 'number', min: 0, max: 0.1 },
+    clasts: { type: 'number', min: 0, max: 1 }
+  }
+}
+
 /** `structuredClone(DEFAULT_LAVA)` merged with `input`, with out-of-range values fixed. */
 export function resolveLavaOptions(input: unknown): LavaOptions {
-  const o = merge(structuredClone(DEFAULT_LAVA), input)
-  const d = DEFAULT_LAVA.render,
-    r = o.render
-  const num = (v: unknown, def: number, lo: number, hi: number) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
-  if (typeof o.material !== 'string' || !o.material) o.material = DEFAULT_LAVA.material
-  r.radius = num(r.radius, d.radius, 0.5, 4)
-  r.smoothing = num(r.smoothing, d.smoothing, 0, 8)
-  r.iterations = Math.round(num(r.iterations, d.iterations, 0, 4))
-  r.resolution = num(r.resolution, d.resolution, 0.25, 1)
-  r.intensity = num(r.intensity, d.intensity, 0, 1000)
-  r.crust = typeof r.crust === 'string' && /^#[0-9a-f]{6}$/i.test(r.crust) ? r.crust : d.crust
-  r.roughness = num(r.roughness, d.roughness, 0.02, 1)
-  r.ropes = num(r.ropes, d.ropes, 0, 1)
-  r.ropeLength = num(r.ropeLength, d.ropeLength, 0.01, 1)
-  r.cracks = num(r.cracks, d.cracks, 0, 1)
-  r.crackSize = num(r.crackSize, d.crackSize, 0.01, 5)
-  r.crackWidth = num(r.crackWidth, d.crackWidth, 0, 0.1)
-  r.clasts = num(r.clasts, d.clasts, 0, 1)
-  return o
+  return applySchema(merge(structuredClone(DEFAULT_LAVA), input), LAVA_SCHEMA, DEFAULT_LAVA)
 }
 
 /**

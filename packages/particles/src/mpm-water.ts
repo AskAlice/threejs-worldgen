@@ -24,6 +24,7 @@ import type { FluidSurfaceInput } from './fluid-surface.ts'
 import { mpmIdentity, registerMPMMaterial, type Mat3 } from './mpm-materials.ts'
 import type { MPMSolver } from './mpm.ts'
 import { merge, seedOf, type DeepPartial } from './options.ts'
+import { applySchema, type Schema } from './sanitize.ts'
 import type { MPMEmit, MPMHeightFn } from './mpm-reference.ts'
 
 export * from './fluid-surface.ts'
@@ -344,21 +345,21 @@ export class PuddleField {
   }
 }
 
+/** Rules of {@link resolvePuddleOptions} (see {@link applySchema}). */
+const PUDDLE_SCHEMA: Schema = {
+  resolution: { type: 'number[]', min: 2, max: 2048, round: true },
+  cellSize: { type: 'number', min: 1e-3 },
+  origin: { type: 'number[]' },
+  flowSpeed: { type: 'number', min: 1e-4 },
+  infiltration: { type: 'number', min: 0 },
+  evaporation: { type: 'number', min: 0 },
+  wetTime: { type: 'number', min: 1e-3 },
+  dryTime: { type: 'number', min: 1e-3 }
+}
+
 /** `structuredClone(DEFAULT_PUDDLES)` merged with `input`, sanitized. */
 export function resolvePuddleOptions(input: unknown): PuddleOptions {
-  const o = merge(structuredClone(DEFAULT_PUDDLES), input)
-  const d = DEFAULT_PUDDLES
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
-  o.resolution = [0, 1].map((a) => Math.round(num(o.resolution?.[a], d.resolution[a], 2, 2048))) as [number, number]
-  o.cellSize = num(o.cellSize, d.cellSize, 1e-3)
-  o.origin = [0, 1].map((a) => num(o.origin?.[a], d.origin[a])) as [number, number]
-  o.flowSpeed = num(o.flowSpeed, d.flowSpeed, 1e-4)
-  o.infiltration = num(o.infiltration, d.infiltration, 0)
-  o.evaporation = num(o.evaporation, d.evaporation, 0)
-  o.wetTime = num(o.wetTime, d.wetTime, 1e-3)
-  o.dryTime = num(o.dryTime, d.dryTime, 1e-3)
-  return o
+  return applySchema(merge(structuredClone(DEFAULT_PUDDLES), input), PUDDLE_SCHEMA, DEFAULT_PUDDLES)
 }
 
 // ---- splashes ----
@@ -619,23 +620,23 @@ export class SplashEmitter {
   }
 }
 
+/** Rules of {@link resolveSplashOptions} (see {@link applySchema}). */
+const SPLASH_SCHEMA: Schema = {
+  seed: { type: 'seed' },
+  rain: { type: 'number', min: 0 },
+  splashes: { type: 'number', min: 0 },
+  radius: { type: 'number', min: 0 },
+  center: { type: 'number[]' },
+  particles: { type: 'number[]', min: 1, max: 32, round: true },
+  speed: { type: 'number', min: 0 },
+  puddleDepth: { type: 'number', min: 0 },
+  maxPerFrame: { type: 'integer', min: 0 },
+  material: { type: 'string' },
+  retireOutside: { type: 'boolean' },
+  soak: { type: 'number', min: 0 }
+}
+
 /** `structuredClone(DEFAULT_SPLASHES)` merged with `input`, sanitized. */
 export function resolveSplashOptions(input: unknown): SplashOptions {
-  const o = merge(structuredClone(DEFAULT_SPLASHES), input)
-  const d = DEFAULT_SPLASHES
-  const num = (v: unknown, def: number, lo = -Infinity, hi = Infinity) =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def
-  if (typeof o.seed !== 'number' && typeof o.seed !== 'string') o.seed = d.seed
-  o.rain = num(o.rain, d.rain, 0)
-  o.splashes = num(o.splashes, d.splashes, 0)
-  o.radius = num(o.radius, d.radius, 0)
-  o.center = [0, 1].map((a) => num(o.center?.[a], d.center[a])) as [number, number]
-  o.particles = [0, 1].map((a) => Math.round(num(o.particles?.[a], d.particles[a], 1, 32))) as [number, number]
-  o.speed = num(o.speed, d.speed, 0)
-  o.puddleDepth = num(o.puddleDepth, d.puddleDepth, 0)
-  o.maxPerFrame = Math.round(num(o.maxPerFrame, d.maxPerFrame, 0))
-  if (typeof o.material !== 'string') o.material = d.material
-  o.retireOutside = typeof o.retireOutside === 'boolean' ? o.retireOutside : d.retireOutside
-  o.soak = num(o.soak, d.soak, 0)
-  return o
+  return applySchema(merge(structuredClone(DEFAULT_SPLASHES), input), SPLASH_SCHEMA, DEFAULT_SPLASHES)
 }
