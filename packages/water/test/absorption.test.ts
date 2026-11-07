@@ -64,10 +64,11 @@ test('depth rejection: foreground samples fall back, and never leak', () => {
   assert.equal(blocked.uv, 'self')
   assert.ok(close(blocked.path, dist * (14 / 10 - 1)))
 
-  // Both samples are foreground: nothing valid behind, so the body colour stands in.
+  // Both samples are foreground: that is the bed at the waterline, read a fraction of a pixel off, so
+  // the water has no thickness there — it must not stand in as deep water.
   const none = behindSample(viewZ, -9, -8, dist)
   assert.equal(none.uv, 'none')
-  assert.equal(none.path, Infinity)
+  assert.equal(none.path, 0)
 
   // No accepted sample ever yields a negative path (which would show a foreground object through the water).
   for (const ownZ of [-8, -9, -10.5]) {
@@ -77,6 +78,27 @@ test('depth rejection: foreground samples fall back, and never leak', () => {
       if (refractedZ < viewZ) assert.equal(s.uv, 'refracted', 'a valid refracted sample is always taken')
     }
   }
+})
+
+test('depth rejection: the water thickness is continuous across the waterline', () => {
+  // The bed sits within a few millimetres of the surface, so the depth read crosses the surface's own z
+  // from pixel to pixel. The thickness may only change by what one pixel of depth covers — never jump
+  // to a deep-water value, which would ring the bed with a dashed outline instead of fading it.
+  const viewZ = -5
+  const dist = 5
+  const step = 2e-3 // one pixel of depth change at this range
+  let previous = Infinity
+  for (let dz = 0.02; dz >= -0.02; dz -= step) {
+    const p = behindSample(viewZ, viewZ + 0.5, viewZ + dz, dist).path
+    assert.ok(p >= 0)
+    assert.ok(previous === Infinity || p - previous <= (dist * step) / -viewZ + 1e-12, `thickness jumps at ${dz} m`)
+    previous = p
+  }
+  assert.equal(
+    behindSample(viewZ, viewZ + 1, viewZ + 1e-3, dist).path,
+    0,
+    'in front of the surface the water is gone, not deep'
+  )
 })
 
 test('appearance: absorption and scatter drive the uniforms', () => {

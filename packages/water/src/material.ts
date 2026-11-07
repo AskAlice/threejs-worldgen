@@ -226,23 +226,28 @@ export function transmittance(absorption: readonly number[], path: number): [num
 
 /** What a water pixel reads behind itself, and how much water lies along that ray. */
 export interface BehindSample {
-  /** `'refracted'` = the offset sample, `'self'` = the pixel's own sample, `'none'` = nothing behind (deep water). */
+  /** `'refracted'` = the offset sample, `'self'` = the pixel's own sample, `'none'` = no sample behind (the bed at the waterline). */
   uv: 'refracted' | 'self' | 'none'
-  /** Metres of water along the view ray; `Infinity` when nothing valid is behind. */
+  /** Metres of water along the view ray; 0 when the depth read sits at or in front of the surface (the waterline). */
   path: number
 }
 
 /**
  * Picks the sample behind a water fragment, rejecting foreground geometry: view-space z is negative in
  * front of the camera, so a sample is behind the surface only when it is more negative. The refracted
- * offset is used when it lands on the background, otherwise the pixel's own sample, and if that is
- * foreground too, nothing (deep water) — so an object in front never leaks through the surface.
+ * offset is used when it lands on the background, otherwise the pixel's own sample — so an object in
+ * front never leaks through the surface.
+ *
+ * A depth read in front of the surface cannot be a real occluder (the depth test already dropped those
+ * pixels): it is the bed at the waterline, read a fraction of a pixel off. The water there has no
+ * thickness, so the path is 0, not a deep-water stand-in: the thickness then crosses zero continuously
+ * with the depth read, instead of jumping per pixel where the surface meets the bed.
  */
 export function behindSample(viewZ: number, refractedZ: number, ownZ: number, dist: number): BehindSample {
   const path = (z: number) => Math.max(0, dist * (z / viewZ - 1))
   if (refractedZ < viewZ) return { uv: 'refracted', path: path(refractedZ) }
   if (ownZ < viewZ) return { uv: 'self', path: path(ownZ) }
-  return { uv: 'none', path: Infinity }
+  return { uv: 'none', path: 0 }
 }
 
 /**
@@ -802,9 +807,12 @@ export function createWaterMaterial(
     const useRefracted = refractedZ.lessThan(viewZ)
     const uv = select(useRefracted, refractedUv, screenUV)
     const sceneZ = select(useRefracted, refractedZ, ownZ)
-    // A foreground sample (the offset crossed a silhouette) would leak its colour through, so treat it
-    // as 10 km of water: fully absorbed, no hole in the surface.
-    const path = select(sceneZ.lessThan(viewZ), max(dist.mul(sceneZ.div(viewZ).sub(1)), 0), float(1e4))
+    // A depth read in front of the surface is the bed at the waterline, read a fraction of a pixel off
+    // (the depth buffer is coarser than the surface's own interpolated z), not an occluder: the water
+    // there has no thickness. Clamping the read to the surface lets the thickness cross zero
+    // continuously. Treating it as 10 km of water instead made that crossing a hard per-pixel switch —
+    // wherever the bed is within the depth buffer's resolution of the surface, a dashed ring.
+    const path = max(dist.mul(min(sceneZ, viewZ).div(viewZ).sub(1)), 0)
     // The shoreline stays on the full-resolution depth, so it does not coarsen.
     const depth = path.mul(max(dot(V, U), 0.02)) // ≈ vertical water depth
     const behind = viewportSharedTexture(uv).rgb
