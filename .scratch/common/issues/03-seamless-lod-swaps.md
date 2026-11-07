@@ -6,11 +6,17 @@
 
 **Blocked by:** None (its original blocker was completed and removed).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] Vertices morph between the coarse and fine positions across a transition band instead of snapping at the swap
-- [ ] Selection has hysteresis: a level change requires crossing a margin, so a boundary does not oscillate while the camera drifts
-- [ ] Cracks at level seams are hidden at every combination of neighbouring levels (skirts or stitching)
+- [x] Vertices morph between the coarse and fine positions across a transition band instead of snapping at the swap
+- [x] Selection has hysteresis: a level change requires crossing a margin, so a boundary does not oscillate while the camera drifts
+- [x] Cracks at level seams are hidden at every combination of neighbouring levels (skirts or stitching)
 - [ ] A scripted camera sweep across several boundaries produces no visible pop and a bounded number of rebuilds per second
 - [ ] Frame captures of the same world point before, during and after a swap show no colour or silhouette jump
 - [ ] Performance stays within the existing build budget
+
+## Comments
+
+**2026-11-06** — The three mechanical criteria landed in `60fff83` (Wave A) and were never ticked here: `chunk.ts` computes a per-vertex geomorph offset so a child lands on the parent's triangulated surface instead of snapping, `lod.ts` keeps `selectChunks` history for split/merge hysteresis, and every chunk carries a skirt deeper than the crack a finer neighbour opens. `chunk.test.ts` pins all three on planes and planets.
+
+Still open for a human: the temporal checks (no pop across a sweep, before/during/after captures, rebuild budget). Those need a moving camera, so screenshots alone cannot prove them.

@@ -4,9 +4,15 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Behaviour described in the imported issue body is implemented
+- [x] Behaviour described in the imported issue body is implemented
+
+## Comments
+
+**2026-11-06** — Moved in `5112072`. `PlacementRule`, `AssetParam`, `AssetDef` and `isPlausible` now live in `packages/biomes/src/assets.ts` and are exported from `threejs-biomes`; worldgen re-exports them and keeps `AssetRegistry`, `planSpawns` and fuzzy search. Props and vehicles extend the shared types and their mirrored copies and the vehicle-local `fitsRule` are deleted. `planSpawns` stayed in worldgen because it takes the registry.
+
+One behaviour change, deliberate: the vehicle route planner now uses the full published rule, so the rocket honours its declared `nearWater: 1500` that `fitsRule` ignored. Biomes 28, worldgen 7, props 9 and vehicles 29 tests pass; all four builds and the example build pass.
 
 **Type:** task · imported from GitHub
 
