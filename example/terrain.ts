@@ -206,7 +206,7 @@ function requestLakes(focus: readonly number[]) {
     const z = planet ? -half : focus[2] - half
     // On a planet the frame's local y is a tangent plane, so pass the sphere's gravity: the sea then
     // follows the geoid and flow curves toward the centre instead of treating a scalar level as flat.
-    const gravity = planet ? { radius: Math.hypot(focus[0], focus[1], focus[2]) } : undefined
+    const gravity = planet ? { radius: world.options.radius } : undefined
     const hydrology = computeHydrology(
       frame.height,
       { x, z, width: LAKE_REGION, depth: LAKE_REGION, cellSize: LAKE_CELL },
