@@ -129,3 +129,77 @@ test('sampleGrid covers the region edges', () => {
   assert.equal(g.heights[0], -10 + 500)
   assert.equal(g.heights[g.heights.length - 1], 10 + 1500)
 })
+
+// --- gravity: solve on hydraulic head, report frame-local y ---------------------------------------
+
+/** A constant-height patch; cell (col, row) sits at `x0 + col·cs, z0 + row·cs`. */
+const planeGrid = (cols: number, rows: number, cs: number, x0: number, z0: number, height: number): HydrologyGrid => ({
+  cols,
+  rows,
+  cellSize: cs,
+  x0,
+  z0,
+  heights: new Float64Array(cols * rows).fill(height)
+})
+
+/** The sphere's surface below the tangent plane at (x, z), the offset the solver adds. */
+const dropAt = (x: number, z: number, R: number) => R - Math.sqrt(R * R - x * x - z * z)
+
+/** A walled bowl with one notch at 6 in the north rim; the map edge is high ground (1000). */
+const bowlAt = (x0: number, z0: number): HydrologyGrid => {
+  const heights = new Float64Array(21 * 21)
+  for (let r = 0; r < 21; r++)
+    for (let c = 0; c < 21; c++) {
+      const edge = c === 0 || r === 0 || c === 20 || r === 20
+      heights[r * 21 + c] = edge ? (c === 10 && r === 0 ? 6 : 1000) : 2 + Math.hypot(c - 10, r - 10) * 0.1
+    }
+  return { cols: 21, rows: 21, cellSize: 10, x0, z0, heights }
+}
+
+test('gravity: a patch away from the tangent point drains toward the planet centre', () => {
+  // 5-6 km east of the tangent point and 0–1 km north: the geoid falls steadily toward x = 0, z = 0.
+  const result = analyzeHydrology(planeGrid(11, 11, 100, 5000, 0, 0), { gravity: { radius: 60_000 } })
+  for (let i = 0; i < 11 * 11; i++) {
+    const c = i % 11,
+      r = (i / 11) | 0
+    if (c === 0) continue // nothing to the west of the first column
+    const j = result.receivers[i]
+    assert.ok(j >= 0, `cell ${c}, ${r} drains`)
+    assert.ok(j % 11 < c, `cell ${c}, ${r} drains west, not east`)
+  }
+  assert.equal(result.lakes.length, 0, 'a monotone slope has no lake')
+})
+
+test('gravity: a lake surface is one equipotential, reported as frame-local y', () => {
+  const R = 60_000,
+    x0 = 5_000
+  const flat = analyzeHydrology(bowlAt(0, 0))
+  const curved = analyzeHydrology(bowlAt(x0, 0), { gravity: { radius: R } })
+  assert.equal(flat.lakes.length, 1)
+  assert.equal(curved.lakes.length, 1)
+  assert.ok(Math.abs(flat.lakes[0].level - 6) < 1e-9, 'flat: the notch height')
+  // One equipotential across the lake: local y at its centre plus the drop there is the spill head.
+  const [c0, r0, bw, bh] = curved.lakes[0].bounds
+  const cx = x0 + (c0 + ((bw - 1) >> 1)) * 10,
+    cz = (r0 + ((bh - 1) >> 1)) * 10
+  const head = curved.lakes[0].level + dropAt(cx, cz, R)
+  assert.ok(Math.abs(head - (6 + dropAt(x0 + 100, 0, R))) < 0.01, `surface head ${head}`)
+  assert.notEqual(curved.lakes[0].level, flat.lakes[0].level, 'the geoid moves the local level')
+  for (let i = 0; i < curved.filled.length; i++)
+    assert.ok(curved.filled[i] >= curved.grid.heights[i] - 1e-9, 'fill never lowers the ground')
+})
+
+test('gravity: seaLevel is an elevation, so a flat patch straddles the sea', () => {
+  const result = analyzeHydrology(planeGrid(21, 2, 1000, 0, 0, -5), {
+    seaLevel: 0,
+    gravity: { radius: 60_000 }
+  })
+  assert.ok(result.geoid)
+  const near = hydrologyWaterAt(result, 0, 0)
+  assert.equal(near.kind, 'sea')
+  assert.ok(Math.abs(near.level) < 1e-9, 'sea at the tangent point is local y 0')
+  assert.equal(near.depth, 5)
+  const far = hydrologyWaterAt(result, 20_000, 0)
+  assert.notEqual(far.kind, 'sea', 'the same height is above the sea once the geoid drops')
+  assert.ok(result.geoid![20] > 1000, 'the geoid has dropped kilometres 20 km out')
+})

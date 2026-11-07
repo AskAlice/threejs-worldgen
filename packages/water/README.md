@@ -217,7 +217,8 @@ Appearance, `origin`, `waves` (default calm: `amplitude 0.03`, `wavelength [0.3,
 | Option | Default | What it does |
 |---|---|---|
 | `epsilon` | `1e-4` | Gradient (m per cell) put across filled flats so every cell drains. |
-| `seaLevel` | `-Infinity` | Cells at or below are sea: outlets, never filled. |
+| `seaLevel` | `-Infinity` | Cells at or below are sea: outlets, never filled. With `gravity`, an elevation above the equipotential. |
+| `gravity` | none | `{ radius }` of the equipotential sphere about the frame origin: still-water surfaces follow it, and flow curves toward the planet's centre. Omit on a flat world. |
 | `riverArea` | `250000` | Catchment (m²) where a channel becomes a river. |
 | `widthFactor`, `widthExponent` | `4`, `0.5` | Width = widthFactor × (area / 1 km²)^widthExponent. |
 | `minWidth`, `maxWidth` | `1.5`, `120` | Width limits, m. |
@@ -228,7 +229,9 @@ Appearance, `origin`, `waves` (default calm: `amplitude 0.03`, `wavelength [0.3,
 | `smoothing` | `2` | Smoothing passes over river polylines. |
 
 The result has `filled`, `receivers`, `accumulation`, `lakeIndex` (per cell), `rivers` (polylines with surface, bed,
-width and area per point) and `lakes` (level, area, max depth, cell mask). The steps are exported on their own too:
+width and area per point) and `lakes` (level, area, max depth, cell mask). Heights in all of those are frame-local
+y, as sampled; with `gravity` the solver works on hydraulic head internally and `geoid` carries the per-cell offset
+(`heights[i] + geoid[i]` is elevation above the equipotential). The steps are exported on their own too:
 `sampleGrid`, `fillDepressions`, `flowReceivers`, `flowAccumulation`, `analyzeHydrology`, `riverModifiers`.
 
 Imports from `three/webgpu`, like `threejs-grass`. Full API docs: <https://askalice.github.io/threejs-worldgen/docs/>.

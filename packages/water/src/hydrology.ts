@@ -69,6 +69,13 @@ export interface HydrologyOptions {
   minLakeDepth: number
   /** Smoothing passes over river polylines (removes the D8 zig-zag). */
   smoothing: number
+  /**
+   * Spherical gravity: still water surfaces are equipotentials of a sphere of this radius about the
+   * frame origin. Then `heights` are tangent-plane heights, "downhill" curves toward the planet's
+   * centre, and `seaLevel` is an elevation above that equipotential rather than a frame-local height.
+   * Omit on a flat world, where gravity is uniform and local y is already level.
+   */
+  gravity?: { radius: number }
 }
 
 /** Default hydrology settings: rivers from 0.25 km² of catchment, lakes from 400 m² and 0.3 m deep. */
@@ -135,6 +142,29 @@ export interface HydrologyResult {
   rivers: RiverPath[]
   /** Lakes. */
   lakes: Lake[]
+  /**
+   * Per-cell geoid offset (metres) when `gravity` is set: the sphere's surface lies this far below the
+   * tangent plane at the cell. `heights[i] + geoid[i]` is the cell's elevation above the equipotential.
+   */
+  geoid?: Float64Array
+}
+
+/** Height of the equipotential sphere below the tangent plane at (x, z): `R − √(R² − d²)`. */
+function gravityDrop(x: number, z: number, radius: number): number {
+  const d2 = x * x + z * z
+  const r2 = radius * radius
+  return d2 >= r2 ? radius : radius - Math.sqrt(r2 - d2)
+}
+
+/** Geoid offset per cell, or `null` when there is no spherical gravity (the flat-world path). */
+function geoidOffsets(grid: HydrologyGrid, gravity: { radius: number } | undefined): Float64Array | null {
+  const R = gravity?.radius
+  if (R === undefined || !Number.isFinite(R) || R <= 0) return null
+  const { cols, rows, cellSize: cs, x0, z0 } = grid
+  const out = new Float64Array(cols * rows)
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) out[r * cols + c] = gravityDrop(x0 + c * cs, z0 + r * cs, R)
+  return out
 }
 
 /** Samples `height(x, z)` on a grid covering `region` (both edges included). */
@@ -269,19 +299,24 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   const { cols, rows, cellSize: cs, heights } = grid
   const n = cols * rows
   const cellArea = cs * cs
-  const filled = fillDepressions(heights, cols, rows, Math.max(0, o.epsilon), o.seaLevel)
-  const receivers = flowReceivers(filled, cols, rows, heights, o.seaLevel)
+  // Solve on hydraulic head (height above the equipotential), not frame-local y, so on a planet the
+  // sea follows the sphere and flow curves toward its centre. Outputs are converted back to local y.
+  const geoid = geoidOffsets(grid, o.gravity)
+  const head = geoid ? Float64Array.from(heights, (h, i) => h + geoid[i]) : heights
+  const filledHead = fillDepressions(head, cols, rows, Math.max(0, o.epsilon), o.seaLevel)
+  const filled = geoid ? Float64Array.from(filledHead, (h, i) => h - geoid[i]) : filledHead
+  const receivers = flowReceivers(filledHead, cols, rows, head, o.seaLevel)
   const { accumulation, order } = flowAccumulation(receivers, cellArea)
 
   // Lakes from an exact (ε = 0) fill, so each lake is flat at its true spill level.
-  const level = o.epsilon > 0 ? fillDepressions(heights, cols, rows, 0, o.seaLevel) : filled
+  const level = o.epsilon > 0 ? fillDepressions(head, cols, rows, 0, o.seaLevel) : filledHead
   const lakeIndex = new Int32Array(n).fill(-1)
   const lakes: Lake[] = []
   const stack: number[] = []
   const members: number[] = []
   const tol = 1e-9
   for (let s = 0; s < n; s++) {
-    if (lakeIndex[s] !== -1 || !(level[s] - heights[s] > tol)) continue
+    if (lakeIndex[s] !== -1 || !(level[s] - head[s] > tol)) continue
     // Flood the connected set of filled cells.
     members.length = 0
     stack.push(s)
@@ -297,7 +332,7 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
       members.push(i)
       const c = i % cols,
         r = (i / cols) | 0
-      maxDepth = Math.max(maxDepth, level[i] - heights[i])
+      maxDepth = Math.max(maxDepth, level[i] - head[i])
       top = Math.max(top, level[i])
       c0 = Math.min(c0, c)
       r0 = Math.min(r0, r)
@@ -308,7 +343,7 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
           nr = r + DR[d]
         if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
         const j = nr * cols + nc
-        if (lakeIndex[j] === -1 && level[j] - heights[j] > tol) {
+        if (lakeIndex[j] === -1 && level[j] - head[j] > tol) {
           lakeIndex[j] = -2
           stack.push(j)
         }
@@ -322,7 +357,16 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
       bh = r1 - r0 + 1
     const mask = new Uint8Array(bw * bh)
     for (const i of members) mask[(((i / cols) | 0) - r0) * bw + (i % cols) - c0] = 1
-    lakes.push({ level: top, area: members.length * cellArea, maxDepth, bounds: [c0, r0, bw, bh], mask })
+    // The surface is one equipotential (constant head). Report the local y at the lake's centre: the
+    // renderer draws it as a disc, and over a lake's extent the sphere is flat to a few centimetres.
+    const centre = (r0 + ((bh - 1) >> 1)) * cols + c0 + ((bw - 1) >> 1)
+    lakes.push({
+      level: geoid ? top - geoid[centre] : top,
+      area: members.length * cellArea,
+      maxDepth,
+      bounds: [c0, r0, bw, bh],
+      mask
+    })
   }
   for (let i = 0; i < n; i++) if (lakeIndex[i] < -1) lakeIndex[i] = -1
 
@@ -332,12 +376,12 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   const surface = new Float64Array(n)
   const width = new Float64Array(n)
   for (let i = 0; i < n; i++) {
-    if (accumulation[i] < o.riverArea || lakeIndex[i] >= 0 || heights[i] <= o.seaLevel) continue
+    if (accumulation[i] < o.riverArea || lakeIndex[i] >= 0 || head[i] <= o.seaLevel) continue
     isRiver[i] = 1
     const w = Math.min(o.maxWidth, Math.max(o.minWidth, o.widthFactor * (accumulation[i] / 1e6) ** o.widthExponent))
     const depth = Math.max(o.minDepth, w * o.depthFactor)
     width[i] = w
-    bed[i] = filled[i] - depth
+    bed[i] = filledHead[i] - depth
     surface[i] = bed[i] + depth * o.fill
   }
   // Each river cell continues the upstream branch that drains the most; other branches end there (confluences).
@@ -354,8 +398,9 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
   const rivers: RiverPath[] = []
   const point = (path: RiverPath, i: number, s: number, b: number, w: number) => {
     path.points.push([grid.x0 + (i % cols) * cs, grid.z0 + ((i / cols) | 0) * cs])
-    path.surface.push(s)
-    path.bed.push(b)
+    // River heights are head while solving; public polylines are frame-local y, like `heights`.
+    path.surface.push(geoid ? s - geoid[i] : s)
+    path.bed.push(geoid ? b - geoid[i] : b)
     path.width.push(w)
     path.area.push(accumulation[i])
   }
@@ -381,7 +426,7 @@ export function analyzeHydrology(grid: HydrologyGrid, input: Partial<HydrologyOp
     }
     if (path.points.length >= 2) rivers.push(smoothPath(path, o.smoothing))
   }
-  return { grid, options: o, filled, receivers, accumulation, lakeIndex, rivers, lakes }
+  return { grid, options: o, filled, receivers, accumulation, lakeIndex, rivers, lakes, geoid: geoid ?? undefined }
 }
 
 /** Samples `height` over `region` and analyses it: the one-call version of {@link sampleGrid} + {@link analyzeHydrology}. */
@@ -494,10 +539,14 @@ export function hydrologyWaterAt(
     out.depth = Math.max(0, l - heights[i])
     return out
   }
-  if (heights[i] <= o.seaLevel) {
+  // Gravity: `seaLevel` is an elevation above the equipotential, so compare head and report the
+  // sea surface as the frame-local y it has at this cell.
+  const drop = result.geoid?.[i] ?? 0
+  const seaLevel = result.geoid ? o.seaLevel - drop : o.seaLevel
+  if (heights[i] + drop <= o.seaLevel) {
     out.kind = 'sea'
-    out.level = o.seaLevel
-    out.depth = o.seaLevel - heights[i]
+    out.level = seaLevel
+    out.depth = seaLevel - heights[i]
     return out
   }
   if (result.accumulation[i] < o.riverArea) return out
@@ -514,7 +563,11 @@ export function hydrologyWaterAt(
     const dx = ((j % cols) - c) * cs,
       dz = (((j / cols) | 0) - r) * cs
     const dist = Math.hypot(dx, dz)
-    const speed = Math.min(4, Math.max(0.1, Math.sqrt(Math.max(0, result.filled[i] - result.filled[j]) / dist / 0.01)))
+    // Head difference, not local-y difference: on a curved world the two differ by the geoid slope.
+    const dropJ = result.geoid?.[j] ?? 0
+    const headI = result.filled[i] + drop,
+      headJ = result.filled[j] + dropJ
+    const speed = Math.min(4, Math.max(0.1, Math.sqrt(Math.max(0, headI - headJ) / dist / 0.01)))
     out.flowX = (dx / dist) * speed
     out.flowZ = (dz / dist) * speed
   }
