@@ -49,6 +49,12 @@ const height = useHeightSampler(ground, 512)
 return <mesh ref={setGround} geometry={terrain} />
 ```
 
+The same entry re-exports the lifecycle the field components share: `useInstance(create, { dispose, reset, deps, ref })`
+creates (or awaits) an instance, applies `reset` with the latest props after every render, disposes it exactly once on
+unmount or when `deps` change, fills the imperative `ref`, and never attaches a create that resolved after unmount.
+`useTerrain(terrain)` is the matching `terrain` prop: inline height functions are read live, a mesh or ref keeps its
+identity, so a ref that mounts late is adopted by the field's `update()` instead of recreating it.
+
 ## License
 
 Apache-2.0

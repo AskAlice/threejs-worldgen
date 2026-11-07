@@ -5,10 +5,11 @@
  *
  * @module threejs-city/react
  */
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { useEffect, useMemo, useRef, type Ref } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera } from 'three/webgpu'
 import type { LocalFrame, World } from 'threejs-biomes'
+import { useInstance } from 'threejs-heightfield/react'
 import { City as CityImpl } from './city.ts'
 import type { CityInput } from './options.ts'
 import { Population } from './population.ts'
@@ -47,21 +48,15 @@ export interface CityProps extends CityInput {
  */
 export function City({ world, frame, camera, ref, ...options }: CityProps): React.JSX.Element | null {
   const { camera: defaultCamera } = useThree()
-  const [city, setCity] = useState<CityImpl | null>(null)
   const latest = useRef(options)
   latest.current = options
-  useEffect(() => {
-    const c = new CityImpl({ world, frame, ...latest.current })
-    setCity(c)
-    return () => {
-      c.dispose()
-      setCity(null)
-    }
-  }, [world, frame])
-  useEffect(() => {
-    city?.reset(options)
+  const city = useInstance(() => new CityImpl({ world, frame, ...latest.current }), {
+    dispose: (c) => c.dispose(),
+    reset: (c) => c.reset(latest.current),
+    deps: [world, frame],
+    ref
   })
-  useImperativeHandle(ref, () => city!, [city])
+
   useFrame(() => {
     if (!city) return
     city.camera = camera ?? defaultCamera
@@ -92,21 +87,15 @@ export interface SettlementsProps extends Partial<SettlementsOptions> {
  */
 export function Settlements({ world, frame, camera, ref, ...options }: SettlementsProps): React.JSX.Element | null {
   const { camera: defaultCamera } = useThree()
-  const [group, setGroup] = useState<SettlementsImpl | null>(null)
   const latest = useRef(options)
   latest.current = options
-  useEffect(() => {
-    const s = new SettlementsImpl({ world, frame, ...latest.current })
-    setGroup(s)
-    return () => {
-      s.dispose()
-      setGroup(null)
-    }
-  }, [world, frame])
-  useEffect(() => {
-    group?.reset(options)
+  const group = useInstance(() => new SettlementsImpl({ world, frame, ...latest.current }), {
+    dispose: (s) => s.dispose(),
+    reset: (s) => s.reset(latest.current),
+    deps: [world, frame],
+    ref
   })
-  useImperativeHandle(ref, () => group!, [group])
+
   useFrame(() => {
     if (!group) return
     group.setCamera(camera ?? defaultCamera)
@@ -160,18 +149,13 @@ export function PopulationOverlay({
 }: PopulationOverlayProps): React.JSX.Element | null {
   const { camera: defaultCamera } = useThree()
   const activeCamera = camera ?? defaultCamera
-  const [overlay, setOverlay] = useState<PopulationOverlayImpl | null>(null)
   const latest = useRef(options)
   latest.current = options
 
-  useEffect(() => {
-    const o = new PopulationOverlayImpl({ population, camera: activeCamera, ...latest.current })
-    setOverlay(o)
-    return () => {
-      o.dispose()
-      setOverlay(null)
-    }
-  }, [population])
+  const overlay = useInstance(
+    () => new PopulationOverlayImpl({ population, camera: activeCamera, ...latest.current }),
+    { dispose: (o) => o.dispose(), deps: [population], ref }
+  )
 
   useEffect(() => {
     if (overlay) overlay.camera = activeCamera
@@ -182,7 +166,6 @@ export function PopulationOverlay({
     overlay?.reset(options)
   }, [overlay, key])
 
-  useImperativeHandle(ref, () => overlay!, [overlay])
   useFrame(() => overlay?.update())
   return overlay ? <primitive object={overlay.object} /> : null
 }

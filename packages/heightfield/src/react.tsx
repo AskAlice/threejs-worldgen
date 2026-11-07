@@ -1,5 +1,6 @@
 /**
- * React entry point: `useHeightSampler`, plus everything from `threejs-heightfield`.
+ * React entry point: `useHeightSampler`, the shared field lifecycle (`useInstance`, `useTerrain`), plus
+ * everything from `threejs-heightfield`.
  *
  * @module threejs-heightfield/react
  */
@@ -7,6 +8,7 @@ import { useMemo } from 'react'
 import { createHeightSampler, type HeightFn, type Terrain } from './index.ts'
 
 export * from './index.ts'
+export { useInstance, useTerrain, terrainKey, type InstanceOptions, type TerrainProp } from './lifecycle.ts'
 
 /**
  * {@link createHeightSampler} for React: a height function is used as-is, a mesh or group (e.g. from a `ref`

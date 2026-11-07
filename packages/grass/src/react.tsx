@@ -4,45 +4,21 @@
  *
  * @module threejs-grass/react
  */
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
+import { useEffect, useRef, type Ref, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { Camera, Object3D } from 'three/webgpu'
 import { Grass as GrassImpl, type GrassRenderer } from './grass.ts'
 import type { GrassInput } from './grass-settings.ts'
 import { TerrainPainter, type Brush } from './grass-map.ts'
 import { Corn as CornImpl, type CornInput } from './corn.ts'
-import type { HeightFn, Terrain } from 'threejs-heightfield'
+import type { Terrain } from 'threejs-heightfield'
+import { useInstance, useTerrain } from 'threejs-heightfield/react'
 
 export * from './index.ts'
 /** The imperative {@link GrassImpl | Grass} class, re-exported under another name because `Grass` is the component here. */
 export { Grass as GrassImpl } from './grass.ts'
 /** The imperative {@link CornImpl | Corn} class, re-exported under another name because `Corn` is the component here. */
 export { Corn as CornImpl } from './corn.ts'
-
-type TerrainProp = Terrain | RefObject<Object3D | null> | undefined
-
-/**
- * The terrain source handed to the field. Inline height functions are wrapped once (reading the latest prop
- * through a ref) so a new function identity never looks like a new terrain. Refs are passed through as-is:
- * the field adopts whatever a ref points at on each update, so a ref that mounts late behaves the same here
- * as in the vanilla entry point.
- */
-function useTerrain(terrain: TerrainProp) {
-  const latest = useRef(terrain)
-  latest.current = terrain
-  const height: HeightFn = useMemo(
-    () => (x, z) => {
-      const t = latest.current
-      return typeof t === 'function' ? t(x, z) : NaN
-    },
-    []
-  )
-  // A ref's identity never changes, so key the field on the prop value, not the resolved object.
-  return {
-    source: typeof terrain === 'function' ? height : terrain,
-    key: typeof terrain === 'function' ? null : terrain
-  }
-}
 
 /** Props of the `<Grass>` component: every {@link GrassInput} setting plus the ones below. */
 export interface GrassProps extends GrassInput {
@@ -75,38 +51,29 @@ export interface GrassProps extends GrassInput {
 export function Grass({ ref, terrain, camera, paint = false, ...options }: GrassProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
-  const [grass, setGrass] = useState<GrassImpl | null>(null)
   const latest = useRef(options)
   latest.current = options
 
   // Height functions are often written inline; only an object/ref prop change should recreate the field.
   const terrainSource = useTerrain(terrain)
 
-  useEffect(() => {
-    let created: GrassImpl | null = null
-    let cancelled = false
-    GrassImpl.create({
-      camera: activeCamera,
-      renderer: gl as unknown as GrassRenderer,
-      terrain: terrainSource.source,
-      ...latest.current
-    }).then((g) => {
-      if (cancelled) return g.dispose()
-      created = g
-      setGrass(g)
-    })
-    return () => {
-      cancelled = true
-      created?.dispose()
-      setGrass(null)
+  const grass = useInstance(
+    () =>
+      GrassImpl.create({
+        camera: activeCamera,
+        renderer: gl as unknown as GrassRenderer,
+        terrain: terrainSource.source,
+        ...latest.current
+      }),
+    {
+      dispose: (g) => g.dispose(),
+      // Props are the full truth: reset() drops overrides whose props were removed. Cheap: visual props
+      // only touch uniforms; tiles rebuild only when layout props actually change.
+      reset: (g) => g.reset(latest.current),
+      deps: [activeCamera, gl, terrainSource.key],
+      ref
     }
-  }, [activeCamera, gl, terrainSource.key])
-
-  // Props are the full truth: reset() drops overrides whose props were removed. Cheap: visual props
-  // only touch uniforms; tiles rebuild only when layout props actually change.
-  useEffect(() => {
-    grass?.reset(options)
-  })
+  )
 
   const painter = useRef<TerrainPainter | null>(null)
   const painting = !!paint
@@ -122,7 +89,6 @@ export function Grass({ ref, terrain, camera, paint = false, ...options }: Grass
     if (painter.current && paint) Object.assign(painter.current.brush, paint)
   })
 
-  useImperativeHandle<GrassImpl | null, GrassImpl | null>(ref, () => grass, [grass])
   // update() also adopts a terrain ref that mounted after the field; see `Grass.update`.
   useFrame(() => grass?.update())
 
@@ -152,35 +118,26 @@ export interface CornProps extends CornInput {
 export function Corn({ ref, terrain, camera, ...options }: CornProps): React.JSX.Element | null {
   const { camera: defaultCamera, gl } = useThree()
   const activeCamera = camera ?? defaultCamera
-  const [corn, setCorn] = useState<CornImpl | null>(null)
   const latest = useRef(options)
   latest.current = options
   const terrainSource = useTerrain(terrain)
 
-  useEffect(() => {
-    let created: CornImpl | null = null
-    let cancelled = false
-    CornImpl.create({
-      camera: activeCamera,
-      renderer: gl as unknown as GrassRenderer,
-      terrain: terrainSource.source,
-      ...latest.current
-    }).then((c) => {
-      if (cancelled) return c.dispose()
-      created = c
-      setCorn(c)
-    })
-    return () => {
-      cancelled = true
-      created?.dispose()
-      setCorn(null)
+  const corn = useInstance(
+    () =>
+      CornImpl.create({
+        camera: activeCamera,
+        renderer: gl as unknown as GrassRenderer,
+        terrain: terrainSource.source,
+        ...latest.current
+      }),
+    {
+      dispose: (c) => c.dispose(),
+      reset: (c) => c.reset(latest.current),
+      deps: [activeCamera, gl, terrainSource.key],
+      ref
     }
-  }, [activeCamera, gl, terrainSource.key])
+  )
 
-  useEffect(() => {
-    corn?.reset(options)
-  })
-  useImperativeHandle<CornImpl | null, CornImpl | null>(ref, () => corn, [corn])
   useFrame(() => corn?.update())
   return corn ? <primitive object={corn.object} /> : null
 }
